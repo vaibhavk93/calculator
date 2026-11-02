@@ -67,6 +67,34 @@ describe('typing and equals', () => {
   })
 })
 
+describe('the line above the result', () => {
+  it('remembers what "=" evaluated, and forgets it once you edit', () => {
+    const { press, get } = make()
+    press('2', '+', '3', '=')
+    expect(get().lastExpression).toBe('2+3')
+    press('*')
+    expect(get().lastExpression).toBeNull()
+  })
+  it('an ignored key does not wipe it', () => {
+    const { press, get } = make()
+    press('2', '+', '3', '=')
+    press(')')
+    expect(get().lastExpression).toBe('2+3')
+  })
+  it('a bare number records nothing to show', () => {
+    const { press, get } = make()
+    press('7', '=')
+    expect(get().lastExpression).toBeNull()
+  })
+  it('errors carry the error tone, info notices do not', () => {
+    const { press, get } = make()
+    press('5', '/', '0', '=')
+    expect(get().notice?.tone).toBe('error')
+    get().memoryRecall()
+    expect(get().notice?.tone).toBe('info')
+  })
+})
+
 describe('undo', () => {
   it('steps back through edits', () => {
     const { press, get } = make()

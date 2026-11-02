@@ -18,7 +18,7 @@ export interface InputState {
 export type Key =
   | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '00' | '.'
   | '+' | '-' | '*' | '/' | '^'
-  | '()' | '%' | '!' | 'pi' | 'e'
+  | '()' | '(' | ')' | '%' | '!' | 'pi' | 'e'
   | 'sin' | 'cos' | 'tan' | 'asin' | 'acos' | 'atan' | 'log' | 'ln' | 'sqrt'
   | 'backspace' | 'clear' | '='
 
@@ -78,7 +78,7 @@ export function applyKey(state: InputState, key: Key, opts: EvalOptions): InputR
   }
 
   // After "=", digits and fresh starts replace the result; operators continue from it.
-  const continuesFromResult = isOp(key) || key === '%' || key === '!'
+  const continuesFromResult = isOp(key) || key === '%' || key === '!' || key === ')'
   let expr = state.expr
   if (state.fresh && !continuesFromResult) expr = ''
 
@@ -104,6 +104,13 @@ export function applyKey(state: InputState, key: Key, opts: EvalOptions): InputR
       if (open > 0 && endsWithOperand(expr)) return keep(expr + ')')
       return keep(expr + '(')
     }
+
+    // Literal brackets, for a hardware keyboard. The on-screen "( )" key above decides for itself.
+    case '(':
+      return keep(expr + '(')
+
+    case ')':
+      return countParens(expr) > 0 && endsWithOperand(expr) ? keep(expr + ')') : { state }
 
     case '%':
       return keep(endsWithOperand(expr) ? expr + '%' : expr)

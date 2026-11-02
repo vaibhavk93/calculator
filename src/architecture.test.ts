@@ -54,9 +54,9 @@ const layerOf = (file: string): Layer | null => {
   return top && top in ALLOWED ? (top as Layer) : null
 }
 const THIRD_PARTY_OK: Record<Layer, string[]> = {
-  engine: ['decimal.js', 'vitest'],
-  lib: ['decimal.js', 'vitest'],
-  store: ['zustand', 'zustand/vanilla', 'decimal.js', 'vitest'],
+  engine: ['decimal.js'],
+  lib: ['decimal.js'],
+  store: ['zustand', 'zustand/vanilla', 'decimal.js'],
   components: ['react', 'react-dom', 'zustand', 'react/jsx-runtime'],
   features: ['react', 'react-dom', 'zustand', 'react/jsx-runtime'],
 }
@@ -80,7 +80,9 @@ describe('layering', () => {
         } else if (/\.(css|woff2?)$/.test(spec)) {
           continue
         } else {
-          const ok = THIRD_PARTY_OK[layer].some((p) => spec === p || spec.startsWith(p + '/'))
+          // The test runner is allowed in test files only, never in shipped source.
+          const allowed = isTest(file) ? [...THIRD_PARTY_OK[layer], 'vitest'] : THIRD_PARTY_OK[layer]
+          const ok = allowed.some((p) => spec === p || spec.startsWith(p + '/'))
           expect(ok, `${rel(file)} imports "${spec}", not allowed in ${layer}`).toBe(true)
         }
       }

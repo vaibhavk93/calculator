@@ -383,7 +383,7 @@ or web version cheap.
 
 | Phase | Deliverable | Verification |
 |---|---|---|
-| P1 | Working app shell + core calculator, runs in browser | Screenshots + engine unit tests |
+| P1 | Working app shell + core calculator, runs in browser | Screenshots + engine unit tests. **DONE**: 395 unit tests, 42 real-browser checks, see README |
 | P2 | All 15 everyday calculators | Unit tests + screenshots |
 | P3 | Full loan suite with amortisation tables | Tests validated against a bank EMI table |
 | P4 | Investment suite with charts | Tests validated against official scheme calculators |

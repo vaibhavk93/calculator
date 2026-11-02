@@ -9,7 +9,41 @@ saved note with a reminder.
 
 No ads. No account. No tracking. Works offline.
 
-**Status:** Planning and design complete. No code written yet.
+**Status:** **P1 (foundation) is built.** A working calculator you can run today. P2 onward is not started.
+
+```bash
+npm install
+npm run dev          # http://localhost:5173
+npm run check        # typecheck + 395 unit tests
+```
+
+### What P1 includes
+
+| Spec | Status |
+|---|---|
+| A1 Expression calculator, brackets, `%`, `^`, backspace, undo | Done |
+| A2 Live preview of the result as you type | Done |
+| A3 Scientific: sin cos tan asin acos atan log ln √ x! π e, degrees/radians | Done |
+| A4 History: tap to reuse, delete with Undo, clear-all needs typing CLEAR | Done (a visible delete button replaces swipe: swipe has no accessible alternative) |
+| A5 Indian / international grouping, `16,67,226`, "16.67 lakh" echo | Done |
+| A6 Decimal places 0–10 or Auto | Done |
+| A7 Memory M+ M− MR MC | Done |
+| A8 Hardware keyboard | Done |
+| A9 Copy result / paste number | Done |
+| A10 Dark, light, system + four accents | Done, contrast verified for every combination |
+| A11 Favourites | Deferred to P2 (needs the Tools list) |
+| A12 Startup screen | Done |
+| A13 Backup and restore (file) | Done |
+| A14 Formula transparency | Arrives with the calculators that have formulas (P3+) |
+| A15 Vibrate on key press, keep screen on | Done (web APIs; Capacitor plugins in P8) |
+
+Tools, Saved and Due are honest empty states until their phases. Tape, Save and Reminders are P6.
+
+### Not yet run on a real Android device
+
+Everything is verified in desktop Chromium (390×844, 360×640, 360×800, 200% font size, reduced
+motion). Haptics, wake lock and clipboard-read behave differently inside an Android WebView, and
+that is checked in P8.
 
 ## Documents
 

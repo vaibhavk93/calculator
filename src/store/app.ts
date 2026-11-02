@@ -22,6 +22,12 @@ import {
 export type Overlay = 'none' | 'settings' | 'history'
 export type Panel = 'none' | 'more' | 'scientific'
 
+export interface Notice {
+  id: number
+  text: string
+  tone: 'info' | 'error'
+}
+
 export interface Removed {
   entry: HistoryEntry
   index: number
@@ -44,8 +50,10 @@ export interface AppState {
   tab: Tab
   overlay: Overlay
   panel: Panel
-  /** Short-lived notice shown on the calculator's preview line ("Copied", an error). */
-  notice: { id: number; text: string } | null
+  /** Short-lived notice shown under the result ("Copied", or an error). */
+  notice: Notice | null
+  /** The expression "=" just evaluated, for the line above the result. Null when nothing was computed. */
+  lastExpression: string | null
   snack: Snack | null
   removed: Removed[] | null
 
@@ -66,7 +74,7 @@ export interface AppState {
   setTab: (tab: Tab) => void
   setOverlay: (overlay: Overlay) => void
   setPanel: (panel: Panel) => void
-  showNotice: (text: string) => void
+  showNotice: (text: string, tone?: Notice['tone']) => void
   clearNotice: (id: number) => void
   dismissSnack: (id: number) => void
   restore: (data: PersistedData) => void
@@ -119,6 +127,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       overlay: 'none',
       panel: 'none',
       notice: null,
+      lastExpression: null,
       snack: null,
       removed: null,
 
@@ -127,7 +136,10 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const res = applyKey(input, key, { angle: settings.angle })
 
         const patch: Partial<AppState> = withUndo(res.state)
-        patch.notice = res.error ? { id: nextId(), text: res.error } : null
+        patch.notice = res.error ? { id: nextId(), text: res.error, tone: 'error' } : null
+        // An ignored key (state unchanged) must not wipe the "expression =" line.
+        if (res.commit) patch.lastExpression = res.commit.expression
+        else if (!sameInput(input, res.state)) patch.lastExpression = null
 
         if (res.commit && settings.keepHistory) {
           const entry: HistoryEntry = {
@@ -150,18 +162,18 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
 
       memoryAdd: (sign) => {
         const v = currentValue()
-        if (!v) return set({ notice: { id: nextId(), text: 'Nothing to add to memory' } })
+        if (!v) return set({ notice: { id: nextId(), text: 'Nothing to add to memory', tone: 'info' } })
         const base = new D(get().memory ?? 0)
-        set({ memory: toPlain(sign === 1 ? base.plus(v) : base.minus(v)), notice: { id: nextId(), text: 'Memory updated' } })
+        set({ memory: toPlain(sign === 1 ? base.plus(v) : base.minus(v)), notice: { id: nextId(), text: 'Memory updated', tone: 'info' } })
       },
 
       memoryRecall: () => {
         const { memory, input } = get()
-        if (memory === null) return set({ notice: { id: nextId(), text: 'Memory is empty' } })
+        if (memory === null) return set({ notice: { id: nextId(), text: 'Memory is empty', tone: 'info' } })
         set(withUndo(insertNumber(input, memory)))
       },
 
-      memoryClear: () => set({ memory: null, notice: { id: nextId(), text: 'Memory cleared' } }),
+      memoryClear: () => set({ memory: null, notice: { id: nextId(), text: 'Memory cleared', tone: 'info' } }),
 
       insertPlain: (plain) => set(withUndo(insertNumber(get().input, plain))),
 
@@ -216,7 +228,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       setOverlay: (overlay) => set({ overlay }),
       setPanel: (panel) => set({ panel: get().panel === panel ? 'none' : panel }),
 
-      showNotice: (text) => set({ notice: { id: nextId(), text } }),
+      showNotice: (text, tone = 'info') => set({ notice: { id: nextId(), text, tone } }),
       clearNotice: (id) => {
         if (get().notice?.id === id) set({ notice: null })
       },
@@ -234,6 +246,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
           removed: null,
           snack: null,
           notice: null,
+          lastExpression: null,
         }),
 
       snapshot: () => {

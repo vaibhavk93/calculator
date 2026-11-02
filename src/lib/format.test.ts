@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { D } from '../engine'
-import { formatDecimal, formatExpression, formatPlain, groupInteger, magnitudeWords, MINUS } from './format'
+import { formatDecimal, formatExpression, formatForCopy, formatPlain, groupInteger, magnitudeWords, MINUS } from './format'
 import type { FormatOptions } from './format'
 
 const IN: FormatOptions = { system: 'indian', decimals: 'auto' }
@@ -123,4 +123,21 @@ describe('magnitudeWords', () => {
     expect(w('250')).toBeNull()
     expect(magnitudeWords(new D(NaN), 'indian')).toBeNull()
   })
+})
+
+describe('formatForCopy', () => {
+  const c = (s: string, d: FormatOptions['decimals'] = 'auto') => formatForCopy(new D(s), d)
+  it('has no grouping and an ASCII minus, so it pastes into a spreadsheet', () => {
+    expect(c('1667226')).toBe('1667226')
+    expect(c('-57650.5')).toBe('-57650.5')
+  })
+  it('honours the decimal setting', () => {
+    expect(c('2.345', 2)).toBe('2.35')
+    expect(c('5', 2)).toBe('5.00')
+  })
+  it('never copies "-0"', () => {
+    expect(c('-0.001', 2)).toBe('0.00')
+    expect(c('-0.00000000001')).toBe('0')
+  })
+  it('non-finite copies nothing', () => expect(formatForCopy(new D(NaN), 'auto')).toBe(''))
 })

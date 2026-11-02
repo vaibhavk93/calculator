@@ -158,3 +158,35 @@ work is), not from measurement.
 establishes every pattern, so it's the most honest test. If it comes out clean,
 the rest of the plan is safe at that tier or below. If you're fighting it,
 you'll know within one session and the only thing lost is one session.
+
+
+---
+
+## 8. Field report: P1 built on Sonnet 5.5
+
+P1 was built exactly as recommended above: Sonnet 5.5 against the spec, tests first.
+
+**What held up.** The spec did its job. Engine, formatting, theme and store were written against the
+contracts in the PRD and design system, and the 395 unit tests passed essentially first time. A
+deliberate bug planted in percent handling and in operator replacement turned tests red each time,
+so the safety net is real. The design rules held too: `architecture.test.ts` makes teal, uppercase
+eyebrows, shadows and stray radii a failing build instead of a matter of discipline.
+
+**What the unit tests could not see.** Every real defect in P1 was found only by running the app in a
+browser:
+
+| Bug | Why tests missed it |
+|---|---|
+| A tapped key kept keyboard focus, so Enter re-pressed it instead of meaning "=" | Needs real focus and real key events |
+| A tapped *utility* button did the same; the first fix only covered number keys, and the second (`:focus-visible`) failed because typing flips Chromium into keyboard mode | Same |
+| Result digits sliced by a scrolling box on a 640px phone; my first check measured the box, not the glyphs | A passing test that tested the wrong thing |
+| Long numbers scrolled from the left, hiding the digits being typed | Layout only |
+| Expression squeezed to a half-height sliver | Layout only |
+
+**Conclusion for the model question.** The recommendation was sound: the cheaper model was not the
+limiting factor, and the unit-test net did catch what it was meant to. But the plan was missing a
+gate. **For any phase that touches UI, a real-browser run (`e2e/smoke.mjs`) and looking at the
+screenshots is part of "done"**, whichever model writes the code. It is now in `CLAUDE.md`.
+
+One more honest data point: two of my first four fixes were wrong and were only exposed because the
+browser test was specific enough to fail. A weaker verification step would have shipped them.

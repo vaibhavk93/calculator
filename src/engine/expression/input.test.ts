@@ -87,6 +87,23 @@ describe('the smart bracket key', () => {
   })
 })
 
+describe('literal brackets (hardware keyboard)', () => {
+  it('"(" always opens', () => {
+    expect(typed(['(', '5', '(' ])).toBe('(5(')
+  })
+  it('")" closes only when something is open and there is an operand before it', () => {
+    expect(typed(['(', '5', ')'])).toBe('(5)')
+    expect(typed([')'])).toBe('')
+    expect(typed(['5', ')'])).toBe('5')
+    expect(typed(['(', ')'])).toBe('(')
+    expect(typed(['(', '5', '+', ')'])).toBe('(5+')
+  })
+  it('a stray ")" after "=" leaves the result untouched', () => {
+    const afterSum = press(['2', '+', '3', '=']).state
+    expect(press([')'], afterSum).state).toEqual(afterSum)
+  })
+})
+
 describe('% and !', () => {
   it('only after an operand', () => {
     expect(typed(['%'])).toBe('')
@@ -184,7 +201,7 @@ describe('after equals', () => {
 
 describe('unknown keys', () => {
   it('are ignored, never appended to the expression', () => {
-    for (const bad of ['(', 'foo', '', '5+5', 'x', 'drop table']) {
+    for (const bad of ['foo', '', '5+5', 'x', 'drop table']) {
       const r = applyKey({ expr: '5', fresh: false }, bad as Key, OPTS)
       expect(r.state).toEqual({ expr: '5', fresh: false })
     }

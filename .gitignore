@@ -4,3 +4,6 @@ dist/
 .DS_Store
 .vite/
 coverage/
+
+# local browser-test output
+e2e/shots/

@@ -37,6 +37,18 @@ export function formatDecimal(value: Dec, opts: FormatOptions): string {
   return (negative ? MINUS : '') + groupInteger(int, opts.system) + (frac ? '.' + frac : '')
 }
 
+/**
+ * What goes on the clipboard: the value at the user's chosen precision, with no
+ * grouping commas and an ASCII minus, so it pastes cleanly into a spreadsheet.
+ */
+export function formatForCopy(value: Dec, decimals: DecimalSetting): string {
+  if (!value.isFinite()) return ''
+  const places = decimals === 'auto' ? AUTO_MAX_DECIMALS : decimals
+  const rounded = value.toDecimalPlaces(places, D.ROUND_HALF_UP)
+  if (rounded.isZero()) return decimals === 'auto' || decimals === 0 ? '0' : rounded.abs().toFixed(places)
+  return decimals === 'auto' ? rounded.toFixed() : rounded.toFixed(places)
+}
+
 /** For stored plain-decimal strings (history results, memory). Falls back to the input if unparseable. */
 export function formatPlain(plain: string, opts: FormatOptions): string {
   try {
