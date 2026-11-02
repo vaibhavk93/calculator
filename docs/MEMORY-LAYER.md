@@ -127,6 +127,12 @@ than re-doing it, nobody saves anything.
 - The saved card keeps the **live inputs**, not just the answer. Reopening a
   saved EMI card restores the form so you can tweak and recalculate.
 
+> **History is the seed of this layer (P1.1).** A locked history row with a memo is a
+> lightweight Saved Card. It must not become a second mechanism. Field mapping, so P6 promotes
+> rather than rebuilds: `memo` → `title`, `expression` + `result` → `inputs` + `result`,
+> `at` → `createdAt`, `locked` → "kept". In P6, **Save** on a locked row converts it in place
+> and the row leaves history.
+
 ### 4.2 Tape mode (running tally)
 - A mode on the main calculator where each `=` becomes a **line item**.
 - Each line can be given a label by typing it, inline: `Flights 24000`.

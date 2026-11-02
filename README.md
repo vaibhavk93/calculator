@@ -9,7 +9,7 @@ saved note with a reminder.
 
 No ads. No account. No tracking. Works offline.
 
-**Status:** **P1 (foundation) is built.** A working calculator you can run today. P2 onward is not started.
+**Status:** **P1 (foundation) is built.** A working calculator you can run today. **P1.1 (history power-ups: lock, memo, edit, share) is planned next.** P2 onward is not started.
 
 ```bash
 npm install
@@ -49,7 +49,7 @@ that is checked in P8.
 
 | Doc | What's in it |
 |---|---|
-| [`PRD.md`](docs/PRD.md) | Full product requirements — input/output contract for all 86 calculators and features, phased build sequence, risks, definition of done |
+| [`PRD.md`](docs/PRD.md) | Full product requirements — input/output contract for all 91 calculators and features, phased build sequence, risks, definition of done |
 | [`UX-GUIDELINES.md`](docs/UX-GUIDELINES.md) | Design principles, researched good/bad practices from the category, colour and type tokens, keypad spec, accessibility rules, review checklist |
 | [`MEMORY-LAYER.md`](docs/MEMORY-LAYER.md) | The differentiator: notes, reminders, tapes. 30 mapped use cases, data model, privacy position |
 | [`GTM-STRATEGY.md`](docs/GTM-STRATEGY.md) | How this competes for #1 downloads — positioning, ASO, retention mechanics, monetisation, launch sequence, honest counter-argument |
@@ -63,7 +63,7 @@ that is checked in P8.
 
 | Section | Contents | Count |
 |---|---|---|
-| A | Core calculator engine, history, settings, theming | 15 |
+| A | Core calculator engine, history, settings, theming | 20 |
 | B | Everyday converters and utilities | 15 |
 | C | Loans & EMI | 11 |
 | D | Investments & savings | 13 |

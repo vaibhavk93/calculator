@@ -82,6 +82,7 @@ dependency and risk, not by cutting features.
 | Phase | Contents | Rationale |
 |---|---|---|
 | **P1 — Foundation** | Core calculator engine, history, settings, navigation shell, theming, Indian number format | Everything else renders inside this shell |
+| **P1.1 — History power-ups** | Row menu, lock, memo, edit entry, share entry (A16–A20) | Found better in the reference app; small; and the seed of the memory layer (see below) |
 | **P2 — Everyday** | All converters & utilities (Section B) | Highest daily-use frequency; ClevCalc parity achieved here |
 | **P3 — Loans** | Full EMI/loan suite (Section C) | The primary stated gap |
 | **P4 — Investments** | SIP/FD/PPF/NPS/EPF suite (Section D) | Pure math, no external data, low risk |
@@ -115,6 +116,25 @@ the engine and UI are built against.
 | A13 | Backup / restore | JSON file | Export/import history, scenarios, settings |
 | A14 | Formula transparency | — | Every result screen shows formula + substituted values |
 | A15 | Haptics & keep-screen-on | Toggles | Vibration on key press; screen stays awake |
+| A16 | History row menu *(P1.1)* | ⋮ on each history row | Menu: Copy · Share · Edit · Lock/Unlock · Delete. Row tap still reuses the expression/result. |
+| A17 | Lock entry *(P1.1)* | Lock/Unlock on a row | Lock icon on the row. Locked rows survive **Clear all** and the 200-entry cap. Delete is unavailable until unlocked. Max 100 locked; at the limit: "Unlock one to lock another." |
+| A18 | Memo *(P1.1)* | Short text (≤ 80 chars) per entry | Shown above the expression in history; searchable once P6 search exists |
+| A19 | Edit entry *(P1.1)* | Memo, expression, date-time | Expression re-evaluated by the engine on save; invalid input blocks save with plain words ("Can't divide by zero"). Result is never typed by hand. |
+| A20 | Share entry *(P1.1)* | A history row | Plain text `expression = result` through the system share sheet. No promotional footer. |
+
+**Reference-app review (ClevCalc, 5 screenshots, 2 Nov 2026).** A16–A20 come from its history
+screens. Reviewed and **not** adopted:
+
+| ClevCalc behaviour | Decision | Why |
+|---|---|---|
+| Banner ad pinned under the keypad | Never | Ads are the category's #1 complaint; zero ads is the positioning (`GTM-STRATEGY.md`) |
+| "ClevCalc + link" appended to every share | Never | A shared result should be the result, not our advertising |
+| Share confirmation dialog before the share sheet | Skip | The system sheet already previews and cancels; an extra dialog is an extra tap |
+| Teal operators and brackets inside the typed expression | Skip | Accent means "you can act on this" (`DESIGN-SYSTEM.md`); operators are not actionable. Use weight or `ink-2`, not a hue. |
+| Teal-on-white Material look | Skip | The design system rejects the category-reflex palette |
+| Hamburger drawer navigation | Skip | We use a tab bar; a drawer hides Saved and Due, the two screens that bring users back |
+| Expression wrapping onto several lines | Already done | `.display__expr` wraps and scrolls to the cursor |
+| `00` key, single smart `( )` key | Already done | In the P1 keypad |
 
 ### B. Everyday Converters & Utilities (P2)
 
@@ -368,7 +388,7 @@ or web version cheap.
 - [ ] Debug APK builds successfully and is installable
 - [ ] Cold start < 800 ms on device
 - [ ] Backup export → wipe → restore round-trips without data loss
-- [ ] All 70 features present and functional
+- [ ] All 91 features (sections A–G) and 14 platform items (section H) present and functional
 
 ## 11. Open Questions
 
@@ -384,6 +404,7 @@ or web version cheap.
 | Phase | Deliverable | Verification |
 |---|---|---|
 | P1 | Working app shell + core calculator, runs in browser | Screenshots + engine unit tests. **DONE**: 395 unit tests, 42 real-browser checks, see README |
+| P1.1 | History power-ups A16–A20. Adds `memo?` and `locked?` to `HistoryEntry`; bumps `CURRENT_SCHEMA` with a migration and fixture test. The 200-cap must evict unlocked entries only (today it is `.slice(0, MAX_HISTORY)`, which would drop locked rows). | Unit tests: lock survives clear-all and the cap, locked row cannot be deleted, edit re-evaluates, invalid edit rejected, backup round-trip, v-previous fixture migrates. `e2e/smoke.mjs` extended; screenshots at 360×640 and 200% font size. |
 | P2 | All 15 everyday calculators | Unit tests + screenshots |
 | P3 | Full loan suite with amortisation tables | Tests validated against a bank EMI table |
 | P4 | Investment suite with charts | Tests validated against official scheme calculators |
