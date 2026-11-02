@@ -36,6 +36,7 @@ export function CalculatorScreen() {
 
       <Keypad />
 
+      {core.copySheet}
       {core.pasteOpen && <PasteSheet onClose={core.closePaste} />}
     </div>
   )

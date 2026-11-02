@@ -408,16 +408,6 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
         }
       />
       <div className="screen__body tool" ref={bodyRef}>
-        {/* Takes no room: it floats over the top of the page, only while the answer below is out of sight. */}
-        <div className="answer-anchor">
-          {ok && main && !mainSeen && (
-            <div className="answer" aria-hidden="true">
-              <span className="answer__label">{main.label}</span>
-              <span className="answer__value">{formatCell(main.value, main.fmt, opts)}</span>
-            </div>
-          )}
-        </div>
-
         {/* 1. Edit: where you type. A tinted card. */}
         <h2 className="section-head section-head--tint" id="inputs-head">
           What you are working out
@@ -456,6 +446,16 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
             onRemind={() => setReminding(true)}
           />
         )}
+
+        {/* Takes no room: while the answer above is out of sight, this button floats at the bottom edge. Tapping it scrolls back to the answer. */}
+        <div className="answer-anchor">
+          {ok && main && !mainSeen && (
+            <button type="button" className="answer" aria-label={`${main.label}: ${formatCell(main.value, main.fmt, opts)}. Show the result.`} onClick={() => mainRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
+              <span className="answer__label">{main.label}</span>
+              <span className="answer__value">{formatCell(main.value, main.fmt, opts)}</span>
+            </button>
+          )}
+        </div>
       </div>
       {listing && listableAmount !== null && <ToListSheet value={listableAmount} onClose={() => setListing(false)} onDone={showCard} />}
       {(saving || reminding) && (

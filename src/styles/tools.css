@@ -76,31 +76,36 @@
   text-overflow: ellipsis;
 }
 
-/* The answer stays in view while a long form scrolls under it. */
+/* The answer follows you down a long form as a button at the bottom edge, so it can never be mistaken for a heading. */
 .answer {
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-1) var(--s-4);
+  width: 100%;
+  min-height: 44px;
   padding: var(--s-2) var(--s-4);
-  background: var(--bg);
-  border-bottom: 1px solid var(--ink-3);
+  background: var(--raised);
+  border: 1px solid var(--ink-3);
+  border-radius: var(--r-md);
+  text-align: left;
+  color: var(--ink);
 }
 
-/* The anchor takes no room. The bar floats over the top of the page only while the real answer is scrolled away. */
+/* The anchor takes no room. It sticks to the bottom edge of the page only while the real answer is scrolled away. */
 .answer-anchor {
   position: sticky;
-  top: 0;
+  bottom: 0;
   height: 0;
   z-index: 2;
 }
 
 .answer-anchor > .answer {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
+  left: var(--s-4);
+  right: var(--s-4);
+  bottom: var(--s-3);
+  width: auto;
 }
 
 .answer__label {
@@ -392,8 +397,6 @@
 }
 
 .tool-table th {
-  position: sticky;
-  top: 0;
   background: var(--bg);
   font-family: var(--font-sans);
   font-weight: 500;
@@ -493,8 +496,32 @@
 .save {
   display: flex;
   flex-direction: column;
-  gap: var(--s-2);
+  gap: var(--s-3);
   padding-bottom: var(--s-3);
+}
+
+/* Each part of the form is its own card, so tags, note and reminder read as separate jobs. */
+.save__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  background: var(--tint);
+  border-radius: var(--r-md);
+}
+
+.save__sum {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+
+.save__switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
 }
 
 .save__add,
@@ -511,16 +538,24 @@
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--s-2);
+  gap: var(--s-2) var(--s-2);
 }
 
 .chip {
-  min-height: 44px;
+  position: relative;
+  min-height: 32px;
   padding: 0 var(--s-3);
   border: 1px solid var(--ink-3);
   border-radius: var(--r-md);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--ink-2);
+}
+
+/* Smaller to look at, still 44px to hit: the touch area reaches past the border. */
+.chip::after {
+  content: '';
+  position: absolute;
+  inset: -6px -2px;
 }
 
 .chip[aria-pressed='true'] {
@@ -768,6 +803,14 @@ textarea.field {
   color: var(--tint-ink);
 }
 
+.sect--settings .row {
+  border-top: 1px solid var(--line);
+}
+
+.sect--settings .row:first-of-type {
+  border-top: 0;
+}
+
 .sect__count {
   font-family: var(--font-mono);
   font-size: 0.8125rem;
@@ -895,34 +938,23 @@ textarea.field {
 
 /* ---------------------------------------------------------------- keep and share */
 .keep {
-  margin: var(--s-4) var(--s-4) var(--s-6);
-  padding: 0 var(--s-4) var(--s-3);
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  margin: var(--s-3) var(--s-4) var(--s-6);
+  padding: 0 var(--s-2);
   background: var(--surface);
   border-radius: var(--r-md);
 }
 
-.keep .section-head {
-  padding-left: 0;
-  padding-right: 0;
-}
-
-.keep__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
-  gap: var(--s-2);
-}
-
 .keep__btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--s-2);
-  min-height: 48px;
-  padding: 0 var(--s-3);
-  border: 1px solid var(--ink-3);
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
   border-radius: var(--r-md);
-  font-size: 0.9375rem;
-  color: var(--ink);
+  color: var(--accent);
 }
 
 .keep__btn:active {
@@ -930,8 +962,53 @@ textarea.field {
 }
 
 .keep__msg {
-  min-height: 1.25rem;
-  margin: var(--s-2) 0 0;
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0 var(--s-2) 0 var(--s-1);
   font-size: 0.8125rem;
   color: var(--ink-2);
+  text-align: right;
+}
+
+/* Copy as: two big options that show the text you would get. */
+.copyas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.copyas__opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 56px;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--ink-3);
+  border-radius: var(--r-md);
+  text-align: left;
+}
+
+.copyas__name {
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+
+.copyas__text {
+  max-width: 100%;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.0625rem;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-line;
+}
+
+.copyas__tip {
+  margin: var(--s-1) 0 0;
+  font-size: 0.8125rem;
+  color: var(--ink-3);
 }

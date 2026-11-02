@@ -15,8 +15,12 @@ const MAP: Record<string, Key> = {
   Escape: 'clear',
 }
 
+// The calculator's own expression box is not a place to type text: its keys are the calculator's keys.
+const isCalcBox = (t: EventTarget | null) => t instanceof HTMLTextAreaElement && t.dataset.calcInput !== undefined
+
 const isTyping = (t: EventTarget | null) =>
-  t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.isContentEditable)
+  !isCalcBox(t) &&
+  (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || (t instanceof HTMLElement && t.isContentEditable))
 
 /**
  * Desktop keyboard support: type a whole expression, Enter to evaluate,
@@ -60,6 +64,7 @@ export function useKeyboard(getCopyText: () => string | null, isShowing: (s: App
     const onCopy = (e: ClipboardEvent) => {
       if (!active() || isTyping(e.target)) return
       if (window.getSelection()?.toString()) return // let a real text selection copy normally
+      if (isCalcBox(e.target) && (e.target as HTMLTextAreaElement).selectionStart !== (e.target as HTMLTextAreaElement).selectionEnd) return
       const text = copyRef.current()
       if (text === null) return
       e.clipboardData?.setData('text/plain', text)

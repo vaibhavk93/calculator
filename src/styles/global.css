@@ -217,6 +217,16 @@ button:disabled {
 
 /* The long expression is the first thing to give way when space is short. */
 .display__expr {
+  display: block;
+  flex: 0 1 auto;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  resize: none;
+  outline: none;
+  caret-color: var(--accent);
   flex: 0 1 auto;
   min-height: 0;
   width: 100%;
@@ -561,44 +571,6 @@ button:disabled {
 
 /* ----------------------------------------------------------------- history */
 
-.hrow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: var(--s-2);
-  border-bottom: 1px solid var(--line);
-}
-
-.hrow__expr {
-  flex: 1 1 9rem;
-  min-width: 0;
-  padding: var(--s-3) 0;
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  line-height: 1.35;
-  text-align: left;
-  color: var(--ink-3);
-  overflow-wrap: anywhere;
-  font-variant-numeric: tabular-nums;
-}
-
-.hrow__result {
-  flex: 0 1 auto;
-  margin-left: auto;
-  padding: var(--s-3) 0;
-  font-family: var(--font-mono);
-  font-size: 1.125rem;
-  font-weight: 500;
-  color: var(--accent);
-  text-align: right;
-  overflow-wrap: anywhere;
-  font-variant-numeric: tabular-nums;
-}
-
-.hrow .icon-btn {
-  color: var(--ink-3);
-}
-
 .confirm {
   display: flex;
   flex-direction: column;
@@ -861,13 +833,6 @@ button:disabled {
 .toggle[aria-checked='true']::after {
   background: var(--accent-ink);
   transform: translateX(18px);
-}
-
-/* The track is 24px tall; this invisible layer makes the tap target 44px. */
-.toggle::before {
-  content: '';
-  position: absolute;
-  inset: -10px -4px;
 }
 
 .select {

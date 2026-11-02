@@ -7,6 +7,7 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'tools', label: 'Tools', icon: 'tools' },
   { id: 'saved', label: 'Notes', icon: 'saved' },
   { id: 'due', label: 'Due', icon: 'due' },
+  { id: 'budget', label: 'Budget', icon: 'budget' },
 ]
 
 export function TabBar() {

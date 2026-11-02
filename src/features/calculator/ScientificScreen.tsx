@@ -95,6 +95,7 @@ export function ScientificScreen({ onBack }: { onBack: () => void }) {
       </div>
 
       <Keypad />
+      {core.copySheet}
     </div>
   )
 }

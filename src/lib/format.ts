@@ -129,3 +129,29 @@ export function magnitudeWords(value: Dec, system: NumberSystem): string | null 
 
   return `${value.isNegative() ? MINUS : ''}${scaled.toFixed()} ${units[i]!.name}`
 }
+
+/**
+ * For a cursor in the formatted expression: for every position 0..text.length, the matching position in the
+ * raw expression. Formatting only ever adds commas and spaces and swaps one symbol for another (* for ×), so
+ * walking the two together is enough. The display's cursor and the engine's cursor can then be the same one.
+ */
+export function caretMap(formatted: string, raw: string): number[] {
+  const map: number[] = [0]
+  let r = 0
+  for (const ch of formatted) {
+    const inserted = ch === ',' || (ch === ' ' && raw[r] !== ' ')
+    if (!inserted) r = Math.min(r + 1, raw.length)
+    map.push(r)
+  }
+  return map
+}
+
+/** The display position for a raw position: just after an operator's own spaces, otherwise before any. */
+export function displayCaret(map: number[], raw: string, rawIndex: number): number {
+  const prevIsOp = /[+\-*/^]/.test(raw.charAt(rawIndex - 1))
+  if (prevIsOp) {
+    for (let p = map.length - 1; p >= 0; p--) if (map[p] === rawIndex) return p
+  }
+  const p = map.indexOf(rawIndex)
+  return p === -1 ? map.length - 1 : p
+}

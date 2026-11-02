@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Sheet } from '../../components/Sheet'
+import { tintStyle } from '../../components/tint'
 import { useApp } from '../../components/StoreProvider'
 import type { CardDraft } from '../../store/app'
 import { DEFAULT_TAGS, type Reminder, type Repeat, type SavedCard } from '../../store/types'
-import { Segmented } from '../settings/controls'
+import { Segmented, Toggle } from '../settings/controls'
 
 type Remind = 'off' | Repeat
 
@@ -77,50 +78,63 @@ export function SaveSheet({
   return (
     <Sheet title={card ? 'Update' : 'Save'} onClose={onClose} action={<button type="button" className="btn btn--primary" onClick={done}>Done</button>}>
       <div className="save">
-        <label className="field-label" htmlFor="save-title">Title</label>
-        <input id="save-title" className="field" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
-
-        <span className="field-label">Tag</span>
-        <div className="chips" role="group" aria-label="Tags">
-          {allTags.map((t) => (
-            <button key={t} type="button" className="chip" aria-pressed={tags.includes(t)} onClick={() => toggle(t)}>
-              {t}
-            </button>
-          ))}
-        </div>
-        <div className="save__add">
-          <input className="field" placeholder="Your own tag" aria-label="Add your own tag" value={custom} maxLength={30} onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCustom()} />
-          <button type="button" className="btn" onClick={addCustom} disabled={!custom.trim()}>Add</button>
+        <div className="save__card" style={tintStyle(1)}>
+          <label className="field-label" htmlFor="save-title">Title</label>
+          <input id="save-title" className="field" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
+          {draft.summary && <p className="save__sum">{draft.summary}</p>}
         </div>
 
-        <label className="field-label" htmlFor="save-note">Note</label>
-        <textarea id="save-note" className="field" rows={2} value={note} maxLength={5000} onChange={(e) => setNote(e.target.value)} />
-
-        <span className="field-label">Remind me</span>
-        <Segmented
-          label="Remind me"
-          value={remind}
-          onChange={setRemind}
-          options={[
-            { value: 'off', label: 'No' },
-            { value: 'none', label: 'Once' },
-            { value: 'monthly', label: 'Monthly' },
-            { value: 'quarterly', label: 'Quarterly' },
-            { value: 'yearly', label: 'Yearly' },
-          ]}
-        />
-        {remind !== 'off' && (
-          <div className="save__when">
-            <label className="field-row">
-              <span className="field-label">{remind === 'none' ? 'Due on' : 'First due on'}</span>
-              <input className="field field--mono" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </label>
-            <label className="field-row">
-              <span className="field-label">Remind me this many days before</span>
-              <input className="field field--mono" inputMode="numeric" value={lead} onChange={(e) => setLead(e.target.value.replace(/\D/g, '').slice(0, 2))} />
-            </label>
+        <div className="save__card" style={tintStyle(2)}>
+          <span className="field-label" id="save-tags">Tags</span>
+          <div className="chips" role="group" aria-labelledby="save-tags">
+            {allTags.map((t) => (
+              <button key={t} type="button" className="chip" aria-pressed={tags.includes(t)} onClick={() => toggle(t)}>
+                {t}
+              </button>
+            ))}
           </div>
-        )}
+          <div className="save__add">
+            <input className="field" placeholder="Your own tag" aria-label="Add your own tag" value={custom} maxLength={30} onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCustom()} />
+            <button type="button" className="btn" onClick={addCustom} disabled={!custom.trim()}>Add</button>
+          </div>
+        </div>
+
+        <div className="save__card" style={tintStyle(3)}>
+          <label className="field-label" htmlFor="save-note">Note</label>
+          <textarea id="save-note" className="field" rows={2} value={note} maxLength={5000} onChange={(e) => setNote(e.target.value)} />
+        </div>
+
+        <div className="save__card" style={tintStyle(4)}>
+          <div className="save__switch">
+            <span className="field-label" id="save-remind">Remind me</span>
+            <Toggle label="Remind me" checked={remind !== 'off'} onChange={(on) => setRemind(on ? 'none' : 'off')} />
+          </div>
+          {remind !== 'off' && (
+            <>
+              <Segmented
+                label="How often"
+                value={remind}
+                onChange={setRemind}
+                options={[
+                  { value: 'none', label: 'Once' },
+                  { value: 'monthly', label: 'Monthly' },
+                  { value: 'quarterly', label: 'Quarterly' },
+                  { value: 'yearly', label: 'Yearly' },
+                ]}
+              />
+              <div className="save__when">
+                <label className="field-row">
+                  <span className="field-label">{remind === 'none' ? 'Due on' : 'First due on'}</span>
+                  <input className="field field--mono" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                </label>
+                <label className="field-row">
+                  <span className="field-label">Days before</span>
+                  <input className="field field--mono" inputMode="numeric" value={lead} onChange={(e) => setLead(e.target.value.replace(/\D/g, '').slice(0, 2))} />
+                </label>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </Sheet>
   )

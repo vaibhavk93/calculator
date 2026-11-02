@@ -3,6 +3,7 @@ import {
   D,
   INITIAL_INPUT,
   applyKey,
+  applyKeyAt,
   evaluatePreview,
   insertExpressionAt,
   insertNumber,
@@ -10,8 +11,11 @@ import {
   type InputState,
   type Key,
 } from '../engine'
+import { parseNum } from '../lib/tool'
 import { sanitizeSettings } from './persistence'
 import {
+  MAX_CATEGORIES,
+  MAX_EXPENSES,
   MAX_CARDS,
   MAX_HISTORY,
   MAX_MEMO,
@@ -25,6 +29,7 @@ import {
   type SavedCard,
   type Settings,
   type Tab,
+  type BudgetData,
 } from './types'
 import { advance } from '../lib/reminders'
 import { listSummary, repeatLines, tapeTotal } from '../lib/tape'
@@ -85,14 +90,27 @@ export interface ToolsNav {
 
 export const TOOLS_HOME: ToolsNav = { category: null, tool: null, scientific: false }
 
+/**
+ * Where the cursor is inside `expr`, or what part of it is selected. Null means "at the end", which is
+ * where typing normally goes. It names the text it belongs to, so as soon as the input changes by any
+ * other route (undo, history, restore) it quietly stops applying.
+ */
+export interface Selection {
+  expr: string
+  start: number
+  end: number
+}
+
 export interface AppState {
   input: InputState
+  selection: Selection | null
   undoStack: InputState[]
   history: HistoryEntry[]
   cards: SavedCard[]
   reminders: Reminder[]
   memory: string | null
   settings: Settings
+  budget: BudgetData
 
   tab: Tab
   /** Where the user is inside the Tools tab. */
@@ -111,6 +129,25 @@ export interface AppState {
   removed: Removed[] | null
 
   press: (key: Key) => void
+
+  /** Records something spent. Returns false (and says why) when the amount is not a positive number. */
+  addExpense: (draft: { amount: string; categoryId: string | null; date: string; note: string }) => boolean
+  /** Changes an entry. Same rules as addExpense. */
+  updateExpense: (id: string, draft: { amount: string; categoryId: string | null; date: string; note: string }) => boolean
+  /** Removes an entry; the snackbar offers Undo. */
+  deleteExpense: (id: string) => void
+  /** A monthly limit for one category, or null to remove it. */
+  setCategoryLimit: (id: string, limit: string | null) => void
+  /** One limit for everything spent in a month, or null to remove it. */
+  setOverallLimit: (limit: string | null) => void
+  addCategory: (name: string) => string | null
+  renameCategory: (id: string, name: string) => void
+  /** Its entries stay, shown as Uncategorised. */
+  deleteCategory: (id: string) => void
+  /** Moves the cursor or selects part of what is typed. At the very end it goes back to null. */
+  setSelection: (start: number, end: number) => void
+  /** Tapping the line above a finished answer: brings that expression back for editing, with the cursor there. */
+  editLast: (start: number, end: number) => void
   undoInput: () => void
   memoryAdd: (sign: 1 | -1) => void
   memoryRecall: () => void
@@ -189,6 +226,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
   const keep = initial.cards.filter((c) => c.deletedAt === null || deps.now() - c.deletedAt < TRASH_DAYS * DAY)
   const keepIds = new Set(keep.map((c) => c.id))
   let removedCardId: string | null = null
+  let removedExpenseId: string | null = null
 
   return createStore<AppState>()((set, get) => {
     /** Records the current input so it can be undone, if the next state actually differs. */
@@ -216,6 +254,26 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       set({ reminders: [...others, next] })
     }
 
+    const fail = (text: string) => {
+      set({ notice: { id: nextId(), text, tone: 'error' } })
+      return false
+    }
+
+    /** A plain positive amount, a real calendar day, a category that exists. Or the reason it is not. */
+    const checkedExpense = (d: { amount: string; categoryId: string | null; date: string; note: string }) => {
+      const amount = parseNum(d.amount)
+      if (!amount || !amount.isPositive() || amount.isZero()) return 'Enter an amount above zero'
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date) || Number.isNaN(new Date(`${d.date}T00:00:00`).getTime())) return 'Pick a date'
+      const categoryId = d.categoryId !== null && get().budget.categories.some((c) => c.id === d.categoryId && c.deletedAt === null) ? d.categoryId : null
+      return { amount: toPlain(amount), categoryId, date: d.date, note: d.note.trim().slice(0, 200) }
+    }
+
+    const cleanLimit = (limit: string | null) => {
+      if (limit === null) return null
+      const v = parseNum(limit)
+      return v && v.isPositive() && !v.isZero() ? toPlain(v) : null
+    }
+
     const currentValue = () => {
       const { input, settings } = get()
       const r = evaluatePreview(input.expr, { angle: settings.angle })
@@ -224,12 +282,14 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
 
     return {
       input: initial.input,
+      selection: null,
       undoStack: [],
       history: initial.history,
       cards: keep,
       reminders: initial.reminders.filter((r) => keepIds.has(r.cardId)),
       memory: initial.memory,
       settings: initial.settings,
+      budget: initial.budget,
 
       // A chosen startup calculator opens the Tools tab with that calculator already showing.
       tab: initial.settings.startupTool ? 'tools' : initial.settings.startupTab,
@@ -244,10 +304,14 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       removed: null,
 
       press: (key) => {
-        const { input, settings, history } = get()
-        const res = applyKey(input, key, { angle: settings.angle })
+        const { input, settings, history, selection } = get()
+        const sel = selection && !input.fresh && selection.expr === input.expr ? selection : null
+        const res = sel ? applyKeyAt(input, key, { angle: settings.angle }, sel.start, sel.end) : applyKey(input, key, { angle: settings.angle })
 
         const patch: Partial<AppState> = withUndo(res.state)
+        // Typing mid-expression keeps the cursor there; reaching the end hands it back to "the end".
+        const caret: number | null = sel && 'caret' in res && typeof res.caret === 'number' ? res.caret : null
+        patch.selection = caret !== null && caret < res.state.expr.length ? { expr: res.state.expr, start: caret, end: caret } : null
         patch.notice = res.error ? { id: nextId(), text: res.error, tone: 'error' } : null
         // An ignored key (state unchanged) must not wipe the "expression =" line.
         if (res.commit) patch.lastExpression = res.commit.expression
@@ -265,11 +329,35 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         set(patch)
       },
 
+      setSelection: (start, end) => {
+        const { input } = get()
+        const len = input.expr.length
+        const a = Math.max(0, Math.min(start, end, len))
+        const b = Math.min(Math.max(start, end), len)
+        const next = input.fresh || (a === len && b === len) ? null : { expr: input.expr, start: a, end: b }
+        const cur = get().selection
+        if (cur === next || (cur && next && cur.expr === next.expr && cur.start === next.start && cur.end === next.end)) return
+        set({ selection: next })
+      },
+
+      editLast: (start, end) => {
+        const { input, lastExpression } = get()
+        if (!input.fresh || !lastExpression) return
+        const len = lastExpression.length
+        const a = Math.max(0, Math.min(start, end, len))
+        const b = Math.min(Math.max(start, end), len)
+        set({
+          ...withUndo({ expr: lastExpression, fresh: false }),
+          lastExpression: null,
+          selection: a === len && b === len ? null : { expr: lastExpression, start: a, end: b },
+        })
+      },
+
       undoInput: () => {
         const { undoStack } = get()
         const prev = undoStack[undoStack.length - 1]
         if (!prev) return
-        set({ input: prev, undoStack: undoStack.slice(0, -1), notice: null })
+        set({ input: prev, undoStack: undoStack.slice(0, -1), notice: null, selection: null })
       },
 
       memoryAdd: (sign) => {
@@ -290,7 +378,14 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       insertPlain: (plain) => set(withUndo(insertNumber(get().input, plain))),
 
       insertExpression: (raw) => {
-        const { input } = get()
+        const { input, selection } = get()
+        const sel = selection && !input.fresh && selection.expr === input.expr ? selection : null
+        // Pasted into the middle of an expression, it goes where the cursor is.
+        if (sel) {
+          const expr = (input.expr.slice(0, sel.start) + raw + input.expr.slice(sel.end)).slice(0, 500)
+          const caret = Math.min(sel.start + raw.length, expr.length)
+          return set({ ...withUndo({ expr, fresh: false }), notice: null, selection: caret < expr.length ? { expr, start: caret, end: caret } : null })
+        }
         const base = input.fresh ? '' : input.expr
         set({ ...withUndo({ expr: (base + raw).slice(0, 500), fresh: false }), notice: null })
       },
@@ -341,7 +436,76 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         })
       },
 
+      addExpense: (draft) => {
+        const e = checkedExpense(draft)
+        if (typeof e === 'string') return fail(e)
+        const { budget } = get()
+        if (budget.expenses.length >= MAX_EXPENSES) return fail(`You can keep up to ${MAX_EXPENSES} entries.`)
+        set({ budget: { ...budget, expenses: [{ id: deps.newId(), ...e, deletedAt: null }, ...budget.expenses] }, notice: null })
+        return true
+      },
+
+      updateExpense: (id, draft) => {
+        const e = checkedExpense(draft)
+        if (typeof e === 'string') return fail(e)
+        const { budget } = get()
+        set({ budget: { ...budget, expenses: budget.expenses.map((x) => (x.id === id ? { ...x, ...e } : x)) } })
+        return true
+      },
+
+      deleteExpense: (id) => {
+        const { budget } = get()
+        const target = budget.expenses.find((x) => x.id === id && x.deletedAt === null)
+        if (!target) return
+        removedExpenseId = id
+        removedCardId = null
+        set({
+          budget: { ...budget, expenses: budget.expenses.map((x) => (x.id === id ? { ...x, deletedAt: deps.now() } : x)) },
+          snack: { id: nextId(), text: 'Removed from your budget', canUndo: true },
+        })
+      },
+
+      setCategoryLimit: (id, limit) => {
+        const { budget } = get()
+        set({ budget: { ...budget, categories: budget.categories.map((c) => (c.id === id ? { ...c, limit: cleanLimit(limit) } : c)) } })
+      },
+
+      setOverallLimit: (limit) => set({ budget: { ...get().budget, overall: cleanLimit(limit) } }),
+
+      addCategory: (name) => {
+        const clean = name.trim().slice(0, 40)
+        const { budget } = get()
+        if (!clean) return null
+        if (budget.categories.filter((c) => c.deletedAt === null).length >= MAX_CATEGORIES) {
+          fail(`You can have up to ${MAX_CATEGORIES} categories.`)
+          return null
+        }
+        const live = budget.categories.find((c) => c.deletedAt === null && c.name.toLowerCase() === clean.toLowerCase())
+        if (live) return live.id
+        const id = deps.newId()
+        set({ budget: { ...budget, categories: [...budget.categories, { id, name: clean, limit: null, deletedAt: null }] } })
+        return id
+      },
+
+      renameCategory: (id, name) => {
+        const clean = name.trim().slice(0, 40)
+        if (!clean) return
+        const { budget } = get()
+        set({ budget: { ...budget, categories: budget.categories.map((c) => (c.id === id ? { ...c, name: clean } : c)) } })
+      },
+
+      deleteCategory: (id) => {
+        const { budget } = get()
+        set({ budget: { ...budget, categories: budget.categories.map((c) => (c.id === id ? { ...c, deletedAt: deps.now() } : c)) } })
+      },
+
       undoRemoval: () => {
+        if (removedExpenseId) {
+          const id = removedExpenseId
+          removedExpenseId = null
+          const { budget } = get()
+          return set({ snack: null, budget: { ...budget, expenses: budget.expenses.map((x) => (x.id === id ? { ...x, deletedAt: null } : x)) } })
+        }
         if (removedCardId) {
           const id = removedCardId
           removedCardId = null
@@ -496,12 +660,14 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       restore: (data) =>
         set({
           input: data.input,
+          selection: null,
           undoStack: [],
           history: data.history,
           cards: data.cards,
           reminders: data.reminders,
           memory: data.memory,
           settings: data.settings,
+          budget: data.budget,
           removed: null,
           snack: null,
           notice: null,
@@ -509,8 +675,8 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         }),
 
       snapshot: () => {
-        const { input, history, cards, reminders, memory, settings } = get()
-        return { schemaVersion: initial.schemaVersion, input, history, cards, reminders, memory, settings }
+        const { input, history, cards, reminders, memory, settings, budget } = get()
+        return { schemaVersion: initial.schemaVersion, input, history, cards, reminders, memory, settings, budget }
       },
     }
   })

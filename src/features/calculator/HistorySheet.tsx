@@ -91,7 +91,7 @@ export function HistorySheet() {
           Nothing here yet. Calculations you finish with = are kept here, and you can tap one to use it again.
         </p>
       ) : (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        <ul className="hlist">
           {history.map((h) => {
             const expression = formatExpression(h.expression, system)
             const result = formatPlain(h.result, fmt)
@@ -130,17 +130,19 @@ export function HistorySheet() {
                     <button type="button" className="hrow__result" aria-label={`Use result ${result}`} onClick={() => reuseResult(h.id)}>
                       {result}
                     </button>
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      aria-label={h.memo ? `Rename ${expression}` : `Name ${expression}`}
-                      onClick={() => startEdit(h.id, h.memo)}
-                    >
-                      <Icon name="edit" size={18} />
-                    </button>
-                    <button type="button" className="icon-btn" aria-label={`Delete ${expression}`} onClick={() => deleteHistory(h.id)}>
-                      <Icon name="trash" size={18} />
-                    </button>
+                    <span className="hrow__acts">
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        aria-label={h.memo ? `Rename ${expression}` : `Name ${expression}`}
+                        onClick={() => startEdit(h.id, h.memo)}
+                      >
+                        <Icon name="edit" size={18} />
+                      </button>
+                      <button type="button" className="icon-btn" aria-label={`Delete ${expression}`} onClick={() => deleteHistory(h.id)}>
+                        <Icon name="trash" size={18} />
+                      </button>
+                    </span>
                   </>
                 )}
               </li>

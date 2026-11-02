@@ -362,7 +362,7 @@ describe('snapshot and restore', () => {
     press('7', '+', '1', '=')
     get().memoryAdd(1)
     const snap = get().snapshot()
-    expect(Object.keys(snap).sort()).toEqual(['cards', 'history', 'input', 'memory', 'reminders', 'schemaVersion', 'settings'])
+    expect(Object.keys(snap).sort()).toEqual(['budget', 'cards', 'history', 'input', 'memory', 'reminders', 'schemaVersion', 'settings'])
     expect(snap.history).toHaveLength(1)
   })
   it('restore replaces state and clears transient things', () => {
@@ -378,5 +378,93 @@ describe('snapshot and restore', () => {
     expect(b.get().input).toEqual(snap.input)
     expect(b.get().undoStack).toEqual([])
     expect(b.get().snack).toBeNull()
+  })
+})
+
+describe('budget', () => {
+  const draft = (over = {}) => ({ amount: '1,250.50', categoryId: null, date: '2026-11-02', note: ' tea ', ...over })
+  it('records an expense with a clean amount and note', () => {
+    const { get } = make()
+    expect(get().addExpense(draft())).toBe(true)
+    expect(get().budget.expenses[0]).toMatchObject({ amount: '1250.5', date: '2026-11-02', note: 'tea', deletedAt: null })
+  })
+  it('refuses zero, blank and unreadable amounts with a plain message', () => {
+    const { get } = make()
+    for (const amount of ['', '0', 'abc', '-5']) expect(get().addExpense(draft({ amount }))).toBe(false)
+    expect(get().notice?.text).toBe('Enter an amount above zero')
+    expect(get().budget.expenses).toHaveLength(0)
+  })
+  it('refuses a bad date', () => {
+    const { get } = make()
+    expect(get().addExpense(draft({ date: '02/11/2026' }))).toBe(false)
+  })
+  it('a category that does not exist becomes Uncategorised', () => {
+    const { get } = make()
+    get().addExpense(draft({ categoryId: 'ghost' }))
+    expect(get().budget.expenses[0]!.categoryId).toBeNull()
+  })
+  it('delete can be undone', () => {
+    const { get } = make()
+    get().addExpense(draft())
+    const id = get().budget.expenses[0]!.id
+    get().deleteExpense(id)
+    expect(get().budget.expenses[0]!.deletedAt).not.toBeNull()
+    expect(get().snack?.canUndo).toBe(true)
+    get().undoRemoval()
+    expect(get().budget.expenses[0]!.deletedAt).toBeNull()
+  })
+  it('deleting a category keeps its entries', () => {
+    const { get } = make()
+    const cat = get().budget.categories[0]!.id
+    get().addExpense(draft({ categoryId: cat }))
+    get().deleteCategory(cat)
+    expect(get().budget.expenses).toHaveLength(1)
+    expect(get().budget.categories.find((c) => c.id === cat)!.deletedAt).not.toBeNull()
+  })
+  it('a limit must be a positive number, otherwise it is cleared', () => {
+    const { get } = make()
+    const cat = get().budget.categories[0]!.id
+    get().setCategoryLimit(cat, '4,000')
+    expect(get().budget.categories[0]!.limit).toBe('4000')
+    get().setCategoryLimit(cat, '0')
+    expect(get().budget.categories[0]!.limit).toBeNull()
+  })
+  it('adding a category twice gives the same one', () => {
+    const { get } = make()
+    const a = get().addCategory('Pets')
+    expect(get().addCategory(' pets ')).toBe(a)
+  })
+})
+
+describe('editing inside the expression', () => {
+  it('typing at the cursor goes there and keeps the cursor', () => {
+    const { get, press } = make()
+    press('1', '2', '3', '4')
+    get().setSelection(2, 2)
+    press('9')
+    expect(get().input.expr).toBe('12934')
+    expect(get().selection).toMatchObject({ start: 3, end: 3 })
+  })
+  it('a cursor at the very end is "no cursor"', () => {
+    const { get, press } = make()
+    press('1', '2')
+    get().setSelection(2, 2)
+    expect(get().selection).toBeNull()
+  })
+  it('a cursor stops applying once the input changes some other way', () => {
+    const { get, press } = make()
+    press('1', '+', '2')
+    get().setSelection(1, 1)
+    get().undoInput()
+    press('9')
+    expect(get().input.expr).toBe('1+9')
+  })
+  it('after = the expression can be brought back and edited', () => {
+    const { get, press } = make()
+    press('5', '+', '3', '=')
+    get().editLast(1, 1)
+    expect(get().input).toEqual({ expr: '5+3', fresh: false })
+    press('*')
+    expect(get().input.expr).toBe('5*3')
   })
 })

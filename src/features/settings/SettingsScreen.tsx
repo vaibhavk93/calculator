@@ -1,20 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { tintStyle } from '../../components/tint'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { downloadTextFile } from '../../lib/device'
 import { checkReminderPermissions, ensurePermission, notificationsSupported, openExactAlarmSettings, type ReminderPermissions } from '../../lib/notifications'
 import { ACCENT_NAMES, ACCENTS } from '../../lib/theme'
 import { backupFilename, buildBackup, parseBackup } from '../../store/backup'
-import { TABS, type PersistedData, type Tab } from '../../store/types'
+import { TABS, type CopyFormat, type PersistedData, type Tab } from '../../store/types'
 import pkg from '../../../package.json'
 import { ALL_TOOLS } from '../tools/registry'
 import { GROUPS } from '../tools/groups'
 import { OptionRow, Row, Segmented, Toggle } from './controls'
 
-const TAB_LABEL: Record<Tab, string> = { calculate: 'Calculate', tools: 'Tools', saved: 'Notes', due: 'Due' }
+const TAB_LABEL: Record<Tab, string> = { calculate: 'Calculate', tools: 'Tools', saved: 'Notes', due: 'Due', budget: 'Budget' }
 const DECIMAL_CHOICES = ['auto', ...Array.from({ length: 11 }, (_, i) => String(i))]
 
 type Backup = { state: 'idle' } | { state: 'confirm'; data: PersistedData; exportedAt: string | null } | { state: 'done'; text: string } | { state: 'error'; text: string }
+
+/** One titled, tinted card of settings. The tint says which section it is, nothing more. */
+function Section({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+  return (
+    <section className="sect sect--settings" style={tintStyle(n)} aria-label={title}>
+      <h2 className="sect__head">{title}</h2>
+      {children}
+    </section>
+  )
+}
 
 /** What the phone allows reminders to do, and the buttons that fix it. Shown on the phone only. */
 function ReminderPermissionRows() {
@@ -27,9 +38,7 @@ function ReminderPermissionRows() {
   }, [refresh])
   if (!perm) return null
   return (
-    <>
-      <h2 className="group__title">Reminders</h2>
-      <div className="group">
+    <Section n={4} title="Reminders">
         <button type="button" className="row row--button" disabled={perm.notifications} onClick={() => void ensurePermission().then(refresh)}>
           <span className="row__text">
             <span className="row__label">Notifications: {perm.notifications ? 'allowed' : 'not allowed'}</span>
@@ -46,8 +55,7 @@ function ReminderPermissionRows() {
             </span>
           </span>
         </button>
-      </div>
-    </>
+    </Section>
   )
 }
 
@@ -90,8 +98,7 @@ export function SettingsScreen() {
       <ScreenHeader title="Settings" onBack={() => setOverlay('none')} />
 
       <div className="screen__body">
-        <h2 className="group__title">Appearance</h2>
-        <div className="group">
+        <Section n={1} title="Appearance">
           <Row label="Theme">
             <Segmented
               label="Theme"
@@ -121,15 +128,14 @@ export function SettingsScreen() {
               ))}
             </div>
           </Row>
-        </div>
+        </Section>
 
-        <h2 className="group__title">Numbers</h2>
-        <div className="group" role="radiogroup" aria-label="Number format">
+        <Section n={2} title="Numbers">
+        <div role="radiogroup" aria-label="Number format">
           <OptionRow label="Indian" sample="12,34,567.89" checked={s.numberSystem === 'indian'} onSelect={() => update({ numberSystem: 'indian' })} />
           <OptionRow label="International" sample="1,234,567.89" checked={s.numberSystem === 'international'} onSelect={() => update({ numberSystem: 'international' })} />
         </div>
-        <div className="group">
-          <Row label="Decimal places" hint="Auto shows up to 10 and trims the zeros">
+          <Row label="Decimal places" hint="Auto trims the zeros">
             <select
               className="select"
               aria-label="Decimal places"
@@ -143,6 +149,13 @@ export function SettingsScreen() {
               ))}
             </select>
           </Row>
+          <Row label="Copying numbers" hint="1,50,000 or 150000">
+            <select className="select" aria-label="Copying numbers" value={s.copyFormat} onChange={(e) => update({ copyFormat: e.target.value as CopyFormat })}>
+              <option value="ask">Ask each time</option>
+              <option value="with">With commas</option>
+              <option value="without">Without commas</option>
+            </select>
+          </Row>
           <Row label="Angles">
             <Segmented
               label="Angle mode"
@@ -154,10 +167,9 @@ export function SettingsScreen() {
               ]}
             />
           </Row>
-        </div>
+        </Section>
 
-        <h2 className="group__title">Behaviour</h2>
-        <div className="group">
+        <Section n={3} title="Behaviour">
           <Row label="Opens on">
             <select className="select select--wide" aria-label="Opens on" value={opensOn} onChange={(e) => chooseOpensOn(e.target.value)}>
               <optgroup label="Screens">
@@ -187,12 +199,11 @@ export function SettingsScreen() {
           <Row label="Keep calculation history" hint="Turn off to stop recording new calculations">
             <Toggle label="Keep calculation history" checked={s.keepHistory} onChange={(keepHistory) => update({ keepHistory })} />
           </Row>
-        </div>
+        </Section>
 
         {notificationsSupported() && <ReminderPermissionRows />}
 
-        <h2 className="group__title">Your data</h2>
-        <div className="group">
+        <Section n={5} title="Your data">
           <button type="button" className="row row--button" onClick={exportBackup}>
             <span className="row__text">
               <span className="row__label">Export a backup</span>
@@ -206,7 +217,7 @@ export function SettingsScreen() {
             </span>
           </button>
           <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" aria-label="Choose a backup file" tabIndex={-1} onChange={(e) => void chooseFile(e.target.files?.[0])} />
-        </div>
+        </Section>
 
         {backup.state === 'confirm' && (
           <div className="confirm" style={{ margin: '16px 16px 0' }}>
@@ -231,12 +242,11 @@ export function SettingsScreen() {
           </p>
         )}
 
-        <h2 className="group__title">About</h2>
-        <div className="group">
+        <Section n={6} title="About">
           <Row label="Calc" hint="Everything stays on this phone. No account, no ads, no tracking.">
             <span className="row__value">{pkg.version}</span>
           </Row>
-        </div>
+        </Section>
       </div>
     </div>
   )

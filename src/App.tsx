@@ -4,6 +4,7 @@ import { useApp, useAppStore } from './components/StoreProvider'
 import { TabBar } from './components/TabBar'
 import { CalculatorScreen } from './features/calculator/CalculatorScreen'
 import { HistorySheet } from './features/calculator/HistorySheet'
+import { BudgetScreen } from './features/budget/BudgetScreen'
 import { DueScreen } from './features/memory/DueScreen'
 import { SavedScreen } from './features/memory/SavedScreen'
 import { SettingsScreen } from './features/settings/SettingsScreen'
@@ -136,6 +137,7 @@ export function App() {
         {tab === 'tools' && <ToolsScreen />}
         {tab === 'saved' && <SavedScreen />}
         {tab === 'due' && <DueScreen />}
+        {tab === 'budget' && <BudgetScreen />}
       </main>
 
       <div {...behind}>

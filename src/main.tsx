@@ -14,6 +14,7 @@ import './styles/global.css'
 import './styles/tools.css'
 import './styles/lists.css'
 import './styles/history.css'
+import './styles/budget.css'
 
 import { App } from './App'
 import { StoreProvider } from './components/StoreProvider'

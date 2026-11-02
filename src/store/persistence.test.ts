@@ -14,7 +14,7 @@ import {
   sanitizeSettings,
   savePersisted,
 } from './persistence'
-import { DEFAULT_SETTINGS, type PersistedData } from './types'
+import { DEFAULT_SETTINGS, starterBudget, type PersistedData } from './types'
 
 const sample = (): PersistedData => ({
   schemaVersion: CURRENT_SCHEMA,
@@ -27,6 +27,7 @@ const sample = (): PersistedData => ({
   reminders: [],
   memory: '42.5',
   input: { expr: '5+3', fresh: false },
+  budget: starterBudget(),
 })
 
 describe('sanitizeSettings', () => {
@@ -290,5 +291,34 @@ describe('checklist fields on stored lists', () => {
     const [c] = sanitizeCards([card({ checklist: 'yes', lines: [{ id: 'a', label: 'x', value: '5', done: 'true' }] })])
     expect(c!.checklist).toBeUndefined()
     expect(c!.lines[0]).not.toHaveProperty('done')
+  })
+})
+
+describe('budget data', () => {
+  it('data saved before the Budget tab existed gets the starter categories, not an error', () => {
+    const { budget: _drop, ...old } = sample()
+    const out = migrate(old)
+    expect(out.budget.categories.length).toBeGreaterThan(5)
+    expect(out.budget.expenses).toEqual([])
+  })
+  it('drops damaged entries and keeps the good ones', () => {
+    const out = migrate({
+      ...sample(),
+      budget: {
+        overall: '-5',
+        categories: [{ id: 'c1', name: 'Food', limit: '4000', deletedAt: null }, { id: '', name: 'x' }, { id: 'c2', name: '   ' }],
+        expenses: [
+          { id: 'e1', date: '2026-11-02', amount: '120.50', categoryId: 'c1', note: 'tea', deletedAt: null },
+          { id: 'e2', date: '2026-13-40', amount: '5', categoryId: 'c1' },
+          { id: 'e3', date: '2026-11-02', amount: '-5', categoryId: 'c1' },
+          { id: 'e4', date: '2026-11-03', amount: '9', categoryId: 'nope' },
+        ],
+      },
+    })
+    expect(out.budget.overall).toBeNull()
+    expect(out.budget.categories.map((c) => c.id)).toEqual(['c1'])
+    expect(out.budget.expenses.map((e) => e.id)).toEqual(['e1', 'e4'])
+    // An entry whose category is gone stays, as Uncategorised.
+    expect(out.budget.expenses[1]!.categoryId).toBeNull()
   })
 })

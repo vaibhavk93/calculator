@@ -136,6 +136,40 @@ export function applyKey(state: InputState, key: Key, opts: EvalOptions): InputR
   }
 }
 
+/**
+ * A key pressed with the cursor somewhere inside the expression, or with part of it selected.
+ *
+ * The existing rules (leading zeros, "a new operator replaces the dangling one", bracket counting) all
+ * work on the end of an expression, so this applies the key to the text before the cursor and glues the
+ * text after the cursor back on. Typing "×" with the cursor just after "+" therefore swaps the operator
+ * instead of stacking two. `caret` is where the cursor ends up.
+ */
+export function applyKeyAt(state: InputState, key: Key, opts: EvalOptions, start: number, end: number): InputResult & { caret: number } {
+  const len = state.expr.length
+  const a = Math.max(0, Math.min(start, end, len))
+  const b = Math.max(a, Math.min(Math.max(start, end), len))
+  const atEnd = a === len && b === len
+  if (state.fresh || atEnd || key === 'clear' || key === '=') {
+    const r = applyKey(state, key, opts)
+    return { ...r, caret: r.state.expr.length }
+  }
+
+  const prefix = state.expr.slice(0, a)
+  let suffix = state.expr.slice(b)
+
+  // Backspace over a selection just removes it.
+  if (key === 'backspace' && a !== b) return { state: { expr: prefix + suffix, fresh: false }, caret: a }
+
+  // A decimal point typed inside a number that already has one is ignored.
+  if (key === '.' && /^[0-9]*\./.test(suffix) && /[0-9.]*$/.test(prefix)) return { state, caret: a }
+  const r = applyKey({ expr: prefix, fresh: false }, key, opts)
+  const next = r.state.expr
+  // Replacing an operator that follows the cursor: do not leave "5+*3".
+  if (isOp(key) && /[+\-*/^]$/.test(next) && next !== prefix) suffix = suffix.replace(/^[+*/^]+/, '').replace(/^-(?=[+\-*/^])/, '')
+  const expr = (next + suffix).slice(0, 500)
+  return { state: { expr, fresh: false }, caret: Math.min(next.length, expr.length) }
+}
+
 function typeDigit(expr: string, key: string): string {
   const seg = numberSegment(expr)
   if (seg.length >= MAX_NUMBER_CHARS) return expr

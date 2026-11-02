@@ -1,23 +1,94 @@
-/* History row naming (A18): a short name shown above the expression, and its
-   inline edit form. Kept in its own file so it does not collide with other
-   in-flight work on global.css. */
+/* History: one card per calculation.
+     name (optional)
+     what you typed                    [edit] [delete]
+     = the answer
+   Tapping what you typed reuses the expression, tapping the answer reuses the answer. Nothing wraps into a
+   second row of icons, at any font size: the icons live in their own column. */
+
+.hlist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'memo memo'
+    'expr acts'
+    'result acts';
+  align-items: center;
+  padding: var(--s-1) var(--s-1) var(--s-1) var(--s-3);
+  background: var(--surface);
+  border-radius: var(--r-md);
+}
 
 .hrow__memo {
-  flex: 1 0 100%;
+  grid-area: memo;
+  padding-top: var(--s-2);
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.hrow__expr {
+  grid-area: expr;
+  min-height: 36px;
+  padding: var(--s-2) 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.35;
+  text-align: left;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.hrow__result {
+  grid-area: result;
+  min-height: 40px;
+  padding: 0 0 var(--s-2);
+  font-family: var(--font-mono);
+  font-size: 1.125rem;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: left;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.hrow__result::before {
+  content: '=\00a0';
+  color: var(--ink-3);
+}
+
+.hrow__acts {
+  grid-area: acts;
+  display: flex;
+  align-items: center;
+}
+
+.hrow__acts .icon-btn {
+  width: 38px;
+  color: var(--ink-2);
 }
 
 .hrow__edit {
   display: flex;
-  flex: 1 0 100%;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
   align-items: center;
   gap: var(--s-2);
-  padding: var(--s-2) 0;
+  padding: var(--s-2) var(--s-2) var(--s-2) 0;
 }
 
 .hrow__edit .field {
-  flex: 1 1 auto;
+  flex: 1 1 10rem;
   min-width: 0;
 }

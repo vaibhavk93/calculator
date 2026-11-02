@@ -9,6 +9,12 @@ import {
   MAX_CARDS,
   MAX_PINNED,
   REPEATS,
+  MAX_CATEGORIES,
+  MAX_EXPENSES,
+  starterBudget,
+  type BudgetCategory,
+  type BudgetData,
+  type BudgetExpense,
   type HistoryEntry,
   type PersistedData,
   type Reminder,
@@ -33,6 +39,7 @@ export function defaultPersisted(): PersistedData {
     reminders: [],
     memory: null,
     input: { ...INITIAL_INPUT },
+    budget: starterBudget(),
   }
 }
 
@@ -61,6 +68,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     haptics: bool(r.haptics, d.haptics),
     keepAwake: bool(r.keepAwake, d.keepAwake),
     keepHistory: bool(r.keepHistory, d.keepHistory),
+    copyFormat: oneOf(r.copyFormat, ['ask', 'with', 'without'] as const, d.copyFormat),
   }
 }
 
@@ -186,6 +194,40 @@ export function sanitizeReminders(raw: unknown, cards: SavedCard[]): Reminder[] 
   return out
 }
 
+const DAY_KEY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
+
+export function sanitizeBudget(raw: unknown): BudgetData {
+  if (!isObject(raw)) return starterBudget()
+  const cats: BudgetCategory[] = []
+  const catIds = new Set<string>()
+  for (const c of Array.isArray(raw.categories) ? raw.categories : []) {
+    if (!isObject(c) || !goodId(c.id) || catIds.has(c.id)) continue
+    const name = str(c.name, 40).trim()
+    if (!name) continue
+    catIds.add(c.id)
+    cats.push({ id: c.id, name, limit: isPlainNumber(c.limit) && !c.limit.startsWith('-') ? c.limit : null, deletedAt: typeof c.deletedAt === 'number' && Number.isFinite(c.deletedAt) ? c.deletedAt : null })
+    if (cats.length >= MAX_CATEGORIES) break
+  }
+  const expenses: BudgetExpense[] = []
+  const seen = new Set<string>()
+  for (const e of Array.isArray(raw.expenses) ? raw.expenses : []) {
+    if (!isObject(e) || !goodId(e.id) || seen.has(e.id)) continue
+    if (typeof e.date !== 'string' || !DAY_KEY.test(e.date) || !isPlainNumber(e.amount) || e.amount.startsWith('-')) continue
+    seen.add(e.id)
+    expenses.push({
+      id: e.id,
+      date: e.date,
+      amount: e.amount,
+      // A category that no longer exists is "Uncategorised"; the entry is kept.
+      categoryId: typeof e.categoryId === 'string' && catIds.has(e.categoryId) ? e.categoryId : null,
+      note: str(e.note, 200),
+      deletedAt: typeof e.deletedAt === 'number' && Number.isFinite(e.deletedAt) ? e.deletedAt : null,
+    })
+    if (expenses.length >= MAX_EXPENSES) break
+  }
+  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, categories: cats, expenses }
+}
+
 type Migration = (data: Record<string, unknown>) => Record<string, unknown>
 /**
  * One entry per schema bump: MIGRATIONS[n] upgrades version n to n+1.
@@ -223,6 +265,8 @@ export function migrate(raw: unknown): PersistedData {
     reminders: sanitizeReminders(data.reminders, cards),
     memory: isPlainNumber(data.memory) ? data.memory : null,
     input: sanitizeInput(data.input),
+    // Absent before the Budget tab existed: a fresh starter set, not an error.
+    budget: sanitizeBudget(data.budget),
   }
 }
 

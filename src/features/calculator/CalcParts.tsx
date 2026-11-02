@@ -4,7 +4,8 @@ import { Sheet } from '../../components/Sheet'
 import { useApp } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
 import { parseClipboardExpression } from '../../lib/clipboard'
-import { copyText, haptic, readClipboardText } from '../../lib/device'
+import { haptic, readClipboardText } from '../../lib/device'
+import { useCopyAs } from '../../components/CopyAs'
 import type { AppState } from '../../store/app'
 import { computeDisplay } from './displayLogic'
 import { useRepeatingPress } from './Keypad'
@@ -35,11 +36,12 @@ export function useCalcCore() {
     [input, lastExpression, settings.numberSystem, settings.decimals, settings.angle],
   )
 
+  const { copy, sheet: copySheet } = useCopyAs()
   const doCopy = useCallback(async () => {
     if (view.copyText === null) return showNotice('Nothing to copy yet')
-    const ok = await copyText(view.copyText)
-    showNotice(ok ? 'Copied' : "Couldn't copy. Long-press the number instead.", ok ? 'info' : 'error')
-  }, [view.copyText, showNotice])
+    // The big line is the number as shown, with its commas; copyText is the same number without them.
+    await copy(view.resultLine, view.copyText)
+  }, [view.copyText, view.resultLine, copy, showNotice])
 
   const [pasteOpen, setPasteOpen] = useState(false)
   const doPaste = useCallback(async () => {
@@ -50,7 +52,7 @@ export function useCalcCore() {
     if (problem) showNotice(problem, 'error')
   }, [insertExpression, showNotice])
 
-  return { input, view, doCopy, doPaste, pasteOpen, closePaste: () => setPasteOpen(false) }
+  return { input, view, doCopy, copySheet, doPaste, pasteOpen, closePaste: () => setPasteOpen(false) }
 }
 
 /** Paste, Copy, Undo, Backspace: the row above the keypad. */

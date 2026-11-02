@@ -1,10 +1,11 @@
 import type { AngleMode, InputState } from '../engine'
 import type { DecimalSetting, NumberSystem } from '../lib/format'
+import type { BudgetData } from '../lib/budget'
 import type { Reminder, SavedCard } from '../lib/memory'
 import type { AccentName, ThemePreference } from '../lib/theme'
 
-export type Tab = 'calculate' | 'tools' | 'saved' | 'due'
-export const TABS: readonly Tab[] = ['calculate', 'tools', 'saved', 'due']
+export type Tab = 'calculate' | 'tools' | 'saved' | 'due' | 'budget'
+export const TABS: readonly Tab[] = ['calculate', 'tools', 'saved', 'due', 'budget']
 
 export interface Settings {
   theme: ThemePreference
@@ -19,7 +20,11 @@ export interface Settings {
   keepAwake: boolean
   /** "Keep the calculation record": whether "=" adds to history. */
   keepHistory: boolean
+  /** Copying a number: ask each time, or always with / without thousands commas. */
+  copyFormat: CopyFormat
 }
+
+export type CopyFormat = 'ask' | 'with' | 'without'
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'dark',
@@ -32,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   haptics: true,
   keepAwake: false,
   keepHistory: true,
+  copyFormat: 'ask',
 }
 
 export interface HistoryEntry {
@@ -53,6 +59,9 @@ export const MAX_UNDO = 100
 export * from '../lib/memory'
 
 /** Everything that survives a restart, and everything in a backup file. */
+export type { BudgetCategory, BudgetData, BudgetExpense } from '../lib/budget'
+export { MAX_CATEGORIES, MAX_EXPENSES, STARTER_CATEGORIES, starterBudget } from '../lib/budget'
+
 export interface PersistedData {
   schemaVersion: number
   settings: Settings
@@ -62,4 +71,5 @@ export interface PersistedData {
   /** Plain decimal string, or null when memory is empty. */
   memory: string | null
   input: InputState
+  budget: BudgetData
 }
