@@ -222,7 +222,8 @@ link between spending and the differentiator.
 | "Delete" a category means hide it. If lines use it, ask where to move them. | Old totals must not change under the user |
 | One payment, two categories = two lines | Keeps every line single-category and the sums exact |
 | A refund is a negative line, shown with its sign | No separate refund type to build |
-| ATM withdrawals and transfers are not spend. Not modelled in V1. | Avoids double counting |
+| Paying a credit-card bill is a **settlement**, not spend. A line marked `settlement` is left out of every category and mode total and reduces that card's outstanding. | Without it, ₹10,000 of card purchases plus a ₹10,000 bill payment reads as ₹20,000 spent. A single-entry total in the `financial-planner` repo overstated spending by ₹9,270 (51%) exactly this way |
+| Transfers between your own accounts and ATM withdrawals are also `settlement`. No further line types in V1. | Same reason |
 
 **Risks:** entry friction (the main one: measure taps per entry), category drift
 (Eating out vs Delivery), and scope creep toward budgets and charts before the tag habit is proven.
@@ -351,6 +352,7 @@ TapeLine
 ├── label               string?         "Flights"
 ├── expression          string          "24000"
 ├── value               decimal
+├── kind                enum            spend | settlement   (default spend; G20)
 ├── spentAt             timestamp       the date of the spend, editable
 ├── categoryId          uuid? → ListItem (kind: category, top level)
 ├── subcategoryId       uuid? → ListItem (kind: category, child of categoryId)
