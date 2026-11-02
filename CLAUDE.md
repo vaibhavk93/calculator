@@ -8,6 +8,7 @@ Capacitor for the stores. **Read the docs before writing code.**
 
 | For | Read |
 |---|---|
+| **Where we are, what to build next, open decisions** | `docs/HANDOFF.md` |
 | What to build, per calculator (inputs → outputs) | `docs/PRD.md` |
 | Colours, type, layout, the bans | `docs/DESIGN-SYSTEM.md` |
 | Interaction, copy, accessibility | `docs/UX-GUIDELINES.md` |

@@ -150,3 +150,56 @@ Do not claim something is verified unless you ran it.
 - A preview server may still be running in the background: `pkill -f "vite preview"`.
 - `~/.local/jdks/dl/` holds the Java download archive (about 190 MB). Safe to delete.
 - Scratch files from past sessions live outside the repo and are not needed.
+
+---
+
+## From the cloud session (2 Nov 2026, 12:29), merged in
+
+A second Claude session works on the cloud branch `claude/app-phases-overview-d5xazn`. It wrote the plan below.
+**Its picture of "what is built" is out of date:** it believed only P1 existed (395 tests). This repo has since
+built far more (1090 tests, all calculators, notes, reminders, Budget). Read the plan for **order and decisions**,
+not for status. Status is in the sections above.
+
+### Build order it proposes
+
+| # | Work | Note |
+|---|---|---|
+| 1 | P1.1 History power-ups A16-A20 (row menu, lock, memo, edit, share) | Gotcha: history is capped with `.slice(0, MAX_HISTORY)`, which would silently evict locked rows. Evict unlocked rows only. Needs a schema bump, a migration and a fixture test. Memo (A18) already exists here. |
+| 2 | P2 converters B1-B15, plus A22 "Use result in..." and A23 per-calculator drafts | |
+| 3 | Reminder spike: schedule one notification about 15 minutes out and test it on a Redmi or Realme phone | Reminders are the riskiest piece. A report says Redmi drops notifications set more than about 10 minutes ahead. Still unproven on this OnePlus too. |
+| 4 | P3 loans C1-C15 | C2 must close in exactly N instalments (rounding residue in the last one). Reference: 80 lakh at 8% over 240 months gives an EMI of 66,915. |
+| 5 | P4 investments D1-D17 | |
+| 6 | P5 tax E1-E8 | E8 (exit settlement) does not ship until its rules are checked against primary sources. |
+| 7 | P6 memory layer G1-G20 | Categories, payment methods, pickers, settlement lines: `MEMORY-LAYER.md` 4.6b-4.6c. Budget (this repo) already covers part of G13-G17. |
+| 8 | P7 / P8 platform, native, Android build | The Android build exists here. |
+
+### Decisions the owner has made
+- Landscape layout: yes (built).
+- History features from ClevCalc (A16-A20). Not adopted: ads, a promo line on shares, teal operator colouring, a hamburger drawer, a share-confirm dialog.
+- Spend categories, subcategories and payment methods are lists the user manages, chosen from a picker, never typed (G13-G19). Payment methods are two levels: mode, then instrument.
+- Tier 1 ideas from the earlier finance repos are in the plan (A22-A23, C12-C15, D14-D17, E8, G20).
+
+### Still open
+| Question | Recommendation |
+|---|---|
+| Build P1.1 or P2 next? | P1.1 |
+| Keep SMS, email and statement capture out? | Yes: it breaks "no account, almost no permissions" |
+| PDF export free or Pro? | Decide before any public launch |
+| Run the reminder spike? | Yes |
+
+### Later list (not in the PRD)
+- "Which card for this spend?" (the rules engine in `credit-card-optimiser` is plain JavaScript and ports directly; upkeep is the cost).
+- Statement day, due day, limit and utilisation on each card (extends G14).
+- Budget alerts that say "at most" when data is incomplete (extends G17).
+- Expose the calculator engine as an MCP tool. Cheap, because the engine has no UI.
+- Not adopted: SMS, Gmail and statement-PDF capture, a double-entry ledger, ESOP/RSU tax, Account Aggregator, investment advice.
+
+### Doc inconsistencies it found (not yet fixed)
+- `PRD.md` section 10 names the old branch; section 9 says "70 features" (real count 111 in A-G plus 14 platform items); section 6 stops at P7 while section 12 adds P8; H4 (currency cache) is listed late but P2's currency converter needs it.
+- "74" and "86" calculators or formulas appear in `TECH-DECISIONS.md`, `GTM-STRATEGY.md`, `UX-GUIDELINES.md` and `README.md`.
+
+### Not verified
+Tax slabs, Labour Code and gratuity rules, and the 74 golden test values in the PRD come from the owner's other repos and are claims, not facts. No primary source, no ship.
+
+### Public repo warning
+The cloud session says this repo is **public** and kept personal screenshots out of it. Keep personal figures, phone identifiers and bank data out of commits.
