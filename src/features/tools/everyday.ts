@@ -1,6 +1,7 @@
 import { D, type Dec } from '../../engine'
 import { convertCurrency } from '../../engine/convert/currency'
 import { CURRENCY_NAMES, CURRENCY_SNAPSHOT } from '../../engine/convert/currencySnapshot'
+import { getCurrencyRates, primeCurrencyRates } from '../../lib/currencyRates'
 import { discount } from '../../engine/convert/discount'
 import { fuelCost, fuelEfficiency, type EfficiencyUnit } from '../../engine/convert/fuel'
 import { gst } from '../../engine/convert/gst'
@@ -120,11 +121,17 @@ const unitSpec: ToolSpec = {
 
 // ---- B2 Currency ------------------------------------------------------------
 
+// Kicks off a background fetch of live rates the first time this module loads. Never blocks
+// rendering and never throws: offline or blocked, the bundled snapshot below still works.
+primeCurrencyRates()
+
+// The option list is always the fixed, reviewed set -- a live fetch can update rate numbers,
+// never add or remove a currency from what is offered.
 const currencyOptions = Object.keys(CURRENCY_SNAPSHOT.perInr).map((c) => ({ value: c, label: `${c} ${CURRENCY_NAMES[c] ?? ''}`.trim() }))
 const currencySpec: ToolSpec = {
   id: 'currency',
   title: 'Currency converter',
-  blurb: 'About 30 currencies, saved rates',
+  blurb: 'About 30 currencies, rates refresh every 6 hours',
   category: 'everyday',
   keywords: ['currency', 'forex', 'exchange', 'dollar', 'usd', 'euro', 'pound', 'yen', 'rate'],
   fields: [
@@ -137,16 +144,19 @@ const currencySpec: ToolSpec = {
     if (!r.ok) return r
     const from = str(v, 'from')
     const to = str(v, 'to')
-    const c = convertCurrency(r.n.amount!, from, to)
+    const rates = getCurrencyRates()
+    const c = convertCurrency(r.n.amount!, from, to, rates.perInr)
     if (!c) return { error: 'Pick two currencies' }
     return {
       rows: [
         { label: `Amount in ${to}`, value: c.result, main: true },
         { label: `1 ${from} in ${to}`, value: c.rate },
-        { label: 'Rates as of', value: CURRENCY_SNAPSHOT.date, fmt: 'text' },
+        { label: 'Rates as of', value: rates.date, fmt: 'text' },
       ],
-      formula: ['converted = amount × (rate of target ÷ rate of source), both per 1 INR', `${plain(r.n.amount!)} × (${CURRENCY_SNAPSHOT.perInr[to]} ÷ ${CURRENCY_SNAPSHOT.perInr[from]})`],
-      note: `Rates as of ${CURRENCY_SNAPSHOT.date} (${CURRENCY_SNAPSHOT.source}), saved with the app and not live. Banks and cards add their own margin.`,
+      formula: ['converted = amount × (rate of target ÷ rate of source), both per 1 INR', `${plain(r.n.amount!)} × (${rates.perInr[to]} ÷ ${rates.perInr[from]})`],
+      note: rates.live
+        ? `Rates as of ${rates.date} (${rates.source}), refreshed on this device within the last 6 hours. Banks and cards add their own margin.`
+        : `Rates as of ${rates.date} (${rates.source}), saved with the app -- a live refresh has not reached this device yet. Banks and cards add their own margin.`,
     }
   },
 }
