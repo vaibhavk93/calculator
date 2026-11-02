@@ -51,6 +51,16 @@ export interface ResultRow {
   fmt?: Fmt
   /** The headline figure. One per result. */
   main?: boolean
+  /**
+   * "This is good / bad for you." Colours the value green or red.
+   *
+   * Use it only where good and bad are genuinely unambiguous (you save money,
+   * you pay a penalty, an option is the cheaper one). A number that is merely
+   * large, or merely a fact, has no tone. Colour is never the only signal: the
+   * renderer also states it for a screen reader, since roughly 1 in 12 men
+   * cannot separate red from green.
+   */
+  tone?: 'positive' | 'negative'
 }
 
 export interface ResultTable {

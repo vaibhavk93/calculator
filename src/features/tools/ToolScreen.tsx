@@ -253,7 +253,12 @@ function Result({ out }: { out: Output }) {
       {out.rows.map((r) => (
         <div key={r.label} className={r.main ? 'result__row result__row--main' : 'result__row'}>
           <span className="result__label">{r.label}</span>
-          <span className="result__value">{fmt(r.value, r.fmt)}</span>
+          <span className={r.tone ? `result__value result__value--${r.tone}` : 'result__value'}>
+            {fmt(r.value, r.fmt)}
+            {/* Colour is never the only signal: a screen reader, and anyone who cannot
+                separate red from green, gets the meaning in words. */}
+            {r.tone && <span className="sr-only">{r.tone === 'positive' ? ' — in your favour' : ' — against you'}</span>}
+          </span>
         </div>
       ))}
       {out.note && <p className="result__note">{out.note}</p>}

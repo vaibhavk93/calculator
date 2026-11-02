@@ -197,9 +197,15 @@ button:disabled {
   color: var(--ink-2);
 }
 
+/*
+ * A comfortable band, not a void. Finished calculations used to live above the
+ * current line; once they moved to History only, `flex: 1` left roughly a third
+ * of the screen empty. The display now takes the room it needs and the keypad
+ * takes the rest, which is why the keys are large.
+ */
 .display {
-  flex: 1;
-  min-height: 0;
+  flex: 0 1 auto;
+  min-height: 22dvh;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -345,11 +351,13 @@ button:disabled {
   margin: 0;
 }
 
+/* Takes the space the display does not need, so the keys grow instead of the void.
+   52px is the floor: below that the keys stop being comfortable to hit. */
 .keypad {
-  flex: none;
+  flex: 1 1 auto;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: clamp(52px, 8.4dvh, 64px);
+  grid-auto-rows: minmax(52px, 1fr);
   gap: var(--s-2);
   padding: 0 var(--s-3) var(--s-3);
 }

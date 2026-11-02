@@ -226,7 +226,7 @@ const prepaySpec: ToolSpec = {
     const oldEmi = out.base[0]!.payment
     return {
       rows: [
-        { label: 'Interest saved', value: out.interestSaved, fmt: 'money', main: true },
+        { label: 'Interest saved', value: out.interestSaved, fmt: 'money', main: true, tone: 'positive' },
         mode === 'reduceEmi'
           ? { label: 'New EMI', value: out.newEmi, fmt: 'money' }
           : { label: 'Months saved', value: new D(out.monthsSaved), fmt: 'int' },
@@ -498,10 +498,10 @@ const homeTaxSpec: ToolSpec = {
     const effRate = y1.interest.isZero() ? l.rate : l.rate.times(new D(1).minus(interestTaxSaved.div(y1.interest)))
     const out: Output = {
       rows: [
-        { label: 'Tax saved in year 1', value: y1.taxSaved, fmt: 'money', main: true },
+        { label: 'Tax saved in year 1', value: y1.taxSaved, fmt: 'money', main: true, tone: 'positive' },
         { label: 'Interest deduction, year 1', value: y1.interestDeduction, fmt: 'money' },
         { label: 'Principal deduction, year 1', value: y1.principalDeduction, fmt: 'money' },
-        { label: 'Tax saved over the loan', value: total, fmt: 'money' },
+        { label: 'Tax saved over the loan', value: total, fmt: 'money', tone: 'positive' },
         { label: 'Loan rate after tax saving, year 1', value: effRate, fmt: 'percent' },
       ],
       table: {

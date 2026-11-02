@@ -58,7 +58,10 @@ engine  <-  lib  <-  store  <-  components  <-  features
 - `border-radius` is `var(--r-sm|md|lg)` (4 / 10 / 20) or `0`. Nothing else.
 - No `text-transform: uppercase`, no positive `letter-spacing`, no `box-shadow`, no gradients,
   no `backdrop-filter`, no coloured side-stripe borders.
-- Accent means "you can act on this", never "this is good". Only overdue earns a hue.
+- Accent means "you can act on this", never "this is good".
+- `positive` / `negative` are the only colours meaning good or bad. Use them only where good
+  and bad are unambiguous (money saved, a penalty owed), never on a plain fact or a tie, and
+  never as the only signal — a screen reader must get the same meaning in words.
 - Numbers the user *reads* are Plex Mono, tabular. Sans for words and for keys you press.
 - Every control is at least 44px in one direction. Type is `rem` so it follows system font size.
 - Grouping is by 1px hairline, not by boxes. No nested cards.

@@ -43,6 +43,36 @@ describe('contrast, computed for every theme', () => {
   }
 })
 
+describe('positive and negative (good / bad for you)', () => {
+  for (const theme of THEMES) {
+    const p = PALETTES[theme]
+    const grounds = { bg: p.bg, surface: p.surface, raised: p.raised }
+
+    for (const [gName, ground] of Object.entries(grounds)) {
+      it(`${theme}: both are readable on ${gName}`, () => {
+        expect(contrastRatio(p.positive, ground), `positive on ${gName}`).toBeGreaterThanOrEqual(AA_BODY)
+        expect(contrastRatio(p.negative, ground), `negative on ${gName}`).toBeGreaterThanOrEqual(AA_BODY)
+      })
+    }
+
+    it(`${theme}: they are told apart by more than hue alone`, () => {
+      // A red/green pair that also differs in lightness survives being seen by
+      // someone who cannot separate the two hues, and survives a greyscale print.
+      expect(contrastRatio(p.positive, p.negative)).toBeGreaterThanOrEqual(1.4)
+    })
+  }
+
+  it('both reach the CSS as their own tokens', () => {
+    const vars = buildCssVars('dark', 'citron')
+    expect(vars['--positive']).toBe(PALETTES.dark.positive)
+    expect(vars['--negative']).toBe(PALETTES.dark.negative)
+  })
+
+  it('negative stays in the alert family: one red in the app, not two', () => {
+    for (const theme of THEMES) expect(PALETTES[theme].negative).toBe(PALETTES[theme].alert)
+  })
+})
+
 describe('contrast, for every accent', () => {
   for (const name of ACCENT_NAMES) {
     const a = ACCENTS[name]

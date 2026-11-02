@@ -283,6 +283,17 @@
   flex: none;
 }
 
+/* "Good for you" / "bad for you". Only on figures where that is unambiguous.
+   Never the only signal: the row also carries the meaning in words for a
+   screen reader, and signed amounts keep their + or −. */
+.result__value--positive {
+  color: var(--positive);
+}
+
+.result__value--negative {
+  color: var(--negative);
+}
+
 .result__label {
   min-width: 0;
 }

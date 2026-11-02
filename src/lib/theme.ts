@@ -4,7 +4,12 @@
  * function call and a stray hex in a component is a bug (see architecture.test.ts).
  *
  * Neutrals are chroma 0 on purpose: no hidden warm or cool tint.
- * Accent means "you can act on this", never "this is good".
+ *
+ * Accent means "you can act on this". `positive` and `negative` mean "this is
+ * good / bad for you" and are the ONLY colours allowed to carry that meaning
+ * (owner's decision, 2026-11-02; see docs/DESIGN-SYSTEM.md "Colour that means
+ * good or bad"). They are never used alone: the value also carries a sign or a
+ * word, because roughly 1 in 12 men cannot separate red from green.
  */
 
 export type ThemePreference = 'dark' | 'light' | 'system'
@@ -20,6 +25,10 @@ export interface Palette {
   ink2: string
   ink3: string
   alert: string
+  /** "This is good for you." Never used without a sign or a word beside it. */
+  positive: string
+  /** "This is bad for you." Same hue family as `alert`, which stays for errors. */
+  negative: string
   keyDigit: string
   keyDigitPressed: string
   keyOp: string
@@ -50,6 +59,9 @@ export const PALETTES: Record<ResolvedTheme, Palette> = {
     ink2: '#A4A4A4',
     ink3: '#818181',
     alert: '#EF675A',
+    // 10.6:1 on bg. Chosen at the alert red's perceptual lightness so neither shouts louder.
+    positive: '#5CD08A',
+    negative: '#EF675A',
     keyDigit: '#181818',
     keyDigitPressed: '#262626',
     keyOp: '#0D0D0D',
@@ -66,6 +78,11 @@ export const PALETTES: Record<ResolvedTheme, Palette> = {
     ink2: '#525252',
     ink3: '#5D5D5D',
     alert: '#BE241F',
+    // 10.4:1 on white, and deliberately much darker than `negative`: on light
+    // ground a mid green and a mid red land at nearly the same lightness, so
+    // hue is all that separates them. Lightness has to do the work instead.
+    positive: '#064A26',
+    negative: '#BE241F',
     keyDigit: '#F2F2F2',
     keyDigitPressed: '#E2E2E2',
     // On white, any fill would push operators *forward*; no fill is what makes them recede.
@@ -106,6 +123,8 @@ export function buildCssVars(theme: ResolvedTheme, accent: AccentName): Record<s
     '--ink-2': p.ink2,
     '--ink-3': p.ink3,
     '--alert': p.alert,
+    '--positive': p.positive,
+    '--negative': p.negative,
     '--key-digit': p.keyDigit,
     '--key-digit-pressed': p.keyDigitPressed,
     '--key-op': p.keyOp,

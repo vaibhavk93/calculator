@@ -179,7 +179,7 @@ const discountSpec: ToolSpec = {
     return {
       rows: [
         { label: 'Final price', value: x.final, fmt: 'money', main: true },
-        { label: 'You save', value: x.saved, fmt: 'money' },
+        { label: 'You save', value: x.saved, fmt: 'money', tone: 'positive' },
         { label: 'Combined discount', value: x.effectivePercent, fmt: 'percent' },
       ],
       formula: ['final = price × (1 − d1 ÷ 100) × (1 − d2 ÷ 100) − flat', `${plain(r.n.mrp!)} × (1 − ${plain(d1)} ÷ 100) × (1 − ${plain(d2)} ÷ 100) − ${plain(flat)}`],

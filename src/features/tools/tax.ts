@@ -112,7 +112,8 @@ const incomeTaxSpec: ToolSpec = {
     const verdict =
       c.cheaper === 'same' ? 'Both regimes cost the same' : `${regimeName(c.cheaper)} is cheaper by ₹${r0(c.saving)}`
     const rows: ResultRow[] = [
-      { label: verdict, value: c.saving, fmt: 'money', main: true },
+      // No tone when both regimes cost the same: there is nothing good or bad about a tie.
+      { label: verdict, value: c.saving, fmt: 'money', main: true, ...(c.cheaper === 'same' ? {} : { tone: 'positive' as const }) },
       { label: 'Tax, new regime', value: c.new.total, fmt: 'money' },
       { label: 'Tax, old regime', value: c.old.total, fmt: 'money' },
       { label: 'Taxable income, new regime', value: c.new.totalIncome, fmt: 'money' },
@@ -339,8 +340,8 @@ const advanceSpec: ToolSpec = {
       rows: [
         { label: 'Interest if paid as entered', value: a.totalInterest, fmt: 'money', main: true },
         { label: 'Advance tax due for the year', value: a.net, fmt: 'money' },
-        { label: 'Interest for late instalments (234C)', value: a.interest425, fmt: 'money' },
-        { label: 'Interest for paying under 90% (234B)', value: a.interest424, fmt: 'money' },
+        { label: 'Interest for late instalments (234C)', value: a.interest425, fmt: 'money', tone: 'negative' },
+        { label: 'Interest for paying under 90% (234B)', value: a.interest424, fmt: 'money', tone: 'negative' },
       ],
       table: {
         title: 'Instalments',

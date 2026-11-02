@@ -127,13 +127,44 @@ In a finance app, green naturally reads as *gains* — which would collide with
 an accent that is also greenish. So the accent is reserved strictly for
 **interaction**: the `=` key, the current selection, focus rings.
 
-Value is carried by **sign and weight**, not hue — `+₹4,12,000` / `−₹57,650` —
-which is also how a private-bank statement reads, and how a colour-blind user
-reads it too.
+### Colour that means good or bad
 
-**Only one semantic colour exists: `alert`, for overdue.** That is the one
-state urgent enough to earn a hue. Everything else earns its emphasis through
-typography and position.
+**Changed 2026-11-02, by the owner's decision.** This section replaces an
+earlier rule that banned good/bad colour outright and carried meaning through
+sign and weight alone. The owner found results hard to read at a glance and
+asked for red and green. The rule is changed here rather than worked around.
+
+> **`positive` and `negative` mean "this is good / bad for you." They are the
+> only colours allowed to carry that meaning, and they are never the only
+> signal.**
+
+| Token | Dark | Light |
+|---|---|---|
+| `positive` | `#5CD08A` | `#064A26` |
+| `negative` | `#EF675A` | `#BE241F` |
+
+Both clear 4.5:1 on `bg`, `surface` and `raised` in both themes, asserted in
+`theme.test.ts`. The light green is *much* darker than it first looks on
+purpose: a mid green and a mid red land at nearly the same lightness on white,
+so hue would have been the only thing separating them. The test that caught
+this asserts the pair are at least 1.4:1 against **each other**, which is what
+makes them survive greyscale and red-green colour blindness.
+
+Three constraints keep this from becoming decoration:
+
+1. **Only where good and bad are unambiguous.** Money you save, a penalty you
+   owe, the cheaper of two options. A number that is merely large, or merely a
+   fact ("Total interest"), has **no tone**. A tie has no tone either.
+2. **Never colour alone.** Roughly 1 in 12 men cannot separate red from green.
+   Every toned value also carries the meaning in words for a screen reader, and
+   signed amounts keep their `+` or `−`. Remove the colour and the result must
+   still be fully readable.
+3. **`negative` and `alert` share a hue on purpose.** `alert` still means
+   "overdue, act now"; `negative` means "this number is against you". They never
+   appear on the same row.
+
+Everything that is *not* good or bad still earns its emphasis through
+typography and position, exactly as before.
 
 ---
 
