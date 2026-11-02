@@ -1,12 +1,20 @@
 import { useEffect } from 'react'
 import { SnackBar } from './components/SnackBar'
-import { useApp } from './components/StoreProvider'
+import { useApp, useAppStore } from './components/StoreProvider'
 import { TabBar } from './components/TabBar'
 import { CalculatorScreen } from './features/calculator/CalculatorScreen'
 import { HistorySheet } from './features/calculator/HistorySheet'
-import { DuePlaceholder, SavedPlaceholder, ToolsPlaceholder } from './features/placeholders/ComingSoon'
+import { DueScreen } from './features/memory/DueScreen'
+import { SavedScreen } from './features/memory/SavedScreen'
 import { SettingsScreen } from './features/settings/SettingsScreen'
+import { ToolsScreen } from './features/tools/ToolsScreen'
+import { goBack } from './lib/backStack'
 import { createWakeLock } from './lib/device'
+import { exitApp, onHardwareBack } from './lib/nativeBack'
+import { setStatusBar } from './lib/statusBar'
+import { applyNotifications, ensurePermission, onNotificationAction, planNotifications } from './lib/notifications'
+import { formatCell } from './lib/toolFormat'
+import { D } from './engine'
 import { applyTheme } from './lib/theme'
 
 /** Keeps the document's colours, and the screen's wake lock, in step with settings. */
@@ -16,11 +24,11 @@ function useSettingsEffects() {
   const keepAwake = useApp((s) => s.settings.keepAwake)
 
   useEffect(() => {
-    applyTheme(theme, accent)
+    void setStatusBar(applyTheme(theme, accent) === 'dark')
     if (theme !== 'system') return
     // Follow the phone when it switches between light and dark.
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = () => applyTheme(theme, accent)
+    const onChange = () => void setStatusBar(applyTheme(theme, accent) === 'dark')
     mq.addEventListener('change', onChange)
     return () => mq.removeEventListener('change', onChange)
   }, [theme, accent])
@@ -30,6 +38,56 @@ function useSettingsEffects() {
     void lock.set(keepAwake)
     return () => lock.dispose()
   }, [keepAwake])
+}
+
+/**
+ * Keeps the phone's scheduled notifications in step with the reminders, and handles Mark paid / Snooze
+ * tapped on a notification. The permission is asked for only once a reminder exists, never at launch.
+ */
+function useReminderNotifications() {
+  const reminders = useApp((s) => s.reminders)
+  const cards = useApp((s) => s.cards)
+  const system = useApp((s) => s.settings.numberSystem)
+  const decimals = useApp((s) => s.settings.decimals)
+  const markPaid = useApp((s) => s.markPaid)
+  const snooze = useApp((s) => s.snooze)
+  const setTab = useApp((s) => s.setTab)
+
+  useEffect(() => {
+    const money = (plain: string) => formatCell(new D(plain), 'money', { system, decimals })
+    const planned = planNotifications(reminders, cards, Date.now(), money)
+    void (async () => {
+      if (planned.length > 0 && !(await ensurePermission())) return
+      await applyNotifications(planned)
+    })()
+  }, [reminders, cards, system, decimals])
+
+  useEffect(() => {
+    const stop = onNotificationAction((id, action) => {
+      if (action === 'paid') markPaid(id)
+      else if (action === 'snooze') snooze(id, 1)
+      else setTab('due')
+    })
+    return () => void stop.then((f) => f())
+  }, [markPaid, snooze, setTab])
+}
+
+/**
+ * The Android back button: close a settings or history screen first, then whatever screen has
+ * registered a handler (a calculator, a Tools group), then go to the Calculate tab, then leave.
+ */
+function useHardwareBack() {
+  const store = useAppStore()
+  useEffect(() => {
+    const stop = onHardwareBack(() => {
+      const s = store.getState()
+      if (s.overlay !== 'none') return s.setOverlay('none')
+      if (goBack()) return
+      if (s.tab !== 'calculate') return s.setTab('calculate')
+      exitApp()
+    })
+    return () => void stop.then((f) => f())
+  }, [store])
 }
 
 /**
@@ -54,6 +112,8 @@ function useBlurAfterPointerClick() {
 export function App() {
   useSettingsEffects()
   useBlurAfterPointerClick()
+  useReminderNotifications()
+  useHardwareBack()
   const tab = useApp((s) => s.tab)
   const overlay = useApp((s) => s.overlay)
 
@@ -65,9 +125,9 @@ export function App() {
     <div className="app">
       <main className="app__body" {...behind}>
         {tab === 'calculate' && <CalculatorScreen />}
-        {tab === 'tools' && <ToolsPlaceholder />}
-        {tab === 'saved' && <SavedPlaceholder />}
-        {tab === 'due' && <DuePlaceholder />}
+        {tab === 'tools' && <ToolsScreen />}
+        {tab === 'saved' && <SavedScreen />}
+        {tab === 'due' && <DueScreen />}
       </main>
 
       <div {...behind}>

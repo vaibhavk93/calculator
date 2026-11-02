@@ -11,15 +11,17 @@ import '@fontsource/ibm-plex-mono/latin-400.css'
 import '@fontsource/ibm-plex-mono/latin-500.css'
 import '@fontsource/ibm-plex-mono/latin-ext-400.css'
 import './styles/global.css'
+import './styles/tools.css'
+import './styles/lists.css'
 
 import { App } from './App'
 import { StoreProvider } from './components/StoreProvider'
-import { createLocalStorage } from './lib/storage'
+import { createStorage } from './lib/storage'
 import { applyTheme } from './lib/theme'
 import { bootStore } from './store/boot'
 
 async function main() {
-  const { store } = await bootStore(createLocalStorage())
+  const { store } = await bootStore(createStorage())
 
   // Colours before the first paint, so there is no flash of the wrong theme.
   const { theme, accent } = store.getState().settings

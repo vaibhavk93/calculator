@@ -1,0 +1,595 @@
+/* Styles for the Tools area, the memory screens (saved, tape, due) and the save sheet.
+   Calculator styles stay in global.css. */
+
+/* ------------------------------------------------------------------- tools */
+
+.tools {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* .app already pads for the status bar. Screens that open inside the page body must not pad again. */
+.app__body .screen {
+  padding-top: 0;
+}
+
+.tools__search {
+  flex: none;
+  padding: var(--s-2) var(--s-4) var(--s-1);
+}
+
+.tools__search .field {
+  min-height: 44px;
+}
+
+/* One tappable line: a list row on Tools home, a group page or a search result. */
+.navrow {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--s-2) var(--s-4);
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+
+.group > .navrow:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+/* The whole row changes, so it is clear which one you touched. */
+.navrow:active {
+  background: var(--key-digit-pressed);
+}
+
+.navrow__label {
+  flex: 1;
+  min-width: 0;
+  font-size: 1rem;
+}
+
+.navrow__meta {
+  flex: none;
+  max-width: 45%;
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+  text-align: right;
+}
+
+.navrow__chev {
+  flex: none;
+  color: var(--ink-3);
+}
+
+.navrow > .row__text {
+  flex: 1;
+}
+
+.tab:active {
+  background: var(--key-digit-pressed);
+}
+
+.select--wide {
+  max-width: 58%;
+  text-overflow: ellipsis;
+}
+
+/* The answer stays in view while a long form scrolls under it. */
+.answer {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  min-height: 52px;
+  padding: var(--s-2) var(--s-4);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.answer__label {
+  min-width: 0;
+  font-size: 0.875rem;
+  color: var(--ink-2);
+}
+
+.answer__value {
+  flex: none;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.25rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tools__list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: var(--s-5);
+}
+
+.tools__none {
+  margin: var(--s-5) var(--s-4);
+  color: var(--ink-3);
+  font-size: 0.9375rem;
+}
+
+.tool__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-4) var(--s-3);
+}
+
+.field-row,
+.rows__cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+
+.field-label,
+.rows__cap {
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+
+.field-hint {
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+}
+
+.tool__form .field-hint {
+  display: none;
+}
+
+/* Hints show only while you are in the field, or when it is the one that needs fixing. */
+.tool__form .field-row:focus-within .field-hint,
+.tool__form .field-row[data-invalid] .field-hint {
+  display: block;
+}
+
+.field-words {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+}
+
+.tool__form .field,
+.tool__form .select {
+  min-height: 44px;
+}
+
+.field--date {
+  display: block;
+  min-width: 0;
+  text-align: left;
+}
+
+/* Two or three short choices: same height and underline as the boxes around them. */
+.tool__form .seg {
+  flex-wrap: wrap;
+  gap: 0 var(--s-5);
+  min-height: 44px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tool__form .seg__opt {
+  margin-bottom: -1px;
+}
+
+.more {
+  border-top: 1px solid var(--line);
+}
+
+.more > summary {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  list-style: none;
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+}
+
+.more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.more > summary::after {
+  content: '+';
+  margin-left: auto;
+  font-family: var(--font-mono);
+  color: var(--ink-3);
+}
+
+.more[open] > summary::after {
+  content: '−';
+}
+
+.more__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding-bottom: var(--s-3);
+}
+
+.field--mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.field-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+}
+
+.field-unit {
+  flex: none;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.rows__row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s-3);
+}
+
+.rows__row > .rows__cell {
+  flex: 1 1 0;
+}
+
+.result {
+  padding: 0 var(--s-4) var(--s-4);
+  border-top: 1px solid var(--line);
+}
+
+.result__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  min-height: 44px;
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.result__label {
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+}
+
+.result__value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  /* A money value must never break across lines; the label wraps instead. */
+  white-space: nowrap;
+  flex: none;
+}
+
+.result__label {
+  min-width: 0;
+}
+
+.result__row--main .result__value {
+  font-weight: 500;
+}
+
+.result__note,
+.result__error {
+  margin: var(--s-3) 0 0;
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+}
+
+.result__error {
+  padding: var(--s-4);
+  color: var(--ink-3);
+}
+
+.result__sub {
+  margin: var(--s-4) 0 var(--s-1);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.tool-table-wrap {
+  overflow-x: auto;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.tool-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+}
+
+.tool-table th,
+.tool-table td {
+  padding: var(--s-2) var(--s-2);
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+
+.tool-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.tool-table th:first-child,
+.tool-table td:first-child {
+  text-align: left;
+}
+
+.chart {
+  margin: var(--s-3) 0 0;
+}
+
+.chart svg {
+  width: 100%;
+  height: auto;
+}
+
+.chart__tick {
+  font-size: 9px;
+  fill: var(--ink-3);
+  font-family: var(--font-mono);
+}
+
+.chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+
+.chart__legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  border-radius: var(--r-sm);
+}
+
+.formula {
+  margin-top: var(--s-4);
+  font-size: 0.875rem;
+  color: var(--ink-2);
+}
+
+.formula summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.formula p {
+  margin: 0 0 var(--s-2);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.screen__spacer {
+  flex: 1;
+}
+
+/* ------------------------------------------------------------ save / chips */
+
+.save {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding-bottom: var(--s-3);
+}
+
+.save__add,
+.save__when {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-end;
+}
+
+.save__when > * {
+  flex: 1 1 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.chip {
+  min-height: 44px;
+  padding: 0 var(--s-3);
+  border: 1px solid var(--ink-3);
+  border-radius: var(--r-md);
+  font-size: 0.875rem;
+  color: var(--ink-2);
+}
+
+.chip[aria-pressed='true'] {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+}
+
+textarea.field {
+  resize: none;
+  font-family: inherit;
+}
+
+/* ------------------------------------------------- saved, tape and due */
+
+.saved__head {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4) 0;
+}
+
+.saved__actions {
+  display: flex;
+  gap: var(--s-4);
+}
+
+.row--split {
+  align-items: stretch;
+  padding: 0 var(--s-4);
+}
+
+.row__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--s-3) 0;
+  text-align: left;
+}
+
+.row--split > .link-btn {
+  align-self: center;
+}
+
+.screen__title-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0;
+  font-size: 1rem;
+}
+
+.tape__total,
+.due__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.due__total {
+  flex: none;
+}
+
+.tape__sum {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+
+.tape__hint {
+  padding: 0 var(--s-4);
+}
+
+.tape__lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tape__line {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding-right: var(--s-2);
+}
+
+.tape__edit {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-4);
+  min-height: 48px;
+  align-items: center;
+  padding: 0 var(--s-4);
+  text-align: left;
+}
+
+.tape__copy {
+  margin: var(--s-3) var(--s-4);
+}
+
+.tape__bar {
+  flex: none;
+  padding: var(--s-3) var(--s-4) calc(var(--s-3) + var(--safe-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.tape__row {
+  display: flex;
+  gap: var(--s-3);
+  align-items: center;
+}
+
+.tape__error {
+  margin: 0 0 var(--s-2);
+  font-size: 0.875rem;
+  color: var(--alert);
+}
+
+.due {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0 var(--s-3);
+  padding: var(--s-2) var(--s-4);
+  border-top: 1px solid var(--line);
+}
+
+.due__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 44px;
+  justify-content: center;
+  text-align: left;
+}
+
+.due__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-4);
+}
+
+.due__alert,
+.group__title--alert {
+  color: var(--alert);
+}
+
+.rows legend {
+  padding: 0;
+  margin-bottom: var(--s-2);
+}

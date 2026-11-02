@@ -1,0 +1,127 @@
+import { useState } from 'react'
+import { Sheet } from '../../components/Sheet'
+import { useApp } from '../../components/StoreProvider'
+import type { CardDraft } from '../../store/app'
+import { DEFAULT_TAGS, type Reminder, type Repeat, type SavedCard } from '../../store/types'
+import { Segmented } from '../settings/controls'
+
+type Remind = 'off' | Repeat
+
+const pad = (n: number) => String(n).padStart(2, '0')
+const toDateInput = (ts: number) => {
+  const d = new Date(ts)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+/** A due date is 9 in the morning, local time. */
+const fromDateInput = (v: string) => {
+  const [y, m, d] = v.split('-').map(Number)
+  return y && m && d ? new Date(y, m - 1, d, 9).getTime() : null
+}
+
+/**
+ * The two-tap save: Save opens this with the title already filled; Done keeps it.
+ * Tags, a note and a reminder are all optional.
+ */
+export function SaveSheet({
+  draft,
+  card,
+  reminder,
+  suggest,
+  onClose,
+  onSaved,
+}: {
+  draft: CardDraft
+  /** When editing a card that already exists. */
+  card?: SavedCard
+  reminder?: Reminder
+  /** A reminder rhythm to start with, from a smart suggestion. */
+  suggest?: Repeat
+  onClose: () => void
+  onSaved: (id: string) => void
+}) {
+  const saveCard = useApp((s) => s.saveCard)
+  const updateCard = useApp((s) => s.updateCard)
+  const known = useApp((s) => s.cards)
+
+  const [title, setTitle] = useState(card?.title ?? draft.title)
+  const [tags, setTags] = useState<string[]>(card?.tags ?? [])
+  const [note, setNote] = useState(card?.note ?? '')
+  const [remind, setRemind] = useState<Remind>(reminder ? reminder.repeat : suggest ?? 'off')
+  const [date, setDate] = useState(toDateInput(reminder?.dueAt ?? Date.now() + 30 * 86_400_000))
+  const [lead, setLead] = useState(String(reminder?.leadDays ?? 3))
+  const [custom, setCustom] = useState('')
+
+  const allTags = [...new Set([...DEFAULT_TAGS, ...known.flatMap((c) => c.tags), ...tags])]
+  const toggle = (t: string) => setTags((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]))
+  const addCustom = () => {
+    const t = custom.trim().slice(0, 30)
+    if (t && !tags.includes(t)) setTags([...tags, t])
+    setCustom('')
+  }
+
+  const dueAt = fromDateInput(date)
+  const reminderDraft = remind === 'off' || dueAt === null ? null : { dueAt, repeat: remind, leadDays: Math.max(0, Math.min(60, parseInt(lead, 10) || 0)) }
+
+  const done = () => {
+    const cleanTitle = title.trim() || draft.title
+    if (card) {
+      updateCard(card.id, { title: cleanTitle, tags, note, inputs: draft.inputs, summary: draft.summary, amount: draft.amount, lines: draft.lines }, reminderDraft)
+      onSaved(card.id)
+    } else {
+      const id = saveCard({ ...draft, title: cleanTitle, tags, note }, reminderDraft)
+      if (id) onSaved(id)
+    }
+    onClose()
+  }
+
+  return (
+    <Sheet title={card ? 'Update' : 'Save'} onClose={onClose} action={<button type="button" className="btn btn--primary" onClick={done}>Done</button>}>
+      <div className="save">
+        <label className="field-label" htmlFor="save-title">Title</label>
+        <input id="save-title" className="field" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
+
+        <span className="field-label">Tag</span>
+        <div className="chips" role="group" aria-label="Tags">
+          {allTags.map((t) => (
+            <button key={t} type="button" className="chip" aria-pressed={tags.includes(t)} onClick={() => toggle(t)}>
+              {t}
+            </button>
+          ))}
+        </div>
+        <div className="save__add">
+          <input className="field" placeholder="Your own tag" aria-label="Add your own tag" value={custom} maxLength={30} onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCustom()} />
+          <button type="button" className="btn" onClick={addCustom} disabled={!custom.trim()}>Add</button>
+        </div>
+
+        <label className="field-label" htmlFor="save-note">Note</label>
+        <textarea id="save-note" className="field" rows={2} value={note} maxLength={5000} onChange={(e) => setNote(e.target.value)} />
+
+        <span className="field-label">Remind me</span>
+        <Segmented
+          label="Remind me"
+          value={remind}
+          onChange={setRemind}
+          options={[
+            { value: 'off', label: 'No' },
+            { value: 'none', label: 'Once' },
+            { value: 'monthly', label: 'Monthly' },
+            { value: 'quarterly', label: 'Quarterly' },
+            { value: 'yearly', label: 'Yearly' },
+          ]}
+        />
+        {remind !== 'off' && (
+          <div className="save__when">
+            <label className="field-row">
+              <span className="field-label">{remind === 'none' ? 'Due on' : 'First due on'}</span>
+              <input className="field field--mono" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </label>
+            <label className="field-row">
+              <span className="field-label">Remind me this many days before</span>
+              <input className="field field--mono" inputMode="numeric" value={lead} onChange={(e) => setLead(e.target.value.replace(/\D/g, '').slice(0, 2))} />
+            </label>
+          </div>
+        )}
+      </div>
+    </Sheet>
+  )
+}

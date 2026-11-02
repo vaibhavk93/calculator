@@ -6,9 +6,11 @@ import { ACCENT_NAMES, ACCENTS } from '../../lib/theme'
 import { backupFilename, buildBackup, parseBackup } from '../../store/backup'
 import { TABS, type PersistedData, type Tab } from '../../store/types'
 import pkg from '../../../package.json'
+import { ALL_TOOLS } from '../tools/registry'
+import { GROUPS } from '../tools/groups'
 import { OptionRow, Row, Segmented, Toggle } from './controls'
 
-const TAB_LABEL: Record<Tab, string> = { calculate: 'Calculate', tools: 'Tools', saved: 'Saved', due: 'Due' }
+const TAB_LABEL: Record<Tab, string> = { calculate: 'Calculate', tools: 'Tools', saved: 'Notes', due: 'Due' }
 const DECIMAL_CHOICES = ['auto', ...Array.from({ length: 11 }, (_, i) => String(i))]
 
 type Backup = { state: 'idle' } | { state: 'confirm'; data: PersistedData; exportedAt: string | null } | { state: 'done'; text: string } | { state: 'error'; text: string }
@@ -18,6 +20,14 @@ export function SettingsScreen() {
   const s = useApp((x) => x.settings)
   const update = useApp((x) => x.updateSettings)
   const setOverlay = useApp((x) => x.setOverlay)
+
+  // One picker for both kinds of start: a screen ("tab:saved") or a calculator ("tool:gst").
+  const opensOn = s.startupTool && ALL_TOOLS.some((t) => t.id === s.startupTool) ? `tool:${s.startupTool}` : `tab:${s.startupTab}`
+  const chooseOpensOn = (v: string) => {
+    const [kind, id = ''] = v.split(':')
+    if (kind === 'tool') update({ startupTool: id })
+    else update({ startupTab: id as Tab, startupTool: null })
+  }
 
   const fileRef = useRef<HTMLInputElement>(null)
   const [backup, setBackup] = useState<Backup>({ state: 'idle' })
@@ -118,11 +128,22 @@ export function SettingsScreen() {
         <h2 className="group__title">Behaviour</h2>
         <div className="group">
           <Row label="Opens on">
-            <select className="select" aria-label="Opens on" value={s.startupTab} onChange={(e) => update({ startupTab: e.target.value as Tab })}>
-              {TABS.map((t) => (
-                <option key={t} value={t}>
-                  {TAB_LABEL[t]}
-                </option>
+            <select className="select select--wide" aria-label="Opens on" value={opensOn} onChange={(e) => chooseOpensOn(e.target.value)}>
+              <optgroup label="Screens">
+                {TABS.map((t) => (
+                  <option key={t} value={`tab:${t}`}>
+                    {TAB_LABEL[t]}
+                  </option>
+                ))}
+              </optgroup>
+              {GROUPS.map((g) => (
+                <optgroup key={g.id} label={g.name}>
+                  {g.tools.map((id) => (
+                    <option key={id} value={`tool:${id}`}>
+                      {ALL_TOOLS.find((t) => t.id === id)?.title ?? id}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </Row>
@@ -179,7 +200,7 @@ export function SettingsScreen() {
 
         <h2 className="group__title">About</h2>
         <div className="group">
-          <Row label="VK Calc" hint="Everything stays on this phone. No account, no ads, no tracking.">
+          <Row label="Calc" hint="Everything stays on this phone. No account, no ads, no tracking.">
             <span className="row__value">{pkg.version}</span>
           </Row>
         </div>
