@@ -99,3 +99,76 @@ touched by this session.
 **Now switching to phone testing per the owner's instruction** ("execute the test mobile first"), using **Calc QA**
 (`com.vaibhavkumawat.vkcalc.qa`, own empty data) -- never the owner's real Calc app -- and the safety rules already
 written above (screenshot before every tap batch, no bulk taps on Budget/Notes/Due/History, wake the phone first).
+
+## Round 6 continued: results
+
+**Committed:** `453ba23` (capHistory fix, real bug CALC-254 found by the test run, verified by hand and fixed) and
+`42ef20d` (the six e2e suites, previously written but never committed).
+
+**Phone (Calc QA, com.vaibhavkumawat.vkcalc.qa):** huge-number multiply (8x 12-digit nines) gives `1E+96`, no crash,
+keypad stays in place -- confirmed fixed. Scientific portrait: all rows visible, no clipping -- confirmed fixed.
+Tools home: tinted section cards render correctly, re-sorted taxonomy live. Notes/Due/Budget empty states all
+render cleanly. Not yet checked on the phone: Scientific landscape, Budget with real data entered, Notes/Due with
+items (deliberately not bulk-tested per the safety rules).
+
+**e2e suites, run for the first time:**
+
+| Suite | Cases | Fail | Report |
+|---|---|---|---|
+| tools1 | 461 | 77 | `docs/TEST-REPORT-tools1.md` -- the 2 MATH failures checked by hand: **both false positives**, app is correct |
+| budget | 117 | 18 | `docs/TEST-REPORT-budget.md` -- B-23/B-06 money-entry bugs reconfirmed; one real card/bill-payment bug (B-04) |
+| notes-todo | 45 | 12 | printed twice by the harness (a harness bug, not re-tested); real finds: tag case-folding ("Rent"/"rent" not merged), pin-limit message not shown, trash purge boundary off |
+| calculator | 282 | 39 | **biggest single finding: cursor-aware editing does not work at all** -- tapping mid-expression and typing/backspacing/pasting always acts at the end, never at the tap position (~12 cases, one root cause). Also: bottom key row hidden under the tab bar at 360x640 (CALC-331, matches an old complaint); Scientific overflows sideways with a long expression (4 cases); `.display__result` has `cursor: not-allowed` even though tapping it works (CALC-383); **found and fixed** CALC-254 (see above) |
+| shell | 286 | 215 pass / 71 fail / 29 notes | done. Full triage in [TEST-REPORT-shell.md](TEST-REPORT-shell.md) |
+| tools2 | 208 (was 0) | 205 pass / 3 fail | wrote all 208 cases this round (scaffold existed, zero cases were ever registered). Full writeup in [TEST-REPORT-tools2.md](TEST-REPORT-tools2.md) |
+
+## Round 7: full triage complete, all 6 suites done, 2 more bugs fixed, tools2 written from scratch
+
+All six e2e suites are now finished and triaged against the real source, not just the test's own claims.
+Full per-suite detail: [TEST-REPORT-tools1.md](TEST-REPORT-tools1.md), [TEST-REPORT-budget.md](TEST-REPORT-budget.md),
+[TEST-REPORT-notes-todo.md](TEST-REPORT-notes-todo.md), [TEST-REPORT-calculator.md](TEST-REPORT-calculator.md),
+[TEST-REPORT-shell.md](TEST-REPORT-shell.md), [TEST-REPORT-tools2.md](TEST-REPORT-tools2.md).
+
+**Root causes found that explain clusters of "failures" as ONE cause each (not N separate bugs):**
+
+| Cause | Explains | Real or test bug |
+|---|---|---|
+| `setSelectionRange()` in a test helper doesn't fire the browser's `select` event | 12 calculator "cursor editing broken" cases | **Test bug** — app's cursor editing works (proven by the one case using a real mouse click, which passed) |
+| A test selector `[role=radio][aria-label=Light]` that never matches (the real buttons have no `aria-label`, just text) | 13 shell.test.mjs timeouts | **Test bug** |
+| A contrast-edge check that only reads `borderTopWidth`/`borderTopColor`, never `border-bottom` | 8 shell.test.mjs "0.00<3" failures on `.field` inputs, which are intentionally bottom-underlined per the design system | **Test bug** |
+| Tools home screen was restructured into categories this round; 4 old tests still try `getByText('Loan EMI')` directly on the home screen | N29/N39/N40/N41 in notes-todo.test.mjs | **Test bug** (stale after this round's own UI change) |
+
+**Real bugs found and fixed this round:**
+
+1. `capHistory` could silently drop a brand-new calculation once 200 rows were already named/locked — fixed, 5 new tests (CALC-254 / B-19).
+2. `SaveSheet.tsx`'s custom-tag box only de-duped tags by exact match; `TaskSheet.tsx` already did it case-insensitively. "Rent" + "rent" became two tags on a saved calculation. Fixed to match `TaskSheet.tsx` (N11).
+
+**Real bugs found, not fixed (flagged for a deliberate decision, not a safe one-liner):**
+
+- The pin-limit message (`notice`) is set correctly in the store when a 6th item is pinned from the Notes list, but `SavedScreen.tsx` never reads `notice` at all — only Calculate, TaskSheet, TodoScreen and some Budget sheets do. The message is silently lost on the one screen this action lives on (N14/N15).
+- A dangling binary operator (`"12 +"`) renders with a trailing space (`"12 + "`) — cosmetic, confirmed in the formatter, not fixed (CALC-076/085/088/129).
+- Scientific mode overflows sideways at several phone sizes specifically (Calculate mode is fine at the same sizes) — CALC-350/351/352/353.
+- The bottom keypad row sits under the tab bar at 360×640 — CALC-331, matches an old complaint.
+- `.display__result` shows a "not allowed" cursor even though tapping it is a real, working action — CALC-383.
+- Accent colours sky/violet/amber (and citron in light mode) fail their own 3:1/4.5:1 contrast checks; only citron in dark mode had ever been checked this rigorously before this round.
+- No `<h1>` on 5 screens; 2 screens have more than one `<h1>`.
+
+**tools2.test.mjs now has real coverage.** It had a complete scaffold (every field, every default,
+several independent reference formulas) but zero registered test cases — the 25 calculators from SIP
+through A/B sample size had never been tested at all. Wrote 208 cases: a smoke test, every required-field
+validation, a negative-money check, a 360px overflow check and a 44px tap-target check for all 25, plus 9
+independent numeric cross-checks (SIP, step-up SIP, lump sum, goal SIP, FD, RD, PPF, CAGR, XIRR against a
+second, independently-written formula) and 9 corner cases. 205/208 pass; the 3 failures are the same
+already-known systemic overflow issue tools1 found elsewhere, not new bugs. Deliberately did **not**
+re-derive capital gains, gratuity, advance tax, EPF, NPS or the salary/presumptive-tax calculators
+independently — that's real tax/EPFO law already covered by dedicated engine unit tests
+(`docs/VERIFICATION.md`), and re-deriving it for an e2e test risks writing a wrong "independent" formula
+and reporting a false bug, which is exactly what happened twice in tools1.
+
+**Still open, not yet investigated:**
+- CALC-140 (Indian number-words at a boundary), CALC-237 (a Playwright strict-mode error, possibly a loose test selector), CALC-304/307 (timing, could be a slow machine not a real regression).
+- budget.test.mjs's 9-case Timeout cluster on category/payment-mode pickers (still only "likely a stale selector," not confirmed).
+- shell.test.mjs's SH-K16/K19/K26 (backup/restore edge cases) and the borderline 3.83-4.06 text-contrast findings — measured correctly, not yet traced to the exact fix.
+- The real owner Budget entry that changed category between 21:08 and 21:45 on 2 Nov 2026 — still never confirmed with the owner directly.
+
+All fixes verified: `npm run check` — 1310/1310 unit tests pass.

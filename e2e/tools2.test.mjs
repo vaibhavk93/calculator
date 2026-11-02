@@ -286,3 +286,185 @@ export async function runAll(registerAll) {
 
 export const isMain = import.meta.url === pathToFileURL(process.argv[1] ?? '').href
 export { openApp, tab, stored, startApp }
+
+// ---------------------------------------------------------------------------------------------
+// Cases. Numeric correctness for these 25 calculators already lives in src/engine's own unit
+// tests (invest.test.ts, incomeTax.test.ts, other.test.ts, metrics.test.ts, sampleSize.test.ts),
+// checked against outside sources per docs/VERIFICATION.md. These e2e cases are about the SCREEN:
+// does opening it work, does an empty required field error instead of showing a stale number, does
+// a bad input ever leak NaN/undefined/Infinity onto the page, does it fit 360px, are controls 44px.
+// A handful of POS cases re-derive the simplest formulas independently as a cross-check.
+// ---------------------------------------------------------------------------------------------
+
+// Every calculator opens with its own example numbers and shows a real, clean result straight away.
+for (const id of IDS) {
+  T(`SMOKE-${id}`, 'POS', `${SPEC[id].t}: opens with its example numbers and shows a result, no NaN/undefined/Infinity`, async ({ page }) => {
+    const r = await read(page)
+    is(r.ok, `no result rows shown :: ${r.err ?? r.text.slice(0, 200)}`)
+    const bad = badText(r)
+    is(!bad, `bad text on screen: ${bad}`)
+  }, { tool: id })
+}
+
+// Clearing any required field must show a plain-words error, never a stale or blank result (this is
+// what src/lib/tool.ts's need() is supposed to guarantee for every tool that calls it).
+for (const id of IDS) {
+  const spec = SPEC[id]
+  for (const label of spec.req) {
+    T(`NEG-${id}-${label.replace(/\W+/g, '-')}`, 'NEG', `${spec.t}: clearing "${label}" shows an error, not a stale result`, async ({ page }) => {
+      await setField(page, label, '')
+      const r = await read(page)
+      is(r.err !== null, `no error after clearing "${label}" :: ${r.text.slice(0, 200)}`)
+    }, { tool: id })
+  }
+}
+
+// A negative amount in a money field must never leak as NaN/undefined/Infinity, whether the tool
+// refuses it with an error or (legitimately, e.g. a loss) accepts it as a negative result.
+for (const id of IDS) {
+  const spec = SPEC[id]
+  for (const label of spec.rupee) {
+    T(`NEGNUM-${id}-${label.replace(/\W+/g, '-')}`, 'NEG', `${spec.t}: "${label}" set to -100 never shows NaN/undefined/Infinity`, async ({ page }) => {
+      await setField(page, label, '-100')
+      const r = await read(page)
+      const bad = badText(r)
+      is(!bad, `-100 in "${label}" gave bad text: ${bad}`)
+    }, { tool: id })
+  }
+}
+
+// No calculator screen scrolls sideways at a 360px phone width.
+for (const id of IDS) {
+  T(`OVF-${id}`, 'UI', `${SPEC[id].t}: no sideways overflow at 360px`, async ({ page }) => {
+    const o = await sideways(page)
+    is(o.length === 0, o.slice(0, 4).join(' | '))
+  }, { tool: id, width: 360 })
+}
+
+// Every visible button, input and switch is at least 44px in one direction (project rule).
+for (const id of IDS) {
+  T(`TAP-${id}`, 'UI', `${SPEC[id].t}: every control is 44px in one direction`, async ({ page }) => {
+    const small = await smallTargets(page)
+    is(small.length === 0, small.join(' | '))
+  }, { tool: id })
+}
+
+// ---- POS: independent numeric cross-checks against the app's own example defaults ----------
+
+T('POS-sip', 'POS', 'SIP default (₹5,000/mo, 12%, 10y) matches the closed-form annuity-due formula', async ({ page }) => {
+  const r = await read(page)
+  close('Value at the end', rowNum(r, 'Value at the end'), ref.sip(5000, 12, 10))
+  close('Total invested', rowNum(r, 'Total invested'), D(5000).times(120))
+}, { tool: 'sip' })
+
+T('POS-step-up-sip', 'POS', 'Step-up SIP default (₹5,000/mo, 12%, 10y, +10%/y) matches an independent month-by-month simulation', async ({ page }) => {
+  const r = await read(page)
+  const { bal, inv } = ref.stepSip(5000, 12, 10, 10)
+  close('Value at the end', rowNum(r, 'Value at the end'), bal)
+  close('Total invested', rowNum(r, 'Total invested'), inv)
+}, { tool: 'step-up-sip' })
+
+T('POS-lumpsum', 'POS', 'Lump sum default (₹1,00,000, 12%, 10y) matches A = P(1+r)^t', async ({ page }) => {
+  const r = await read(page)
+  close('Final value', rowNum(r, 'Final value'), ref.lump(100000, 12, 10))
+}, { tool: 'lumpsum' })
+
+T('POS-goal-sip', 'POS', 'SIP-for-a-goal default (target ₹10,00,000, 12%, 10y, nothing saved yet) matches the reverse-annuity formula', async ({ page }) => {
+  const r = await read(page)
+  close('Monthly SIP needed', rowNum(r, 'Monthly SIP needed'), ref.goal(1000000, 12, 10, 0))
+}, { tool: 'goal-sip' })
+
+T('POS-fd', 'POS', 'FD default (₹1,00,000, 7%, 5y, quarterly) matches A = P(1+r/n)^(nt)', async ({ page }) => {
+  const r = await read(page)
+  close('Maturity value', rowNum(r, 'Maturity value'), ref.fd(100000, 7, 5, 4))
+}, { tool: 'fd' })
+
+T('POS-rd', 'POS', 'RD default (₹5,000/mo, 7%, 5y) matches the Indian-bank quarterly-compounding formula', async ({ page }) => {
+  const r = await read(page)
+  close('Maturity value', rowNum(r, 'Maturity value'), ref.rd(5000, 7, 60))
+}, { tool: 'rd' })
+
+T('POS-ppf', 'POS', 'PPF default (₹1,50,000/y, 7.1%, 15y) matches the annuity-due yearly-compounding formula', async ({ page }) => {
+  const r = await read(page)
+  close('Maturity value', rowNum(r, 'Maturity value'), ref.ppf(150000, 7.1, 15))
+}, { tool: 'ppf' })
+
+T('POS-cagr', 'POS', 'CAGR default (₹1,00,000 → ₹2,00,000 over 6y) matches (end/start)^(1/years) − 1', async ({ page }) => {
+  const r = await read(page)
+  const exp = D(200000).div(100000).pow(D(1).div(6)).minus(1).times(100)
+  close('Yearly growth (CAGR)', rowNum(r, 'Yearly growth (CAGR)'), exp)
+}, { tool: 'cagr-xirr' })
+
+T('POS-xirr', 'POS', 'XIRR on the default 3-cashflow example matches an independent bisection on actual/365 days', async ({ page }) => {
+  await choose(page, 'You have', 'Many dates')
+  const r = await read(page)
+  const d = (s) => new Date(`${s}T00:00:00Z`).getTime()
+  const exp = ref.xirr([
+    { t: d('2024-01-01'), a: -100000 },
+    { t: d('2024-07-01'), a: -50000 },
+    { t: d('2026-01-01'), a: 180000 },
+  ])
+  close('Annual return (XIRR)', rowNum(r, 'Annual return (XIRR)'), exp, 0.05)
+}, { tool: 'cagr-xirr' })
+
+// ---- CORNER: a few boundary cases worth a dedicated check -----------------------------------
+
+T('CORNER-ppf-over-max', 'CORNER', 'PPF: a yearly deposit over ₹1,50,000 is refused with the limit in the message', async ({ page }) => {
+  await setField(page, 'Yearly deposit', '200000')
+  const r = await read(page)
+  is(r.err !== null && /1,50,000|150000/.test(r.err), `got :: ${r.err}`)
+}, { tool: 'ppf' })
+
+T('CORNER-ppf-under-min', 'CORNER', 'PPF: a yearly deposit under ₹500 is refused with the minimum in the message', async ({ page }) => {
+  await setField(page, 'Yearly deposit', '100')
+  const r = await read(page)
+  is(r.err !== null && /500/.test(r.err), `got :: ${r.err}`)
+}, { tool: 'ppf' })
+
+T('CORNER-swp-zero-withdrawal', 'CORNER', 'SWP: a withdrawal of 0 is refused, not treated as "never runs out"', async ({ page }) => {
+  await setField(page, 'Monthly withdrawal', '0')
+  const r = await read(page)
+  is(r.err !== null, `got :: ${r.err ?? r.text.slice(0, 150)}`)
+}, { tool: 'swp' })
+
+T('CORNER-fd-zero-years', 'CORNER', 'FD: 0 years is refused ("more than zero"), not treated as an instant maturity', async ({ page }) => {
+  await setField(page, 'Number of years', '0')
+  const r = await read(page)
+  is(r.err !== null, `got :: ${r.err ?? r.text.slice(0, 150)}`)
+}, { tool: 'fd' })
+
+T('CORNER-ab-sample-over-100', 'CORNER', 'A/B sample size: a lift that would push the rate past 100% is refused in words, not NaN', async ({ page }) => {
+  await setField(page, 'Current conversion rate', '98')
+  await setField(page, 'Smallest lift to detect', '5')
+  const r = await read(page)
+  is(r.err !== null && /100%/.test(r.err), `got :: ${r.err ?? r.text.slice(0, 150)}`)
+}, { tool: 'ab-sample-size' })
+
+T('CORNER-capital-gains-sell-before-buy', 'CORNER', 'Capital gains: a sell date before the buy date is refused in words', async ({ page }) => {
+  await setField(page, 'Buy date', '2026-06-15')
+  await setField(page, 'Sell date', '2025-01-01')
+  const r = await read(page)
+  is(r.err !== null, `got :: ${r.err ?? r.text.slice(0, 150)}`)
+}, { tool: 'capital-gains' })
+
+T('CORNER-gratuity-bad-months', 'CORNER', 'Gratuity: "extra months" of 12 or more is refused (must be 0 to 11)', async ({ page }) => {
+  await setField(page, 'Extra months', '12')
+  const r = await read(page)
+  is(r.err !== null, `got :: ${r.err ?? r.text.slice(0, 150)}`)
+}, { tool: 'gratuity' })
+
+T('CORNER-rule40-negative-burn', 'CORNER', 'Rule of 40: a negative net burn is refused, since burn is a cash loss not a gain', async ({ page }) => {
+  await setField(page, 'Net burn', '-5000')
+  const r = await read(page)
+  is(r.err !== null, `got :: ${r.err ?? r.text.slice(0, 150)}`)
+}, { tool: 'rule-of-40' })
+
+T('CORNER-funnel-stage-increases', 'CORNER', 'Funnel: a later stage bigger than the one before it is refused, not shown as a result', async ({ page }) => {
+  // Default rows are Visited 10000, Signed up 1800, ... ; push "Signed up" above "Visited".
+  await page.locator('.rows__row').nth(1).locator('input').nth(1).fill('99999')
+  await settle(page)
+  const r = await read(page)
+  is(r.err !== null, `got :: ${r.err ?? r.text.slice(0, 150)}`)
+}, { tool: 'funnel' })
+
+if (isMain) await runAll(() => {})

@@ -57,7 +57,7 @@ export function SaveSheet({
   const toggle = (t: string) => setTags((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]))
   const addCustom = () => {
     const t = custom.trim().slice(0, 30)
-    if (t && !tags.includes(t)) setTags([...tags, t])
+    if (t && !tags.some((x) => x.toLowerCase() === t.toLowerCase())) setTags([...tags, t])
     setCustom('')
   }
 
