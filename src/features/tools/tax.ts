@@ -1,4 +1,5 @@
 import { D, type Dec } from '../../engine'
+import { formatDecimal } from '../../lib/format'
 import { advanceTax } from '../../engine/tax/advanceTax'
 import { capitalGains, type Asset } from '../../engine/tax/capitalGains'
 import { gratuity } from '../../engine/tax/gratuity'
@@ -12,7 +13,8 @@ const NOTE = taxNote(R)
 const ZERO = new D(0)
 const opt = (v: Values, id: string): Dec => parseNum(v[id]) ?? ZERO
 const money = (id: string, label: string, d: string, hint?: string, advanced?: boolean): Field => ({ id, label, kind: 'number', unit: 'rupee', default: d, hint, advanced })
-const r0 = (x: Dec) => x.toDecimalPlaces(0, D.ROUND_HALF_UP).toFixed()
+/** Whole rupees, grouped the Indian way, for the worked-out lines. */
+const r0 = (x: Dec) => formatDecimal(x.toDecimalPlaces(0, D.ROUND_HALF_UP), { system: 'indian', decimals: 0 })
 const regimeName = (r: Regime) => (r === 'new' ? 'New regime' : 'Old regime')
 
 const ageField: Field = {
@@ -110,7 +112,7 @@ const incomeTaxSpec: ToolSpec = {
     )
     const pick = c.cheaper === 'old' ? c.old : c.new
     const verdict =
-      c.cheaper === 'same' ? 'Both regimes cost the same' : `${regimeName(c.cheaper)} is cheaper by ₹${r0(c.saving)}`
+      c.cheaper === 'same' ? 'Both regimes cost the same' : `${regimeName(c.cheaper)} is cheaper, you save`
     const rows: ResultRow[] = [
       // No tone when both regimes cost the same: there is nothing good or bad about a tie.
       { label: verdict, value: c.saving, fmt: 'money', main: true, ...(c.cheaper === 'same' ? {} : { tone: 'positive' as const }) },

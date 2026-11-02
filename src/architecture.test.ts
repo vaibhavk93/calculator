@@ -55,7 +55,7 @@ const layerOf = (file: string): Layer | null => {
 }
 const THIRD_PARTY_OK: Record<Layer, string[]> = {
   engine: ['decimal.js'],
-  lib: ['decimal.js', 'loglevel', '@capacitor/core', '@capacitor/preferences', '@capacitor/local-notifications', '@capacitor/clipboard', '@capacitor/app', '@capacitor/status-bar'],
+  lib: ['decimal.js', 'loglevel', '@capacitor/core', '@capacitor/preferences', '@capacitor/local-notifications', '@capacitor/clipboard', '@capacitor/app', '@capacitor/status-bar', '@capacitor/share'],
   store: ['zustand', 'zustand/vanilla', 'decimal.js'],
   components: ['react', 'react-dom', 'zustand', 'react/jsx-runtime'],
   features: ['react', 'react-dom', 'zustand', 'react/jsx-runtime'],
@@ -161,6 +161,11 @@ describe('design system (docs/DESIGN-SYSTEM.md)', () => {
       if (/backdrop-filter/.test(code)) bad.push(`${rel(f)}: backdrop-filter`)
     }
     expect(bad).toEqual([])
+  })
+
+  it('every full-screen header is the shared ScreenHeader (docs/DESIGN-SYSTEM.md, Page anatomy)', () => {
+    const own = ALL.filter((f) => /\.tsx$/.test(f) && !isTest(f) && rel(f) !== 'components/ScreenHeader.tsx' && /screen__bar/.test(read(f)))
+    expect(own.map(rel)).toEqual([])
   })
 
   it('no coloured side-stripe borders', () => {

@@ -1,5 +1,6 @@
 import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
+import { ScreenHeader } from '../../components/ScreenHeader'
 import { useBackHandler } from '../../components/useBackHandler'
 import type { Key } from '../../engine'
 import { haptic } from '../../lib/device'
@@ -54,12 +55,7 @@ export function ScientificScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="screen sci-screen">
-      <header className="screen__bar">
-        <button type="button" className="icon-btn" aria-label="Back" onClick={onBack}>
-          <Icon name="back" size={22} />
-        </button>
-        <h1 className="screen__title">Scientific</h1>
-      </header>
+      <ScreenHeader title="Scientific" onBack={onBack} />
 
       <Display
         view={core.view}

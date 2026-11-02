@@ -1,9 +1,11 @@
 import { D, type Dec } from '../../engine/decimal'
+import { formatDecimal } from '../../lib/format'
 import { cagr, epf, fd, goalSip, lumpsum, ppf, rd, sip, swp, xirr, type YearRow } from '../../engine/investments/invest'
 import { EXAMPLE, PPF } from '../../engine/investments/rates'
 import { need, parseNum, type Field, type Output, type ToolSpec } from '../../lib/tool'
 
-const s = (v: Dec, dp = 2) => v.toDecimalPlaces(dp).toFixed()
+/** Grouped the Indian way for the worked-out lines (1,50,000 and not 150000). */
+const s = (v: Dec, dp = 2) => formatDecimal(v.toDecimalPlaces(dp), { system: 'indian', decimals: 'auto' })
 const EX = 'Example rate, enter your own'
 
 const num = (id: string, label: string, def: string, unit: Extract<Field, { kind: 'number' }>['unit'] = 'none', hint?: string, advanced?: boolean): Field => ({

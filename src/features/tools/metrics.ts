@@ -1,11 +1,12 @@
 import { D, type Dec } from '../../engine/decimal'
+import { formatDecimal } from '../../lib/format'
 import { burnBand, burnMultiple, cacLtv, cacPayback, ruleOf40 } from '../../engine/metrics/unit'
 import { funnel, retention, runRate } from '../../engine/metrics/growth'
 import { sampleSize } from '../../engine/metrics/sampleSize'
 import { need, parseNum, type ToolSpec, type Values } from '../../lib/tool'
 
-const f = (v: Dec) => v.toFixed()
-const f2 = (v: Dec) => v.toDecimalPlaces(2).toFixed()
+const f = (v: Dec) => formatDecimal(v, { system: 'indian', decimals: 'auto' })
+const f2 = (v: Dec) => formatDecimal(v.toDecimalPlaces(2), { system: 'indian', decimals: 'auto' })
 
 /** An error when any named number is negative. */
 function nonNegative(n: Record<string, Dec>, fields: { id: string; label: string }[]): { error: string } | null {

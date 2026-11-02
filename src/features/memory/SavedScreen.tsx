@@ -3,6 +3,7 @@ import { EmptyState } from '../../components/EmptyState'
 import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
 import { tintStyle } from '../../components/tint'
+import { ScreenHeader } from '../../components/ScreenHeader'
 import { useBackHandler } from '../../components/useBackHandler'
 import { matchesCard } from '../../lib/cardSearch'
 import { dueLabel } from '../../lib/reminders'
@@ -141,16 +142,17 @@ function TrashScreen({ onBack }: { onBack: () => void }) {
   const empty = useApp((s) => s.emptyTrash)
   return (
     <div className="screen" role="dialog" aria-modal="true" aria-label="Trash">
-      <div className="screen__bar">
-        <button type="button" className="icon-btn" aria-label="Back" onClick={onBack}>
-          <Icon name="back" size={20} />
-        </button>
-        <h1 className="screen__title">Trash</h1>
-        <span className="screen__spacer" />
-        {cards.length > 0 && (
-          <button type="button" className="link-btn link-btn--danger" onClick={() => { empty(); onBack() }}>Empty Trash</button>
-        )}
-      </div>
+      <ScreenHeader
+        title="Trash"
+        onBack={onBack}
+        action={
+          cards.length > 0 && (
+            <button type="button" className="link-btn link-btn--danger" onClick={() => { empty(); onBack() }}>
+              Empty Trash
+            </button>
+          )
+        }
+      />
       <div className="screen__body">
         <p className="result__note tape__hint">Deleted items stay here for 7 days, then go for good.</p>
         <div className="group">

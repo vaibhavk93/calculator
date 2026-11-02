@@ -467,8 +467,13 @@ button:disabled {
     grid-auto-rows: clamp(44px, 6.6dvh, 64px);
   }
   .sci-screen .screen__bar {
-    height: 44px;
-  }
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: 52px;
+  padding: var(--s-1) var(--s-3) var(--s-1) var(--s-2);
+}
   .sci-screen .display {
     padding-bottom: 6px;
   }
@@ -726,8 +731,11 @@ button:disabled {
 
 .screen__title {
   margin: 0;
+  min-width: 0;
   font-size: 1rem;
   font-weight: 500;
+  /* Wraps at a large font size; a header must never cut its own title off. */
+  overflow-wrap: anywhere;
 }
 
 .screen__body {
@@ -745,6 +753,7 @@ button:disabled {
 
 .row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--s-4);
@@ -795,7 +804,8 @@ button:disabled {
 
 .seg {
   display: flex;
-  gap: var(--s-4);
+  flex-wrap: wrap;
+  gap: 0 var(--s-4);
 }
 
 .seg__opt {
@@ -814,6 +824,17 @@ button:disabled {
 .toggle {
   position: relative;
   flex: none;
+  /* The tap area is 44px high; the track you see is drawn inside it. */
+  width: 56px;
+  height: 44px;
+  background: none;
+}
+
+.toggle::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 7px;
   width: 42px;
   height: 24px;
   border-radius: var(--r-sm);
@@ -824,8 +845,8 @@ button:disabled {
 .toggle::after {
   content: '';
   position: absolute;
-  top: 3px;
-  left: 3px;
+  top: 13px;
+  left: 10px;
   width: 18px;
   height: 18px;
   border-radius: var(--r-sm);
@@ -833,7 +854,7 @@ button:disabled {
   transition: transform 140ms var(--ease-out), background-color 140ms var(--ease-out);
 }
 
-.toggle[aria-checked='true'] {
+.toggle[aria-checked='true']::before {
   background: var(--accent-fill);
 }
 

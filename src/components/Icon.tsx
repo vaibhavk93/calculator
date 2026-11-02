@@ -17,6 +17,9 @@ export type IconName =
   | 'check'
   | 'chevron'
   | 'pin'
+  | 'copy'
+  | 'share'
+  | 'list'
   | 'pinFilled'
   | 'edit'
 
@@ -68,6 +71,21 @@ const PATHS: Record<IconName, ReactNode> = {
   trash: <path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13" />,
   check: <path d="M5 12.5l4.5 4.5L19 7" />,
   chevron: <path d="M9 5l7 7-7 7" />,
+  copy: (
+    <>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V6a2 2 0 0 1 2-2h9" />
+    </>
+  ),
+  share: (
+    <>
+      <circle cx="18" cy="5" r="2.5" />
+      <circle cx="6" cy="12" r="2.5" />
+      <circle cx="18" cy="19" r="2.5" />
+      <path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4" />
+    </>
+  ),
+  list: <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />,
   // A pushpin: the head, the body, the needle. Outline when loose, filled when pinned.
   pin: (
     <>

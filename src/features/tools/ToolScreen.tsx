@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
@@ -20,7 +20,10 @@ import type { CardDraft } from '../../store/app'
 import type { SavedCard } from '../../store/types'
 import { SaveSheet } from '../memory/SaveSheet'
 import { ToListSheet } from '../memory/ToListSheet'
+import { ScreenHeader } from '../../components/ScreenHeader'
 import { tintStyle } from '../../components/tint'
+import { buildShareText, inputLines } from '../../lib/shareText'
+import { KeepAndShare } from './KeepAndShare'
 import { groupOfTool } from './groups'
 import { Segmented } from '../settings/controls'
 import { advancedOpen, caretFor, groupTyped, rawNumber, shouldGroup, significantBefore, type Leaf } from './fieldInput'
@@ -180,29 +183,18 @@ function FieldRow({ field, values, set, error }: { field: Field; values: Values;
  */
 function Table({ table, fmt }: { table: ResultTable; fmt: (c: Parameters<typeof formatCell>[0], f?: Fmt) => string }) {
   if (table.columns.length <= 2) {
+    // Label and value, side by side while they fit, stacked when they do not (a big number or a big font).
     return (
-      <div className="tool-table-wrap">
+      <div className="kv-wrap">
         {table.title && <h3 className="result__sub">{table.title}</h3>}
-        <table className="tool-table">
-          <thead>
-            <tr>
-              {table.columns.map((c) => (
-                <th key={c} scope="col">
-                  {c}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {table.rows.map((row, i) => (
-              <tr key={i}>
-                {row.map((cell, j) => (
-                  <td key={j}>{fmt(cell, table.fmts?.[j])}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <ul className="kv" aria-label={table.title ?? 'Table'}>
+          {table.rows.map((row, i) => (
+            <li className="kv__row" key={i}>
+              <span className="kv__k">{fmt(row[0] ?? '', table.fmts?.[0])}</span>
+              {row[1] !== undefined && <span className="kv__v">{fmt(row[1], table.fmts?.[1])}</span>}
+            </li>
+          ))}
+        </ul>
       </div>
     )
   }
@@ -276,7 +268,7 @@ function Chart({ chart }: { chart: ResultChart }) {
   )
 }
 
-function Result({ out }: { out: Output }) {
+function Result({ out, mainRef }: { out: Output; mainRef: React.RefObject<HTMLDivElement> }) {
   const system = useApp((s) => s.settings.numberSystem)
   const decimals = useApp((s) => s.settings.decimals)
   const fmt = (c: Parameters<typeof formatCell>[0], f?: Fmt) => formatCell(c, f, { system, decimals })
@@ -286,9 +278,9 @@ function Result({ out }: { out: Output }) {
         Result
       </h2>
       {out.rows.map((r) => (
-        <div key={r.label} className={r.main ? 'result__row result__row--main' : 'result__row'}>
+        <div key={r.label} ref={r.main ? mainRef : undefined} className={r.main ? 'result__row result__row--main' : 'result__row'}>
           <span className="result__label">{r.label}</span>
-          <span className={r.tone ? `result__value result__value--${r.tone}` : 'result__value'}>
+          <span className={['result__value', r.tone ? `result__value--${r.tone}` : '', typeof r.value === 'string' ? 'result__value--text' : ''].filter(Boolean).join(' ')}>
             {fmt(r.value, r.fmt)}
             {/* Colour is never the only signal: a screen reader, and anyone who cannot
                 separate red from green, gets the meaning in words. */}
@@ -327,6 +319,11 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
     })
   const [saving, setSaving] = useState(false)
   const [listing, setListing] = useState(false)
+  const [reminding, setReminding] = useState(false)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const mainRef = useRef<HTMLDivElement>(null)
+  // The floating answer bar shows only once the real answer has scrolled out of sight.
+  const [mainSeen, setMainSeen] = useState(true)
   const showCard = useApp((s) => s.showCard)
   // Once "More options" is open (by the user, or by itself because a field changed) it stays open.
   const [moreOpen, setMoreOpen] = useState(false)
@@ -372,39 +369,56 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
   const advanced = spec.fields.filter((f) => f.advanced && (!f.visibleIf || f.visibleIf(values)))
   const error = isError(computed) ? computed.error : null
 
+  const opts = { system, decimals }
+  const shareBody = ok
+    ? buildShareText({
+        title: saved?.title ?? spec.title,
+        inputs: inputLines(spec.fields, values, opts),
+        rows: computed.rows.map((r) => ({ label: r.label, text: formatCell(r.value, r.fmt, opts) })),
+        note: computed.note,
+      })
+    : ''
+
+  // Watch the main answer row; when it is not on screen, the answer bar floats over the top of the page.
+  useEffect(() => {
+    const target = mainRef.current
+    const root = bodyRef.current
+    if (!target || !root || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(([entry]) => setMainSeen(entry?.isIntersecting ?? true), { root, threshold: 0.2 })
+    io.observe(target)
+    return () => io.disconnect()
+  }, [ok, computed])
+
   return (
     <div className="screen" style={tintStyle(groupOfTool(spec.id)?.tint ?? 8)} role="dialog" aria-modal="true" aria-label={spec.title}>
-      <div className="screen__bar">
-        <button type="button" className="icon-btn" aria-label="Back" onClick={onBack}>
-          <Icon name="back" size={20} />
-        </button>
-        <h1 className="screen__title">{saved?.title ?? spec.title}</h1>
-        <span className="screen__spacer" />
-        {saved && (
-          <button type="button" className="icon-btn" aria-label="Delete" onClick={() => { deleteCard(saved.id); onBack() }}>
-            <Icon name="trash" size={20} />
+      <ScreenHeader
+        title={saved?.title ?? spec.title}
+        onBack={onBack}
+        icons={
+          saved && (
+            <button type="button" className="icon-btn" aria-label={`Delete ${saved.title}`} onClick={() => { deleteCard(saved.id); onBack() }}>
+              <Icon name="trash" size={20} />
+            </button>
+          )
+        }
+        action={
+          <button type="button" className="link-btn" disabled={!ok} onClick={() => setSaving(true)}>
+            {saved ? 'Update' : 'Save'}
           </button>
-        )}
-        <button type="button" className="link-btn" disabled={!ok} onClick={() => setSaving(true)}>
-          {saved ? 'Update' : 'Save'}
-        </button>
-      </div>
-      <div className="answer" aria-live="polite">
-        {main ? (
-          <>
-            <span className="answer__label">{main.label}</span>
-            <span className="answer__value">{formatCell(main.value, main.fmt, { system, decimals })}</span>
-            {listableAmount !== null && (
-              <button type="button" className="link-btn answer__act" onClick={() => setListing(true)}>
-                To list
-              </button>
-            )}
-          </>
-        ) : (
-          <span className="answer__label">{error ?? ' '}</span>
-        )}
-      </div>
-      <div className="screen__body tool">
+        }
+      />
+      <div className="screen__body tool" ref={bodyRef}>
+        {/* Takes no room: it floats over the top of the page, only while the answer below is out of sight. */}
+        <div className="answer-anchor">
+          {ok && main && !mainSeen && (
+            <div className="answer" aria-hidden="true">
+              <span className="answer__label">{main.label}</span>
+              <span className="answer__value">{formatCell(main.value, main.fmt, opts)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* 1. Edit: where you type. A tinted card. */}
         <h2 className="section-head section-head--tint" id="inputs-head">
           What you are working out
         </h2>
@@ -423,10 +437,40 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
             </details>
           )}
         </form>
-        {!isError(computed) && <Result out={computed} />}
+        {error && (
+          <p className="tool__error" role="status">
+            {error}
+          </p>
+        )}
+
+        {/* 2. Result: what it comes to. A plain card, never tinted. */}
+        {ok && <Result out={computed} mainRef={mainRef} />}
+
+        {/* 3. Keep and share: what to do with it. */}
+        {ok && (
+          <KeepAndShare
+            title={saved?.title ?? spec.title}
+            text={shareBody}
+            canList={listableAmount !== null}
+            onList={() => setListing(true)}
+            onRemind={() => setReminding(true)}
+          />
+        )}
       </div>
       {listing && listableAmount !== null && <ToListSheet value={listableAmount} onClose={() => setListing(false)} onDone={showCard} />}
-      {saving && <SaveSheet draft={draft} card={saved} reminder={reminder} onClose={() => setSaving(false)} onSaved={setSavedId} />}
+      {(saving || reminding) && (
+        <SaveSheet
+          draft={draft}
+          card={saved}
+          reminder={reminder}
+          suggest={reminding ? 'none' : undefined}
+          onClose={() => {
+            setSaving(false)
+            setReminding(false)
+          }}
+          onSaved={setSavedId}
+        />
+      )}
     </div>
   )
 }

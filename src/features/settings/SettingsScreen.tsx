@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Icon } from '../../components/Icon'
+import { ScreenHeader } from '../../components/ScreenHeader'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { downloadTextFile } from '../../lib/device'
 import { ACCENT_NAMES, ACCENTS } from '../../lib/theme'
@@ -51,12 +51,7 @@ export function SettingsScreen() {
 
   return (
     <div className="screen" role="dialog" aria-modal="true" aria-label="Settings">
-      <div className="screen__bar">
-        <button type="button" className="icon-btn" aria-label="Back" onClick={() => setOverlay('none')}>
-          <Icon name="back" size={20} />
-        </button>
-        <h1 className="screen__title">Settings</h1>
-      </div>
+      <ScreenHeader title="Settings" onBack={() => setOverlay('none')} />
 
       <div className="screen__body">
         <h2 className="group__title">Appearance</h2>
@@ -172,7 +167,7 @@ export function SettingsScreen() {
               <span className="row__hint">Replaces what is on this phone now</span>
             </span>
           </button>
-          <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" tabIndex={-1} onChange={(e) => void chooseFile(e.target.files?.[0])} />
+          <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" aria-label="Choose a backup file" tabIndex={-1} onChange={(e) => void chooseFile(e.target.files?.[0])} />
         </div>
 
         {backup.state === 'confirm' && (

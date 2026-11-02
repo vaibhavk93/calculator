@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
+import { ScreenHeader } from '../../components/ScreenHeader'
 import { tintStyle } from '../../components/tint'
 import { useBackHandler } from '../../components/useBackHandler'
 import type { ToolSpec } from '../../lib/tool'
@@ -21,12 +22,7 @@ const specsOf = (g: ToolGroup) => g.tools.map((id) => ALL_TOOLS.find((t) => t.id
 function GroupPage({ group, onBack, onOpen }: { group: ToolGroup; onBack: () => void; onOpen: (id: string) => void }) {
   return (
     <div className="screen" style={tintStyle(group.tint)} role="dialog" aria-modal="true" aria-label={group.name}>
-      <div className="screen__bar">
-        <button type="button" className="icon-btn" aria-label="Back" onClick={onBack}>
-          <Icon name="back" size={20} />
-        </button>
-        <h1 className="screen__title screen__title--tint">{group.name}</h1>
-      </div>
+      <ScreenHeader title={group.name} onBack={onBack} tint />
       <div className="screen__body sections">
         {group.sections.map((sec) => (
           <section className="sect" key={sec.title} aria-label={sec.title}>

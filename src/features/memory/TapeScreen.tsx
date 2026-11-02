@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
+import { ScreenHeader } from '../../components/ScreenHeader'
 import { useBackHandler } from '../../components/useBackHandler'
 import { D, toPlain } from '../../engine'
 import { copyText } from '../../lib/device'
@@ -74,24 +75,27 @@ export function TapeScreen({ card, onBack }: { card?: SavedCard; onBack: () => v
 
   return (
     <div className="screen" role="dialog" aria-modal="true" aria-label="List">
-      <div className="screen__bar">
-        <button type="button" className="icon-btn" aria-label="Back" onClick={onBack}>
-          <Icon name="back" size={20} />
-        </button>
-        <input
-          className="field screen__title-input"
-          aria-label="List name"
-          value={title}
-          maxLength={120}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={() => id && updateCard(id, { title: title.trim() || 'List' })}
-        />
-        {stored && (
-          <button type="button" className="icon-btn" aria-label="Delete list" onClick={() => { deleteCard(stored.id); onBack() }}>
-            <Icon name="trash" size={20} />
-          </button>
-        )}
-      </div>
+      <ScreenHeader
+        title={title}
+        onBack={onBack}
+        titleSlot={
+          <input
+            className="field screen__title-input"
+            aria-label="List name"
+            value={title}
+            maxLength={120}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={() => id && updateCard(id, { title: title.trim() || 'List' })}
+          />
+        }
+        icons={
+          stored && (
+            <button type="button" className="icon-btn" aria-label={`Delete ${stored.title}`} onClick={() => { deleteCard(stored.id); onBack() }}>
+              <Icon name="trash" size={20} />
+            </button>
+          )
+        }
+      />
 
       <div className="screen__body tape">
         <div className="tape__total">

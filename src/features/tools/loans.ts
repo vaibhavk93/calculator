@@ -1,4 +1,5 @@
 import { D, type Dec } from '../../engine'
+import { formatDecimal } from '../../lib/format'
 import { homeLoanTax, type Occupancy, type Regime } from '../../engine/loans/homeTax'
 import {
   balanceTransfer,
@@ -83,7 +84,8 @@ function readLoan(v: Values): Loan | { error: string } {
   return { p: p!, rate: rate!, n }
 }
 
-const money = (x: Dec) => `₹${x.toFixed(2)}`
+/** Grouped the Indian way, so the worked-out lines read ₹50,00,000 and not ₹5000000. */
+const money = (x: Dec) => `₹${formatDecimal(x, { system: 'indian', decimals: 2 })}`
 const pct = (x: Dec) => `${x.toFixed()}%`
 const yearsMonths = (m: number) => (m >= 12 ? `${Math.floor(m / 12)} y ${m % 12} m` : `${m} m`)
 
