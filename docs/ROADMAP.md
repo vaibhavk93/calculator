@@ -86,7 +86,7 @@ Status marks: **Built** = in the code and tested. **Partly** = some of it works.
 
 | Asked for | Built? | If not, why |
 |---|---|---|
-| **Why is the alarm / reminder permission blocked?** | **Answered** | `SCHEDULE_EXACT_ALARM` is **removed on purpose** in the manifest, so Android greys the toggle out. It cannot be switched on from device settings |
+| **Why is the alarm / reminder permission blocked?** | **Fixed 2026-11-02** | It was removed on purpose in the manifest, so Android showed no switch. Now declared again; Settings, Reminders shows both permissions with a button that opens the right Android screen. Needs a real-phone check |
 | Make reminders fire exactly | **Not built** | Needs a deliberate trade-off: Play restricts exact alarms to real alarm apps. Prove delivery first |
 | **Currency rates from the web** | **Partly** | The source is already known and used: **Frankfurter** (`api.frankfurter.dev`, ECB rates). Only the bundled snapshot exists; the live fetch is not written |
 | **Test every feature end to end** (positive, negative, error) | **Not built** | `e2e/smoke.mjs` is **stale** — it taps buttons that no longer exist. The harness must be repaired before it can test anything |

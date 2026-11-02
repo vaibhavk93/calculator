@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { SnackBar } from './components/SnackBar'
 import { useApp, useAppStore } from './components/StoreProvider'
 import { TabBar } from './components/TabBar'
@@ -53,6 +53,14 @@ function useReminderNotifications() {
   const snooze = useApp((s) => s.snooze)
   const setTab = useApp((s) => s.setTab)
 
+  // Coming back from Android's permission screens re-plans, so a newly allowed exact alarm takes effect.
+  const [resumed, setResumed] = useState(0)
+  useEffect(() => {
+    const onShow = () => document.visibilityState === 'visible' && setResumed((n) => n + 1)
+    document.addEventListener('visibilitychange', onShow)
+    return () => document.removeEventListener('visibilitychange', onShow)
+  }, [])
+
   useEffect(() => {
     const money = (plain: string) => formatCell(new D(plain), 'money', { system, decimals })
     const planned = planNotifications(reminders, cards, Date.now(), money)
@@ -60,7 +68,7 @@ function useReminderNotifications() {
       if (planned.length > 0 && !(await ensurePermission())) return
       await applyNotifications(planned)
     })()
-  }, [reminders, cards, system, decimals])
+  }, [reminders, cards, system, decimals, resumed])
 
   useEffect(() => {
     const stop = onNotificationAction((id, action) => {

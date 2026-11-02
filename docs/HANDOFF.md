@@ -101,7 +101,7 @@ Then read, in this order: `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/PARALLEL-WO
 | Fix | A private copy of Java's trust list with the Zscaler root added: `~/.local/jdks/cacerts-with-zscaler` (password `changeit`), used through `JAVA_TOOL_OPTIONS` for builds only |
 | Gradle download timeout | Raised to 120000 ms in `android/gradle/wrapper/gradle-wrapper.properties` |
 | First build | About 7 minutes (downloads). Later ones are much faster |
-| Permissions | `SCHEDULE_EXACT_ALARM` is **removed** in `AndroidManifest.xml` on purpose (reminders are inexact by design) |
+| Permissions | `SCHEDULE_EXACT_ALARM` is declared (by the Local Notifications plugin) so Android shows the "Alarms & reminders" switch. Settings, Reminders opens it. Exact if allowed, inexact otherwise. Play may restrict it: revisit before a Play release |
 
 OnePlus may block installs over USB: turn on "Install via USB" in Developer options. For reminders, set VK Calc to
 "Don't optimize" under battery, and allow auto-launch.

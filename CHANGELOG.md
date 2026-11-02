@@ -4,6 +4,9 @@ All notable changes to Calc. Dates are when the work was done.
 
 ## [0.4.0] - 2026-11-02
 
+### Reminder permissions
+- The "Alarms & reminders" permission is declared again, so Android shows its switch. Settings has a new **Reminders** section showing what is allowed and a button to fix each. Reminders are exact when allowed, inexact otherwise.
+
 ### Page anatomy (new)
 - Every calculator page has the same four parts: a shared header, a tinted **edit** card, a plain **result** card, and a **Keep and share** card (Copy, Share, To list, Remind me). Guidelines in `docs/DESIGN-SYSTEM.md` section 14.
 - **Share** opens the phone's share sheet with a message that carries the title, what was typed, the answers and the note.

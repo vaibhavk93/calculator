@@ -84,9 +84,8 @@ was raised to 120000 in `android/gradle/wrapper/gradle-wrapper.properties`.
 
 ## 5. Things that are set on purpose
 
-- `android/app/src/main/AndroidManifest.xml` removes `SCHEDULE_EXACT_ALARM` with `tools:node="remove"`. The notification
-  plugin adds it, and `docs/PRD.md` H5 says reminders must be inexact. Check the built app with
-  `aapt2 dump permissions app-debug.apk`: it should list only INTERNET, RECEIVE_BOOT_COMPLETED, WAKE_LOCK, POST_NOTIFICATIONS.
+- `SCHEDULE_EXACT_ALARM` is kept (the notification plugin adds it). Removing it hides Android's "Alarms & reminders" switch, so the
+  owner could not turn it on. Check with `aapt2 dump permissions app-debug.apk`: INTERNET, RECEIVE_BOOT_COMPLETED, WAKE_LOCK, POST_NOTIFICATIONS, SCHEDULE_EXACT_ALARM.
 - `applicationId` is `com.vaibhavkumawat.vkcalc`. Do not change it: a different id installs as a different app.
 - Debug builds are signed with `~/.android/debug.keystore`. Reinstalling from the same Mac keeps your data. A build from
   another computer has a different key and cannot update it: export a backup first (Settings).

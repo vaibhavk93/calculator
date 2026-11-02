@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { downloadTextFile } from '../../lib/device'
+import { checkReminderPermissions, ensurePermission, notificationsSupported, openExactAlarmSettings, type ReminderPermissions } from '../../lib/notifications'
 import { ACCENT_NAMES, ACCENTS } from '../../lib/theme'
 import { backupFilename, buildBackup, parseBackup } from '../../store/backup'
 import { TABS, type PersistedData, type Tab } from '../../store/types'
@@ -14,6 +15,41 @@ const TAB_LABEL: Record<Tab, string> = { calculate: 'Calculate', tools: 'Tools',
 const DECIMAL_CHOICES = ['auto', ...Array.from({ length: 11 }, (_, i) => String(i))]
 
 type Backup = { state: 'idle' } | { state: 'confirm'; data: PersistedData; exportedAt: string | null } | { state: 'done'; text: string } | { state: 'error'; text: string }
+
+/** What the phone allows reminders to do, and the buttons that fix it. Shown on the phone only. */
+function ReminderPermissionRows() {
+  const [perm, setPerm] = useState<ReminderPermissions | null>(null)
+  const refresh = useCallback(() => void checkReminderPermissions().then(setPerm), [])
+  useEffect(() => {
+    refresh()
+    document.addEventListener('visibilitychange', refresh)
+    return () => document.removeEventListener('visibilitychange', refresh)
+  }, [refresh])
+  if (!perm) return null
+  return (
+    <>
+      <h2 className="group__title">Reminders</h2>
+      <div className="group">
+        <button type="button" className="row row--button" disabled={perm.notifications} onClick={() => void ensurePermission().then(refresh)}>
+          <span className="row__text">
+            <span className="row__label">Notifications: {perm.notifications ? 'allowed' : 'not allowed'}</span>
+            <span className="row__hint">
+              {perm.notifications ? 'Reminders can show on your screen' : 'Tap to allow. If nothing appears, open Android Settings, Apps, Calc, Notifications'}
+            </span>
+          </span>
+        </button>
+        <button type="button" className="row row--button" disabled={perm.exact} onClick={() => void openExactAlarmSettings().then(refresh)}>
+          <span className="row__text">
+            <span className="row__label">Alarms and reminders: {perm.exact ? 'allowed' : 'not allowed'}</span>
+            <span className="row__hint">
+              {perm.exact ? 'Reminders arrive on time' : 'Tap, then switch on "Allow setting alarms and reminders". Without it a reminder can be late'}
+            </span>
+          </span>
+        </button>
+      </div>
+    </>
+  )
+}
 
 export function SettingsScreen() {
   const store = useAppStore()
@@ -152,6 +188,8 @@ export function SettingsScreen() {
             <Toggle label="Keep calculation history" checked={s.keepHistory} onChange={(keepHistory) => update({ keepHistory })} />
           </Row>
         </div>
+
+        {notificationsSupported() && <ReminderPermissionRows />}
 
         <h2 className="group__title">Your data</h2>
         <div className="group">

@@ -58,10 +58,43 @@ export async function ensurePermission(): Promise<boolean> {
   }
 }
 
-/** Replaces everything scheduled with exactly `planned`. Inexact on purpose: no exact-alarm permission. */
+export interface ReminderPermissions {
+  /** May notifications be shown at all? */
+  notifications: boolean
+  /** May reminders fire at the exact minute ("Alarms & reminders" in Android settings)? Otherwise they may be late by minutes. */
+  exact: boolean
+}
+
+/** What the phone currently allows. Never asks. */
+export async function checkReminderPermissions(): Promise<ReminderPermissions> {
+  if (!notificationsSupported()) return { notifications: false, exact: false }
+  try {
+    const [n, e] = await Promise.all([LocalNotifications.checkPermissions(), LocalNotifications.checkExactNotificationSetting()])
+    return { notifications: n.display === 'granted', exact: e.exact_alarm === 'granted' }
+  } catch {
+    return { notifications: false, exact: false }
+  }
+}
+
+/** Opens Android's "Alarms & reminders" screen for this app. Returns what is allowed once the user is back. */
+export async function openExactAlarmSettings(): Promise<boolean> {
+  if (!notificationsSupported()) return false
+  try {
+    return (await LocalNotifications.changeExactNotificationSetting()).exact_alarm === 'granted'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Replaces everything scheduled with exactly `planned`. Exact when the phone allows it, otherwise
+ * inexact. Exactness is asked for explicitly: left on by default, the plugin would throw the
+ * system settings screen at the user on every reschedule.
+ */
 export async function applyNotifications(planned: Planned[]): Promise<void> {
   if (!notificationsSupported()) return
   try {
+    const exact = (await checkReminderPermissions()).exact
     const { notifications } = await LocalNotifications.getPending()
     if (notifications.length > 0) await LocalNotifications.cancel({ notifications })
     if (planned.length === 0) return
@@ -74,6 +107,7 @@ export async function applyNotifications(planned: Planned[]): Promise<void> {
         title: p.title,
         body: p.body,
         schedule: { at: new Date(p.at), allowWhileIdle: true },
+        isExactNotification: exact,
         actionTypeId: ACTION_TYPE,
         extra: { reminderId: p.reminderId },
       })),

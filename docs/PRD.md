@@ -265,7 +265,7 @@ fails.
 | H2 | **Freshness disclosure** | Pack date, current date | "Rates as of Oct 2026" on every affected result; escalating banner past a Budget or quarter boundary |
 | H3 | **Rate override** | User-entered rate | Any config rate can be overridden by hand. The pack is a convenience, never a lock-in. |
 | H4 | **Currency rate cache** | Frankfurter fetch, 6h TTL | Converted amount + rate age. Bundled snapshot ships in the APK so day-one offline works. |
-| H5 | **Inexact reminder scheduling** | Due date, lead days | Notification within a ±1h window. **Deliberately avoids `SCHEDULE_EXACT_ALARM`**, which Android 14+ denies by default and Play restricts to clock/calendar apps. |
+| H5 | **Exact reminders when allowed** | Due date, lead days | Uses exact alarms if the user switches on "Alarms & reminders" for Calc (Settings, Reminders has the button), otherwise inexact, which can be minutes late. The permission is declared (reversed 2026-11-02 at the owner's request: with it removed, Android showed no switch). Play restricts `SCHEDULE_EXACT_ALARM` to clock/calendar apps: revisit before a Play release. |
 | H6 | **Delivery verification** | Fire log per reminder | Detects silently-dropped notifications and surfaces a fix. Counters aggressive OEM battery killers. |
 | H7 | **Guided OEM setup** | Detected manufacturer | Deep-link to that brand's autostart/battery page with specific instructions |
 | H8 | **Notification permission flow** | — | Asked *after* the first reminder is set, never at launch. Graceful denied path. |

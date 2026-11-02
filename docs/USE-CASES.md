@@ -161,7 +161,7 @@ think of more — see **Future ideas** at the bottom.
 | Android debug build installs and launches | ✅ | PRD §8, `android/`, `docs/BUILD-ANDROID.md` — **but the installed APK predates the latest UI changes; rebuild before testing** |
 | Hardware back button closes sheets/screens in the right order | ✅ | PRD, `lib/backStack.ts`, `lib/nativeBack.ts` |
 | Status bar icons readable in both themes | ✅ | `lib/statusBar.ts` |
-| Inexact reminder scheduling (no `SCHEDULE_EXACT_ALARM`) | ✅ | PRD H5, confirmed removed in `AndroidManifest.xml` |
+| Exact reminders when the user allows "Alarms & reminders", inexact otherwise | ✅ | PRD H5; Settings, Reminders |
 | Rules packs fetched from a CDN (tax/GST/rates stay current without a release) | ⏳ | PRD H1 — rates are bundled JSON only, no CDN mechanism |
 | Freshness disclosure ("Rates as of …") on affected results | ⏳ | PRD H2 — not built |
 | Guided OEM battery-killer setup (Xiaomi/Vivo/Oppo/Realme) | ⏳ | PRD H7 — not built |
