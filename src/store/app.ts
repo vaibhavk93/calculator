@@ -12,12 +12,15 @@ import {
   type Key,
 } from '../engine'
 import { parseNum } from '../lib/tool'
+import { cleanInstrument, instrumentFitsMode, paymentError, type ExpenseDraft } from '../lib/budget'
 import { sanitizeSettings } from './persistence'
 import {
   MAX_CATEGORIES,
   MAX_EXPENSES,
+  MAX_INSTRUMENTS,
   isPaymentMode,
-  type PaymentModeId,
+  type InstrumentDraft,
+  type PayInstrument,
   MAX_CARDS,
   MAX_HISTORY,
   MAX_MEMO,
@@ -66,6 +69,8 @@ export interface Removed {
 export interface Snack {
   id: number
   text: string
+  /** A highlighted action in the message, such as "Open folder". */
+  link?: { label: string; run: () => void }
   /** When set, the snackbar offers Undo for the last removal (history rows, or a card). */
   canUndo: boolean
 }
@@ -133,19 +138,30 @@ export interface AppState {
   press: (key: Key) => void
 
   /** Records something spent. Returns false (and says why) when the amount is not a positive number. */
-  addExpense: (draft: { amount: string; categoryId: string | null; mode?: PaymentModeId | null; date: string; note: string }) => boolean
+  addExpense: (draft: ExpenseDraft) => boolean
   /** Changes an entry. Same rules as addExpense. */
-  updateExpense: (id: string, draft: { amount: string; categoryId: string | null; mode?: PaymentModeId | null; date: string; note: string }) => boolean
+  updateExpense: (id: string, draft: ExpenseDraft) => boolean
   /** Removes an entry; the snackbar offers Undo. */
   deleteExpense: (id: string) => void
   /** A monthly limit for one category, or null to remove it. */
   setCategoryLimit: (id: string, limit: string | null) => void
   /** One limit for everything spent in a month, or null to remove it. */
   setOverallLimit: (limit: string | null) => void
-  addCategory: (name: string) => string | null
+  /**
+   * Adds a category, or a subcategory when `parentId` is given. Returns its id, or the id of the live one with the
+   * same name (ignoring case) under the same parent. Returns null for a blank name, the cap, or a parent that is
+   * missing or is itself a subcategory.
+   */
+  addCategory: (name: string, parentId?: string | null) => string | null
   renameCategory: (id: string, name: string) => void
-  /** Its entries stay, shown as Uncategorised. */
+  /** Deleting a top-level category deletes its subcategories too. Entries stay, shown as Uncategorised. */
   deleteCategory: (id: string) => void
+  /** Adds a card, account or wallet. Returns its id, or the existing one with the same name and kind. Null (with a notice) when not valid. */
+  addInstrument: (draft: InstrumentDraft) => string | null
+  /** Changes some fields. Entries whose mode no longer accepts it lose it. False (with a notice) when not valid. */
+  updateInstrument: (id: string, patch: Partial<InstrumentDraft>) => boolean
+  /** Soft delete. Entries paid with it keep their mode and lose the instrument. */
+  deleteInstrument: (id: string) => void
   /** Moves the cursor or selects part of what is typed. At the very end it goes back to null. */
   setSelection: (start: number, end: number) => void
   /** Tapping the line above a finished answer: brings that expression back for editing, with the cursor there. */
@@ -198,6 +214,8 @@ export interface AppState {
   showNotice: (text: string, tone?: Notice['tone']) => void
   clearNotice: (id: number) => void
   dismissSnack: (id: number) => void
+  /** A short message with one tappable link, for outcomes the user may want to follow up ("Backup saved. Open folder"). */
+  showLinkSnack: (text: string, link: { label: string; run: () => void }) => void
   restore: (data: PersistedData) => void
   snapshot: () => PersistedData
 }
@@ -261,14 +279,18 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       return false
     }
 
-    /** A plain positive amount, a real calendar day, a category that exists. Or the reason it is not. */
-    const checkedExpense = (d: { amount: string; categoryId: string | null; mode?: PaymentModeId | null; date: string; note: string }) => {
+    /** A plain positive amount, a real calendar day, a category that exists, a mode and instrument that go together. Or the reason it is not. */
+    const checkedExpense = (d: ExpenseDraft) => {
       const amount = parseNum(d.amount)
       if (!amount || !amount.isPositive() || amount.isZero()) return 'Enter an amount above zero'
       if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date) || Number.isNaN(new Date(`${d.date}T00:00:00`).getTime())) return 'Pick a date'
-      const categoryId = d.categoryId !== null && get().budget.categories.some((c) => c.id === d.categoryId && c.deletedAt === null) ? d.categoryId : null
+      const { budget } = get()
+      const categoryId = d.categoryId !== null && budget.categories.some((c) => c.id === d.categoryId && c.deletedAt === null) ? d.categoryId : null
       const mode = isPaymentMode(d.mode) ? d.mode : null
-      return { amount: toPlain(amount), categoryId, mode, date: d.date, note: d.note.trim().slice(0, 200) }
+      const instrumentId = d.instrumentId ?? null
+      const bad = paymentError(budget, mode, instrumentId)
+      if (bad) return bad
+      return { amount: toPlain(amount), categoryId, mode, instrumentId, date: d.date, note: d.note.trim().slice(0, 200) }
     }
 
     const cleanLimit = (limit: string | null) => {
@@ -475,18 +497,19 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
 
       setOverallLimit: (limit) => set({ budget: { ...get().budget, overall: cleanLimit(limit) } }),
 
-      addCategory: (name) => {
+      addCategory: (name, parentId = null) => {
         const clean = name.trim().slice(0, 40)
         const { budget } = get()
         if (!clean) return null
+        if (parentId !== null && !budget.categories.some((c) => c.id === parentId && c.deletedAt === null && c.parentId === null)) return null
         if (budget.categories.filter((c) => c.deletedAt === null).length >= MAX_CATEGORIES) {
           fail(`You can have up to ${MAX_CATEGORIES} categories.`)
           return null
         }
-        const live = budget.categories.find((c) => c.deletedAt === null && c.name.toLowerCase() === clean.toLowerCase())
+        const live = budget.categories.find((c) => c.deletedAt === null && c.parentId === parentId && c.name.toLowerCase() === clean.toLowerCase())
         if (live) return live.id
         const id = deps.newId()
-        set({ budget: { ...budget, categories: [...budget.categories, { id, name: clean, limit: null, deletedAt: null }] } })
+        set({ budget: { ...budget, categories: [...budget.categories, { id, name: clean, limit: null, parentId, deletedAt: null }] } })
         return id
       },
 
@@ -499,7 +522,61 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
 
       deleteCategory: (id) => {
         const { budget } = get()
-        set({ budget: { ...budget, categories: budget.categories.map((c) => (c.id === id ? { ...c, deletedAt: deps.now() } : c)) } })
+        const at = deps.now()
+        set({ budget: { ...budget, categories: budget.categories.map((c) => ((c.id === id || c.parentId === id) && c.deletedAt === null ? { ...c, deletedAt: at } : c)) } })
+      },
+
+      addInstrument: (draft) => {
+        const r = cleanInstrument(draft)
+        if (!r.ok) {
+          fail(r.error)
+          return null
+        }
+        const { budget } = get()
+        const live = budget.instruments.filter((i) => i.deletedAt === null)
+        const same = live.find((i) => i.kind === r.value.kind && i.name.toLowerCase() === r.value.name.toLowerCase())
+        if (same) return same.id
+        if (live.length >= MAX_INSTRUMENTS) {
+          fail(`You can have up to ${MAX_INSTRUMENTS} cards, accounts and wallets.`)
+          return null
+        }
+        const id = deps.newId()
+        set({ budget: { ...budget, instruments: [...budget.instruments, { id, ...r.value, deletedAt: null }] }, notice: null })
+        return id
+      },
+
+      updateInstrument: (id, patch) => {
+        const { budget } = get()
+        const cur = budget.instruments.find((i) => i.id === id && i.deletedAt === null)
+        if (!cur) return false
+        const r = cleanInstrument({ ...cur, ...patch })
+        if (!r.ok) return fail(r.error)
+        if (budget.instruments.some((i) => i.id !== id && i.deletedAt === null && i.kind === r.value.kind && i.name.toLowerCase() === r.value.name.toLowerCase())) {
+          return fail('You already have one with that name')
+        }
+        const next: PayInstrument = { ...cur, ...r.value }
+        set({
+          budget: {
+            ...budget,
+            instruments: budget.instruments.map((i) => (i.id === id ? next : i)),
+            // A kind or network change can make an old pairing invalid (a Visa credit card used for UPI): the entry keeps its mode, loses the instrument.
+            expenses: budget.expenses.map((x) => (x.instrumentId === id && (x.mode === null || !instrumentFitsMode(x.mode, next)) ? { ...x, instrumentId: null } : x)),
+          },
+          notice: null,
+        })
+        return true
+      },
+
+      deleteInstrument: (id) => {
+        const { budget } = get()
+        const at = deps.now()
+        set({
+          budget: {
+            ...budget,
+            instruments: budget.instruments.map((i) => (i.id === id && i.deletedAt === null ? { ...i, deletedAt: at } : i)),
+            expenses: budget.expenses.map((x) => (x.instrumentId === id ? { ...x, instrumentId: null } : x)),
+          },
+        })
       },
 
       undoRemoval: () => {
@@ -656,6 +733,8 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       clearNotice: (id) => {
         if (get().notice?.id === id) set({ notice: null })
       },
+      showLinkSnack: (text, link) => set({ snack: { id: nextId(), text, canUndo: false, link } }),
+
       dismissSnack: (id) => {
         if (get().snack?.id === id) set({ snack: null, removed: null })
       },

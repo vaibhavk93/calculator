@@ -42,7 +42,7 @@ export function ToListSheet({ value, onClose, onDone }: { value: string; onClose
   }
 
   return (
-    <Sheet title="Add to a list" onClose={onClose} action={<button type="button" className="btn btn--primary" onClick={done}>Add</button>}>
+    <Sheet title="Add to a list" onClose={onClose} footer={<button type="button" className="btn btn--primary" onClick={done}>Add to list</button>}>
       <div className="tolist">
         <p className="tolist__sum" aria-live="polite">
           {count === 1 ? money(value) : `${count} lines of ${money(value)} = ${money(total)}`}

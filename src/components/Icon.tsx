@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 export type IconName =
+  | 'down'
   | 'budget'
   | 'history'
   | 'menu'
@@ -25,6 +26,7 @@ export type IconName =
   | 'edit'
 
 const PATHS: Record<IconName, ReactNode> = {
+  down: <path d="M6 9.5l6 6 6-6" />,
   budget: (
     <>
       <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H19v3" />

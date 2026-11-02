@@ -981,6 +981,47 @@ button:disabled {
     padding: var(--s-2) var(--s-3) var(--s-2) 0;
   }
 
+  /*
+   * The scientific screen sideways: functions and the display on the left, the keypad on the right, like
+   * Calculate. Stacked, the number keys were pushed off the bottom of a 360px-tall screen.
+   */
+  .sci-screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'bar keys'
+      'display keys'
+      'fns keys';
+    column-gap: var(--s-2);
+  }
+
+  .sci-screen .screen__bar {
+    grid-area: bar;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    min-height: 44px;
+  }
+
+  .sci-screen .display {
+    grid-area: display;
+  }
+
+  .sci-screen .sci {
+    grid-area: fns;
+    grid-auto-rows: 34px;
+    gap: 4px;
+    padding: 0 0 var(--s-1) var(--s-3);
+  }
+
+  .sci-screen .keypad {
+    grid-area: keys;
+    min-height: 0;
+    grid-template-rows: repeat(5, minmax(44px, 1fr));
+    padding: var(--s-2) var(--s-3) var(--s-2) 0;
+  }
+
   /* The bottom sheet becomes a side panel: a 78%-high sheet would be 280px of a 360px screen. */
   .sheet {
     top: 0;

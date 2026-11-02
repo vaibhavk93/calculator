@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Sheet } from '../../components/Sheet'
-import { tintStyle } from '../../components/tint'
+import { FormField, RequiredNote } from '../../components/FormField'
 import { useApp } from '../../components/StoreProvider'
 import type { CardDraft } from '../../store/app'
 import { DEFAULT_TAGS, type Reminder, type Repeat, type SavedCard } from '../../store/types'
@@ -51,6 +51,7 @@ export function SaveSheet({
   const [date, setDate] = useState(toDateInput(reminder?.dueAt ?? Date.now() + 30 * 86_400_000))
   const [lead, setLead] = useState(String(reminder?.leadDays ?? 3))
   const [custom, setCustom] = useState('')
+  const [titleError, setTitleError] = useState<string | null>(null)
 
   const allTags = [...new Set([...DEFAULT_TAGS, ...known.flatMap((c) => c.tags), ...tags])]
   const toggle = (t: string) => setTags((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]))
@@ -64,7 +65,10 @@ export function SaveSheet({
   const reminderDraft = remind === 'off' || dueAt === null ? null : { dueAt, repeat: remind, leadDays: Math.max(0, Math.min(60, parseInt(lead, 10) || 0)) }
 
   const done = () => {
-    const cleanTitle = title.trim() || draft.title
+    const cleanTitle = title.trim()
+    if (!cleanTitle) return setTitleError('Give this a name')
+    if (remind !== 'off' && dueAt === null) return
+    setTitleError(null)
     if (card) {
       updateCard(card.id, { title: cleanTitle, tags, note, inputs: draft.inputs, summary: draft.summary, amount: draft.amount, lines: draft.lines }, reminderDraft)
       onSaved(card.id)
@@ -76,15 +80,28 @@ export function SaveSheet({
   }
 
   return (
-    <Sheet title={card ? 'Update' : 'Save'} onClose={onClose} action={<button type="button" className="btn btn--primary" onClick={done}>Done</button>}>
+    <Sheet title={card ? 'Update' : 'Save'} onClose={onClose} footer={<button type="button" className="btn btn--primary" onClick={done}>{card ? 'Update' : 'Save'}</button>}>
       <div className="save">
-        <div className="save__card" style={tintStyle(1)}>
-          <label className="field-label" htmlFor="save-title">Title</label>
-          <input id="save-title" className="field" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
+        <RequiredNote />
+        <div className="save__card">
+          <FormField label="Title" htmlFor="save-title" required error={titleError}>
+            <input
+              id="save-title"
+              className="field"
+              value={title}
+              maxLength={120}
+              aria-invalid={titleError ? true : undefined}
+              aria-describedby={titleError ? 'save-title-msg' : undefined}
+              onChange={(e) => {
+                setTitle(e.target.value)
+                if (titleError) setTitleError(null)
+              }}
+            />
+          </FormField>
           {draft.summary && <p className="save__sum">{draft.summary}</p>}
         </div>
 
-        <div className="save__card" style={tintStyle(2)}>
+        <div className="save__card">
           <span className="field-label" id="save-tags">Tags</span>
           <div className="chips" role="group" aria-labelledby="save-tags">
             {allTags.map((t) => (
@@ -99,12 +116,12 @@ export function SaveSheet({
           </div>
         </div>
 
-        <div className="save__card" style={tintStyle(3)}>
+        <div className="save__card">
           <label className="field-label" htmlFor="save-note">Note</label>
           <textarea id="save-note" className="field" rows={2} value={note} maxLength={5000} onChange={(e) => setNote(e.target.value)} />
         </div>
 
-        <div className="save__card" style={tintStyle(4)}>
+        <div className="save__card">
           <div className="save__switch">
             <span className="field-label" id="save-remind">Remind me</span>
             <Toggle label="Remind me" checked={remind !== 'off'} onChange={(on) => setRemind(on ? 'none' : 'off')} />

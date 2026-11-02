@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useApp } from './StoreProvider'
 
-const VISIBLE_MS = 6000
+const VISIBLE_MS = 8000
 
 /** A flat bar above the tab bar. Disappears on its own after six seconds. */
 export function SnackBar() {
@@ -19,6 +19,11 @@ export function SnackBar() {
   return (
     <div className="snack" role="status">
       <span>{snack.text}</span>
+      {snack.link && (
+        <button type="button" className="link-btn snack__link" onClick={() => { snack.link?.run(); dismiss(snack.id) }}>
+          {snack.link.label}
+        </button>
+      )}
       {snack.canUndo && (
         <button type="button" className="link-btn" onClick={undo}>
           Undo

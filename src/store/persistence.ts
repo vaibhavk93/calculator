@@ -11,8 +11,13 @@ import {
   REPEATS,
   MAX_CATEGORIES,
   MAX_EXPENSES,
+  MAX_INSTRUMENTS,
+  instrumentFitsMode,
+  isInstrumentKind,
+  isNetwork,
   isPaymentMode,
   starterBudget,
+  type PayInstrument,
   type BudgetCategory,
   type BudgetData,
   type BudgetExpense,
@@ -199,35 +204,75 @@ const DAY_KEY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
 
 export function sanitizeBudget(raw: unknown): BudgetData {
   if (!isObject(raw)) return starterBudget()
-  const cats: BudgetCategory[] = []
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+
+  // Categories: first collect the well-formed ones, then settle the parent links (old data has none).
+  const found: { cat: BudgetCategory; rawParent: unknown }[] = []
   const catIds = new Set<string>()
   for (const c of Array.isArray(raw.categories) ? raw.categories : []) {
     if (!isObject(c) || !goodId(c.id) || catIds.has(c.id)) continue
     const name = str(c.name, 40).trim()
     if (!name) continue
     catIds.add(c.id)
-    cats.push({ id: c.id, name, limit: isPlainNumber(c.limit) && !c.limit.startsWith('-') ? c.limit : null, deletedAt: typeof c.deletedAt === 'number' && Number.isFinite(c.deletedAt) ? c.deletedAt : null })
-    if (cats.length >= MAX_CATEGORIES) break
+    found.push({
+      cat: { id: c.id, name, limit: isPlainNumber(c.limit) && !c.limit.startsWith('-') ? c.limit : null, parentId: null, deletedAt: num(c.deletedAt) },
+      rawParent: c.parentId,
+    })
+    if (found.length >= MAX_CATEGORIES) break
   }
+  // A parent must exist and be top-level itself. Otherwise the category becomes top-level. A child of a deleted parent is deleted too.
+  const topIds = new Map(found.filter((f) => typeof f.rawParent !== 'string' || !catIds.has(f.rawParent)).map((f) => [f.cat.id, f.cat]))
+  const cats = found.map(({ cat, rawParent }) => {
+    const parent = typeof rawParent === 'string' && rawParent !== cat.id ? topIds.get(rawParent) : undefined
+    if (!parent) return cat
+    return { ...cat, parentId: parent.id, deletedAt: parent.deletedAt !== null ? (cat.deletedAt ?? parent.deletedAt) : cat.deletedAt }
+  })
+
+  const instruments: PayInstrument[] = []
+  const instById = new Map<string, PayInstrument>()
+  for (const i of Array.isArray(raw.instruments) ? raw.instruments : []) {
+    if (!isObject(i) || !goodId(i.id) || instById.has(i.id) || !isInstrumentKind(i.kind)) continue
+    const name = str(i.name, 40).trim()
+    if (!name) continue
+    const card = i.kind === 'credit' || i.kind === 'debit'
+    const inst: PayInstrument = {
+      id: i.id,
+      name,
+      kind: i.kind,
+      network: card && isNetwork(i.network) ? i.network : null,
+      bank: str(i.bank, 40).trim(),
+      last4: typeof i.last4 === 'string' && /^\d{4}$/.test(i.last4) ? i.last4 : '',
+      rewardNote: str(i.rewardNote, 200),
+      deletedAt: num(i.deletedAt),
+    }
+    instruments.push(inst)
+    instById.set(inst.id, inst)
+    if (instruments.length >= MAX_INSTRUMENTS * 5) break
+  }
+
   const expenses: BudgetExpense[] = []
   const seen = new Set<string>()
   for (const e of Array.isArray(raw.expenses) ? raw.expenses : []) {
     if (!isObject(e) || !goodId(e.id) || seen.has(e.id)) continue
     if (typeof e.date !== 'string' || !DAY_KEY.test(e.date) || !isPlainNumber(e.amount) || e.amount.startsWith('-')) continue
     seen.add(e.id)
+    const mode = isPaymentMode(e.mode) ? e.mode : null
+    const inst = typeof e.instrumentId === 'string' ? instById.get(e.instrumentId) : undefined
     expenses.push({
       id: e.id,
       date: e.date,
       amount: e.amount,
       // A category that no longer exists is "Uncategorised"; the entry is kept.
       categoryId: typeof e.categoryId === 'string' && catIds.has(e.categoryId) ? e.categoryId : null,
-      mode: isPaymentMode(e.mode) ? e.mode : null,
+      mode,
+      // A deleted or unknown instrument, or one the mode does not accept, is dropped; the entry is kept.
+      instrumentId: inst && inst.deletedAt === null && mode !== null && instrumentFitsMode(mode, inst) ? inst.id : null,
       note: str(e.note, 200),
-      deletedAt: typeof e.deletedAt === 'number' && Number.isFinite(e.deletedAt) ? e.deletedAt : null,
+      deletedAt: num(e.deletedAt),
     })
     if (expenses.length >= MAX_EXPENSES) break
   }
-  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, categories: cats, expenses }
+  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, categories: cats, instruments, expenses }
 }
 
 type Migration = (data: Record<string, unknown>) => Record<string, unknown>

@@ -1,18 +1,22 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { Icon } from './Icon'
 
 interface SheetProps {
   title: string
   onClose: () => void
-  /** Sits on the right of the title row. */
+  /** A small secondary action beside the close button, such as "Clear all". Never the main action. */
   action?: ReactNode
+  /** The one main action ("Add expense", "Save"), pinned to the bottom edge. See docs/FORMS-AND-SHEETS.md. */
+  footer?: ReactNode
   children: ReactNode
 }
 
 /**
- * A bottom sheet. Closes on Escape and on a tap outside it, moves focus in when
- * it opens and back to where it was when it closes.
+ * A bottom sheet. The title is on the left and a close button (X) on the right, so the sheet never needs
+ * the system back button to leave. The main action lives in the footer, where the thumb already is.
+ * Closes on Escape and on a tap outside it, moves focus in when it opens and back to where it was when it closes.
  */
-export function Sheet({ title, onClose, action, children }: SheetProps) {
+export function Sheet({ title, onClose, action, footer, children }: SheetProps) {
   const ref = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const closeRef = useRef(onClose)
@@ -48,8 +52,12 @@ export function Sheet({ title, onClose, action, children }: SheetProps) {
             {title}
           </h2>
           {action}
+          <button type="button" className="icon-btn sheet__close" aria-label={`Close ${title}`} onClick={onClose}>
+            <Icon name="close" size={20} />
+          </button>
         </div>
         <div className="sheet__body">{children}</div>
+        {footer && <div className="sheet__foot">{footer}</div>}
       </div>
     </>
   )

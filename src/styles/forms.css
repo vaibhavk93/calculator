@@ -1,0 +1,237 @@
+/* Forms, pickers and sheets: one pattern everywhere. Rules in docs/FORMS-AND-SHEETS.md. */
+
+/* ---------------------------------------------------------------- headings */
+/* Three levels, each clearly heavier than body text (400):
+   screen title 700 / section heading 700 with a hairline under it / label 500. */
+
+.sheet__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.screen__title {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.sect__head,
+.section-head {
+  font-weight: 700;
+}
+
+.sect__head {
+  margin: 0 var(--s-4);
+  padding: var(--s-3) 0 var(--s-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.group__title {
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------------- sheet */
+
+.sheet__head {
+  padding-bottom: var(--s-1);
+}
+
+.sheet__close {
+  flex: none;
+  margin-right: calc(var(--s-2) * -1);
+}
+
+/* The title takes the room; the close button stays at the right edge. */
+.sheet__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sheet__foot {
+  flex: none;
+  padding: var(--s-3) var(--s-4) var(--s-3);
+  border-top: 1px solid var(--line);
+  background: var(--sheet);
+}
+
+.sheet__foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.sheet__foot .btn {
+  width: 100%;
+}
+
+/* A link in a toast: bold and in the accent, so it reads as the thing to tap. */
+.snack__link {
+  flex: none;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------- field */
+
+.ffield {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+}
+
+.ffield__label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.req {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.ffield__hint,
+.ffield__error {
+  margin: 0;
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.ffield__hint {
+  color: var(--ink-3);
+}
+
+/* An error is words first; the colour only backs them up. */
+.ffield__error {
+  color: var(--alert);
+  font-weight: 500;
+}
+
+.ffield[data-invalid] .field,
+.ffield[data-invalid] .pick {
+  border-bottom-color: var(--alert);
+}
+
+.ffield__legend {
+  margin: 0 0 var(--s-1);
+  font-size: 0.75rem;
+  color: var(--ink-3);
+}
+
+/* ------------------------------------------------------------------ picker */
+
+.pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--s-1) 0 0;
+  border-bottom: 1px solid var(--ink-3);
+  color: var(--ink);
+  text-align: left;
+}
+
+.pick:focus-visible {
+  border-bottom-color: var(--accent);
+}
+
+.pick__value {
+  min-width: 0;
+  font-size: 1.0625rem;
+  overflow-wrap: anywhere;
+}
+
+.pick__value--empty {
+  color: var(--ink-3);
+}
+
+.pick .icon {
+  flex: none;
+  color: var(--accent);
+}
+
+/* In a settings row the picker is as wide as its value, at the right. */
+.pick--end {
+  width: auto;
+  max-width: 62%;
+  justify-content: flex-end;
+  padding-left: var(--s-2);
+}
+
+.pick--end .pick__value {
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  text-align: right;
+}
+
+.pick__search {
+  margin-bottom: var(--s-2);
+}
+
+.pick__list {
+  display: flex;
+  flex-direction: column;
+}
+
+.pick__group {
+  margin: var(--s-3) 0 var(--s-1);
+  padding-bottom: var(--s-1);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.pick__opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--s-2) var(--s-1);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.pick__opt:active {
+  background: var(--key-op-pressed);
+}
+
+.pick__opt[aria-selected='true'] {
+  color: var(--accent);
+}
+
+.pick__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pick__label {
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.pick__hint {
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+}
+
+.pick__opt .icon {
+  flex: none;
+}
+
+/* ---------------------------------------------------------------- settings rows */
+/* The text shrinks before the control wraps, so a long hint never pushes a switch onto its own line. */
+.row__text {
+  flex: 1 1 7rem;
+}
+
+.sect--settings .row {
+  gap: var(--s-2) var(--s-3);
+}

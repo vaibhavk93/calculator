@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../components/Icon'
+import { PickerSelect } from '../../components/PickerSelect'
 import { useApp } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
 import { magnitudeWords, type NumberSystem } from '../../lib/format'
@@ -104,13 +105,7 @@ function Input({ field, value, onChange, describedBy, invalid, words }: {
     return field.options.length <= 3 ? (
       <Segmented label={field.label} value={value} options={field.options} onChange={onChange} />
     ) : (
-      <select id={id} className="field" aria-describedby={describedBy} value={value} onChange={(e) => onChange(e.target.value)}>
-        {field.options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      <PickerSelect id={id} label={field.label} value={value} options={field.options} onChange={onChange} describedBy={describedBy} />
     )
   }
   if (field.kind === 'date') {

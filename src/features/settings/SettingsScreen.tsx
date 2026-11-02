@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { tintStyle } from '../../components/tint'
+import { PickerSelect, type PickOption } from '../../components/PickerSelect'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useApp, useAppStore } from '../../components/StoreProvider'
-import { downloadTextFile } from '../../lib/device'
+import { saveBackupFile } from '../../lib/backupFile'
+import { Sheet } from '../../components/Sheet'
 import { checkReminderPermissions, ensurePermission, notificationsSupported, openExactAlarmSettings, type ReminderPermissions } from '../../lib/notifications'
 import { ACCENT_NAMES, ACCENTS } from '../../lib/theme'
 import { backupFilename, buildBackup, parseBackup } from '../../store/backup'
@@ -17,10 +19,10 @@ const DECIMAL_CHOICES = ['auto', ...Array.from({ length: 11 }, (_, i) => String(
 
 type Backup = { state: 'idle' } | { state: 'confirm'; data: PersistedData; exportedAt: string | null } | { state: 'done'; text: string } | { state: 'error'; text: string }
 
-/** One titled, tinted card of settings. The tint says which section it is, nothing more. */
-function Section({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+/** One titled card of settings. All of them share one calm tint: Settings is one place, not eight sections to tell apart. */
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="sect sect--settings" style={tintStyle(n)} aria-label={title}>
+    <section className="sect sect--settings" style={tintStyle(7)} aria-label={title}>
       <h2 className="sect__head">{title}</h2>
       {children}
     </section>
@@ -38,7 +40,7 @@ function ReminderPermissionRows() {
   }, [refresh])
   if (!perm) return null
   return (
-    <Section n={4} title="Reminders">
+    <Section title="Reminders">
         <button type="button" className="row row--button" disabled={perm.notifications} onClick={() => void ensurePermission().then(refresh)}>
           <span className="row__text">
             <span className="row__label">Notifications: {perm.notifications ? 'allowed' : 'not allowed'}</span>
@@ -73,12 +75,25 @@ export function SettingsScreen() {
     else update({ startupTab: id as Tab, startupTool: null })
   }
 
+  const openOptions: PickOption[] = [
+    ...TABS.map((t) => ({ value: `tab:${t}`, label: TAB_LABEL[t], group: 'Screens' })),
+    ...GROUPS.flatMap((g) => g.tools.map((id) => ({ value: `tool:${id}`, label: ALL_TOOLS.find((t) => t.id === id)?.title ?? id, group: g.name }))),
+  ]
+
   const fileRef = useRef<HTMLInputElement>(null)
   const [backup, setBackup] = useState<Backup>({ state: 'idle' })
 
-  const exportBackup = () => {
-    downloadTextFile(backupFilename(), buildBackup(store.getState().snapshot()))
-    setBackup({ state: 'done', text: 'Backup saved to your downloads.' })
+  // Asks before the first save creates the Calc folder in Downloads. Resolves true to go ahead.
+  const [folderAsk, setFolderAsk] = useState<((ok: boolean) => void) | null>(null)
+  const showLinkSnack = useApp((x) => x.showLinkSnack)
+  const showNotice = useApp((x) => x.showNotice)
+
+  const exportBackup = async () => {
+    const r = await saveBackupFile(backupFilename(), buildBackup(store.getState().snapshot()), () => new Promise<boolean>((resolve) => setFolderAsk(() => resolve)))
+    setFolderAsk(null)
+    if (r.ok) showLinkSnack(`Backup saved to ${r.where}`, { label: 'Open folder', run: () => void r.open() })
+    else if (r.reason === 'failed') showNotice(r.message, 'error')
+    else showNotice('No backup was made', 'info')
   }
 
   const chooseFile = async (file: File | undefined) => {
@@ -98,7 +113,7 @@ export function SettingsScreen() {
       <ScreenHeader title="Settings" onBack={() => setOverlay('none')} />
 
       <div className="screen__body">
-        <Section n={1} title="Appearance">
+        <Section title="Appearance">
           <Row label="Theme">
             <Segmented
               label="Theme"
@@ -130,31 +145,32 @@ export function SettingsScreen() {
           </Row>
         </Section>
 
-        <Section n={2} title="Numbers">
+        <Section title="Numbers">
         <div role="radiogroup" aria-label="Number format">
           <OptionRow label="Indian" sample="12,34,567.89" checked={s.numberSystem === 'indian'} onSelect={() => update({ numberSystem: 'indian' })} />
           <OptionRow label="International" sample="1,234,567.89" checked={s.numberSystem === 'international'} onSelect={() => update({ numberSystem: 'international' })} />
         </div>
           <Row label="Decimal places" hint="Auto trims the zeros">
-            <select
-              className="select"
-              aria-label="Decimal places"
+            <PickerSelect
+              label="Decimal places"
+              align="end"
               value={String(s.decimals)}
-              onChange={(e) => update({ decimals: e.target.value === 'auto' ? 'auto' : Number(e.target.value) })}
-            >
-              {DECIMAL_CHOICES.map((d) => (
-                <option key={d} value={d}>
-                  {d === 'auto' ? 'Auto' : d}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => update({ decimals: v === 'auto' ? 'auto' : Number(v) })}
+              options={DECIMAL_CHOICES.map((d) => ({ value: d, label: d === 'auto' ? 'Auto' : d }))}
+            />
           </Row>
           <Row label="Copying numbers" hint="1,50,000 or 150000">
-            <select className="select" aria-label="Copying numbers" value={s.copyFormat} onChange={(e) => update({ copyFormat: e.target.value as CopyFormat })}>
-              <option value="ask">Ask each time</option>
-              <option value="with">With commas</option>
-              <option value="without">Without commas</option>
-            </select>
+            <PickerSelect
+              label="Copying numbers"
+              align="end"
+              value={s.copyFormat}
+              onChange={(v) => update({ copyFormat: v as CopyFormat })}
+              options={[
+                { value: 'ask', label: 'Ask each time', hint: 'Shows both, you tap one' },
+                { value: 'with', label: 'With commas', hint: '1,50,000' },
+                { value: 'without', label: 'Without commas', hint: '150000' },
+              ]}
+            />
           </Row>
           <Row label="Angles">
             <Segmented
@@ -169,26 +185,9 @@ export function SettingsScreen() {
           </Row>
         </Section>
 
-        <Section n={3} title="Behaviour">
+        <Section title="Behaviour">
           <Row label="Opens on">
-            <select className="select select--wide" aria-label="Opens on" value={opensOn} onChange={(e) => chooseOpensOn(e.target.value)}>
-              <optgroup label="Screens">
-                {TABS.map((t) => (
-                  <option key={t} value={`tab:${t}`}>
-                    {TAB_LABEL[t]}
-                  </option>
-                ))}
-              </optgroup>
-              {GROUPS.map((g) => (
-                <optgroup key={g.id} label={g.name}>
-                  {g.tools.map((id) => (
-                    <option key={id} value={`tool:${id}`}>
-                      {ALL_TOOLS.find((t) => t.id === id)?.title ?? id}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            <PickerSelect label="Opens on" title="Open the app on" align="end" value={opensOn} onChange={chooseOpensOn} options={openOptions} />
           </Row>
           <Row label="Vibrate on key press">
             <Toggle label="Vibrate on key press" checked={s.haptics} onChange={(haptics) => update({ haptics })} />
@@ -203,8 +202,8 @@ export function SettingsScreen() {
 
         {notificationsSupported() && <ReminderPermissionRows />}
 
-        <Section n={5} title="Your data">
-          <button type="button" className="row row--button" onClick={exportBackup}>
+        <Section title="Your data">
+          <button type="button" className="row row--button" onClick={() => void exportBackup()}>
             <span className="row__text">
               <span className="row__label">Export a backup</span>
               <span className="row__hint">History and settings, as one file you keep</span>
@@ -242,12 +241,29 @@ export function SettingsScreen() {
           </p>
         )}
 
-        <Section n={6} title="About">
+        <Section title="About">
           <Row label="Calc" hint="Everything stays on this phone. No account, no ads, no tracking.">
             <span className="row__value">{pkg.version}</span>
           </Row>
         </Section>
       </div>
+      {folderAsk && (
+        <Sheet
+          title="Make a Calc folder?"
+          onClose={() => folderAsk(false)}
+          footer={
+            <>
+              <button type="button" className="btn btn--primary" onClick={() => folderAsk(true)}>Create folder and save</button>
+              <button type="button" className="btn" onClick={() => folderAsk(false)}>Not now</button>
+            </>
+          }
+        >
+          <p className="note" style={{ margin: 0 }}>
+            Backups are kept together in a <strong>Calc</strong> folder inside your Downloads, so they do not get lost among other files.
+            It does not exist yet.
+          </p>
+        </Sheet>
+      )}
     </div>
   )
 }

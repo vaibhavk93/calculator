@@ -323,4 +323,63 @@ describe('budget data', () => {
     // A known mode is kept; an unknown or missing one becomes null.
     expect(out.budget.expenses.map((e) => e.mode)).toEqual(['upi', null])
   })
+  it('old data without parentId, instruments or instrumentId loads unchanged, with safe defaults', () => {
+    const out = migrate({
+      ...sample(),
+      budget: {
+        overall: '500',
+        categories: [{ id: 'c1', name: 'Food', limit: '4000', deletedAt: null }],
+        expenses: [{ id: 'e1', date: '2026-11-02', amount: '120.50', categoryId: 'c1', mode: 'upi', note: 'tea', deletedAt: null }],
+      },
+    })
+    expect(out.budget.categories).toEqual([{ id: 'c1', name: 'Food', limit: '4000', parentId: null, deletedAt: null }])
+    expect(out.budget.instruments).toEqual([])
+    expect(out.budget.expenses[0]).toMatchObject({ id: 'e1', mode: 'upi', instrumentId: null, amount: '120.50' })
+  })
+  it('keeps two-level categories; flattens deeper, missing and circular parents', () => {
+    const c = (id: string, parentId?: unknown, deletedAt: number | null = null) => ({ id, name: id, limit: null, parentId, deletedAt })
+    const out = migrate({
+      ...sample(),
+      budget: {
+        categories: [c('kid', 'top'), c('top'), c('grand', 'kid'), c('lost', 'nope'), c('self', 'self'), c('a', 'b'), c('b', 'a'), c('dtop', undefined, 9), c('dkid', 'dtop')],
+        expenses: [],
+      },
+    })
+    const p = Object.fromEntries(out.budget.categories.map((x) => [x.id, x.parentId]))
+    expect(p).toEqual({ kid: 'top', top: null, grand: null, lost: null, self: null, a: null, b: null, dtop: null, dkid: 'dtop' })
+    // A child of a deleted parent is deleted with it.
+    expect(out.budget.categories.find((x) => x.id === 'dkid')!.deletedAt).toBe(9)
+  })
+  it('sanitizes instruments and ties entries to them only when the pair is valid', () => {
+    const i = (o: Record<string, unknown>) => ({ id: 'x', name: 'Card', kind: 'credit', network: 'rupay', bank: 'Tata', last4: '1234', rewardNote: 'note', deletedAt: null, ...o })
+    const e = (id: string, mode: unknown, instrumentId: unknown) => ({ id, date: '2026-11-02', amount: '1', categoryId: null, mode, instrumentId, note: '', deletedAt: null })
+    const out = migrate({
+      ...sample(),
+      budget: {
+        instruments: [
+          i({ id: 'neo' }),
+          i({ id: 'visa', network: 'visa' }),
+          i({ id: 'w', kind: 'wallet', network: 'visa', last4: '12', bank: 'b'.repeat(99), rewardNote: 'r'.repeat(999) }),
+          i({ id: 'gone', deletedAt: 5 }),
+          i({ id: 'neo' }), // duplicate id
+          i({ id: 'bad', kind: 'crypto' }),
+          i({ id: 'noname', name: '  ' }),
+          i({ id: 'badnet', network: 'discover' }),
+        ],
+        expenses: [e('1', 'upi', 'neo'), e('2', 'upi', 'visa'), e('3', 'cash', 'neo'), e('4', 'credit', 'gone'), e('5', 'credit', 'ghost'), e('6', null, 'neo'), e('7', 'wallet', 'w'), e('8', 'credit', 'neo')],
+      },
+    })
+    expect(out.budget.instruments.map((x) => x.id)).toEqual(['neo', 'visa', 'w', 'gone', 'badnet'])
+    const w = out.budget.instruments.find((x) => x.id === 'w')!
+    expect(w).toMatchObject({ network: null, last4: '' })
+    expect(w.bank).toHaveLength(40)
+    expect(w.rewardNote).toHaveLength(200)
+    expect(out.budget.instruments.find((x) => x.id === 'badnet')!.network).toBeNull()
+    // UPI from RuPay credit stays; UPI from Visa credit, cash+instrument, deleted, unknown, no mode all lose the instrument but the entry stays.
+    expect(out.budget.expenses.map((x) => x.instrumentId)).toEqual(['neo', null, null, null, null, null, 'w', 'neo'])
+    expect(out.budget.expenses.map((x) => x.mode)).toEqual(['upi', 'upi', 'cash', 'credit', 'credit', null, 'wallet', 'credit'])
+  })
+  it('a non-array instruments field is ignored', () => {
+    expect(migrate({ ...sample(), budget: { instruments: 'x', categories: [], expenses: [] } }).budget.instruments).toEqual([])
+  })
 })

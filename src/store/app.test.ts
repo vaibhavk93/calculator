@@ -443,6 +443,146 @@ describe('budget', () => {
     const a = get().addCategory('Pets')
     expect(get().addCategory(' pets ')).toBe(a)
   })
+
+  describe('subcategories', () => {
+    it('adds a subcategory under a top-level one, refuses a child or missing parent', () => {
+      const { get } = make()
+      const food = get().budget.categories[0]!.id
+      const sub = get().addCategory('Swiggy', food)!
+      expect(get().budget.categories.find((c) => c.id === sub)).toMatchObject({ parentId: food, name: 'Swiggy', limit: null })
+      expect(get().addCategory('Deeper', sub)).toBeNull()
+      expect(get().addCategory('Orphan', 'ghost')).toBeNull()
+      expect(get().budget.categories.some((c) => c.name === 'Deeper' || c.name === 'Orphan')).toBe(false)
+    })
+    it('a duplicate name is per parent, ignoring case', () => {
+      const { get } = make()
+      const [a, b] = [get().budget.categories[0]!.id, get().budget.categories[1]!.id]
+      const x = get().addCategory('Snacks', a)
+      expect(get().addCategory(' snacks ', a)).toBe(x)
+      expect(get().addCategory('Snacks', b)).not.toBe(x)
+      expect(get().addCategory('Snacks')).not.toBe(x) // top level is its own scope
+    })
+    it('a subcategory has its own limit and does not touch its parent', () => {
+      const { get } = make()
+      const food = get().budget.categories[0]!.id
+      const sub = get().addCategory('Swiggy', food)!
+      get().setCategoryLimit(sub, '1,000')
+      expect(get().budget.categories.find((c) => c.id === sub)!.limit).toBe('1000')
+      expect(get().budget.categories.find((c) => c.id === food)!.limit).toBeNull()
+    })
+    it('deleting a parent deletes its children; entries stay and become uncategorised', () => {
+      const { get } = make()
+      const food = get().budget.categories[0]!.id
+      const other = get().budget.categories[1]!.id
+      const sub = get().addCategory('Swiggy', food)!
+      get().addExpense({ ...draft(), categoryId: sub })
+      get().deleteCategory(food)
+      const cats = get().budget.categories
+      expect(cats.find((c) => c.id === food)!.deletedAt).not.toBeNull()
+      expect(cats.find((c) => c.id === sub)!.deletedAt).not.toBeNull()
+      expect(cats.find((c) => c.id === other)!.deletedAt).toBeNull()
+      expect(get().budget.expenses).toHaveLength(1)
+      expect(get().addCategory('New', food)).toBeNull() // a deleted parent cannot take children
+    })
+    it('an expense can be filed under a subcategory', () => {
+      const { get } = make()
+      const sub = get().addCategory('Swiggy', get().budget.categories[0]!.id)!
+      get().addExpense({ ...draft(), categoryId: sub })
+      expect(get().budget.expenses[0]!.categoryId).toBe(sub)
+    })
+  })
+
+  describe('instruments', () => {
+    const neo = { name: 'Tata Neo', kind: 'credit', network: 'rupay', bank: 'Tata', last4: '4321', rewardNote: '5% on Tata Neu' } as const
+    it('adds an instrument, and a duplicate name of the same kind returns the existing one', () => {
+      const { get } = make()
+      const id = get().addInstrument(neo)!
+      expect(get().budget.instruments[0]).toMatchObject({ id, name: 'Tata Neo', kind: 'credit', network: 'rupay', last4: '4321', deletedAt: null })
+      expect(get().addInstrument({ ...neo, name: ' tata neo ' })).toBe(id)
+      expect(get().budget.instruments).toHaveLength(1)
+      // same name, other kind, is a different thing
+      expect(get().addInstrument({ name: 'Tata Neo', kind: 'debit' })).not.toBe(id)
+    })
+    it('refuses a blank name and bad last4 with a plain message', () => {
+      const { get } = make()
+      expect(get().addInstrument({ name: ' ', kind: 'bank' })).toBeNull()
+      expect(get().notice?.text).toBe('Give it a name')
+      expect(get().addInstrument({ name: 'HDFC', kind: 'bank', last4: '12' })).toBeNull()
+      expect(get().notice?.text).toBe('Last 4 digits must be exactly 4 numbers')
+      expect(get().budget.instruments).toHaveLength(0)
+    })
+    it('caps live instruments at 40; a deleted one frees a slot', () => {
+      const { get } = make()
+      for (let i = 0; i < 40; i++) expect(get().addInstrument({ name: `W${i}`, kind: 'wallet' })).not.toBeNull()
+      expect(get().addInstrument({ name: 'One more', kind: 'wallet' })).toBeNull()
+      expect(get().notice?.text).toMatch(/up to 40/)
+      get().deleteInstrument(get().budget.instruments[0]!.id)
+      expect(get().addInstrument({ name: 'One more', kind: 'wallet' })).not.toBeNull()
+    })
+    it('accepts valid mode and instrument pairs', () => {
+      const { get } = make()
+      const rupay = get().addInstrument(neo)!
+      const bank = get().addInstrument({ name: 'HDFC Savings', kind: 'bank' })!
+      const wallet = get().addInstrument({ name: 'Amazon Pay', kind: 'wallet' })!
+      for (const [mode, instrumentId] of [['credit', rupay], ['upi', rupay], ['upi', bank], ['upi', wallet], ['netbanking', bank], ['wallet', wallet], ['cash', null]] as const) {
+        expect(get().addExpense({ ...draft(), mode, instrumentId })).toBe(true)
+      }
+      expect(get().budget.expenses[0]!.instrumentId).toBeNull()
+      expect(get().budget.expenses[1]).toMatchObject({ mode: 'wallet', instrumentId: wallet })
+    })
+    it('rejects UPI from a Visa credit card, with the reason', () => {
+      const { get } = make()
+      const visa = get().addInstrument({ name: 'Visa card', kind: 'credit', network: 'visa' })!
+      expect(get().addExpense({ ...draft(), mode: 'upi', instrumentId: visa })).toBe(false)
+      expect(get().notice?.text).toBe('Pick a RuPay credit card, a bank account, a debit card or a wallet for UPI')
+      expect(get().budget.expenses).toHaveLength(0)
+    })
+    it('rejects the other wrong pairs, and an instrument with no mode, on add and on update', () => {
+      const { get } = make()
+      const cc = get().addInstrument({ name: 'Swiggy HDFC', kind: 'credit', network: 'mastercard' })!
+      const wallet = get().addInstrument({ name: 'Amazon Pay', kind: 'wallet' })!
+      expect(get().addExpense({ ...draft(), mode: 'debit', instrumentId: cc })).toBe(false)
+      expect(get().addExpense({ ...draft(), mode: 'cash', instrumentId: wallet })).toBe(false)
+      expect(get().addExpense({ ...draft(), mode: 'credit', instrumentId: wallet })).toBe(false)
+      expect(get().addExpense({ ...draft(), mode: null, instrumentId: cc })).toBe(false)
+      expect(get().addExpense({ ...draft(), mode: 'credit', instrumentId: 'ghost' })).toBe(false)
+      get().addExpense({ ...draft(), mode: 'credit', instrumentId: cc })
+      const id = get().budget.expenses[0]!.id
+      expect(get().updateExpense(id, { ...draft(), mode: 'wallet', instrumentId: cc })).toBe(false)
+      expect(get().budget.expenses[0]).toMatchObject({ mode: 'credit', instrumentId: cc })
+      expect(get().updateExpense(id, { ...draft(), mode: 'cash' })).toBe(true)
+      expect(get().budget.expenses[0]).toMatchObject({ mode: 'cash', instrumentId: null })
+    })
+    it('deleting an instrument keeps the entries and their mode but drops the link', () => {
+      const { get } = make()
+      const cc = get().addInstrument(neo)!
+      get().addExpense({ ...draft(), mode: 'credit', instrumentId: cc })
+      get().deleteInstrument(cc)
+      expect(get().budget.instruments[0]!.deletedAt).not.toBeNull()
+      expect(get().budget.expenses[0]).toMatchObject({ mode: 'credit', instrumentId: null })
+      // and it can no longer be picked
+      expect(get().addExpense({ ...draft(), mode: 'credit', instrumentId: cc })).toBe(false)
+    })
+    it('updateInstrument edits fields; a change that breaks an old pairing clears it from the entry', () => {
+      const { get } = make()
+      const cc = get().addInstrument(neo)!
+      get().addExpense({ ...draft(), mode: 'upi', instrumentId: cc })
+      expect(get().updateInstrument(cc, { rewardNote: '  new  ', last4: '9999' })).toBe(true)
+      expect(get().budget.instruments[0]).toMatchObject({ rewardNote: 'new', last4: '9999', name: 'Tata Neo' })
+      expect(get().budget.expenses[0]!.instrumentId).toBe(cc)
+      expect(get().updateInstrument(cc, { network: 'visa' })).toBe(true) // no longer UPI-able
+      expect(get().budget.expenses[0]).toMatchObject({ mode: 'upi', instrumentId: null })
+      expect(get().updateInstrument(cc, { last4: 'x' })).toBe(false)
+      expect(get().updateInstrument('ghost', { name: 'x' })).toBe(false)
+    })
+    it('a rename onto another instrument of the same kind is refused', () => {
+      const { get } = make()
+      get().addInstrument({ name: 'A', kind: 'wallet' })
+      const b = get().addInstrument({ name: 'B', kind: 'wallet' })!
+      expect(get().updateInstrument(b, { name: 'a' })).toBe(false)
+      expect(get().notice?.text).toBe('You already have one with that name')
+    })
+  })
 })
 
 describe('editing inside the expression', () => {

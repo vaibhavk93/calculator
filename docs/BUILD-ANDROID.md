@@ -94,3 +94,13 @@ was raised to 120000 in `android/gradle/wrapper/gradle-wrapper.properties`.
 
 Not done yet: a release keystore, `assembleRelease`, and a signed APK. Create a keystore once, keep it outside the repo,
 back it up, and use it for every release. Lose it and you cannot update the app.
+
+## 5. Backup folder plugin (Download/Calc)
+
+`android/app/src/main/java/com/vaibhavkumawat/vkcalc/BackupFilePlugin.java` is a small local Capacitor plugin (Java, not Kotlin: the project has no Kotlin Gradle plugin). It is registered in `MainActivity` before `super.onCreate`. The web side is `src/lib/backupFile.ts`.
+
+- **Save:** `MediaStore.Downloads` with `RELATIVE_PATH = Download/Calc/`. Creates the folder, needs no storage permission, Android 10+ only (older phones get a "failed" result).
+- **Does the folder exist?** MediaStore cannot see an empty folder, and an app only sees files it made itself. So `hasBackupFolder()` means "this app already saved a file in Download/Calc". "No files yet" is treated as "folder absent", and the app asks once. The answer is remembered in Preferences under `vkcalc.backupFolderOk`.
+- **Open folder:** tries `ACTION_VIEW` on the document URI `primary:Download/Calc` (opens the system Files app on the folder), and falls back to `ACTION_VIEW_DOWNLOADS` (the Downloads list). The saved file's own URI is not used, because that opens the file, not the folder.
+- **Limit (unverified on a phone):** which of the two intents works on Android 16 depends on the phone's Files app. Test on the OnePlus. If the first fails, the user lands in Downloads and sees the Calc folder there.
+- A same-name file is renamed by Android to `name (1).json`; the returned path shows the real name.
