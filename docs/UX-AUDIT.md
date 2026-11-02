@@ -75,3 +75,34 @@ the Tools tab inside a calculator returns to the Tools list.
 | The launch screen would flash white on a dark app | **Fixed**: dark launch theme and the Calc mark |
 
 Not yet looked at after the revamp: Settings, the Due tab, the Notes list, the Save sheet, the light theme, 200% font, and the phone.
+
+## 5. Full-page audit, 2026-11-02 (every calculator and every app page)
+
+**Method:** a scripted checker (`e2e/audit-harness.js`) opened all **51 calculators** and **25 app pages** (calculator,
+Scientific, History, Settings, Tools home and search, all 8 group pages, Notes and its list, calculator and new-list views,
+Trash, Due, and the Save, To list, Remind me and Paste sheets), at normal size and at **200% font**. It checks sideways
+scrolling, off-screen content, cut-off text, controls under 44px, unnamed controls, bad text and wrapping money.
+
+| # | Bug found | Where | Fix |
+|---|---|---|---|
+| 1 | The answer was shown twice (answer bar and first result row) | All 51 calculators | The answer bar floats under the header only while the Result is scrolled away, and takes no room |
+| 2 | **To list** ran off the screen at large font | About 25 calculators | Moved out of the answer bar into the new Keep and share section |
+| 3 | Text results ran off the screen ("From 7.50% a year") | Loan presets, Date, Savings withdrawal, Funnel, Capital gains | Words wrap; only money refuses to. A row wraps its value under its label |
+| 4 | Two-column tables ran off the right edge | Unit converter, In-hand salary | Two columns become label and value rows that stack when they must |
+| 5 | The five-way "No / Once / Monthly / Quarterly / Yearly" switch overflowed | Save and Remind me sheets at large font | The segmented control wraps |
+| 6 | Settings switches were 42 by 24px | Settings | A 56 by 44 tap area around the same track |
+| 7 | The backup file input had no name | Settings | Labelled "Choose a backup file" |
+| 8 | Six hand-built headers had drifted (icon sizes, "Delete" versus "Delete list", two styles for the main action) | Calculator, group page, list, Trash, Settings, Scientific | One `ScreenHeader`, and a test that fails if any file draws its own |
+| 9 | "New regime is cheaper by ₹42150": the amount was baked into the label, ungrouped, and repeated by the value beside it | Income tax | The label says which regime; the value shows the saving |
+| 10 | Worked-out lines showed ungrouped amounts (₹5000000, ₹1425000) | Loans, Savings, Tax, Metrics | Grouped the Indian way (₹50,00,000) in each module's number helper |
+
+After the fixes the checker reports **no real findings** (two known false alarms are listed in its header).
+
+**Not fixed, and why:**
+
+| Item | Why |
+|---|---|
+| World time is a table and the time does not tick | A presentation redesign (a clock, a globe or map), not a bug. See ROADMAP section 3 |
+| Light theme checked on Tools and Notes only | Contrast is proven by tests; the full light sweep is not done |
+| Android back button, share sheet, paste | Need the phone. Not run |
+

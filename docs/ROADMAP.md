@@ -53,13 +53,17 @@ Status marks: **Built** = in the code and tested. **Partly** = some of it works.
 | Step-by-step flow is hard to follow | **Partly** | The two cards above fix the main cause. A guided step-by-step mode for the long forms (income tax) is not built |
 | **An accordion with no sign that it opens** | **Not built** | Cause found: `display: flex` on `<summary>` removes the browser's own disclosure triangle |
 | Rethink the design from scratch | **Not built** | A full redesign would throw away a working design system. Fixing the four rows above addresses the real complaints |
-| Light theme and 200% font checked | **Partly** | Light theme checked on Tools, Notes. **200% font still not checked** (the row blocks fall to one column when the font is large, by design) |
+| Light theme and 200% font checked | **Partly** | **200% font: Built and checked** (all 51 calculators and 25 app pages, the sweep found and fixed the overflow bugs). Light theme: Tools and Notes seen; the full light sweep is not done |
 | **Multi-colour cards so sections are easy to tell apart** | **Built** | Eight tints; hues kept out of red, green and the accent, enforced by test |
 | **No horizontal scrolling** unless there is no other way | **Built** | A table of three or more columns is drawn as one block per row (heading, then labelled values). Measured: no scrolling box anywhere in the repayment schedule. Two-column tables stay tables |
 | **Sort the categories properly** (Convert mixed units, currency, binary/hex) | **Built** | "Convert" is gone. Currency is under Money, binary/hex under Math and numbers, units under Units and travel. 8 groups, each split into 2 to 4 titled sections (Loans: Plan a loan, Change a loan, Special cases) |
 | **The calculator layout must not shift** to show To list / Remind me | **Built** | The action row is always in the layout at a fixed height. Measured: key, button-row and answer positions identical before and after "=" |
 | **Pin / unpin icons on Notes** | **Built** | A pushpin: outline when loose, filled and accent-coloured when pinned. Notes are grouped Pinned, Lists, Calculations |
 | Research how to handle long sectioned lists | **Done** | Apple's inset grouped style (one wash around a section, heading to last row); one card per row for tables on a phone (works when rows are read one at a time, not compared) |
+| **A thorough UI audit of every page of every tool and the whole app**; find and fix bugs | **Built** | 76 pages checked by a scripted sweep at normal and 200% font; 10 kinds of bug fixed (`docs/UX-AUDIT.md` section 5). The sweep is saved as `e2e/audit-harness.js` |
+| **Guidelines for the page header, back, save, the information on a page, the result, the edit and the sharing sections** | **Built** | `docs/DESIGN-SYSTEM.md` section 14, "Page anatomy"; one shared `ScreenHeader`, enforced by a test |
+| **An information-sharing section** | **Built** | "Keep and share": Copy, Share (the phone's share sheet), To list, Remind me. The shared text carries the title, what was typed, the answers and the note |
+| **World time should look like a clock** | **Not built** | Still a table that does not tick. A redesign, listed above |
 
 ### Calculators that present themselves badly
 

@@ -56,6 +56,15 @@ The order to do these in is in `docs/IMPROVEMENT-PLAN.md` section 3. Numbers 33 
 | 31 | Amount quick-chips (+1K, +10K, +1L) and sliders for rate and tenure (UX 5.1) | UX guidelines |
 | 32 | Share and Reset actions on a result (UX 5.2) | UX guidelines |
 
+## From the 2026-11-02 page audit
+
+| # | Item | Source |
+|---|---|---|
+| 41 | World time as a ticking clock with a globe or map and popular cities, not a table | Owner, ROADMAP section 3 |
+| 42 | Run the audit sweep in the light theme across all 76 pages | UX-AUDIT section 5 |
+| 43 | Test the share sheet and the "Keep and share" buttons on the phone | Needs a device |
+| 44 | Turn `e2e/audit-harness.js` into a Playwright script so it runs without a browser tool | Testing |
+
 ## Budget tracker (asked for; two steps, the second is gated)
 
 Full reasoning, the risk and the details found earlier are in `docs/ROADMAP.md` section 4. Do not skip the gate.

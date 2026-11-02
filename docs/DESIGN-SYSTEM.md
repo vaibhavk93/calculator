@@ -409,3 +409,108 @@ Grouping stays by hairline, not by box (section 5). No nested cards.
 - [ ] No more than 5 fields show by default
 - [ ] A screen with a "back" registers `useBackHandler`
 - [ ] Checked at 360px, in both themes, and at 200% font size
+
+---
+
+## 14. Page anatomy: header, information, edit, result, keep and share
+
+*Added 2026-11-02 after a full audit of every page. Six hand-built headers had drifted apart (icon sizes, the label on
+Delete, a different style for the main action), and results, edits and sharing were mixed together. Every full screen now
+has the same parts in the same order. Code: `ScreenHeader`, `KeepAndShare`, and the sections in `ToolScreen`.*
+
+```
+ +----------------------------------------------+
+ |  <  Title (wraps, never cut off)   [icon] Save|   1. PAGE HEADER
+ +----------------------------------------------+
+ |  What you are working out                    |
+ |  +----------------------------------------+  |   2. EDIT       tinted card
+ |  |  Loan amount        Rate        Term   |  |
+ |  +----------------------------------------+  |
+ |  Result                                      |
+ |  +----------------------------------------+  |   3. RESULT     plain card, never tinted
+ |  |  Monthly EMI                 ₹43,391   |  |
+ |  |  note, chart, table, how it works      |  |
+ |  +----------------------------------------+  |
+ |  Keep and share                              |
+ |  +----------------------------------------+  |   4. KEEP AND SHARE   plain card
+ |  |  Copy   Share   To list   Remind me    |  |
+ |  +----------------------------------------+  |
+ +----------------------------------------------+
+   An answer bar floats under the header only while the Result is scrolled out of sight.
+```
+
+### 14.1 Page header
+
+One component, `ScreenHeader`, for every full screen. A test fails if any other file draws `screen__bar`.
+
+| Part | Rule |
+|---|---|
+| **Back** | First, always, a 44px icon button labelled "Back". It also answers the Android back button (`useBackHandler`) |
+| **Title** | One `h1`, 1rem, weight 500. It **wraps** at a large font and is never truncated. Only a list's name is an editable title |
+| **Icon actions** | Quiet icon buttons, at most two, after the title. Delete is a trash icon labelled "Delete <name>" (never plain "Delete") |
+| **Primary action** | At most **one**, the rightmost: accent text, no border. "Save", "Update" (after saving), "Empty Trash". Disabled while there is nothing to save |
+| **Nothing else** | No subtitle, no description, no help icon, no second text action. Information lives in the page, not the bar |
+| **Section colour** | A group page tints its title. A calculator's header stays neutral |
+| **Height** | At least 52px; it grows with a wrapped title |
+
+### 14.2 Information on the page
+
+Every piece of explanation has one home, in order of how much room it takes:
+
+| Kind | Where | Rule |
+|---|---|---|
+| **Hint** | Under its field, **only while the field has focus** (or has the error) | 12 words or fewer. Only if it prevents a wrong number |
+| **Error** | Under the form, `alert` colour, `role="status"` | Says what to do. Never "Invalid input". The Result is hidden while there is an error |
+| **Note** | The last line of the Result card | At most 2 sentences. Keeps every disclaimer ("Estimate for FY2026-27. Verify with a CA", "as of <date>", "example rate") |
+| **How this is worked out** | A disclosure at the foot of the Result | Keeps a visible arrow. Amounts are grouped (₹50,00,000) so they read |
+| **Section heading** | Above each card | Says what the card is: "What you are working out", "Result", "Keep and share" |
+
+There is no page-level intro text. The title and the blurb in the list already said what this is.
+
+### 14.3 Edit section
+
+| Rule | Detail |
+|---|---|
+| A **tinted card** under the heading "What you are working out" | The section colour of its group. It is the only tinted part of a calculator |
+| Field | Label above (5 words or fewer), value in mono, unit beside it, digits grouped as typed, "50 lakh" beneath rupee fields |
+| Order | The 3 to 5 fields that decide the answer, then "More options" for the rest |
+| Choices | 2 to 3 short options as a segmented control (it **wraps** at a large font); more as the phone's own dropdown |
+| Controls | At least 44px high. A switch has a 56 by 44 tap area around its track |
+
+### 14.4 Result section
+
+| Rule | Detail |
+|---|---|
+| A **plain `surface` card**, heading "Result" | **Never tinted**, so a number's colour keeps its meaning (good, bad) |
+| The main answer | First row, largest. One per page |
+| Rows | Label left, value right in mono. A value that does not fit **drops under its label**. Money never breaks; words wrap |
+| Tables | Two columns: label and value rows. Three or more: one block per row (heading, then labelled values). **Nothing scrolls sideways**, at any font size |
+| Chart | Only where it shows something the numbers cannot (a proportion, a trend). The numbers stay readable |
+| The floating answer bar | Shows the main answer under the header **only while the Result is scrolled out of sight**. It takes no room in the layout, and never duplicates an answer you can already see |
+
+### 14.5 Keep and share section
+
+What to do with a finished answer. A plain card, heading "Keep and share", a grid of bordered buttons (`ink-3`, 48px).
+
+| Button | Does | Shown |
+|---|---|---|
+| **Copy** | Copies the whole story as text | Always |
+| **Share** | Opens the phone's share sheet with the same text (copies, and says so, where there is none) | Always |
+| **To list** | Adds the amount to a list, as one line or several | Money answers only |
+| **Remind me** | Saves the calculator with a reminder | Always |
+| *Save* | *Lives in the page header, not here: it is the page's one main action* | |
+
+The text is built by `buildShareText`: the title, what was typed ("Loan amount: ₹50,00,000 · Rate: 8.5%"), the answers,
+the note, and "Worked out in Calc". A bare number means nothing in a chat. Feedback is one line under the buttons
+("Copied. Paste it anywhere."), cleared after about two seconds.
+
+### 14.6 Checklist: a page is done when
+
+- [ ] Its header is `ScreenHeader`, with at most one primary action
+- [ ] It shows no answer twice at the same time
+- [ ] Nothing scrolls sideways, at normal size **and at 200% font**
+- [ ] Every control is at least 44px and has a name
+- [ ] Only the Edit card is tinted; the Result card is plain
+- [ ] Information is where 14.2 says, and a hint appears only on focus
+- [ ] The scripted audit (`e2e/audit-harness.js`) reports nothing
+

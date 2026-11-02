@@ -2,6 +2,24 @@
 
 All notable changes to Calc. Dates are when the work was done.
 
+## [0.4.0] - 2026-11-02
+
+### Page anatomy (new)
+- Every calculator page has the same four parts: a shared header, a tinted **edit** card, a plain **result** card, and a **Keep and share** card (Copy, Share, To list, Remind me). Guidelines in `docs/DESIGN-SYSTEM.md` section 14.
+- **Share** opens the phone's share sheet with a message that carries the title, what was typed, the answers and the note.
+- The answer bar floats only while the result is scrolled out of sight, so an answer is never shown twice.
+- One `ScreenHeader` for every full screen, enforced by a test.
+
+### Bugs found by a full audit of 51 calculators and 25 app pages, and fixed
+- Content running off the screen at large font sizes (about 30 calculators): the answer bar, text results, two-column tables, the reminder switch.
+- Settings switches below the 44px tap size; an unnamed file input.
+- Tax: "cheaper by ₹42150" had an unformatted, repeated amount. "How this is worked out" lines now group amounts (₹50,00,000) in loans, savings, tax and metrics.
+- The audit checker is saved as `e2e/audit-harness.js`.
+
+### Tools, Notes, Due
+- Eight section colours; Tools home is colour tiles; each group split into titled section cards; "Convert" removed (currency under Money, binary/hex under Math, units under Units and travel).
+- Tables of three or more columns are row blocks: nothing scrolls sideways. Pin and unpin icons on Notes. The calculator's action row no longer shifts the layout after `=`.
+
 ## [0.3.0] - 2026-11-02
 
 ### Calculator
