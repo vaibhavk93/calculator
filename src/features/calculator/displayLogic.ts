@@ -1,4 +1,6 @@
 import { D, evaluatePreview, type InputState } from '../../engine'
+import { createLogger } from '../../lib/logger'
+
 import { formatDecimal, formatExpression, formatForCopy, formatPlain, magnitudeWords } from '../../lib/format'
 import type { Settings } from '../../store/types'
 
@@ -11,6 +13,8 @@ export interface DisplayView {
   copyText: string | null
   /** "1.67 crore", or an error from the live preview. */
   echo: { text: string; tone: 'info' | 'error' } | null
+  /** True while the big number is only a live preview of what is being typed; "=" turns it into the answer. */
+  preview: boolean
 }
 
 const BARE_NUMBER = /^-?(?:\d+\.?\d*|\.\d+)$/
@@ -20,7 +24,7 @@ const BARE_NUMBER = /^-?(?:\d+\.?\d*|\.\d+)$/
  *   - nothing typed          -> "0"
  *   - just after "="         -> the result, large; the expression that made it above, with " ="
  *   - a single number typed  -> that number, as typed, large; no expression line (it would only repeat it)
- *   - an expression          -> the expression above, the live result below
+ *   - an expression          -> the expression above, the live result below, dimmed (a preview, not the answer)
  */
 export function computeDisplay(
   input: InputState,
@@ -29,8 +33,10 @@ export function computeDisplay(
 ): DisplayView {
   const fmt = { system: settings.numberSystem, decimals: settings.decimals }
   const { expr, fresh } = input
+  const logger = createLogger('Calculator')
+  logger.debug('Compute display', { expr, lastExpression, fresh, settings })
 
-  if (expr === '') return { exprLine: '', resultLine: '0', copyText: null, echo: null }
+  if (expr === '') return { exprLine: '', resultLine: '0', copyText: null, echo: null, preview: false }
 
   if (fresh) {
     const value = new D(expr)
@@ -39,6 +45,7 @@ export function computeDisplay(
       resultLine: formatPlain(expr, fmt),
       copyText: formatForCopy(value, fmt.decimals),
       echo: wordsOf(value, fmt.system),
+      preview: false,
     }
   }
 
@@ -49,6 +56,7 @@ export function computeDisplay(
       resultLine: formatExpression(expr, fmt.system),
       copyText: formatForCopy(new D(expr), fmt.decimals),
       echo: wordsOf(new D(expr), fmt.system),
+      preview: false,
     }
   }
 
@@ -61,6 +69,7 @@ export function computeDisplay(
       resultLine: formatDecimal(preview.value, fmt),
       copyText: formatForCopy(preview.value, fmt.decimals),
       echo: wordsOf(preview.value, fmt.system),
+      preview: true,
     }
   }
 
@@ -71,10 +80,34 @@ export function computeDisplay(
     resultLine: '',
     copyText: null,
     echo: worthSaying ? { text: preview.message, tone: 'error' } : null,
+    preview: false,
   }
 }
 
 function wordsOf(value: InstanceType<typeof D>, system: Settings['numberSystem']): DisplayView['echo'] {
   const words = magnitudeWords(value, system)
   return words ? { text: words, tone: 'info' } : null
+}
+
+/** A finished calculation shown faded above the current line. `id` is null when it is not from history. */
+export interface PastLine {
+  id: string | null
+  expression: string
+  result: string
+}
+
+/**
+ * The finished calculations to show above the current line, oldest first. `source` is newest first (history, or the last commit when history is off).
+ * The calculation the big number is showing right now is not repeated above it.
+ */
+export function recentWork(
+  input: InputState,
+  lastExpression: string | null,
+  source: PastLine[],
+  max: number,
+): PastLine[] {
+  const newest = source[0]
+  const showingNewest = input.fresh && newest !== undefined && newest.expression === lastExpression && newest.result === input.expr
+  const skip = showingNewest ? 1 : 0
+  return source.slice(skip, skip + Math.max(0, max)).reverse()
 }

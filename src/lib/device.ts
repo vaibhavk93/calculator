@@ -7,6 +7,9 @@
  * KeepAwake, Clipboard, Filesystem); the call sites do not change.
  */
 
+import { Capacitor } from '@capacitor/core'
+import { Clipboard } from '@capacitor/clipboard'
+
 export function haptic(enabled: boolean, ms = 8): void {
   if (!enabled) return
   try {
@@ -66,6 +69,14 @@ export function createWakeLock(): WakeLockController {
 }
 
 export async function copyText(text: string): Promise<boolean> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await Clipboard.write({ string: text })
+      return true
+    } catch {
+      /* fall through to the web paths */
+    }
+  }
   try {
     await navigator.clipboard.writeText(text)
     return true
@@ -88,10 +99,14 @@ export async function copyText(text: string): Promise<boolean> {
   }
 }
 
-/** Null means "couldn't read it" (permission denied or unsupported), not "it was empty". */
+/**
+ * The clipboard's text, or null when it couldn't be read or held no text. Callers treat both the
+ * same way: offer a text box the user can long-press paste into, which always works.
+ */
 export async function readClipboardText(): Promise<string | null> {
   try {
-    return await navigator.clipboard.readText()
+    const text = Capacitor.isNativePlatform() ? (await Clipboard.read()).value : await navigator.clipboard.readText()
+    return text && text.trim() ? text : null
   } catch {
     return null
   }

@@ -168,6 +168,8 @@ function typeOperator(expr: string, op: string): string {
 }
 
 function equals(state: InputState, opts: EvalOptions): InputResult {
+  // Already a finished result: nothing new to work out, so nothing changes and nothing is recorded.
+  if (state.fresh) return { state }
   const closed = closeExpression(state.expr)
   if (closed === '') return { state }
 

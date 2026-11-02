@@ -174,6 +174,13 @@ describe('equals', () => {
 describe('after equals', () => {
   const afterSum = press(['2', '+', '3', '=']).state
 
+  it('"=" again does nothing: same state, no second record', () => {
+    const r = applyKey(afterSum, '=', OPTS)
+    expect(r.state).toBe(afterSum)
+    expect(r.commit).toBeUndefined()
+    expect(r.error).toBeUndefined()
+  })
+
   it('a digit starts a new calculation', () => {
     expect(press(['7'], afterSum).state).toEqual({ expr: '7', fresh: false })
   })

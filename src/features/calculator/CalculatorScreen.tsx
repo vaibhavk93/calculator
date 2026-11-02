@@ -1,49 +1,24 @@
-import { useCallback, useMemo } from 'react'
 import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
-import { copyText, haptic } from '../../lib/device'
-import { computeDisplay } from './display'
+import { ResultActions } from '../memory/ResultActions'
+import { PasteSheet, UtilRow, useCalcCore } from './CalcParts'
 import { Display } from './Display'
-import { Keypad, useRepeatingPress } from './Keypad'
-import { MorePanel, ScientificPanel } from './Panels'
+import { Keypad } from './Keypad'
 import { useKeyboard } from './useKeyboard'
 
+/** Short phones keep one past line so the current one never gets squeezed. */
+const pastLinesFor = () => (window.innerHeight < 700 ? 1 : 3)
+
 export function CalculatorScreen() {
-  const input = useApp((s) => s.input)
-  const lastExpression = useApp((s) => s.lastExpression)
-  const settings = useApp((s) => s.settings)
-  const panel = useApp((s) => s.panel)
-  const canUndo = useApp((s) => s.undoStack.length > 0)
-
-  const press = useApp((s) => s.press)
-  const undoInput = useApp((s) => s.undoInput)
-  const setPanel = useApp((s) => s.setPanel)
   const setOverlay = useApp((s) => s.setOverlay)
-  const showNotice = useApp((s) => s.showNotice)
+  const core = useCalcCore(pastLinesFor())
 
-  const view = useMemo(
-    () => computeDisplay(input, lastExpression, settings),
-    // Only the fields the display depends on, so unrelated settings don't recompute it.
-    [input, lastExpression, settings.numberSystem, settings.decimals, settings.angle],
-  )
-
-  const doCopy = useCallback(async () => {
-    if (view.copyText === null) return showNotice('Nothing to copy yet')
-    const ok = await copyText(view.copyText)
-    showNotice(ok ? 'Copied' : "Couldn't copy here", ok ? 'info' : 'error')
-  }, [view.copyText, showNotice])
-
-  useKeyboard(() => view.copyText)
-
-  const backspace = useRepeatingPress(() => {
-    haptic(settings.haptics)
-    press('backspace')
-  })
+  useKeyboard(() => core.view.copyText, (s) => s.tab === 'calculate' && !s.nav.scientific)
 
   return (
-    <div className="calc" data-panel={panel}>
+    <div className="calc">
       <header className="calc__bar">
-        <span className="calc__title">VK Calc</span>
+        <span className="calc__title">Calc</span>
         <button type="button" className="icon-btn" aria-label="History" onClick={() => setOverlay('history')}>
           <Icon name="history" size={21} />
         </button>
@@ -52,39 +27,21 @@ export function CalculatorScreen() {
         </button>
       </header>
 
-      <Display view={view} fresh={input.fresh} onCopy={() => void doCopy()} />
+      <Display
+        view={core.view}
+        fresh={core.input.fresh}
+        onCopy={() => void core.doCopy()}
+        past={core.past}
+        onPastTap={core.pickPast}
+      />
 
-      <div className="util">
-        <button
-          type="button"
-          className="util__btn"
-          aria-label="Memory and clipboard"
-          aria-expanded={panel === 'more'}
-          onClick={() => setPanel('more')}
-        >
-          <Icon name="more" size={22} />
-        </button>
-        <button
-          type="button"
-          className="util__btn"
-          aria-label="Scientific functions"
-          aria-expanded={panel === 'scientific'}
-          onClick={() => setPanel('scientific')}
-        >
-          <Icon name="up" size={22} className="icon--turn" />
-        </button>
-        <button type="button" className="util__btn" aria-label="Undo" disabled={!canUndo} onClick={undoInput}>
-          <Icon name="undo" size={21} />
-        </button>
-        <button type="button" className="util__btn util__btn--primary" aria-label="Backspace" {...backspace}>
-          <Icon name="backspace" size={23} />
-        </button>
-      </div>
+      {core.input.fresh && <ResultActions value={core.input.expr} />}
 
-      {panel === 'more' && <MorePanel onCopy={() => void doCopy()} />}
-      {panel === 'scientific' && <ScientificPanel />}
+      <UtilRow onPaste={() => void core.doPaste()} onCopy={() => void core.doCopy()} />
 
       <Keypad />
+
+      {core.pasteOpen && <PasteSheet onClose={core.closePaste} />}
     </div>
   )
 }

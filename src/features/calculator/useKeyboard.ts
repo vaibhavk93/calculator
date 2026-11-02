@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import type { Key } from '../../engine'
-import { parseClipboardNumber } from '../../lib/clipboard'
 import { useAppStore } from '../../components/StoreProvider'
+import type { AppState } from '../../store/app'
+import { applyPaste } from './CalcParts'
 
 const MAP: Record<string, Key> = {
   '0': '0', '1': '1', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9',
@@ -19,18 +20,21 @@ const isTyping = (t: EventTarget | null) =>
 
 /**
  * Desktop keyboard support: type a whole expression, Enter to evaluate,
- * Ctrl+Z to undo, Ctrl+C to copy the result, Ctrl+V to paste a number.
+ * Ctrl+Z to undo, Ctrl+C to copy the result, Ctrl+V to paste a calculation.
  * Reads the store at event time, so it registers once and never goes stale.
+ * `isShowing` says whether this screen is the one in front, so two calculators never both type.
  */
-export function useKeyboard(getCopyText: () => string | null) {
+export function useKeyboard(getCopyText: () => string | null, isShowing: (s: AppState) => boolean) {
   const store = useAppStore()
   const copyRef = useRef(getCopyText)
   copyRef.current = getCopyText
+  const showingRef = useRef(isShowing)
+  showingRef.current = isShowing
 
   useEffect(() => {
     const active = () => {
       const s = store.getState()
-      return s.tab === 'calculate' && s.overlay === 'none'
+      return s.overlay === 'none' && showingRef.current(s)
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -66,9 +70,8 @@ export function useKeyboard(getCopyText: () => string | null) {
     const onPaste = (e: ClipboardEvent) => {
       if (!active() || isTyping(e.target)) return
       e.preventDefault()
-      const n = parseClipboardNumber(e.clipboardData?.getData('text/plain') ?? '')
-      if (n === null) store.getState().showNotice("That isn't a number", 'error')
-      else store.getState().insertPlain(n)
+      const problem = applyPaste(store.getState(), e.clipboardData?.getData('text/plain') ?? '')
+      if (problem) store.getState().showNotice(problem, 'error')
     }
 
     window.addEventListener('keydown', onKeyDown)

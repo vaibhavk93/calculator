@@ -1,5 +1,5 @@
 /*
- * VK Calc — global styles.
+ * Calc — global styles.
  * Colours are never written here: every colour is a custom property set by
  * lib/theme.ts. Radius is one of three tokens. See docs/DESIGN-SYSTEM.md.
  */
@@ -278,6 +278,11 @@ button:disabled {
   color: var(--alert);
 }
 
+/*
+ * Keys and buttons that are not digits or "=" carry a 1px outline in ink-3: 5.2:1 on the dark
+ * ground and 6.6:1 on the light one, above the 3:1 a control's edge needs. --line (1.3:1) would
+ * be invisible, which is the problem this outline fixes.
+ */
 .util {
   flex: none;
   display: flex;
@@ -287,69 +292,105 @@ button:disabled {
 
 .util__btn {
   flex: 1;
+  min-width: 0;
   height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--ink-2);
+  border: 1px solid var(--ink-3);
   border-radius: var(--r-md);
-}
-
-.util__btn[aria-expanded='true'] {
-  color: var(--accent);
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color 90ms var(--ease-out), transform 90ms var(--ease-out);
 }
 
 .util__btn:active {
   background: var(--key-op-pressed);
+  border-color: var(--ink-2);
+  transform: scale(0.96);
+}
+
+.util__btn:disabled {
+  border-color: var(--line);
 }
 
 .util__btn--primary {
   color: var(--accent);
 }
 
-.util__btn .icon {
-  transition: transform 160ms var(--ease-out);
+/* Finished calculations above the current line: faded, tappable, the first thing to give way. */
+.display__past {
+  flex: 0 100 auto;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
 }
 
-.util__btn[aria-expanded='true'] .icon--turn {
-  transform: rotate(180deg);
+.display__past::-webkit-scrollbar {
+  display: none;
 }
 
-.panel {
-  flex: none;
-  display: grid;
-  gap: var(--s-2);
-  padding: 0 var(--s-3) var(--s-2);
-  animation: rise 160ms var(--ease-out);
-}
-
-.panel--more {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-}
-
-.panel--sci {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
-.panel__btn {
-  height: 40px;
+.past {
+  width: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  font-size: 0.875rem;
-  color: var(--ink-2);
-  background: var(--surface);
+  align-items: baseline;
+  gap: var(--s-3);
+  padding: 3px 0;
+  color: var(--ink-3);
+  text-align: left;
+  border-radius: var(--r-sm);
 }
 
-.panel__btn:active {
+.past:active {
   background: var(--key-op-pressed);
 }
 
-.panel__btn[aria-pressed='true'] {
-  color: var(--accent);
-  border-color: var(--accent-dim);
+.past__expr {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+}
+
+.past__result {
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* While typing, the big number is only a preview. "=" makes it the answer, at full strength. */
+.display__result[data-preview='true'] {
+  color: var(--ink-3);
+}
+
+.paste {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.paste__label {
+  font-size: 0.875rem;
+  color: var(--ink-2);
+}
+
+.paste__box {
+  resize: none;
+  font-family: var(--font-mono);
+}
+
+.paste .note {
+  margin: 0;
 }
 
 .keypad {
@@ -371,25 +412,30 @@ button:disabled {
   color: var(--ink);
   user-select: none;
   -webkit-user-select: none;
-  transition: background-color 90ms var(--ease-out);
+  transition: background-color 90ms var(--ease-out), transform 90ms var(--ease-out);
 }
 
+/* Every key shows it was pressed: a darker ground and a slight press-in. */
 .key:active {
   background: var(--key-digit-pressed);
+  transform: scale(0.96);
 }
 
 .key--op {
   background: var(--key-op);
+  border: 1px solid var(--ink-3);
   color: var(--ink-2);
   font-size: 1.25rem;
 }
 
 .key--op:active {
   background: var(--key-op-pressed);
+  border-color: var(--ink-2);
 }
 
 .key--clear {
   background: var(--key-op);
+  border: 1px solid var(--ink-3);
   color: var(--alert);
   font-size: 1.0625rem;
   font-weight: 500;
@@ -397,6 +443,7 @@ button:disabled {
 
 .key--clear:active {
   background: var(--key-op-pressed);
+  border-color: var(--ink-2);
 }
 
 .key--equals {
@@ -424,27 +471,48 @@ button:disabled {
   }
 }
 
+/* ------------------------------------------------------------- scientific */
+
+.sci-screen .display {
+  padding-bottom: var(--s-2);
+}
+
+/* Five across is about 62px wide at 360px, so the short rows still clear 44px in width. */
+.sci {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-auto-rows: 36px;
+  gap: 6px;
+  padding: 0 var(--s-3) var(--s-2);
+}
+
+.key--fn {
+  font-size: 0.9375rem;
+}
+
+.key--back {
+  color: var(--accent);
+}
+
 /*
- * Short phones (about 640px tall) cannot fit the scientific panel, the keypad and a readable
- * result at full size. Rows tighten, but never below 44px, and the result keeps its place.
+ * Short phones (about 640px tall): the function rows and keypad tighten, never below 44px in
+ * one direction, so the result keeps its place without scrolling.
  */
 @media (max-height: 740px) {
-  .calc[data-panel='scientific'] .keypad {
+  .sci {
+    grid-auto-rows: 32px;
+  }
+  .sci-screen .keypad {
     grid-auto-rows: clamp(44px, 6.6dvh, 64px);
   }
-  .calc[data-panel='scientific'] .panel__btn {
-    height: 36px;
-  }
-  .calc[data-panel='scientific'] .calc__bar {
+  .sci-screen .screen__bar {
     height: 44px;
   }
-  .calc[data-panel='scientific'] .util {
-    padding-bottom: var(--s-1);
-  }
-  .calc[data-panel='scientific'] .display {
+  .sci-screen .display {
     padding-bottom: 6px;
   }
-  .calc[data-panel='scientific'] .display__echo {
+  .sci-screen .display__echo {
     min-height: 1.25rem;
   }
 }
@@ -591,7 +659,7 @@ button:disabled {
   padding: 10px 0;
   background: none;
   border: 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--ink-3);
   border-radius: 0;
   font-size: 1.0625rem;
   color: var(--ink);
@@ -611,7 +679,7 @@ button:disabled {
   border-radius: var(--r-md);
   font-size: 0.9375rem;
   font-weight: 500;
-  border: 1px solid var(--line);
+  border: 1px solid var(--ink-3);
   color: var(--ink-2);
 }
 

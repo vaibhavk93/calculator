@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { computeDisplay } from './display'
+import { computeDisplay, recentWork } from './displayLogic'
+
+const INITIAL = { expr: '', fresh: false }
 
 const S = { numberSystem: 'indian', decimals: 'auto', angle: 'deg' } as const
 const show = (expr: string, fresh = false, last: string | null = null, s: Parameters<typeof computeDisplay>[2] = S) =>
@@ -7,7 +9,7 @@ const show = (expr: string, fresh = false, last: string | null = null, s: Parame
 
 describe('computeDisplay', () => {
   it('empty shows 0', () => {
-    expect(show('')).toMatchObject({ exprLine: '', resultLine: '0', copyText: null, echo: null })
+    expect(show('')).toMatchObject({ exprLine: '', resultLine: '0', copyText: null, echo: null, preview: false })
   })
 
   describe('a single number being typed', () => {
@@ -89,5 +91,31 @@ describe('computeDisplay', () => {
     it('negative results use the true minus sign', () => {
       expect(show('-5', true, '3-8').resultLine).toBe('−5')
     })
+  })
+})
+
+describe('preview versus answer', () => {
+  it('an expression being typed is a preview', () => expect(show('23*36').preview).toBe(true))
+  it('after "=" it is the answer', () => expect(show('828', true, '23*36').preview).toBe(false))
+  it('a bare number being typed is not dimmed', () => expect(show('828').preview).toBe(false))
+  it('nothing computable is not a preview', () => expect(show('5/0').preview).toBe(false))
+})
+
+describe('recentWork', () => {
+  const h = (id: string, expression: string, result: string) => ({ id, expression, result })
+  const src = [h('c', '3+3', '6'), h('b', '2+2', '4'), h('a', '1+1', '2'), h('z', '9+9', '18')]
+
+  it('oldest first, at most max', () => {
+    expect(recentWork({ expr: '7', fresh: false }, null, src, 3).map((l) => l.id)).toEqual(['a', 'b', 'c'])
+  })
+  it('does not repeat the calculation the big number is showing', () => {
+    expect(recentWork({ expr: '6', fresh: true }, '3+3', src, 3).map((l) => l.id)).toEqual(['z', 'a', 'b'])
+  })
+  it('after a restart (no last expression) the newest stays above', () => {
+    expect(recentWork({ expr: '6', fresh: true }, null, src, 2).map((l) => l.id)).toEqual(['b', 'c'])
+  })
+  it('max 0 or no source shows nothing', () => {
+    expect(recentWork(INITIAL, null, src, 0)).toEqual([])
+    expect(recentWork(INITIAL, null, [], 3)).toEqual([])
   })
 })
