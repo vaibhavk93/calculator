@@ -38,8 +38,9 @@ name, save and compare a calculation instead of re-entering it.
 1. Replace ClevCalc entirely for day-to-day use within one week of install.
 2. Answer any personal-finance question (loan, investment, tax) without leaving the app.
 3. Every result shows the formula and inputs used — trustworthy, auditable math.
-4. Fully offline except currency rates.
-5. Zero ads, zero paywall, zero account.
+4. Turn a stateless calculator into something that remembers: notes and reminders on any calculation.
+5. Fully offline except currency rates.
+6. Zero ads, zero paywall, zero account.
 
 ### Non-Goals
 - Monetisation, subscriptions, ads.
@@ -84,7 +85,7 @@ dependency and risk, not by cutting features.
 | **P3 — Loans** | Full EMI/loan suite (Section C) | The primary stated gap |
 | **P4 — Investments** | SIP/FD/PPF/NPS/EPF suite (Section D) | Pure math, no external data, low risk |
 | **P5 — Tax & Salary** | Income tax, HRA, capital gains, salary (Section E) | Highest maintenance risk — isolated behind a rules config |
-| **P6 — Personalisation + PM pack** | Scenarios, compare, NL input, export, product metrics (Section F) | Depends on P1–P5 existing |
+| **P6 — Memory layer + PM pack** | Notes, reminders, tapes, widgets, scenarios, NL input, export, product metrics (Sections F & G) | The differentiator. Depends on P1–P5 existing. |
 
 ---
 
@@ -201,6 +202,33 @@ the engine and UI are built against.
 | F11 | A/B test sample size | Baseline rate, MDE, power, significance | Required sample per variant, test duration at given traffic |
 | F12 | Retention / cohort | Cohort size, period-wise retained counts | Retention curve, average lifetime |
 | F13 | Rule of 40 / burn multiple | Growth %, profit margin %, net burn, net new ARR | Rule-of-40 score, burn multiple, health verdict |
+
+---
+
+### G. Memory Layer — Notes, Reminders & Tapes (P6)
+
+> **This is the competitive differentiator.** Verified: no calculator app on
+> either store combines notes, reminders and labelled calculations.
+> Full specification in [`MEMORY-LAYER.md`](MEMORY-LAYER.md).
+
+| # | Feature | Inputs | Outputs |
+|---|---|---|---|
+| G1 | Save any result | Title, optional note, tag, reminder | A Saved Card holding the live inputs, re-openable and editable |
+| G2 | Tape mode | Labelled line items (`Flights 24000`) | Running total; each line editable and deletable |
+| G3 | Notes | Free text, optional photo (receipt/bill) | Searchable note on any card |
+| G4 | Reminders | Due date, repeat rule, lead days | Local notification with Mark paid · Snooze · Open |
+| G5 | Mark paid | — | Recurring reminder auto-advances to next cycle, payment logged to card history |
+| G6 | Reminders tab | — | Overdue → This week → Later, with total due in next 30 days |
+| G7 | Smart suggestions | What was just calculated | One dismissible chip offering the relevant reminder or save |
+| G8 | Tags & pinning | — | Pre-made tags (Credit Card, Loan, Rent, Tax, Travel), up to 5 pinned cards |
+| G9 | Search | Query string | Matches titles, notes, tags and amounts |
+| G10 | Trash & undo | — | 7-day recoverable Trash; Undo snackbar on every delete |
+| G11 | Home-screen widgets | — | Quick calculator (4×2), Next due (2×2), Tape total (2×2) |
+| G12 | Export | A card or tape | Text, PNG result card, or PDF |
+
+**Design rule:** saving must take **two taps**. If saving a calculation is more
+effort than redoing it, nobody saves anything and the entire differentiator
+fails.
 
 ---
 
@@ -321,6 +349,6 @@ or web version cheap.
 | P3 | Full loan suite with amortisation tables | Tests validated against a bank EMI table |
 | P4 | Investment suite with charts | Tests validated against official scheme calculators |
 | P5 | Tax & salary with FY2026-27 rules | Tests validated against published slab examples |
-| P6 | Scenarios, NL input, export, PM pack | Tests + screenshots |
+| P6 | Memory layer (notes, reminders, tapes, widgets), scenarios, NL input, export, PM pack | Tests + screenshots + reminder fires on a real device |
 | P7 | Capacitor Android build → installable APK | Gradle build succeeds; you install and smoke-test |
 | Later | iOS target | Requires a Mac — your machine or a CI runner |
