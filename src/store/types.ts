@@ -41,7 +41,11 @@ export interface HistoryEntry {
   /** Plain decimal string. Formatted at render time, so a settings change applies retroactively. */
   result: string
   at: number
+  /** A short name you gave this calculation. A named row is never removed by Clear all or the history cap. */
+  memo?: string
 }
+
+export const MAX_MEMO = 80
 
 export const MAX_HISTORY = 200
 export const MAX_UNDO = 100

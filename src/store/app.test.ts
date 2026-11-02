@@ -240,6 +240,82 @@ describe('history: reuse, delete, undo', () => {
   })
 })
 
+describe('history: naming a calculation', () => {
+  function withTwo() {
+    const m = make()
+    m.press('1', '+', '1', '=', 'clear', '2', '*', '3', '=', 'clear')
+    return m
+  }
+
+  it('sets a name', () => {
+    const { get } = withTwo()
+    const id = get().history[0]!.id
+    get().renameHistory(id, 'Rent split')
+    expect(get().history.find((h) => h.id === id)?.memo).toBe('Rent split')
+  })
+
+  it('trims and caps a name at 80 characters', () => {
+    const { get } = withTwo()
+    const id = get().history[0]!.id
+    get().renameHistory(id, `  ${'x'.repeat(100)}  `)
+    expect(get().history.find((h) => h.id === id)?.memo).toHaveLength(80)
+  })
+
+  it('an empty name clears it', () => {
+    const { get } = withTwo()
+    const id = get().history[0]!.id
+    get().renameHistory(id, 'temp')
+    get().renameHistory(id, '   ')
+    expect(get().history.find((h) => h.id === id)?.memo).toBeUndefined()
+  })
+
+  it('a named row survives Clear all; an unnamed one does not', () => {
+    const { get } = withTwo()
+    const oldestId = get().history[1]!.id
+    get().renameHistory(oldestId, 'Keep me')
+    const named = get().history.find((h) => h.id === oldestId)
+    get().clearHistory()
+    expect(get().history).toEqual([named])
+    expect(get().snack?.text).toBe('Cleared 1 calculations')
+  })
+
+  it('Clear all is unavailable once every row is named (there is nothing to clear)', () => {
+    const { get } = withTwo()
+    for (const h of get().history) get().renameHistory(h.id, 'kept')
+    get().clearHistory()
+    expect(get().history).toHaveLength(2)
+    expect(get().snack).toBeNull()
+  })
+
+  it('the 200-row cap evicts the oldest unnamed row, never a named one', () => {
+    const { press, get } = make()
+    const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const
+    press('1', '+', '1', '=')
+    const first = get().history[0]!.id
+    get().renameHistory(first, 'Do not lose me')
+    for (let i = 0; i < MAX_HISTORY; i++) {
+      press('clear', digits[i % 9]!, '+', '1', '=')
+    }
+    expect(get().history).toHaveLength(MAX_HISTORY)
+    expect(get().history.some((h) => h.id === first)).toBe(true)
+    expect(get().history.find((h) => h.id === first)?.memo).toBe('Do not lose me')
+  })
+
+  it('deleting a named row directly still works (naming only blocks bulk removal)', () => {
+    const { get } = withTwo()
+    const id = get().history[0]!.id
+    get().renameHistory(id, 'temp')
+    get().deleteHistory(id)
+    expect(get().history.find((h) => h.id === id)).toBeUndefined()
+  })
+
+  it('unknown ids are ignored', () => {
+    const { get } = withTwo()
+    expect(() => get().renameHistory('nope', 'x')).not.toThrow()
+    expect(get().history.every((h) => h.memo === undefined)).toBe(true)
+  })
+})
+
 describe('settings', () => {
   it('applies a patch and keeps the rest', () => {
     const { get } = make()

@@ -16,6 +16,7 @@ export type IconName =
   | 'trash'
   | 'check'
   | 'chevron'
+  | 'edit'
 
 const PATHS: Record<IconName, ReactNode> = {
   history: (
@@ -65,6 +66,12 @@ const PATHS: Record<IconName, ReactNode> = {
   trash: <path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13" />,
   check: <path d="M5 12.5l4.5 4.5L19 7" />,
   chevron: <path d="M9 5l7 7-7 7" />,
+  edit: (
+    <>
+      <path d="M4 20l1-4.5L15.5 5 19 8.5 8.5 19z" />
+      <path d="M13 7.5l3.5 3.5" />
+    </>
+  ),
 }
 
 export function Icon({ name, size = 20, className = '' }: { name: IconName; size?: number; className?: string }) {

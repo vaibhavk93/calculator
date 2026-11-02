@@ -74,6 +74,17 @@ describe('sanitizeHistory', () => {
     const many = Array.from({ length: 500 }, (_, i) => ({ id: `id${i}`, expression: '1+1', result: '2', at: i }))
     expect(sanitizeHistory(many)).toHaveLength(200)
   })
+  it('keeps a memo, trimmed and capped at 80 characters', () => {
+    const out = sanitizeHistory([{ id: 'a', expression: '1+1', result: '2', at: 1, memo: `  ${'x'.repeat(100)}  ` }])
+    expect(out[0]!.memo).toHaveLength(80)
+  })
+  it('a blank or non-string memo is dropped, not stored as an empty string', () => {
+    const out = sanitizeHistory([
+      { id: 'a', expression: '1+1', result: '2', at: 1, memo: '   ' },
+      { id: 'b', expression: '1+1', result: '2', at: 1, memo: 42 },
+    ])
+    expect(out.every((h) => h.memo === undefined)).toBe(true)
+  })
 })
 
 describe('sanitizeInput', () => {
@@ -193,12 +204,35 @@ describe('schema v1 -> v2 (adds saved cards and reminders)', () => {
   }
   it('keeps everything the user had and starts with no cards or reminders', () => {
     const out = migrate(v1)
-    expect(out.schemaVersion).toBe(2)
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA)
     expect(out.settings.theme).toBe('light')
     expect(out.history).toHaveLength(1)
     expect(out.memory).toBe('7')
     expect(out.cards).toEqual([])
     expect(out.reminders).toEqual([])
+  })
+})
+
+describe('schema v2 -> v3 (adds a name on a history entry)', () => {
+  // A real v2 file: cards and reminders exist, but no history entry has ever had a memo.
+  const v2 = {
+    schemaVersion: 2,
+    settings: { ...DEFAULT_SETTINGS },
+    history: [{ id: 'a', expression: '2+2', result: '4', at: 5 }],
+    cards: [],
+    reminders: [],
+    memory: null,
+    input: { expr: '', fresh: false },
+  }
+  it('loads with no memo, since the field is new and additive', () => {
+    const out = migrate(v2)
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA)
+    expect(out.history).toEqual([{ id: 'a', expression: '2+2', result: '4', at: 5 }])
+    expect(out.history[0]!.memo).toBeUndefined()
+  })
+  it('a memo already on disk (written by a v3 build, re-read by migrate) survives', () => {
+    const out = migrate({ ...v2, history: [{ id: 'a', expression: '2+2', result: '4', at: 5, memo: 'Rent' }] })
+    expect(out.history[0]!.memo).toBe('Rent')
   })
 })
 

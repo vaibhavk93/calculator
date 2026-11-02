@@ -1,0 +1,23 @@
+/* History row naming (A18): a short name shown above the expression, and its
+   inline edit form. Kept in its own file so it does not collide with other
+   in-flight work on global.css. */
+
+.hrow__memo {
+  flex: 1 0 100%;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.hrow__edit {
+  display: flex;
+  flex: 1 0 100%;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) 0;
+}
+
+.hrow__edit .field {
+  flex: 1 1 auto;
+  min-width: 0;
+}

@@ -13,6 +13,7 @@ import '@fontsource/ibm-plex-mono/latin-ext-400.css'
 import './styles/global.css'
 import './styles/tools.css'
 import './styles/lists.css'
+import './styles/history.css'
 
 import { App } from './App'
 import { StoreProvider } from './components/StoreProvider'

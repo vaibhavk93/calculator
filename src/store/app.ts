@@ -13,6 +13,7 @@ import { sanitizeSettings } from './persistence'
 import {
   MAX_CARDS,
   MAX_HISTORY,
+  MAX_MEMO,
   MAX_PINNED,
   MAX_UNDO,
   TRASH_DAYS,
@@ -26,6 +27,19 @@ import {
 } from './types'
 import { advance } from '../lib/reminders'
 import { listSummary, repeatLines, tapeTotal } from '../lib/tape'
+
+/**
+ * Caps history at `max`, but a named row is never evicted this way (only Clear all's
+ * confirmation, or deleting it directly, removes one). When over the cap, the oldest
+ * unnamed rows go first; `entries` is newest-first.
+ */
+function capHistory(entries: HistoryEntry[], max: number): HistoryEntry[] {
+  if (entries.length <= max) return entries
+  const named = entries.filter((e) => e.memo)
+  const budget = Math.max(0, max - named.length)
+  const keepUnnamed = new Set(entries.filter((e) => !e.memo).slice(0, budget).map((e) => e.id))
+  return entries.filter((e) => e.memo || keepUnnamed.has(e.id))
+}
 
 export type Overlay = 'none' | 'settings' | 'history'
 export type Panel = 'none' | 'more' | 'scientific'
@@ -106,6 +120,8 @@ export interface AppState {
 
   reuseExpression: (id: string) => void
   reuseResult: (id: string) => void
+  /** Sets or clears the name on a history row. An empty string clears it. */
+  renameHistory: (id: string, memo: string) => void
   deleteHistory: (id: string) => void
   clearHistory: () => void
   undoRemoval: () => void
@@ -243,7 +259,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
             result: res.commit.result,
             at: deps.now(),
           }
-          patch.history = [entry, ...history].slice(0, MAX_HISTORY)
+          patch.history = capHistory([entry, ...history], MAX_HISTORY)
         }
         set(patch)
       },
@@ -290,6 +306,13 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         set({ ...withUndo(insertNumber(get().input, entry.result)), overlay: 'none' })
       },
 
+      renameHistory: (id, memo) => {
+        const trimmed = memo.trim().slice(0, MAX_MEMO)
+        set({
+          history: get().history.map((h) => (h.id === id ? { ...h, memo: trimmed || undefined } : h)),
+        })
+      },
+
       deleteHistory: (id) => {
         const { history } = get()
         const index = history.findIndex((h) => h.id === id)
@@ -304,11 +327,13 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
 
       clearHistory: () => {
         const { history } = get()
-        if (history.length === 0) return
+        // Named rows are kept: clearing is for the clutter, not for what you bothered to name.
+        const toRemove = history.map((entry, index) => ({ entry, index })).filter((r) => !r.entry.memo)
+        if (toRemove.length === 0) return
         set({
-          history: [],
-          removed: history.map((entry, index) => ({ entry, index })),
-          snack: { id: nextId(), text: `Cleared ${history.length} calculations`, canUndo: true },
+          history: history.filter((h) => h.memo),
+          removed: toRemove,
+          snack: { id: nextId(), text: `Cleared ${toRemove.length} calculations`, canUndo: true },
         })
       },
 

@@ -3,6 +3,7 @@ import { Icon } from '../../components/Icon'
 import { Sheet } from '../../components/Sheet'
 import { useApp } from '../../components/StoreProvider'
 import { formatExpression, formatPlain } from '../../lib/format'
+import { MAX_MEMO } from '../../store/types'
 
 export function HistorySheet() {
   const history = useApp((s) => s.history)
@@ -11,19 +12,32 @@ export function HistorySheet() {
   const setOverlay = useApp((s) => s.setOverlay)
   const reuseExpression = useApp((s) => s.reuseExpression)
   const reuseResult = useApp((s) => s.reuseResult)
+  const renameHistory = useApp((s) => s.renameHistory)
   const deleteHistory = useApp((s) => s.deleteHistory)
   const clearHistory = useApp((s) => s.clearHistory)
 
   const [confirming, setConfirming] = useState(false)
   const [typed, setTyped] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draft, setDraft] = useState('')
 
   const fmt = { system, decimals }
   const armed = typed.trim().toUpperCase() === 'CLEAR'
+  const clearable = history.filter((h) => !h.memo).length
 
   const close = () => setOverlay('none')
   const cancelClear = () => {
     setConfirming(false)
     setTyped('')
+  }
+  const startEdit = (id: string, current: string | undefined) => {
+    setEditingId(id)
+    setDraft(current ?? '')
+  }
+  const saveEdit = () => {
+    if (editingId) renameHistory(editingId, draft)
+    setEditingId(null)
+    setDraft('')
   }
 
   return (
@@ -31,7 +45,7 @@ export function HistorySheet() {
       title="History"
       onClose={close}
       action={
-        history.length > 0 && !confirming ? (
+        clearable > 0 && !confirming ? (
           <button type="button" className="link-btn link-btn--danger" onClick={() => setConfirming(true)}>
             Clear all
           </button>
@@ -49,7 +63,8 @@ export function HistorySheet() {
           }}
         >
           <p>
-            Type CLEAR to remove all {history.length} calculations. You will have a few seconds to undo.
+            Type CLEAR to remove {clearable} calculation{clearable === 1 ? '' : 's'}. Named calculations are kept.
+            You will have a few seconds to undo.
           </p>
           <input
             className="field"
@@ -80,17 +95,54 @@ export function HistorySheet() {
           {history.map((h) => {
             const expression = formatExpression(h.expression, system)
             const result = formatPlain(h.result, fmt)
+            const editing = editingId === h.id
             return (
               <li key={h.id} className="hrow">
-                <button type="button" className="hrow__expr" aria-label={`Use expression ${expression}`} onClick={() => reuseExpression(h.id)}>
-                  {expression}
-                </button>
-                <button type="button" className="hrow__result" aria-label={`Use result ${result}`} onClick={() => reuseResult(h.id)}>
-                  {result}
-                </button>
-                <button type="button" className="icon-btn" aria-label={`Delete ${expression}`} onClick={() => deleteHistory(h.id)}>
-                  <Icon name="trash" size={18} />
-                </button>
+                {editing ? (
+                  <form
+                    className="hrow__edit"
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      saveEdit()
+                    }}
+                  >
+                    <input
+                      className="field"
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value.slice(0, MAX_MEMO))}
+                      aria-label={`Name for ${expression}`}
+                      placeholder="Name this calculation"
+                      autoFocus
+                    />
+                    <button type="button" className="btn" onClick={() => setEditingId(null)}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn">
+                      Save
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    {h.memo ? <span className="hrow__memo">{h.memo}</span> : null}
+                    <button type="button" className="hrow__expr" aria-label={`Use expression ${expression}`} onClick={() => reuseExpression(h.id)}>
+                      {expression}
+                    </button>
+                    <button type="button" className="hrow__result" aria-label={`Use result ${result}`} onClick={() => reuseResult(h.id)}>
+                      {result}
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      aria-label={h.memo ? `Rename ${expression}` : `Name ${expression}`}
+                      onClick={() => startEdit(h.id, h.memo)}
+                    >
+                      <Icon name="edit" size={18} />
+                    </button>
+                    <button type="button" className="icon-btn" aria-label={`Delete ${expression}`} onClick={() => deleteHistory(h.id)}>
+                      <Icon name="trash" size={18} />
+                    </button>
+                  </>
+                )}
               </li>
             )
           })}

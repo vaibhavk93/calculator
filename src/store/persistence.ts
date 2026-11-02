@@ -4,6 +4,7 @@ import type { KeyValueStorage } from '../lib/storage'
 import {
   DEFAULT_SETTINGS,
   MAX_HISTORY,
+  MAX_MEMO,
   TABS,
   MAX_CARDS,
   MAX_PINNED,
@@ -21,7 +22,7 @@ import type { Values } from '../lib/tool'
 
 export const STORAGE_KEY = 'vkcalc.data'
 /** Bump when the stored shape changes, and add a step to MIGRATIONS. */
-export const CURRENT_SCHEMA = 2
+export const CURRENT_SCHEMA = 3
 
 export function defaultPersisted(): PersistedData {
   return {
@@ -79,7 +80,8 @@ export function sanitizeHistory(raw: unknown): HistoryEntry[] {
     if (typeof expression !== 'string' || expression === '' || expression.length > 500 || !RAW_EXPRESSION.test(expression)) continue
     if (!isPlainNumber(result)) continue
     seen.add(id)
-    out.push({ id, expression, result, at: typeof at === 'number' && Number.isFinite(at) ? at : 0 })
+    const memo = typeof item.memo === 'string' ? item.memo.trim().slice(0, MAX_MEMO) : ''
+    out.push({ id, expression, result, at: typeof at === 'number' && Number.isFinite(at) ? at : 0, ...(memo ? { memo } : {}) })
     if (out.length >= MAX_HISTORY) break
   }
   return out
@@ -188,6 +190,9 @@ type Migration = (data: Record<string, unknown>) => Record<string, unknown>
 const MIGRATIONS: Record<number, Migration> = {
   // v1 had no saved cards or reminders.
   1: (data) => ({ ...data, cards: [], reminders: [] }),
+  // v2 had no memo on a history entry. It is optional and additive, so old data needs no change:
+  // sanitizeHistory reads `memo` if present and leaves it out otherwise.
+  2: (data) => data,
 }
 
 /** Turns whatever was in storage (or a backup file) into valid current-schema data. Never throws. */
