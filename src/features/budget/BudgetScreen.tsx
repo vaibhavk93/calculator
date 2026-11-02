@@ -4,7 +4,7 @@ import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
 import { tintStyle } from '../../components/tint'
 import { D, type Dec } from '../../engine'
-import { entriesIn, monthKey, monthLabel, shiftMonth, summarise, type BudgetExpense } from '../../lib/budget'
+import { entriesIn, modeLabel, monthKey, monthLabel, shiftMonth, summarise, type BudgetExpense } from '../../lib/budget'
 import { formatCell } from '../../lib/toolFormat'
 import { CategorySheet, ExpenseSheet, LimitsSheet } from './sheets'
 
@@ -43,6 +43,7 @@ export function BudgetScreen() {
   const money = (v: Dec) => formatCell(v, 'money', { system, decimals })
   const s = summarise(budget, month)
   const nameOf = (e: BudgetExpense) => budget.categories.find((c) => c.id === e.categoryId && c.deletedAt === null)?.name ?? 'Uncategorised'
+  const label = (e: BudgetExpense) => (e.mode ? `${nameOf(e)} · ${modeLabel(e.mode)}` : nameOf(e))
   const never = budget.expenses.every((e) => e.deletedAt !== null)
 
   const sheets = (
@@ -142,6 +143,26 @@ export function BudgetScreen() {
           </div>
         </section>
 
+        {s.byMode.length > 0 && (
+          <section className="sect" style={tintStyle(7)} aria-label="Paid with">
+            <h2 className="sect__head"><span>Paid with</span></h2>
+            <div className="sect__body">
+              {s.byMode.map((m) => (
+                <div className="budget__row budget__row--plain" key={m.id}>
+                  <span className="row__label">{m.label}</span>
+                  <span className="budget__amt">{money(m.spent)}</span>
+                </div>
+              ))}
+              {!s.noMode.isZero() && (
+                <div className="budget__row budget__row--plain">
+                  <span className="row__label">No mode</span>
+                  <span className="budget__amt">{money(s.noMode)}</span>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         <section className="sect" style={tintStyle(5)} aria-label="This month">
           <h2 className="sect__head">
             <span>This month</span>
@@ -155,7 +176,7 @@ export function BudgetScreen() {
                 <div className="budget__entry" key={e.id}>
                   <button type="button" className="budget__main" aria-label={`Edit ${money(amount)} ${nameOf(e)}`} onClick={() => setSheet({ kind: 'expense', id: e.id })}>
                     <span className="budget__amt">{money(amount)}</span>
-                    <span className="row__label">{nameOf(e)}</span>
+                    <span className="row__label">{label(e)}</span>
                     <span className="row__hint">{shortDate(e.date)}{e.note ? ` · ${e.note}` : ''}</span>
                   </button>
                   <button type="button" className="icon-btn" aria-label={`Delete ${money(amount)} ${nameOf(e)}`} onClick={() => deleteExpense(e.id)}>

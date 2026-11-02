@@ -308,10 +308,10 @@ describe('budget data', () => {
         overall: '-5',
         categories: [{ id: 'c1', name: 'Food', limit: '4000', deletedAt: null }, { id: '', name: 'x' }, { id: 'c2', name: '   ' }],
         expenses: [
-          { id: 'e1', date: '2026-11-02', amount: '120.50', categoryId: 'c1', note: 'tea', deletedAt: null },
+          { id: 'e1', date: '2026-11-02', amount: '120.50', categoryId: 'c1', mode: 'upi', note: 'tea', deletedAt: null },
           { id: 'e2', date: '2026-13-40', amount: '5', categoryId: 'c1' },
           { id: 'e3', date: '2026-11-02', amount: '-5', categoryId: 'c1' },
-          { id: 'e4', date: '2026-11-03', amount: '9', categoryId: 'nope' },
+          { id: 'e4', date: '2026-11-03', amount: '9', categoryId: 'nope', mode: 'bitcoin' },
         ],
       },
     })
@@ -320,5 +320,7 @@ describe('budget data', () => {
     expect(out.budget.expenses.map((e) => e.id)).toEqual(['e1', 'e4'])
     // An entry whose category is gone stays, as Uncategorised.
     expect(out.budget.expenses[1]!.categoryId).toBeNull()
+    // A known mode is kept; an unknown or missing one becomes null.
+    expect(out.budget.expenses.map((e) => e.mode)).toEqual(['upi', null])
   })
 })

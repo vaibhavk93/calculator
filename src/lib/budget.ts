@@ -8,12 +8,27 @@ export interface BudgetCategory {
   deletedAt: number | null
 }
 
+/** How an entry was paid. A fixed list on purpose: no instruments, nothing to manage. */
+export const PAYMENT_MODES = [
+  { id: 'cash', label: 'Cash' },
+  { id: 'upi', label: 'UPI' },
+  { id: 'credit', label: 'Credit card' },
+  { id: 'debit', label: 'Debit card' },
+  { id: 'netbanking', label: 'Net banking' },
+  { id: 'wallet', label: 'Wallet' },
+] as const
+export type PaymentModeId = (typeof PAYMENT_MODES)[number]['id']
+export const isPaymentMode = (v: unknown): v is PaymentModeId => PAYMENT_MODES.some((m) => m.id === v)
+export const modeLabel = (id: PaymentModeId): string => PAYMENT_MODES.find((m) => m.id === id)!.label
+
 /** One thing spent. `date` is "YYYY-MM-DD" on the user's calendar. A null category means "Uncategorised". */
 export interface BudgetExpense {
   id: string
   date: string
   amount: string
   categoryId: string | null
+  /** How it was paid, or null when not said. */
+  mode: PaymentModeId | null
   note: string
   deletedAt: number | null
 }
@@ -77,6 +92,10 @@ export interface MonthSummary {
   lines: CategoryLine[]
   /** Spent in the month on entries with no category, or whose category was deleted. Never hidden. */
   uncategorised: Dec
+  /** Spent per payment mode, only modes with spend. */
+  byMode: { id: PaymentModeId; label: string; spent: Dec }[]
+  /** Spent on entries with no mode. */
+  noMode: Dec
   entries: BudgetExpense[]
 }
 
@@ -105,9 +124,13 @@ export function summarise(budget: BudgetData, month: string): MonthSummary {
   const spentBy = new Map<string, Dec>()
   let uncategorised = new D(0)
   let spent = new D(0)
+  let noMode = new D(0)
+  const modeSpent = new Map<PaymentModeId, Dec>()
   for (const e of entries) {
     const amount = parse(e.amount) ?? new D(0)
     spent = spent.plus(amount)
+    if (e.mode === null) noMode = noMode.plus(amount)
+    else modeSpent.set(e.mode, (modeSpent.get(e.mode) ?? new D(0)).plus(amount))
     if (e.categoryId !== null && liveIds.has(e.categoryId)) spentBy.set(e.categoryId, (spentBy.get(e.categoryId) ?? new D(0)).plus(amount))
     else uncategorised = uncategorised.plus(amount)
   }
@@ -125,6 +148,25 @@ export function summarise(budget: BudgetData, month: string): MonthSummary {
     overall: overallLimit ? { limit: overallLimit, left: overallLimit.minus(spent), pct: pctOf(spent, overallLimit) } : null,
     lines,
     uncategorised,
+    byMode: PAYMENT_MODES.filter((m) => modeSpent.get(m.id)?.gt(0)).map((m) => ({ id: m.id, label: m.label, spent: modeSpent.get(m.id)! })),
+    noMode,
     entries,
   }
+}
+
+/**
+ * Category and mode to pre-fill when a note exactly matches (ignoring case) an earlier live entry's note.
+ * Most recent date wins; the stored order breaks ties (newest added first). Null when nothing matches.
+ */
+export function suggestFor(budget: BudgetData, note: string): { categoryId: string | null; mode: PaymentModeId | null } | null {
+  const key = note.trim().toLowerCase()
+  if (!key) return null
+  let best: BudgetExpense | null = null
+  for (const e of budget.expenses) {
+    if (e.deletedAt !== null || e.note.trim().toLowerCase() !== key) continue
+    if (!best || e.date > best.date) best = e
+  }
+  if (!best) return null
+  const alive = budget.categories.some((c) => c.id === best!.categoryId && c.deletedAt === null)
+  return { categoryId: alive ? best.categoryId : null, mode: best.mode }
 }

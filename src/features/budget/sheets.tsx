@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Sheet } from '../../components/Sheet'
 import { tintStyle } from '../../components/tint'
 import { useApp } from '../../components/StoreProvider'
-import { dayKey, type BudgetExpense } from '../../lib/budget'
+import { PAYMENT_MODES, dayKey, suggestFor, type BudgetExpense, type PaymentModeId } from '../../lib/budget'
 
 /** Keep digits and one dot. The store checks the rest and says what to fix. */
 const cleanMoney = (v: string) => v.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').slice(0, 16)
@@ -21,17 +21,34 @@ function MoneyField({ id, label, value, onChange, placeholder }: { id: string; l
 
 export function ExpenseSheet({ expense, onClose }: { expense?: BudgetExpense; onClose: () => void }) {
   const categories = useApp((s) => s.budget.categories).filter((c) => c.deletedAt === null)
+  const budget = useApp((s) => s.budget)
   const add = useApp((s) => s.addExpense)
   const update = useApp((s) => s.updateExpense)
   const [amount, setAmount] = useState(expense?.amount ?? '')
   const [categoryId, setCategoryId] = useState<string | null>(expense?.categoryId ?? null)
+  const [mode, setMode] = useState<PaymentModeId | null>(expense?.mode ?? null)
+  // Category and mode pre-fill from an earlier entry with the same note, until the user picks one themselves.
+  const [touched, setTouched] = useState(expense !== undefined)
   const [date, setDate] = useState(expense?.date ?? dayKey(new Date()))
   const [note, setNote] = useState(expense?.note ?? '')
 
   // The store explains a bad entry in the notice; the sheet stays open until it is accepted.
   const done = () => {
-    const draft = { amount, categoryId, date, note: note.trim() }
+    const draft = { amount, categoryId, mode, date, note: note.trim() }
     if (expense ? update(expense.id, draft) : add(draft)) onClose()
+  }
+
+  const changeNote = (v: string) => {
+    setNote(v)
+    const hit = touched ? null : suggestFor(budget, v)
+    if (hit) {
+      setCategoryId(hit.categoryId)
+      setMode(hit.mode)
+    }
+  }
+  const pick = <T,>(set: (v: T) => void, v: T) => {
+    set(v)
+    setTouched(true)
   }
 
   return (
@@ -43,9 +60,17 @@ export function ExpenseSheet({ expense, onClose }: { expense?: BudgetExpense; on
         <div className="save__card" style={tintStyle(4)}>
           <span className="field-label" id="exp-cat">Category</span>
           <div className="chips" role="group" aria-labelledby="exp-cat">
-            <button type="button" className="chip" aria-pressed={categoryId === null} onClick={() => setCategoryId(null)}>Uncategorised</button>
+            <button type="button" className="chip" aria-pressed={categoryId === null} onClick={() => pick(setCategoryId, null)}>Uncategorised</button>
             {categories.map((c) => (
-              <button key={c.id} type="button" className="chip" aria-pressed={categoryId === c.id} onClick={() => setCategoryId(c.id)}>{c.name}</button>
+              <button key={c.id} type="button" className="chip" aria-pressed={categoryId === c.id} onClick={() => pick(setCategoryId, c.id)}>{c.name}</button>
+            ))}
+          </div>
+        </div>
+        <div className="save__card" style={tintStyle(6)}>
+          <span className="field-label" id="exp-mode">Paid with</span>
+          <div className="chips" role="group" aria-labelledby="exp-mode">
+            {PAYMENT_MODES.map((m) => (
+              <button key={m.id} type="button" className="chip" aria-pressed={mode === m.id} onClick={() => pick(setMode, mode === m.id ? null : m.id)}>{m.label}</button>
             ))}
           </div>
         </div>
@@ -56,7 +81,7 @@ export function ExpenseSheet({ expense, onClose }: { expense?: BudgetExpense; on
           </label>
           <label className="field-row">
             <span className="field-label">Note</span>
-            <input className="field" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} />
+            <input className="field" value={note} maxLength={200} onChange={(e) => changeNote(e.target.value)} />
           </label>
         </div>
       </div>

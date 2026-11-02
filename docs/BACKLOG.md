@@ -89,3 +89,5 @@ Left out on purpose, with no evidence they are needed: rollover, card cycles, SM
 
 See the table at the end of `docs/VERIFICATION.md`: tax slabs before 1 April, small-savings rates every quarter, EPF rate
 yearly, GST when the Council meets, the currency snapshot daily until live refresh exists.
+
+- Payment mode is built (fixed list, chips, pre-fill from the same note, Paid with card). Still to do: instruments, subcategories, a manage-lists screen, spend breakdown by period.

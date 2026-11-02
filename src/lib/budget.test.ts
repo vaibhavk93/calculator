@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { dayKey, monthKey, shiftMonth, summarise } from './budget'
+import { dayKey, modeLabel, monthKey, shiftMonth, suggestFor, summarise } from './budget'
 import type { BudgetData } from './budget'
 
 const cat = (id: string, limit: string | null = null, deletedAt: number | null = null) => ({ id, name: id, limit, deletedAt })
-const exp = (id: string, date: string, amount: string, categoryId: string | null, deletedAt: number | null = null) => ({ id, date, amount, categoryId, note: '', deletedAt })
+const exp = (id: string, date: string, amount: string, categoryId: string | null, deletedAt: number | null = null) => ({ id, date, amount, categoryId, mode: null, note: '', deletedAt })
 
 const data: BudgetData = {
   overall: '10000',
@@ -65,5 +65,29 @@ describe('months', () => {
   it('formats a date in local time', () => {
     expect(monthKey(new Date(2026, 10, 2))).toBe('2026-11')
     expect(dayKey(new Date(2026, 10, 2))).toBe('2026-11-02')
+  })
+})
+
+describe('payment mode', () => {
+  const m = (id: string, amount: string, mode: 'upi' | 'cash' | null, deletedAt: number | null = null, date = '2026-11-02', note = '') => ({ ...exp(id, date, amount, null, deletedAt), mode, note })
+  const b: BudgetData = { overall: null, categories: [cat('food')], expenses: [m('1', '0.1', 'upi'), m('2', '0.2', 'upi'), m('3', '50', 'cash'), m('4', '999', 'upi', 5), m('5', '7', null), m('6', '9', 'cash', null, '2026-10-30')] }
+  it('sums per mode exactly, skips deleted and other months', () => {
+    const s = summarise(b, '2026-11')
+    expect(s.byMode.map((x) => [x.id, x.label, x.spent.toString()])).toEqual([['cash', 'Cash', '50'], ['upi', 'UPI', '0.3']])
+    expect(s.noMode.toString()).toBe('7')
+  })
+  it('modeLabel names a mode', () => expect(modeLabel('credit')).toBe('Credit card'))
+  it('suggestFor matches the note ignoring case, newest date first, live entries only', () => {
+    const x: BudgetData = {
+      ...b,
+      expenses: [
+        { ...m('a', '1', 'cash', null, '2026-11-01', 'Swiggy'), categoryId: 'food' },
+        { ...m('b', '1', 'upi', null, '2026-11-03', 'swiggy '), categoryId: 'food' },
+        { ...m('c', '1', 'cash', 9, '2026-11-09', 'swiggy'), categoryId: 'food' },
+      ],
+    }
+    expect(suggestFor(x, 'SWIGGY')).toEqual({ categoryId: 'food', mode: 'upi' })
+    expect(suggestFor(x, 'swig')).toBeNull()
+    expect(suggestFor(x, '  ')).toBeNull()
   })
 })

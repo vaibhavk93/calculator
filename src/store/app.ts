@@ -16,6 +16,8 @@ import { sanitizeSettings } from './persistence'
 import {
   MAX_CATEGORIES,
   MAX_EXPENSES,
+  isPaymentMode,
+  type PaymentModeId,
   MAX_CARDS,
   MAX_HISTORY,
   MAX_MEMO,
@@ -131,9 +133,9 @@ export interface AppState {
   press: (key: Key) => void
 
   /** Records something spent. Returns false (and says why) when the amount is not a positive number. */
-  addExpense: (draft: { amount: string; categoryId: string | null; date: string; note: string }) => boolean
+  addExpense: (draft: { amount: string; categoryId: string | null; mode?: PaymentModeId | null; date: string; note: string }) => boolean
   /** Changes an entry. Same rules as addExpense. */
-  updateExpense: (id: string, draft: { amount: string; categoryId: string | null; date: string; note: string }) => boolean
+  updateExpense: (id: string, draft: { amount: string; categoryId: string | null; mode?: PaymentModeId | null; date: string; note: string }) => boolean
   /** Removes an entry; the snackbar offers Undo. */
   deleteExpense: (id: string) => void
   /** A monthly limit for one category, or null to remove it. */
@@ -260,12 +262,13 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
     }
 
     /** A plain positive amount, a real calendar day, a category that exists. Or the reason it is not. */
-    const checkedExpense = (d: { amount: string; categoryId: string | null; date: string; note: string }) => {
+    const checkedExpense = (d: { amount: string; categoryId: string | null; mode?: PaymentModeId | null; date: string; note: string }) => {
       const amount = parseNum(d.amount)
       if (!amount || !amount.isPositive() || amount.isZero()) return 'Enter an amount above zero'
       if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date) || Number.isNaN(new Date(`${d.date}T00:00:00`).getTime())) return 'Pick a date'
       const categoryId = d.categoryId !== null && get().budget.categories.some((c) => c.id === d.categoryId && c.deletedAt === null) ? d.categoryId : null
-      return { amount: toPlain(amount), categoryId, date: d.date, note: d.note.trim().slice(0, 200) }
+      const mode = isPaymentMode(d.mode) ? d.mode : null
+      return { amount: toPlain(amount), categoryId, mode, date: d.date, note: d.note.trim().slice(0, 200) }
     }
 
     const cleanLimit = (limit: string | null) => {

@@ -119,12 +119,12 @@
 .answer__value {
   flex: 0 1 auto;
   min-width: 0;
-  overflow-wrap: anywhere;
   margin-left: auto;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 1.25rem;
+  font-size: 1.0625rem;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .tools__list {

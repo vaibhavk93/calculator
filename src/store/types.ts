@@ -59,8 +59,8 @@ export const MAX_UNDO = 100
 export * from '../lib/memory'
 
 /** Everything that survives a restart, and everything in a backup file. */
-export type { BudgetCategory, BudgetData, BudgetExpense } from '../lib/budget'
-export { MAX_CATEGORIES, MAX_EXPENSES, STARTER_CATEGORIES, starterBudget } from '../lib/budget'
+export type { BudgetCategory, BudgetData, BudgetExpense, PaymentModeId } from '../lib/budget'
+export { MAX_CATEGORIES, MAX_EXPENSES, PAYMENT_MODES, STARTER_CATEGORIES, isPaymentMode, starterBudget } from '../lib/budget'
 
 export interface PersistedData {
   schemaVersion: number

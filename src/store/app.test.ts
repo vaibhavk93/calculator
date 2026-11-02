@@ -388,6 +388,15 @@ describe('budget', () => {
     expect(get().addExpense(draft())).toBe(true)
     expect(get().budget.expenses[0]).toMatchObject({ amount: '1250.5', date: '2026-11-02', note: 'tea', deletedAt: null })
   })
+  it('keeps a known payment mode and drops an unknown one', () => {
+    const { get } = make()
+    get().addExpense(draft({ mode: 'upi' }))
+    get().addExpense(draft({ mode: 'bitcoin' }))
+    get().addExpense(draft())
+    expect(get().budget.expenses.map((e) => e.mode)).toEqual([null, null, 'upi'])
+    get().updateExpense(get().budget.expenses[0]!.id, draft({ mode: 'cash' }))
+    expect(get().budget.expenses[0]!.mode).toBe('cash')
+  })
   it('refuses zero, blank and unreadable amounts with a plain message', () => {
     const { get } = make()
     for (const amount of ['', '0', 'abc', '-5']) expect(get().addExpense(draft({ amount }))).toBe(false)

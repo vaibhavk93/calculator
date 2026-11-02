@@ -11,6 +11,7 @@ import {
   REPEATS,
   MAX_CATEGORIES,
   MAX_EXPENSES,
+  isPaymentMode,
   starterBudget,
   type BudgetCategory,
   type BudgetData,
@@ -220,6 +221,7 @@ export function sanitizeBudget(raw: unknown): BudgetData {
       amount: e.amount,
       // A category that no longer exists is "Uncategorised"; the entry is kept.
       categoryId: typeof e.categoryId === 'string' && catIds.has(e.categoryId) ? e.categoryId : null,
+      mode: isPaymentMode(e.mode) ? e.mode : null,
       note: str(e.note, 200),
       deletedAt: typeof e.deletedAt === 'number' && Number.isFinite(e.deletedAt) ? e.deletedAt : null,
     })
