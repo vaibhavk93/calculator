@@ -172,3 +172,46 @@ and reporting a false bug, which is exactly what happened twice in tools1.
 - The real owner Budget entry that changed category between 21:08 and 21:45 on 2 Nov 2026 — still never confirmed with the owner directly.
 
 All fixes verified: `npm run check` — 1310/1310 unit tests pass.
+
+## Round 8: fixed the real bugs, built, installed on the real phone, planned what's left, competitive research
+
+**9 real app bugs fixed** (commit after 5e528d1): Sheet Escape closing every open sheet at once (routed
+through the existing back-button stack, which already only runs the topmost handler); editing any field
+on a credit card silently detaching its card-bill payments (B-04, root cause: a settlement's `mode: null`
+was wrongly read as "its mode stopped fitting"); a corrupted/tampered save claiming `fresh: true` on a
+half-typed function call white-screening the app (B-16, `sanitizeInput` now requires a plain number, the
+only shape the app itself ever produces for a fresh value); the regular keypad's rows not shrinking below
+52px, pushing the bottom row under the tab bar at 360x640 (same bug already fixed for Scientific, now
+applied to Calculate); backup filename using UTC instead of local date; the web build's "Open folder"
+link doing nothing; a dangling operator rendering a trailing space; the pin-limit notice never rendering
+on the Notes screen (added to the global snackbar too); SaveSheet's tag box only de-duping exact matches
+while TaskSheet already did it case-insensitively.
+
+**One test-infrastructure fix with outsized leverage**: every e2e suite's shared browser-context helper
+(`e2e/lib.mjs`) didn't disable CSS animations. Every `.screen` slides in over 220ms; a geometry check run
+right after navigation could catch that transform mid-flight and report fake sideways overflow. This
+alone explained roughly 20 of the "systemic layout overflow" findings across three suites. Fixed by
+turning on `prefers-reduced-motion` in the shared context (the app's own CSS already honours it).
+
+**Confirmed false positives from my own earlier analysis** (not fixed, because nothing is broken):
+CALC-383 (the "not-allowed" cursor on an empty result — correct, there's nothing to copy yet), CALC-267/
+Y-TAP-history (History's "All" chip — it uses an invisible hit-slop technique that already satisfies the
+44px rule), CG04 (the category pill toggle works correctly; manually reproducing it needed a clean reload
+and real waits, which is a sign the *test* has a timing issue, not the app).
+
+Built (`npm run build`), synced, and installed the **real** `Calc` app (not QA) on the phone at the
+owner's request — this updates their live app, not a disposable test copy. Confirmed healthy with one
+screenshot per the established safe-testing rule (no bulk automated taps against the real app with its
+real data). `docs/TEST-PLAN-REMAINING.md` written: what's still only tested in a browser and needs a real
+device (reminders actually firing, backup/restore round-trip, TalkBack, native clipboard, rotation), what's
+a confirmed bug not yet fixed (the 16-calculator invalid-field-marking gap, junk-input validation, the
+backup/restore data bugs, accent contrast), and what's unconfirmed either way (the budget CG/PM timeout
+cluster, three calculator cases, four stale notes-todo cases from this round's own Tools regrouping).
+
+`docs/COMPETITIVE-RESEARCH-AND-PLAN.md` written by a background agent: read the two sibling repos
+(Financial Advisor, Retirement Plan) and four competitor catalogues, cross-referenced against this
+repo's own `REVIEW-NEW-FEATURES.md` (which already did a competitor sweep the same day) so nothing is
+suggested twice. Verdict: the sibling repos contribute correctness *rules* more than features (exact
+split allocation, posting-date statement cycles, "every rule of thumb shows its condition"); the only
+real missing *tool* is the India small-savings pack (SSY/NSC/VPF/SCSS); 12 competitor features are
+explicitly ruled out for breaking a named design rule, listed so they don't resurface later.
