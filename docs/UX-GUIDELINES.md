@@ -447,3 +447,19 @@ Where the earlier text of this document changed on 2026-11-02, and why.
 | 5.2 results | "Save, Share, Reset" on every result | "Save, To list". Share and Reset not built | Matches the build |
 | 15 display | *(New)* Earlier calculations faded above the current line | Removed: History only | The owner: history should show only when asked for, not while calculating |
 | 6 navigation | Tabs Calc, Tools, Saved, Reminders. 74 calculators. Favourites | Calculate, Tools, Notes, Due. 51 calculators in 9 groups | Matches the build and the owner's words |
+
+## 20. Sections, long lists and a layout that holds still
+
+*Added 2026-11-02 after the owner found lists that "look the same" and a calculator whose layout jumped.*
+
+| Rule | Detail |
+|---|---|
+| Split any list over 6 items | Into titled sections of 1 to 4. A group of 11 loans is three sections, not one wall (`groups.test.ts` enforces it) |
+| Sort by what the person is doing | Not by how the maths works. Currency is money, binary and hex are numbers, units are measuring |
+| A section is a card | A tinted wash, a heading with its count, then plain rows (DS "Section colours") |
+| Choose cards for navigation, rows for facts | Tools home is tiles. A schedule is rows |
+| **No sideways scrolling** | A table of three or more columns becomes one block per row: a heading, then labelled values in a grid. Money never breaks. Two columns stay a table. Do not put a scroll box inside a scrolling page |
+| Do not move the layout | Reserve space for anything that appears later. A finished result must not push the display or keys. Measure: the same top positions before and after |
+| Say what each part is | A calculator shows "What you are working out" on a tinted card and "Result" on a plain one |
+| Pin is an icon | A pushpin: outline when loose, filled and accent-coloured when pinned. Labelled "Pin" or "Unpin" for screen readers |
+

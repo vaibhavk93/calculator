@@ -166,6 +166,56 @@ Three constraints keep this from becoming decoration:
 Everything that is *not* good or bad still earns its emphasis through
 typography and position, exactly as before.
 
+### Section colours (which part is this)
+
+**Added 2026-11-02, by the owner's request**: lists looked the same, so two
+sections were hard to tell apart. Research on grouped lists (Apple's "inset
+grouped" style, used by Notes and Reminders) points the same way: one
+continuous background wrapped around each section, from its heading down
+through its rows.
+
+The app now has **four colour meanings, and a colour never carries two**:
+
+| Meaning | Colour | Where |
+|---|---|---|
+| You can act on this | `accent` | `=`, selected chips, focus, pinned pin |
+| Good or bad for you | `positive`, `negative` | A result value, with a sign or a word |
+| Overdue, act now | `alert` | The Overdue heading, an error |
+| **Which section this is** | **`--tint-1` to `--tint-8`** | Tiles, section cards, an input card, headings |
+
+A tint is **identity, never state**. It never means good, bad, tappable or
+selected.
+
+**Where a tint may appear:** the Tools home tiles; a group page's section
+cards; a calculator's *input* card and its heading; the Notes and Due section
+cards; the small dot in a search result.
+
+**Where it may not:** the **Result card**, the sticky answer bar, any button,
+or behind or beside a number that carries `positive` or `negative`. The Result
+stays a plain `surface` card so a number's colour keeps its meaning. Overdue is
+a plain card with an `alert` heading, not a tint.
+
+| # | Used for | Dark | Light |
+|---|---|---|---|
+| 1 | Math and numbers (indigo) | `#201933` | `#E7E1F9` |
+| 2 | Money and shopping (cyan) | `#192F33` | `#E1F5F9` |
+| 3 | Units and travel (amber); Notes: calculations | `#322B1B` | `#F9F2E2` |
+| 4 | Dates and health (plum); Notes: pinned | `#321B2B` | `#F9E2F2` |
+| 5 | Loans and EMI (blue); Notes: lists; Due: this week | `#182435` | `#E0EBFA` |
+| 6 | Savings and investing (violet) | `#2C1A32` | `#F3E1F9` |
+| 7 | Tax and salary (slate) | `#23262A` | `#E5ECF5` |
+| 8 | Business metrics (sand); Due: later | `#2B2722` | `#F6EFE5` |
+
+(Exact values live in `src/lib/theme.ts`; this table is a guide.)
+
+Constraints, all asserted in `theme.test.ts`:
+
+1. **Hues stay out of red (345 to 25), green (110 to 175) and citron (55 to 80).** A tint can never be mistaken for bad,
+   good or tappable. Tax and Business are near-neutral on purpose.
+2. **Text passes.** `ink` on a tint is 12:1 or better; a heading in `tintInk` on its own tint is 6.4:1 or better (4.5 needed).
+3. **Never colour alone.** Every section has a title and a count, so the colour only helps; remove it and the structure stays.
+4. **One level of card.** A section card holds rows, not cards. Result and schedule rows are plain rows, never nested cards.
+
 ---
 
 ## 4. Typography

@@ -48,12 +48,18 @@ Status marks: **Built** = in the code and tested. **Partly** = some of it works.
 |---|---|---|
 | **Red and green** to show good and bad | **Built** | Rule changed in `DESIGN-SYSTEM.md` deliberately. Only where good/bad is unambiguous; never colour alone |
 | Remove the clutter / wasted space | **Partly** | The calculator's empty third is fixed (keys grew). Other screens untouched |
-| **Headers are not highlighted; two sections do not look separate** | **Not built** | Next in line. Needs section headers on Tools and on every calculator |
-| **The same design is used for different things** | **Not built** | The worst one: an input you can edit looks like a result you cannot. One fix repairs all 51 calculators |
-| Step-by-step flow is hard to follow | **Not built** | Same root cause as the two rows above |
+| **Headers are not highlighted; two sections do not look separate** | **Built** | Every list is now titled sections on tinted cards (Tools groups, Notes, Due), with a count on each heading. Eight section colours, chosen clear of red, green and the accent, and never used on a result (DESIGN-SYSTEM "Section colours"). Seen in dark and light |
+| **The same design is used for different things** | **Built** | A calculator's inputs sit on a tinted card headed "What you are working out"; the result is a plain card headed "Result". An input no longer looks like an answer |
+| Step-by-step flow is hard to follow | **Partly** | The two cards above fix the main cause. A guided step-by-step mode for the long forms (income tax) is not built |
 | **An accordion with no sign that it opens** | **Not built** | Cause found: `display: flex` on `<summary>` removes the browser's own disclosure triangle |
 | Rethink the design from scratch | **Not built** | A full redesign would throw away a working design system. Fixing the four rows above addresses the real complaints |
-| Light theme and 200% font checked | **Not built** | Never looked at since the UI revamp |
+| Light theme and 200% font checked | **Partly** | Light theme checked on Tools, Notes. **200% font still not checked** (the row blocks fall to one column when the font is large, by design) |
+| **Multi-colour cards so sections are easy to tell apart** | **Built** | Eight tints; hues kept out of red, green and the accent, enforced by test |
+| **No horizontal scrolling** unless there is no other way | **Built** | A table of three or more columns is drawn as one block per row (heading, then labelled values). Measured: no scrolling box anywhere in the repayment schedule. Two-column tables stay tables |
+| **Sort the categories properly** (Convert mixed units, currency, binary/hex) | **Built** | "Convert" is gone. Currency is under Money, binary/hex under Math and numbers, units under Units and travel. 8 groups, each split into 2 to 4 titled sections (Loans: Plan a loan, Change a loan, Special cases) |
+| **The calculator layout must not shift** to show To list / Remind me | **Built** | The action row is always in the layout at a fixed height. Measured: key, button-row and answer positions identical before and after "=" |
+| **Pin / unpin icons on Notes** | **Built** | A pushpin: outline when loose, filled and accent-coloured when pinned. Notes are grouped Pinned, Lists, Calculations |
+| Research how to handle long sectioned lists | **Done** | Apple's inset grouped style (one wash around a section, heading to last row); one card per row for tables on a phone (works when rows are read one at a time, not compared) |
 
 ### Calculators that present themselves badly
 
@@ -170,13 +176,36 @@ hand (which people abandon) or reading it automatically (which this app does not
 worth building. If not, step 2 would have failed exactly as the earlier analysis predicted,
 and the cost of finding out was one small feature instead of a rewrite.
 
+### What the app already has toward it, and what the research found
+
+Everything below was already in the project. Nothing here is new research; it is gathered in one place.
+
+| Found | Where | What it gives the budget tracker |
+|---|---|---|
+| Budgeting is a behaviour-change product (YNAB's business), abandoned in week two, and needs a trustworthy record first | The owner's `Financial Advisor/product-planning/13-master-feature-universe.md` | **The gate above stays.** Step 2 is earned, not assumed |
+| Two-level categories, soft delete, uncategorised shown | The owner's MoneyMap data model (same planning folder) | The shape of step 1 |
+| **Eight ready-made tags already exist**: Credit Card, Loan, Rent, Investment, Tax, Travel, Work, Shopping (plus your own) | `DEFAULT_TAGS` in `src/lib/memory.ts`; the tag chips on Notes | **Tags are the seed of categories.** Step 1 can promote them: a per-tag total, not a new system |
+| Lists with exact totals, checkboxes, "left" amounts | `TapeScreen`, `listProgress` | Trip budget and monthly card spends are already a list |
+| Every saved card keeps an amount (and a unit) | `SavedCard.amount`, `amountFmt` | The number a category total adds up |
+| A 30-day total of what is due, recurring reminders, Mark paid history | Due tab | The "bills this month" half of a budget |
+| Use cases the owner named | `docs/MEMORY-LAYER.md` A1 credit card bill, C1 monthly card spends, C2 trip budget, C4 flatmate split, C6 renovation budget, D2 80C shortfall | The first categories and the first screens |
+| "A bar against a limit" for over or under a budget | §3 above | The picture for step 2 |
+
+**The smallest first slice (all of step 1's value, none of step 2's risk):**
+
+1. Show a **total per tag** on Notes ("Travel · ₹48,200 across 6 notes"), labelled as *what you saved*, not what you spent.
+2. **Tag from the result**: one tap from "To list" or "Remind me" to put it under a category.
+3. A **Categories** view: the ready-made tags plus your own, two levels (parent and child), delete is soft, Uncategorised is shown.
+
+Only after a month of use without being asked: a monthly limit per category and a bar. That is step 2 and it keeps its gate.
+
 ---
 
 ## 5. Build order
 
 | Stage | Contents | Why here |
 |---|---|---|
-| **A — Make it readable** | Inputs vs outputs · section headers · accordion arrow · units on saved values | Four complaints, one pass, every screen improves |
+| **A — Make it readable** | Inputs vs outputs · section headers · accordion arrow · units on saved values | **Done 2026-11-02** (sections, tinted cards, row blocks, stable layout, pin icons). Still to judge on the phone |
 | **B — Put it on the phone** | Rebuild the APK, install, walk the checklist | Nothing above is proven until it is on the device |
 | **C — Draw the right picture** | World clock · split bar · date span | Turns named complaints into something better than a table |
 | **D — Label it** | Categories, one-tap assign, per-category totals | The budget question, answered safely |

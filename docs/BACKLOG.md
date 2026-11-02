@@ -56,6 +56,17 @@ The order to do these in is in `docs/IMPROVEMENT-PLAN.md` section 3. Numbers 33 
 | 31 | Amount quick-chips (+1K, +10K, +1L) and sliders for rate and tenure (UX 5.1) | UX guidelines |
 | 32 | Share and Reset actions on a result (UX 5.2) | UX guidelines |
 
+## Budget tracker (asked for; two steps, the second is gated)
+
+Full reasoning, the risk and the details found earlier are in `docs/ROADMAP.md` section 4. Do not skip the gate.
+
+| # | Item | Source | Done when |
+|---|---|---|---|
+| 37 | **Step 1a:** a total per tag on Notes ("Travel · ₹48,200 across 6 notes"), labelled as what you saved | ROADMAP 4 | Tag totals shown and exact |
+| 38 | **Step 1b:** tag from the result: one tap from To list or Remind me to a category | ROADMAP 4 | A result can be filed in one tap |
+| 39 | **Step 1c:** a Categories view: ready-made tags plus your own, two levels, soft delete, Uncategorised shown | ROADMAP 4 | Delete never silently re-files |
+| 40 | **Step 2 (gated):** monthly limit per category and a bar against it. Only after a month of step 1 used without prompting | ROADMAP 4 | The owner has used categories unasked |
+
 ## Keep fresh (rules that go stale)
 
 See the table at the end of `docs/VERIFICATION.md`: tax slabs before 1 April, small-savings rates every quarter, EPF rate
