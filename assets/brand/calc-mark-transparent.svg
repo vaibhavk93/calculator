@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Calc">
+  <rect x="101.0" y="101.0" width="138.0" height="138.0" rx="34.0" fill="none" stroke="#A4A4A4" stroke-width="10.0"/>
+  <path d="M144.0 170.0L196.0 170.0" stroke="#F5F5F5" stroke-width="13.0" stroke-linecap="round" fill="none"/>
+  <circle cx="170.0" cy="143.0" r="8.5" fill="#F5F5F5"/>
+  <circle cx="170.0" cy="197.0" r="8.5" fill="#F5F5F5"/>
+  <rect x="273.0" y="101.0" width="138.0" height="138.0" rx="34.0" fill="none" stroke="#A4A4A4" stroke-width="10.0"/>
+  <path d="M322.0 150.0L362.0 190.0" stroke="#F5F5F5" stroke-width="13.0" stroke-linecap="round" fill="none"/>
+  <path d="M322.0 190.0L362.0 150.0" stroke="#F5F5F5" stroke-width="13.0" stroke-linecap="round" fill="none"/>
+  <rect x="101.0" y="273.0" width="138.0" height="138.0" rx="34.0" fill="none" stroke="#A4A4A4" stroke-width="10.0"/>
+  <path d="M144.0 342.0L196.0 342.0" stroke="#F5F5F5" stroke-width="13.0" stroke-linecap="round" fill="none"/>
+  <rect x="268.0" y="268.0" width="148.0" height="148.0" rx="34.0" fill="#CCD539"/>
+  <path d="M316.0 330.0L368.0 330.0" stroke="#121300" stroke-width="13.0" stroke-linecap="round" fill="none"/>
+  <path d="M316.0 354.0L368.0 354.0" stroke="#121300" stroke-width="13.0" stroke-linecap="round" fill="none"/>
+</svg>

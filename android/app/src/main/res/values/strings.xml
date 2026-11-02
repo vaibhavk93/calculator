@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Calc</string>
+    <string name="title_activity_main">Calc</string>
+    <string name="package_name">com.vaibhavkumawat.vkcalc</string>
+    <string name="custom_url_scheme">com.vaibhavkumawat.vkcalc</string>
+</resources>
