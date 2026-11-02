@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
 import { EmptyState } from '../../components/EmptyState'
 import { useApp } from '../../components/StoreProvider'
+import { tintStyle } from '../../components/tint'
 import { formatCell } from '../../lib/toolFormat'
 import { D } from '../../engine'
 import { dueLabel, dueSoonTotal, groupReminders } from '../../lib/reminders'
 import type { Reminder } from '../../store/types'
 import { CardView } from './CardView'
+
+/** Overdue is the one section that earns a hue by meaning: its heading takes the alert colour on a plain card. */
+const OVERDUE = { '--tint': 'var(--surface)', '--tint-ink': 'var(--alert)' } as React.CSSProperties
 
 const WHEN = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' })
 
@@ -42,11 +46,14 @@ export function DueScreen() {
     )
   }
 
-  const section = (title: string, items: Reminder[], overdue = false) =>
+  const section = (title: string, items: Reminder[], tint: number, overdue = false) =>
     items.length > 0 && (
-      <section>
-        <h2 className={overdue ? 'group__title group__title--alert' : 'group__title'}>{title}</h2>
-        <div className="group">
+      <section className="sect" style={overdue ? OVERDUE : tintStyle(tint)} aria-label={title}>
+        <h2 className="sect__head">
+          <span>{title}</span>
+          <span className="sect__count">{items.length}</span>
+        </h2>
+        <div className="sect__body">
           {items.map((r) => {
             const card = cards.find((c) => c.id === r.cardId)!
             return (
@@ -77,10 +84,10 @@ export function DueScreen() {
         <span className="result__label">Due in the next 30 days</span>
         <span className="tape__sum">{formatCell(total, 'money', { system, decimals })}</span>
       </div>
-      <div className="tools__list">
-        {section('Overdue', g.overdue, true)}
-        {section('This week', g.week)}
-        {section('Later', g.later)}
+      <div className="tools__list sections">
+        {section('Overdue', g.overdue, 8, true)}
+        {section('This week', g.week, 5)}
+        {section('Later', g.later, 8)}
       </div>
       {open && <CardView card={open} onBack={() => setOpenId(null)} />}
     </div>

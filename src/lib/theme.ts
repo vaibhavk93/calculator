@@ -10,6 +10,12 @@
  * (owner's decision, 2026-11-02; see docs/DESIGN-SYSTEM.md "Colour that means
  * good or bad"). They are never used alone: the value also carries a sign or a
  * word, because roughly 1 in 12 men cannot separate red from green.
+ *
+ * Section tints (`tint`, `tintInk`) say "which part of the app is this". They are identity, never
+ * state: they never mean good, bad, tappable or selected. Eight, in a fixed order, one per group of
+ * calculators (see src/features/tools/groups.ts). Hues stay clear of red, green and the citron accent, so a
+ * section colour can never be mistaken for good, bad or tappable. They colour navigation and input areas only:
+ * never the Result section, the answer bar, or anything beside a number that carries positive/negative.
  */
 
 export type ThemePreference = 'dark' | 'light' | 'system'
@@ -35,6 +41,10 @@ export interface Palette {
   keyOpPressed: string
   sheet: string
   scrim: string
+  /** Eight section backgrounds, a faint wash of one hue. Text on them is `ink`. */
+  tint: string[]
+  /** The same eight hues, as heading text and small marks on their own `tint`. */
+  tintInk: string[]
 }
 
 export interface AccentDef {
@@ -68,6 +78,9 @@ export const PALETTES: Record<ResolvedTheme, Palette> = {
     keyOpPressed: '#181818',
     sheet: '#0D0D0D',
     scrim: 'rgba(0, 0, 0, 0.62)',
+    // Math, money, units, life, loans, savings, tax, business. Each pair is 6.4:1 or better (tintInk on tint); ink on tint is 12:1 or better.
+    tint: ['#201933', '#192F33', '#322B1B', '#321B2B', '#182435', '#2C1A32', '#23262A', '#2B2722'],
+    tintInk: ['#AA91F2', '#91E2F2', '#F0D494', '#F094D4', '#8FB9F5', '#D993F1', '#A1BCE3', '#E5CB9F'],
   },
   light: {
     bg: '#FFFFFF',
@@ -90,6 +103,8 @@ export const PALETTES: Record<ResolvedTheme, Palette> = {
     keyOpPressed: '#F2F2F2',
     sheet: '#FFFFFF',
     scrim: 'rgba(18, 18, 18, 0.42)',
+    tint: ['#E7E1F9', '#E1F5F9', '#F9F2E2', '#F9E2F2', '#E0EBFA', '#F3E1F9', '#E5ECF5', '#F6EFE5'],
+    tintInk: ['#2B1961', '#195561', '#5F4B1C', '#5F1C4B', '#173764', '#4F1A60', '#283A52', '#544327'],
   },
 }
 
@@ -131,6 +146,8 @@ export function buildCssVars(theme: ResolvedTheme, accent: AccentName): Record<s
     '--key-op-pressed': p.keyOpPressed,
     '--sheet': p.sheet,
     '--scrim': p.scrim,
+    ...Object.fromEntries(p.tint.map((c, i) => [`--tint-${i + 1}`, c])),
+    ...Object.fromEntries(p.tintInk.map((c, i) => [`--tint-${i + 1}-ink`, c])),
     '--accent': theme === 'dark' ? a.fill : a.textOnLight,
     '--accent-fill': a.fill,
     '--accent-ink': a.ink,

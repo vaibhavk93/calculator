@@ -30,7 +30,7 @@ export function CalculatorScreen() {
         onCopy={() => void core.doCopy()}
       />
 
-      {core.input.fresh && <ResultActions value={core.input.expr} />}
+      <ResultActions value={core.input.expr} active={core.input.fresh} />
 
       <UtilRow onPaste={() => void core.doPaste()} onCopy={() => void core.doCopy()} />
 

@@ -106,8 +106,15 @@
 
 .result-actions {
   flex: none;
+  /* Always this tall, chips or not, so the display and keys never move when a result is finished. */
+  min-height: calc(44px + var(--s-2));
   display: flex;
   justify-content: flex-end;
   gap: var(--s-2);
   padding: 0 var(--s-4) var(--s-2);
+}
+
+/* The pin button on a Notes row sits level with the row's text, not at its top. */
+.row--split > .row__pin {
+  align-self: center;
 }

@@ -170,3 +170,46 @@ describe('applyTheme', () => {
     expect(document.documentElement.dataset.theme).toBe('dark')
   })
 })
+
+describe('section tints (identity colours, never state)', () => {
+  for (const theme of THEMES) {
+    const p = PALETTES[theme]
+    it(`${theme}: eight tints, each with text that passes AA on its own wash`, () => {
+      expect(p.tint).toHaveLength(8)
+      expect(p.tintInk).toHaveLength(8)
+      p.tint.forEach((bg, i) => {
+        expect(contrastRatio(p.ink, bg), `ink on tint ${i + 1}`).toBeGreaterThanOrEqual(7)
+        expect(contrastRatio(p.tintInk[i]!, bg), `tintInk on tint ${i + 1}`).toBeGreaterThanOrEqual(AA_BODY)
+      })
+    })
+    it(`${theme}: every tint is a visibly different card from the ground, and from each other`, () => {
+      p.tint.forEach((bg) => expect(contrastRatio(bg, p.bg)).toBeGreaterThanOrEqual(1.08))
+      expect(new Set(p.tint).size).toBe(8)
+    })
+    it(`${theme}: exposes --tint-1..8 and --tint-1-ink..8-ink as CSS variables`, () => {
+      const vars = buildCssVars(theme, 'citron')
+      for (let i = 1; i <= 8; i++) {
+        expect(vars[`--tint-${i}`]).toBe(p.tint[i - 1])
+        expect(vars[`--tint-${i}-ink`]).toBe(p.tintInk[i - 1])
+      }
+    })
+    it(`${theme}: no saturated tint sits in the red, green or citron hue ranges, so none can read as bad, good or tappable`, () => {
+      const hue = (hex: string) => {
+        const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number]
+        const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
+        if (d === 0) return { h: 0, s: 0 }
+        const l = (max + min) / 2
+        const s = d / (1 - Math.abs(2 * l - 1))
+        const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+        return { h: (h * 60 + 360) % 360, s }
+      }
+      p.tint.concat(p.tintInk).forEach((c) => {
+        const { h, s } = hue(c)
+        if (s < 0.15) return // near-neutral: carries no hue meaning
+        expect(h < 25 || h > 345, `${c} is red-ish (hue ${Math.round(h)})`).toBe(false)
+        expect(h >= 110 && h <= 175, `${c} is green-ish (hue ${Math.round(h)})`).toBe(false)
+        expect(h >= 55 && h <= 80, `${c} is citron-ish (hue ${Math.round(h)})`).toBe(false)
+      })
+    })
+  }
+})

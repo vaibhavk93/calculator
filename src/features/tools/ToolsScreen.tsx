@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
+import { tintStyle } from '../../components/tint'
 import { useBackHandler } from '../../components/useBackHandler'
 import type { ToolSpec } from '../../lib/tool'
 import { ScientificScreen } from '../calculator/ScientificScreen'
@@ -13,27 +14,42 @@ const matches = (t: ToolSpec, q: string) =>
 
 const specsOf = (g: ToolGroup) => g.tools.map((id) => ALL_TOOLS.find((t) => t.id === id)).filter((t): t is ToolSpec => !!t)
 
-/** One group's calculators: a full screen over the Tools home, so Back (or the phone's back button) returns to it. */
+/**
+ * One group, split into its sections. Each section is its own tinted card with a heading, so you can see where one
+ * kind of calculator ends and the next begins. A full screen over the Tools home, so Back returns to it.
+ */
 function GroupPage({ group, onBack, onOpen }: { group: ToolGroup; onBack: () => void; onOpen: (id: string) => void }) {
   return (
-    <div className="screen" role="dialog" aria-modal="true" aria-label={group.name}>
+    <div className="screen" style={tintStyle(group.tint)} role="dialog" aria-modal="true" aria-label={group.name}>
       <div className="screen__bar">
         <button type="button" className="icon-btn" aria-label="Back" onClick={onBack}>
           <Icon name="back" size={20} />
         </button>
-        <h1 className="screen__title">{group.name}</h1>
+        <h1 className="screen__title screen__title--tint">{group.name}</h1>
       </div>
-      <div className="screen__body">
-        <div className="group">
-          {specsOf(group).map((t) => (
-            <button key={t.id} type="button" className="navrow" onClick={() => onOpen(t.id)}>
-              <span className="row__text">
-                <span className="row__label">{t.title}</span>
-                <span className="row__hint">{t.blurb}</span>
-              </span>
-            </button>
-          ))}
-        </div>
+      <div className="screen__body sections">
+        {group.sections.map((sec) => (
+          <section className="sect" key={sec.title} aria-label={sec.title}>
+            <h2 className="sect__head">
+              <span>{sec.title}</span>
+              <span className="sect__count">{sec.tools.length}</span>
+            </h2>
+            <div className="sect__body">
+              {sec.tools
+                .map((id) => ALL_TOOLS.find((t) => t.id === id))
+                .filter((t): t is ToolSpec => !!t)
+                .map((t) => (
+                  <button key={t.id} type="button" className="navrow" onClick={() => onOpen(t.id)}>
+                    <span className="row__text">
+                      <span className="row__label">{t.title}</span>
+                      <span className="row__hint">{t.blurb}</span>
+                    </span>
+                    <Icon name="chevron" size={18} className="navrow__chev" />
+                  </button>
+                ))}
+            </div>
+          </section>
+        ))}
       </div>
     </div>
   )
@@ -81,7 +97,8 @@ export function ToolsScreen() {
           ) : (
             <div className="group">
               {found.map((t) => (
-                <button key={t.id} type="button" className="navrow" onClick={() => setNav({ tool: t.id })}>
+                <button key={t.id} type="button" className="navrow" style={tintStyle(groupOfTool(t.id)?.tint ?? 8)} onClick={() => setNav({ tool: t.id })}>
+                  <span className="dot" aria-hidden="true" />
                   <span className="navrow__label">{t.title}</span>
                   <span className="navrow__meta">{groupOfTool(t.id)?.name}</span>
                 </button>
@@ -90,22 +107,16 @@ export function ToolsScreen() {
           )
         ) : (
           <>
-            {/* A whole calculator and a group of calculators are different things.
-                They used to render as the same row, so the list read as one wall. */}
-            <h2 className="section-head">Calculators</h2>
-            <div className="group">
-              <button type="button" className="navrow" onClick={() => setNav({ scientific: true })}>
-                <span className="navrow__label">Scientific calculator</span>
-                <Icon name="chevron" size={18} className="navrow__chev" />
-              </button>
-            </div>
+            <button type="button" className="hero" onClick={() => setNav({ scientific: true })}>
+              <span>Scientific calculator</span>
+              <Icon name="chevron" size={18} className="navrow__chev" />
+            </button>
             <h2 className="section-head">Browse by what you need</h2>
-            <div className="group">
+            <div className="tiles">
               {GROUPS.map((g) => (
-                <button key={g.id} type="button" className="navrow" onClick={() => setNav({ category: g.id })}>
-                  <span className="navrow__label">{g.name}</span>
-                  <span className="navrow__meta">{g.tools.length}</span>
-                  <Icon name="chevron" size={18} className="navrow__chev" />
+                <button key={g.id} type="button" className="tile" style={tintStyle(g.tint)} onClick={() => setNav({ category: g.id })}>
+                  <span className="tile__name">{g.name}</span>
+                  <span className="tile__meta">{g.tools.length} calculators</span>
                 </button>
               ))}
             </div>

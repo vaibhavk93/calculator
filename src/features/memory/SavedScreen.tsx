@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { EmptyState } from '../../components/EmptyState'
 import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
+import { tintStyle } from '../../components/tint'
 import { useBackHandler } from '../../components/useBackHandler'
 import { matchesCard } from '../../lib/cardSearch'
 import { dueLabel } from '../../lib/reminders'
@@ -76,12 +77,27 @@ export function SavedScreen() {
           Press Save on any calculator, or start a list for a running total. Add a reminder and the Due tab will keep track.
         </EmptyState>
       ) : (
-        <div className="tools__list">
-          <div className="group">
-            {shown.map((c) => (
-              <CardRow key={c.id} card={c} due={reminders.find((r) => r.cardId === c.id && !r.done)?.dueAt} onOpen={() => setView({ kind: 'card', id: c.id })} onPin={() => togglePin(c.id)} />
+        <div className="tools__list sections">
+          {/* Pinned first, then lists, then saved calculations: three cards you can tell apart at a glance. */}
+          {[
+            { title: 'Pinned', tint: 4, items: shown.filter((c) => c.pinned) },
+            { title: 'Lists', tint: 5, items: shown.filter((c) => !c.pinned && c.kind === 'tape') },
+            { title: 'Calculations', tint: 3, items: shown.filter((c) => !c.pinned && c.kind !== 'tape') },
+          ]
+            .filter((sec) => sec.items.length > 0)
+            .map((sec) => (
+              <section className="sect" key={sec.title} style={tintStyle(sec.tint)} aria-label={sec.title}>
+                <h2 className="sect__head">
+                  <span>{sec.title}</span>
+                  <span className="sect__count">{sec.items.length}</span>
+                </h2>
+                <div className="sect__body">
+                  {sec.items.map((c) => (
+                    <CardRow key={c.id} card={c} due={reminders.find((r) => r.cardId === c.id && !r.done)?.dueAt} onOpen={() => setView({ kind: 'card', id: c.id })} onPin={() => togglePin(c.id)} />
+                  ))}
+                </div>
+              </section>
             ))}
-          </div>
           {shown.length === 0 && <p className="tools__none">Nothing matches.</p>}
         </div>
       )}
@@ -105,8 +121,14 @@ function CardRow({ card, due, onOpen, onPin }: { card: SavedCard; due: number | 
           </span>
         )}
       </button>
-      <button type="button" className="link-btn" aria-pressed={card.pinned} onClick={onPin}>
-        {card.pinned ? 'Unpin' : 'Pin'}
+      <button
+        type="button"
+        className="icon-btn row__pin"
+        aria-pressed={card.pinned}
+        aria-label={card.pinned ? `Unpin ${card.title}` : `Pin ${card.title}`}
+        onClick={onPin}
+      >
+        <Icon name={card.pinned ? 'pinFilled' : 'pin'} size={20} />
       </button>
     </div>
   )

@@ -20,6 +20,8 @@ import type { CardDraft } from '../../store/app'
 import type { SavedCard } from '../../store/types'
 import { SaveSheet } from '../memory/SaveSheet'
 import { ToListSheet } from '../memory/ToListSheet'
+import { tintStyle } from '../../components/tint'
+import { groupOfTool } from './groups'
 import { Segmented } from '../settings/controls'
 import { advancedOpen, caretFor, groupTyped, rawNumber, shouldGroup, significantBefore, type Leaf } from './fieldInput'
 
@@ -171,30 +173,60 @@ function FieldRow({ field, values, set, error }: { field: Field; values: Values;
   )
 }
 
+/**
+ * Two columns stay a table. Three or more become one block per row: the first cell is its heading and every other
+ * cell is a labelled value beneath it. That is the phone pattern for a table (no sideways scrolling), and it suits
+ * what these are: schedules and comparisons read one row at a time. Values never break across lines.
+ */
 function Table({ table, fmt }: { table: ResultTable; fmt: (c: Parameters<typeof formatCell>[0], f?: Fmt) => string }) {
-  return (
-    <div className="tool-table-wrap" role="region" aria-label={table.title ?? 'Table'} tabIndex={0}>
-      {table.title && <h3 className="result__sub">{table.title}</h3>}
-      <table className="tool-table">
-        <thead>
-          <tr>
-            {table.columns.map((c) => (
-              <th key={c} scope="col">
-                {c}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {table.rows.map((row, i) => (
-            <tr key={i}>
-              {row.map((cell, j) => (
-                <td key={j}>{fmt(cell, table.fmts?.[j])}</td>
+  if (table.columns.length <= 2) {
+    return (
+      <div className="tool-table-wrap">
+        {table.title && <h3 className="result__sub">{table.title}</h3>}
+        <table className="tool-table">
+          <thead>
+            <tr>
+              {table.columns.map((c) => (
+                <th key={c} scope="col">
+                  {c}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {table.rows.map((row, i) => (
+              <tr key={i}>
+                {row.map((cell, j) => (
+                  <td key={j}>{fmt(cell, table.fmts?.[j])}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+  return (
+    <div className="rowcards-wrap">
+      {table.title && <h3 className="result__sub">{table.title}</h3>}
+      <ol className="rowcards" aria-label={table.title ?? 'Table'}>
+        {table.rows.map((row, i) => (
+          <li className="rowcard" key={i}>
+            {/* A bare number heading ("1") says nothing: put the column's name in front ("Year 1"). */}
+            <p className="rowcard__title">
+              {typeof row[0] === 'string' && !/^\d+$/.test(row[0]) ? row[0] : `${table.columns[0]} ${fmt(row[0] ?? '', table.fmts?.[0])}`}
+            </p>
+            <dl className="rowcard__grid">
+              {row.slice(1).map((cell, j) => (
+                <div className="rowcard__cell" key={j}>
+                  <dt>{table.columns[j + 1]}</dt>
+                  <dd>{fmt(cell, table.fmts?.[j + 1])}</dd>
+                </div>
+              ))}
+            </dl>
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }
@@ -341,7 +373,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
   const error = isError(computed) ? computed.error : null
 
   return (
-    <div className="screen" role="dialog" aria-modal="true" aria-label={spec.title}>
+    <div className="screen" style={tintStyle(groupOfTool(spec.id)?.tint ?? 8)} role="dialog" aria-modal="true" aria-label={spec.title}>
       <div className="screen__bar">
         <button type="button" className="icon-btn" aria-label="Back" onClick={onBack}>
           <Icon name="back" size={20} />
@@ -373,10 +405,10 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
         )}
       </div>
       <div className="screen__body tool">
-        <h2 className="section-head" id="inputs-head">
+        <h2 className="section-head section-head--tint" id="inputs-head">
           What you are working out
         </h2>
-        <form className="tool__form" aria-labelledby="inputs-head" onSubmit={(e) => e.preventDefault()}>
+        <form className="tool__form inputcard" aria-labelledby="inputs-head" onSubmit={(e) => e.preventDefault()}>
           {visible.map((f) => (
             <FieldRow key={f.id} field={f} values={values} set={set} error={error} />
           ))}

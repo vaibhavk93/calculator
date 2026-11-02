@@ -255,8 +255,10 @@
 }
 
 .result {
-  padding: 0 var(--s-4) var(--s-4);
-  border-top: 1px solid var(--line);
+  margin: var(--s-4) var(--s-4) 0;
+  padding: 0 var(--s-4) var(--s-3);
+  background: var(--surface);
+  border-radius: var(--r-md);
 }
 
 /*
@@ -339,10 +341,9 @@
   color: var(--ink-2);
 }
 
+/* A table never scrolls sideways. Anything with three or more columns is drawn as row blocks (see .rowcards). */
 .tool-table-wrap {
-  overflow-x: auto;
-  max-height: 60vh;
-  overflow-y: auto;
+  overflow: visible;
 }
 
 .tool-table {
@@ -650,4 +651,176 @@ textarea.field {
 .rows legend {
   padding: 0;
   margin-bottom: var(--s-2);
+}
+
+
+/* ------------------------------------------------------------ section colours
+ * A section colour says WHICH section this is. It washes the background of a tile, a section card or an input
+ * area, and colours a heading. It is never used on the Result card, the answer bar or beside a number: those
+ * keep their colour for good, bad and tappable. Set with tintStyle(n); eight are defined in src/lib/theme.ts. */
+
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  width: calc(100% - 2 * var(--s-4));
+  min-height: 56px;
+  margin: var(--s-2) var(--s-4) var(--s-1);
+  padding: 0 var(--s-4);
+  border: 1px solid var(--ink-3);
+  border-radius: var(--r-md);
+  font-size: 1rem;
+  text-align: left;
+}
+
+.hero:active {
+  background: var(--key-digit-pressed);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-3);
+  padding: 0 var(--s-4);
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--s-4);
+  min-height: 96px;
+  padding: var(--s-3) var(--s-4);
+  background: var(--tint);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  text-align: left;
+  transition: transform 90ms var(--ease-out);
+}
+
+.tile:active {
+  transform: scale(0.98);
+  border-color: var(--tint-ink);
+}
+
+.tile__name {
+  font-size: 1rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.tile__meta {
+  font-size: 0.8125rem;
+  color: var(--tint-ink);
+}
+
+/* A section card: a titled wash with its rows inside. Rows are plain rows, so cards never nest. */
+.sections {
+  padding: var(--s-2) 0 var(--s-6);
+}
+
+.sect {
+  margin: 0 var(--s-4) var(--s-4);
+  background: var(--tint);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.sect__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin: 0;
+  padding: var(--s-3) var(--s-4) var(--s-2);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--tint-ink);
+}
+
+.sect__count {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.sect__body .navrow {
+  border-top: 1px solid var(--line);
+}
+
+.screen__title--tint {
+  color: var(--tint-ink);
+}
+
+.dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-sm);
+  background: var(--tint-ink);
+}
+
+/* A calculator's inputs sit on a tinted card, the result on a plain one: you can see where the typing ends. */
+.section-head--tint {
+  color: var(--tint-ink);
+  font-size: 0.875rem;
+}
+
+.inputcard {
+  margin: 0 var(--s-4);
+  background: var(--tint);
+  border-radius: var(--r-md);
+  padding: var(--s-4);
+}
+
+/* ---------------------------------------------------------------- row blocks
+ * A table with three or more columns, drawn for a phone: the first cell is a heading, the rest are labelled
+ * values beneath it. Money is never allowed to break. When the font is large the grid falls to one column. */
+.rowcards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rowcard {
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--line);
+}
+
+.rowcard__title {
+  margin: 0 0 var(--s-2);
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.rowcard__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--s-2) var(--s-3);
+  margin: 0;
+}
+
+.rowcard__cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rowcard__cell dt {
+  font-size: 0.75rem;
+  color: var(--ink-3);
+}
+
+.rowcard__cell dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ pin */
+.icon-btn[aria-pressed='true'] {
+  color: var(--accent);
 }
