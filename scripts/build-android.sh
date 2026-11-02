@@ -3,6 +3,8 @@
 #
 #   scripts/build-android.sh            build only
 #   scripts/build-android.sh install    build, then install on the one connected phone
+#   scripts/build-android.sh qa install build and install "Calc QA", a separate copy with its own empty data,
+#                                       for automated phone tests (the owner's real Calc is never touched)
 #
 # Why this exists: the build needs Java 21, Android SDK 36, and (on this network) a Java trust list that includes
 # the Zscaler proxy certificate. docs/BUILD-ANDROID.md explains each step. Run from anywhere.
@@ -13,7 +15,9 @@ JDK="$(ls -d "$HOME"/.local/jdks/jdk-21*/Contents/Home 2>/dev/null | head -1 || 
 SDK="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 TRUST="$HOME/.local/jdks/cacerts-with-zscaler"
 ADB="$SDK/platform-tools/adb"
-APK="$ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
+VARIANT=debug; TASK=assembleDebug
+if [ "${1:-}" = "qa" ]; then VARIANT=qa; TASK=assembleQa; shift; fi
+APK="$ROOT/android/app/build/outputs/apk/$VARIANT/app-$VARIANT.apk"
 
 fail() { echo "ERROR: $1" >&2; exit 1; }
 
@@ -35,7 +39,7 @@ echo "1/4  tests";        npm run check
 echo "2/4  web build";    npm run build
 echo "3/4  sync to android (copies the web app and the plugins in)"; npx cap sync android
 echo "4/4  gradle debug build (the first one takes about 7 minutes)"
-( cd android && ./gradlew assembleDebug --console=plain )
+( cd android && ./gradlew $TASK --console=plain )
 
 [ -f "$APK" ] || fail "Build finished but $APK is missing."
 echo "Built: $APK ($(du -h "$APK" | cut -f1))"

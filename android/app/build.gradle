@@ -17,6 +17,14 @@ android {
         }
     }
     buildTypes {
+        // "Calc QA": the same app with its own id and its own empty data, installed NEXT TO the owner's real Calc.
+        // All automated phone taps go to this one, so nothing can touch real entries. Build it with
+        // scripts/build-android.sh qa install. Never change the debug application id: the owner's data lives there.
+        qa {
+            initWith debug
+            applicationIdSuffix ".qa"
+            matchingFallbacks = ['debug']
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

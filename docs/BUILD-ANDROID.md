@@ -104,3 +104,9 @@ back it up, and use it for every release. Lose it and you cannot update the app.
 - **Open folder:** tries `ACTION_VIEW` on the document URI `primary:Download/Calc` (opens the system Files app on the folder), and falls back to `ACTION_VIEW_DOWNLOADS` (the Downloads list). The saved file's own URI is not used, because that opens the file, not the folder.
 - **Limit (unverified on a phone):** which of the two intents works on Android 16 depends on the phone's Files app. Test on the OnePlus. If the first fails, the user lands in Downloads and sees the Calc folder there.
 - A same-name file is renamed by Android to `name (1).json`; the returned path shows the real name.
+
+
+## Calc QA: a second copy for tests
+
+`scripts/build-android.sh qa install` installs **Calc QA** (`com.vaibhavkumawat.vkcalc.qa`) beside the real app. It has its own name, icon and empty data, so automated taps can never change real entries. Start it with
+`adb shell am start -n com.vaibhavkumawat.vkcalc.qa/com.vaibhavkumawat.vkcalc.MainActivity`. It is a `qa` build type in `android/app/build.gradle` that copies `debug` and adds `.qa` to the id. Never add a suffix to `debug`: the owner's data lives there.
