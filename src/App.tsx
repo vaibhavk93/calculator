@@ -70,7 +70,7 @@ export function App() {
         {tab === 'due' && <DuePlaceholder />}
       </main>
 
-      <div {...behind}>
+      <div className="app__nav" {...behind}>
         <TabBar />
       </div>
 

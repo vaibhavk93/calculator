@@ -87,7 +87,7 @@ dependency and risk, not by cutting features.
 | **P3 — Loans** | Full EMI/loan suite (Section C) | The primary stated gap |
 | **P4 — Investments** | SIP/FD/PPF/NPS/EPF suite (Section D) | Pure math, no external data, low risk |
 | **P5 — Tax & Salary** | Income tax, HRA, capital gains, salary (Section E) | Highest maintenance risk — isolated behind a rules config |
-| **P6 — Memory layer + PM pack** | Notes, reminders, tapes, scenarios, NL input, export, product metrics (Sections F & G) | The differentiator. Depends on P1–P5 existing. |
+| **P6 — Memory layer + PM pack** | Notes, reminders, tapes, spend categories and payment modes, scenarios, NL input, export, product metrics (Sections F & G) | The differentiator. Depends on P1–P5 existing. |
 | **P7 — Platform & native** | Rules packs, delivery reliability, widgets (native Kotlin), tile, share intake, app lock (Section H) | Makes the differentiator actually work on real Indian phones |
 
 ---
@@ -121,6 +121,7 @@ the engine and UI are built against.
 | A18 | Memo *(P1.1)* | Short text (≤ 80 chars) per entry | Shown above the expression in history; searchable once P6 search exists |
 | A19 | Edit entry *(P1.1)* | Memo, expression, date-time | Expression re-evaluated by the engine on save; invalid input blocks save with plain words ("Can't divide by zero"). Result is never typed by hand. |
 | A20 | Share entry *(P1.1)* | A history row | Plain text `expression = result` through the system share sheet. No promotional footer. |
+| A21 | **Landscape layout** *(built, P1 shell)* | Phone rotated, height ≤ 520px | Tab bar becomes a left rail; display + utilities in the middle pane; keypad full-height on the right; history opens as a right-hand side panel; Undo bar sits under it. Rotating keeps the expression and result. Tablets and desktop keep the single column. |
 
 **Reference-app review (ClevCalc, 5 screenshots, 2 Nov 2026).** A16–A20 come from its history
 screens. Reviewed and **not** adopted:
@@ -247,6 +248,11 @@ screens. Reviewed and **not** adopted:
 | G10 | Trash & undo | — | 7-day recoverable Trash; Undo snackbar on every delete |
 | G11 | Home-screen widgets | — | Quick calculator (4×2), Next due (2×2), Tape total (2×2) |
 | G12 | Export | A card or tape | Text, PNG result card, or PDF |
+| G13 | Category → subcategory | On any tape line: pick a category, then optionally a subcategory (two levels, never deeper). Example: ₹500 → Food › Eating out, or Food › Groceries | Seeded list (`config/categories.json`); add, rename, hide your own. Stable ids, so a rename never breaks old entries. |
+| G14 | Payment mode | Cash · UPI · Credit card · Debit card · Net banking · Wallet; optional instrument name ("HDFC Regalia") | Lines on a credit card roll up into that card's total, which becomes the amount on its bill reminder (use case A1) |
+| G15 | Two-tap spend entry | Amount + label, then optional category and mode chips | Chips pre-fill from the last entry with the same label ("Swiggy" → Food › Delivery · UPI). Both are skippable; "Uncategorised" is a valid answer. |
+| G16 | Spend breakdown | Period: this month · last month · custom | Totals by category, tap through to subcategory; totals by payment mode. Hairline tables, no pie charts. Exact decimal sums. |
+| G17 | Category budgets *(not V1)* | Monthly limit per category | "₹X left" / "₹X over", stated in words and sign, not colour |
 
 **Design rule:** saving must take **two taps**. If saving a calculation is more
 effort than redoing it, nobody saves anything and the entire differentiator
@@ -388,7 +394,7 @@ or web version cheap.
 - [ ] Debug APK builds successfully and is installable
 - [ ] Cold start < 800 ms on device
 - [ ] Backup export → wipe → restore round-trips without data loss
-- [ ] All 91 features (sections A–G) and 14 platform items (section H) present and functional
+- [ ] All 97 features (sections A–G) and 14 platform items (section H) present and functional
 
 ## 11. Open Questions
 
@@ -409,7 +415,7 @@ or web version cheap.
 | P3 | Full loan suite with amortisation tables | Tests validated against a bank EMI table |
 | P4 | Investment suite with charts | Tests validated against official scheme calculators |
 | P5 | Tax & salary with FY2026-27 rules | Tests validated against published slab examples |
-| P6 | Memory layer (notes, reminders, tapes), scenarios, NL input, export, PM pack | Tests + screenshots + reminder fires on a real device |
+| P6 | Memory layer (notes, reminders, tapes), **spend categories + payment modes (G13–G16)**, scenarios, NL input, export, PM pack | Tests + screenshots + reminder fires on a real device. Categories: a credit-card tape totals match the sum of its lines to the paisa; renaming or hiding a subcategory never orphans an entry; entry stays at amount + label + at most 2 taps. |
 | P7 | Rules packs, OEM reliability layer, native widgets, tile, app lock | Reminder verified firing on a Xiaomi/Realme device, not just Pixel |
 | P8 | Capacitor Android build → installable APK | Gradle build succeeds; you install and smoke-test |
 | Later | iOS target | Requires a Mac — your machine or a CI runner |

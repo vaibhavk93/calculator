@@ -352,6 +352,188 @@ const shot = (page, name) => page.screenshot({ path: join(SHOTS, `${name}.png`),
   await ctx.close()
 }
 
+// --------------------------------------------------------------------------
+// Landscape: a phone on its side is ~360px tall. Two panes, a rail instead of a bottom bar.
+// A .toggle is drawn 24px tall; its ::before layer (inset -10px) makes the tap target 44px,
+// which getBoundingClientRect cannot see, so toggles are checked by that CSS rule instead.
+const smallTargets = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('button, [role=radio], [role=switch], select, input')]
+      .filter((el) => el.offsetParent !== null && !el.classList.contains('sr-only') && !el.classList.contains('toggle'))
+      .map((el) => {
+        const r = el.getBoundingClientRect()
+        return { label: el.getAttribute('aria-label') || el.textContent.trim().slice(0, 20), w: Math.round(r.width), h: Math.round(r.height) }
+      })
+      .filter((b) => b.w < 44 && b.h < 44),
+  )
+const noScroll = (page) =>
+  page.evaluate(() => ({
+    x: document.documentElement.scrollWidth > innerWidth,
+    y: document.documentElement.scrollHeight > innerHeight,
+  }))
+
+for (const [w, h] of [
+  [800, 360],
+  [640, 360],
+]) {
+  const tag = `${w}x${h}`
+  const { page, ctx } = await newPage({ viewport: { width: w, height: h } })
+
+  // Touch calculation works on its side.
+  await tapKeys(page, [...digits('18450'), 'Add', ...digits('7200'), 'Add', ...digits('32000')])
+  check(`${tag} landscape: typing by touch gives the live result`, (await text(page, '.display__result')) === '57,650')
+
+  const geo = await page.evaluate(() => {
+    const r = (sel) => document.querySelector(sel).getBoundingClientRect()
+    const nav = r('.tabbar')
+    const disp = r('.display')
+    const pad = r('.keypad')
+    const res = document.querySelector('.display__result')
+    const rr = res.getBoundingClientRect()
+    return {
+      railVertical: nav.height >= innerHeight - 1 && nav.width <= 80 && nav.left <= 1,
+      keypadRightOfDisplay: pad.left >= disp.right - 1,
+      keypadInView: pad.top >= 0 && pad.bottom <= innerHeight + 0.5 && pad.right <= innerWidth + 0.5,
+      resultWhole: res.scrollHeight <= res.clientHeight + 1 && rr.bottom <= disp.bottom + 1 && rr.top >= disp.top - 1,
+      tabsFit: [...document.querySelectorAll('.tab')].every((t) => t.getBoundingClientRect().bottom <= innerHeight + 0.5),
+    }
+  })
+  check(`${tag} landscape: tab rail on the left, keypad on the right, result whole`, Object.values(geo).every(Boolean), JSON.stringify(geo))
+  check(`${tag} landscape: no page scroll`, JSON.stringify(await noScroll(page)) === '{"x":false,"y":false}', JSON.stringify(await noScroll(page)))
+  check(`${tag} landscape: every control at least 44px in one direction`, (await smallTargets(page)).length === 0, JSON.stringify(await smallTargets(page)))
+  await shot(page, `19-landscape-${tag}-typing`)
+
+  // Scientific panel: the tightest case.
+  await page.getByRole('button', { name: 'Scientific functions' }).tap()
+  await page.waitForTimeout(200)
+  const sci = await page.evaluate(() => {
+    const d = document.querySelector('.display').getBoundingClientRect()
+    const res = document.querySelector('.display__result')
+    const rr = res.getBoundingClientRect()
+    const p = document.querySelector('.panel').getBoundingClientRect()
+    const k = document.querySelector('.keypad').getBoundingClientRect()
+    return {
+      displayH: Math.round(d.height),
+      resultWhole: res.scrollHeight <= res.clientHeight + 1 && rr.bottom <= d.bottom + 1 && rr.top >= d.top - 1,
+      panelInView: p.bottom <= innerHeight + 0.5,
+      keypadInView: k.bottom <= innerHeight + 0.5,
+      noOverflow: document.documentElement.scrollHeight <= innerHeight,
+    }
+  })
+  check(`${tag} landscape + scientific panel: result whole, panel and keypad on screen`,
+    sci.resultWhole && sci.panelInView && sci.keypadInView && sci.noOverflow && sci.displayH >= 70, JSON.stringify(sci))
+  check(`${tag} landscape + scientific panel: controls still 44px`, (await smallTargets(page)).length === 0, JSON.stringify(await smallTargets(page)))
+  await shot(page, `20-landscape-${tag}-scientific`)
+  await page.getByRole('button', { name: 'Scientific functions' }).tap()
+
+  // Memory panel.
+  await page.getByRole('button', { name: 'Memory and clipboard' }).tap()
+  await page.waitForTimeout(200)
+  const more = await page.evaluate(() => ({
+    panelInView: document.querySelector('.panel').getBoundingClientRect().bottom <= innerHeight + 0.5,
+    noOverflow: document.documentElement.scrollHeight <= innerHeight,
+  }))
+  check(`${tag} landscape + memory panel fits`, more.panelInView && more.noOverflow, JSON.stringify(more))
+  check(`${tag} landscape + memory panel: controls still 44px`, (await smallTargets(page)).length === 0, JSON.stringify(await smallTargets(page)))
+  await shot(page, `21-landscape-${tag}-memory`)
+  await page.getByRole('button', { name: 'Memory and clipboard' }).tap()
+
+  // History opens as a side panel, and its Undo bar stays inside that panel's width.
+  await key(page, 'Equals').tap()
+  await page.getByRole('button', { name: 'History' }).tap()
+  await page.waitForSelector('.sheet')
+  await page.waitForTimeout(350)
+  const sheet = await page.evaluate(() => {
+    const s = document.querySelector('.sheet').getBoundingClientRect()
+    return { right: Math.round(s.right), width: Math.round(s.width), top: Math.round(s.top), bottom: Math.round(s.bottom), vw: innerWidth, vh: innerHeight }
+  })
+  check(`${tag} landscape: history is a full-height side panel on the right`,
+    sheet.right === sheet.vw && sheet.top === 0 && sheet.bottom === sheet.vh && sheet.width <= 440, JSON.stringify(sheet))
+  check(`${tag} landscape: history controls are 44px`, (await smallTargets(page)).length === 0, JSON.stringify(await smallTargets(page)))
+  await shot(page, `22-landscape-${tag}-history`)
+  await page.locator('.hrow').first().getByRole('button', { name: /^Delete/ }).tap()
+  await page.waitForTimeout(300) // let the 160ms slide-in finish: mid-animation it sits 12px low
+  const snack = await page.evaluate(() => {
+    const n = document.querySelector('.snack').getBoundingClientRect()
+    const s = document.querySelector('.sheet').getBoundingClientRect()
+    return { snackLeft: Math.round(n.left), sheetLeft: Math.round(s.left), snackRight: Math.round(n.right), vw: innerWidth, bottom: Math.round(n.bottom), vh: innerHeight }
+  })
+  check(`${tag} landscape: the Undo bar sits under the history panel, inside the screen`,
+    snack.snackLeft >= snack.sheetLeft - 1 && snack.snackRight <= snack.vw + 0.5 && snack.bottom <= snack.vh + 0.5, JSON.stringify(snack))
+  await shot(page, `23-landscape-${tag}-undo`)
+  await page.locator('.snack').getByRole('button', { name: 'Undo' }).tap()
+  check(`${tag} landscape: Undo restores the deleted row`, (await page.locator('.hrow').count()) === 1)
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('.sheet', { state: 'detached' })
+
+  // Settings and an empty tab.
+  await page.getByRole('button', { name: 'Settings' }).tap()
+  await page.waitForSelector('.screen')
+  await page.waitForTimeout(300)
+  check(`${tag} landscape: settings has no sideways scroll`, !(await noScroll(page)).x, JSON.stringify(await noScroll(page)))
+  check(`${tag} landscape: settings controls are 44px`, (await smallTargets(page)).length === 0, JSON.stringify(await smallTargets(page)))
+  await shot(page, `24-landscape-${tag}-settings`)
+  await page.getByRole('button', { name: 'Back', exact: true }).tap()
+  await page.getByRole('navigation').getByRole('button', { name: 'Saved' }).tap()
+  const empty = await page.evaluate(() => {
+    const e = document.querySelector('.empty').getBoundingClientRect()
+    return { inView: e.top >= 0 && e.bottom <= innerHeight + 0.5, noOverflow: document.documentElement.scrollHeight <= innerHeight }
+  })
+  check(`${tag} landscape: empty tab fits without scrolling`, empty.inView && empty.noOverflow, JSON.stringify(empty))
+  await shot(page, `25-landscape-${tag}-saved`)
+  await ctx.close()
+}
+
+// Light theme, and the largest system font, on the smallest landscape screen.
+{
+  const { page, ctx } = await newPage({ viewport: { width: 640, height: 360 }, colorScheme: 'light' })
+  await page.getByRole('button', { name: 'Settings' }).tap()
+  await page.getByRole('radio', { name: 'Light' }).tap()
+  await page.getByRole('button', { name: 'Back', exact: true }).tap()
+  await page.keyboard.type('18450+7200+32000')
+  await page.getByRole('button', { name: 'Scientific functions' }).tap()
+  await shot(page, '26-landscape-light-scientific')
+  await page.getByRole('button', { name: 'Scientific functions' }).tap()
+  await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+  await page.waitForTimeout(200)
+  const big = await page.evaluate(() => {
+    const k = document.querySelector('.keypad').getBoundingClientRect()
+    return {
+      overflowX: document.documentElement.scrollWidth > innerWidth,
+      overflowY: document.documentElement.scrollHeight > innerHeight,
+      keypadInView: k.bottom <= innerHeight + 0.5 && k.top >= 0,
+      tabLabelsClipped: [...document.querySelectorAll('.tab span')].some((s) => s.scrollWidth > s.clientWidth + 1),
+    }
+  })
+  check('640x360 landscape at 200% font: no page scroll, keypad on screen, rail labels whole', !big.overflowX && !big.overflowY && big.keypadInView && !big.tabLabelsClipped, JSON.stringify(big))
+  await shot(page, '27-landscape-200pct-font')
+  await ctx.close()
+}
+
+// Rotating a phone mid-use: nothing is lost, and the layout follows in both directions.
+{
+  const { page, ctx } = await newPage()
+  await page.keyboard.type('18450+7200+32000')
+  const portrait = await page.evaluate(() => document.querySelector('.tabbar').getBoundingClientRect().width)
+  await page.setViewportSize({ width: 800, height: 360 })
+  await page.waitForTimeout(250)
+  const land = await page.evaluate(() => {
+    const t = document.querySelector('.tabbar').getBoundingClientRect()
+    return { railWidth: Math.round(t.width), railHeight: Math.round(t.height) }
+  })
+  check('rotating to landscape switches to the rail and keeps the expression and result',
+    land.railWidth <= 80 && land.railHeight >= 359 && (await text(page, '.display__result')) === '57,650' && (await text(page, '.display__expr')) === '18,450 + 7,200 + 32,000',
+    `${portrait}px bar -> ${JSON.stringify(land)}`)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.waitForTimeout(250)
+  const back = await page.evaluate(() => {
+    const t = document.querySelector('.tabbar').getBoundingClientRect()
+    return { width: Math.round(t.width), height: Math.round(t.height) }
+  })
+  check('rotating back restores the bottom tab bar', back.width >= 380 && back.height <= 80 && (await text(page, '.display__result')) === '57,650', JSON.stringify(back))
+  await ctx.close()
+}
+
 await browser.close()
 
 check('no console errors or uncaught exceptions during the whole run', errors.length === 0, errors.slice(0, 3).join(' | '))

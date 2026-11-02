@@ -198,6 +198,23 @@ is the subject of the screen and deserves a distinct plane. **Nested cards never
 | Border | 1px, `line`. Never 2px+ as a coloured accent. |
 | Elevation | Surface lightness only. **No shadows in dark mode.** |
 
+### Landscape
+
+Applies when `orientation: landscape` and height ≤ 520px: a phone on its side (about 360px
+tall). Keyed on height, so a desktop window or tablet keeps the tall single column.
+
+| Element | Portrait | Landscape |
+|---|---|---|
+| Navigation | Bottom tab bar | Left rail, `max(72px, 3.4rem)` wide so labels survive 200% font |
+| Calculator | One column | Two panes: display + utilities, and the keypad full height on the right |
+| Panels (scientific, memory) | Above the keypad | Under the utilities. Buttons 44px tall; memory is 3 × 2 |
+| History | Bottom sheet, 78% high | Full-height side panel from the right, ≤ 440px wide |
+| Undo bar | Above the tab bar | Under the history panel |
+| Settings | Full width | Centred column, ≤ 640px |
+
+Insets: the rail and panels respect `safe-area-inset-left/right` for notches.
+Verified at 800×360 and 640×360, dark and light, at 200% font, and by rotating live.
+
 ### Rhythm
 
 Density varies deliberately: the display area is generous and quiet, the

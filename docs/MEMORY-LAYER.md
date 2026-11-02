@@ -179,6 +179,58 @@ never a blocking dialog. If dismissed twice for a given type, stop offering it.
 - **Search** across titles, notes, tags and amounts.
 - **Filter** Saved by tag, by date, by "has reminder".
 
+### 4.6b Categories, subcategories and payment mode (G13–G17)
+
+**Recommendation: tag tape lines. Do not build a budget app.** A full expense tracker is a
+different product with strong incumbents. The tape already holds labelled line items, so adding
+*what kind* and *how paid* to each line gives 95% of the value (answering "where did it go?" and
+"what is on my HDFC card?") for a fraction of the build, and it stays inside the three-tap loop.
+
+| Tier | Contents |
+|---|---|
+| **MVP (P6)** | Category → subcategory on each tape line, payment mode on each line, last-used defaults, totals by category and by mode for a period |
+| **Production-ready** | Edit the category list, move entries when a subcategory is removed, instrument names, include in backup and PDF/text export |
+| **Long-term** | Category budgets with "left / over" (G17), recurring spends from reminders, CSV export |
+
+**Why payment mode matters more than it looks.** It is the grouping key for the credit-card
+bill (use case A1): every line with `paymentMode = credit` and `instrument = HDFC` in a statement
+month sums to "HDFC card, November", and that total becomes the reminder amount. This is the
+link between spending and the differentiator.
+
+**Seed list** (data in `config/categories.json`, not code; editable by the user):
+
+| Category | Subcategories |
+|---|---|
+| Food | Groceries · Eating out · Delivery · Snacks & chai · Office lunch |
+| Transport | Fuel · Cab & auto · Metro & bus · Parking & tolls · Vehicle service |
+| Home & bills | Rent · Electricity · Water & gas · Mobile & internet · Maintenance |
+| Shopping | Clothes · Electronics · Household · Gifts |
+| Health | Doctor · Medicines · Insurance premium · Fitness |
+| Travel | Flights & trains · Stay · Local |
+| Entertainment | Subscriptions · Movies & events · Games |
+| Education | Fees · Books & courses |
+| Money | EMI · Investments · Taxes & fees |
+| Other | (none) |
+
+**Rules**
+
+| Rule | Why |
+|---|---|
+| Two levels, never deeper | Deeper trees make entry slower and reports sparser |
+| Category and mode are always optional | If a tag is mandatory, people stop logging |
+| Defaults come from the last line with the same label | Typing "Swiggy" should be enough |
+| "Delete" a category means hide it. If lines use it, ask where to move them. | Old totals must not change under the user |
+| One payment, two categories = two lines | Keeps every line single-category and the sums exact |
+| A refund is a negative line, shown with its sign | No separate refund type to build |
+| ATM withdrawals and transfers are not spend. Not modelled in V1. | Avoids double counting |
+
+**Risks:** entry friction (the main one: measure taps per entry), category drift
+(Eating out vs Delivery), and scope creep toward budgets and charts before the tag habit is proven.
+PDF/CSV export is a free feature here but a Pro feature in `GTM-STRATEGY.md`; decide before launch.
+
+**Dependency:** needs Save and Tape (G1, G2), so it ships inside P6. It must not be built as a
+separate expense table beforehand: that would duplicate `SavedCard` and `TapeLine`.
+
 ### 4.7 Safety — directly answering the category's worst flaw
 | Action | Behaviour |
 |---|---|
@@ -235,6 +287,19 @@ TapeLine
 ├── label               string?         "Flights"
 ├── expression          string          "24000"
 ├── value               decimal
+├── spentAt             timestamp       the date of the spend, editable
+├── categoryId          uuid? → Category
+├── subcategoryId       uuid? → Category (child of categoryId)
+├── paymentMode         enum?           cash | upi | credit | debit | netbanking | wallet
+├── instrument          string?         "HDFC Regalia": which card or account
+└── order               int
+
+Category                                 (seeded from config/categories.json, then yours)
+├── id                  uuid            stable: renames never break old lines
+├── name                string
+├── parentId            uuid?           null = top level. Two levels maximum.
+├── hidden              boolean         "delete" = hide, so history stays intact
+├── seeded              boolean
 └── order               int
 ```
 
