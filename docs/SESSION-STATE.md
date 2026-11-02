@@ -73,3 +73,29 @@ Owner asked whether everything was tested negatively, positively, error/corner/U
 
 ## Calc QA (22:20): the safe phone-test app
 `scripts/build-android.sh qa install` builds and installs **Calc QA** (`com.vaibhavkumawat.vkcalc.qa`, own empty data) next to the owner's real Calc (`com.vaibhavkumawat.vkcalc`, untouched, last updated 21:06:42). ALL automated phone taps, bulk typing and screenshots go to Calc QA only: `adb shell am start -n com.vaibhavkumawat.vkcalc.qa/com.vaibhavkumawat.vkcalc.MainActivity`. Never run taps against the real app. Never change the debug applicationId.
+
+## Round 6 (this session, continuing after a session switch)
+
+**calculator-93 archived at the owner's request** ("I do not think it is doing anything"). Found via
+`mcp__ccd_session_mgmt__list_sessions`: it was `local_e893111a-2cbb-4ad3-be16-7309fc010d53`, title "Merge and push",
+the only other running session in this folder. Archived cleanly (stops the process, not a raw `kill -9` on a guessed
+PID). **Confirmed as the cause of every `adb shell` hang this session saw** (`echo hello` itself was timing out):
+the instant it was archived, `adb shell echo hello` answered immediately. It had been holding the device's one
+shell/transport slot the whole time.
+
+**Still unresolved, needs the owner's answer, asked again:** the real Budget entry that silently changed from
+Spending to "Transfer between own accounts" between 21:08 and 21:45 (see "Phone test at 21:06" above). Not
+touched by this session.
+
+**e2e suites, run for real for the first time (started before the archive, in background):**
+- `tools1.test.mjs` (26 cases): started, result pending
+- `budget.test.mjs` (79), `notes-todo.test.mjs` (45), `calculator.test.mjs` (272), `shell.test.mjs` (166): queued
+  sequentially in background, result pending
+- `tools2.test.mjs`: confirmed to have **zero actual test cases** -- real, independently-verified reference
+  formulas (SIP, PPF, tax slabs, XIRR) and the runner scaffold exist, but no `T(...)` case was ever written and
+  the file never calls `runAll()`. Calculators 27-51 (SIP, investments, tax, business metrics) have no e2e
+  coverage. Needs the actual cases written.
+
+**Now switching to phone testing per the owner's instruction** ("execute the test mobile first"), using **Calc QA**
+(`com.vaibhavkumawat.vkcalc.qa`, own empty data) -- never the owner's real Calc app -- and the safety rules already
+written above (screenshot before every tap batch, no bulk taps on Budget/Notes/Due/History, wake the phone first).

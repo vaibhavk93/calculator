@@ -94,9 +94,14 @@ export const isPlainNumber = (v: unknown): v is string => typeof v === 'string' 
  */
 export function capHistory(entries: HistoryEntry[], max: number): HistoryEntry[] {
   if (entries.length <= max) return entries
-  const kept = entries.filter(isKept).length
-  const room = new Set(entries.filter((e) => !isKept(e)).slice(0, Math.max(0, max - kept)).map((e) => e.id))
-  return entries.filter((e) => isKept(e) || room.has(e.id))
+  const [newest, ...rest] = entries
+  if (!newest) return entries
+  // The newest row's own slot is reserved before anything else: a calculation you just
+  // finished must never vanish the instant it is made, even if every other row happens
+  // to be kept (named or locked) already -- e2e/calculator.test.mjs CALC-254.
+  const kept = rest.filter(isKept).length
+  const room = new Set(rest.filter((e) => !isKept(e)).slice(0, Math.max(0, max - 1 - kept)).map((e) => e.id))
+  return [newest, ...rest.filter((e) => isKept(e) || room.has(e.id))]
 }
 
 export function sanitizeHistory(raw: unknown): HistoryEntry[] {

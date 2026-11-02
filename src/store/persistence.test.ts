@@ -4,6 +4,7 @@ import { buildBackup, backupFilename, parseBackup } from './backup'
 import {
   CURRENT_SCHEMA,
   STORAGE_KEY,
+  capHistory,
   defaultPersisted,
   loadPersisted,
   migrate,
@@ -15,6 +16,7 @@ import {
   sanitizeSettings,
   savePersisted,
 } from './persistence'
+import type { HistoryEntry } from './types'
 import { DEFAULT_SETTINGS, starterBudget, type PersistedData } from './types'
 
 const sample = (): PersistedData => ({
@@ -425,5 +427,40 @@ describe('budget data', () => {
   })
   it('a non-array instruments field is ignored', () => {
     expect(migrate({ ...sample(), budget: { instruments: 'x', categories: [], expenses: [] } }).budget.instruments).toEqual([])
+  })
+})
+
+describe('capHistory', () => {
+  const row = (id: string, o: Partial<HistoryEntry> = {}): HistoryEntry => ({ id, expression: '1+1', result: '2', at: 0, ...o })
+
+  it('does nothing under the cap', () => {
+    const entries = [row('a'), row('b')]
+    expect(capHistory(entries, 200)).toEqual(entries)
+  })
+
+  it('evicts the oldest unkept row first, newest-first order kept', () => {
+    const entries = [row('new'), row('old')]
+    expect(capHistory(entries, 1).map((e) => e.id)).toEqual(['new'])
+  })
+
+  it('never evicts a named or locked row, even past the cap', () => {
+    const entries = [row('new'), row('named', { memo: 'kept' }), row('old')]
+    expect(capHistory(entries, 1).map((e) => e.id).sort()).toEqual(['named', 'new'])
+  })
+
+  it('a brand-new row survives even when every other row is already kept (CALC-254)', () => {
+    // Found by e2e/calculator.test.mjs: 200 locked rows plus a fresh calculation used to
+    // evict the fresh one immediately, since there was no room left to reserve for it.
+    const kept = Array.from({ length: 200 }, (_, i) => row(`k${i}`, { locked: true }))
+    const out = capHistory([row('brand-new'), ...kept], 200)
+    expect(out.some((e) => e.id === 'brand-new')).toBe(true)
+    expect(out).toHaveLength(201) // one over the cap: all 200 are kept, plus the reserved newest
+  })
+
+  it('the newest row is reserved even when it is itself the only kept one', () => {
+    const entries = [row('new', { memo: 'kept' }), ...Array.from({ length: 5 }, (_, i) => row(`u${i}`))]
+    const out = capHistory(entries, 3)
+    expect(out[0]!.id).toBe('new')
+    expect(out).toHaveLength(3)
   })
 })
