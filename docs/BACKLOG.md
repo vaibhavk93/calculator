@@ -14,7 +14,7 @@ The order to do these in is in `docs/IMPROVEMENT-PLAN.md` section 3. Numbers 33 
 | 35 | **Settings: "Send a test reminder"** (a notification one minute out) | Critic: proves delivery in minutes, not weeks | Tap, lock the phone, it arrives |
 | 36 | Pre-commit hook that runs `npm run check` (no CI, no lint yet) | Critic | A failing test blocks a commit |
 | 1 | Sync, rebuild and install the revamped build on the phone | HANDOFF | `scripts/build-android.sh install` succeeds and the phone checklist in `docs/TESTING.md` passes |
-| 2 | Prove paste and copy on the phone | Owner feedback | Checklist items 2 and 3 pass |
+| 2 | Prove paste and copy on the phone (and the new Copy as sheet, item 46) | Owner feedback | Checklist items 2, 3 and 11 pass in `docs/TESTING.md` |
 | 3 | Prove reminder delivery on the OnePlus, overnight, after reboot, after force-stop | Critic, HANDOFF | Results written in `docs/VERIFICATION.md` |
 | 4 | Show verification status on each result ("checked against X" or "recomputed only") and "not checked against the final Finance Act 2026" on tax | Critic of the caveats plan | Visible on the result, driven by data, not a doc |
 | 5 | Commit the work | HANDOFF | Reviewed diff, committed on `dev` |
@@ -62,19 +62,28 @@ The order to do these in is in `docs/IMPROVEMENT-PLAN.md` section 3. Numbers 33 
 |---|---|---|
 | 41 | World time as a ticking clock with a globe or map and popular cities, not a table | Owner, ROADMAP section 3 |
 | 42 | Run the audit sweep in the light theme across all 76 pages | UX-AUDIT section 5 |
-| 43 | Test the share sheet and the "Keep and share" buttons on the phone | Needs a device |
+| 43 | Test the share sheet and the "Keep and share" icon row on the phone | Needs a device |
 | 44 | Turn `e2e/audit-harness.js` into a Playwright script so it runs without a browser tool | Testing |
 
-## Budget tracker (asked for; two steps, the second is gated)
+## Budget tracker (asked for; built early on 2026-11-02, unproven)
 
-Full reasoning, the risk and the details found earlier are in `docs/ROADMAP.md` section 4. Do not skip the gate.
+Full reasoning, the risk and the details found earlier are in `docs/ROADMAP.md` section 4. The owner asked for the Budget tab
+explicitly on 2026-11-02, which **overrides the old gate** (a month of tag totals first). The tab is built. It is **not proven**: not seen on a phone, not used for a month.
 
-| # | Item | Source | Done when |
+| # | Item | Source | Status |
 |---|---|---|---|
-| 37 | **Step 1a:** a total per tag on Notes ("Travel · ₹48,200 across 6 notes"), labelled as what you saved | ROADMAP 4 | Tag totals shown and exact |
-| 38 | **Step 1b:** tag from the result: one tap from To list or Remind me to a category | ROADMAP 4 | A result can be filed in one tap |
-| 39 | **Step 1c:** a Categories view: ready-made tags plus your own, two levels, soft delete, Uncategorised shown | ROADMAP 4 | Delete never silently re-files |
-| 40 | **Step 2 (gated):** monthly limit per category and a bar against it. Only after a month of step 1 used without prompting | ROADMAP 4 | The owner has used categories unasked |
+| 37 | **Step 1a:** a total per tag on Notes ("Travel · ₹48,200 across 6 notes"), labelled as what you saved | ROADMAP 4 | Not built. The Budget tab does not replace it (it totals expenses, not saved notes) |
+| 38 | **Step 1b:** tag from the result: one tap from To list or Remind me to a category | ROADMAP 4 | Not built |
+| 39 | **Step 1c:** a Categories view: ready-made tags plus your own, two levels, soft delete, Uncategorised shown | ROADMAP 4 | Partly: Budget categories exist (one level, soft delete, Uncategorised shown). Two levels are not built |
+| 40 | **Step 2:** monthly limit per category and a bar against it | ROADMAP 4 | **Built early 2026-11-02, unproven.** Limits are per category, not per month, plus an optional overall limit |
+| 45 | **Phone-test cursor editing** in the calculator line: tap to move, delete at the cursor, replace an operator, tap after "=" to edit, a lone number | 0.5.0 | Not run on a phone |
+| 46 | **Phone-test "Copy as"**: Settings, Copying numbers (Ask, commas, no commas); the sheet; the instant copy when both texts match | 0.5.0 | Not run on a phone |
+| 47 | **Per-month budget limits** (a different limit for one month) | Left out of 0.5.0 on purpose | Only if the owner asks. No evidence yet |
+| 48 | **Budget in the share text** (add the month's limit and spend to what Share sends) | 0.5.0 | Not built |
+| 49 | **Add a Budget item to the tab-bar font check**: five tabs at 200% font, the label must not be cut off or wrap badly | 0.5.0 | Not done |
+| 50 | **200% font sweep and light theme** for the new screens (Budget, History cards, Settings cards, Save sheet, Copy as) | 0.5.0 | Not done. Extend `e2e/audit-harness.js` to cover Budget |
+
+Left out on purpose, with no evidence they are needed: rollover, card cycles, SMS parsing, a ledger, 50/30/20.
 
 ## Keep fresh (rules that go stale)
 

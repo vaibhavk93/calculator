@@ -463,3 +463,45 @@ Where the earlier text of this document changed on 2026-11-02, and why.
 | Say what each part is | A calculator shows "What you are working out" on a tinted card and "Result" on a plain one |
 | Pin is an icon | A pushpin: outline when loose, filled and accent-coloured when pinned. Labelled "Pin" or "Unpin" for screen readers |
 
+## 21. Editing an expression
+
+*Added 2026-11-02 (0.5.0). Built and tested in code. Not yet tried on a phone.*
+
+The expression line is a **text box**, not a label. You can fix a mistake without clearing the line.
+
+| You do | What happens |
+|---|---|
+| Tap in the line | The cursor goes there. Keys insert and delete at the cursor, not only at the end |
+| Select some text, then type | The selection is replaced |
+| Tap an operator, then press a different operator | The operator is **replaced in place**: `12+34` with `-` gives `12-34`, not `12+-34` |
+| Press `=`, then tap the line | You edit the **last expression** (`editLast`) |
+| A lone number (no operator yet) | Its edit line is **hidden** until you tap the big number. This keeps the basic calculator clean |
+| Grouped digits (`1,23,456`) | The cursor position is mapped between the typed text and the grouped text shown on screen (`caretMap`, `displayCaret`), so commas do not shift it |
+
+Rules:
+- A decimal point typed inside a number that already has one is ignored.
+- Keys still fire on pointer-down and must not keep focus (CLAUDE.md, "Hard-won rules").
+- The line must stay readable at 200% font. **Not yet checked.**
+
+**Caveat:** this has only been tested in code. Check it on a phone (`docs/TESTING.md` section 3, item 10).
+
+## 22. Copying numbers
+
+*Added 2026-11-02 (0.5.0). Not yet tried on a phone.*
+
+A copied number can go into a bank form (no commas) or a chat (commas read better). The app asks once, or remembers.
+
+| Setting (Settings, Copying numbers) | Copy does |
+|---|---|
+| **Ask each time** (default) | Opens a **"Copy as" sheet** showing both texts. Tap the one you want |
+| With commas | Copies `12,34,567` at once |
+| Without commas | Copies `1234567` at once |
+
+Rules:
+- **If both texts are identical** (a number like `12` has no commas), copy straight away. Do not show a sheet with two equal choices.
+- The sheet shows the **actual text** that will be copied, not a description of it.
+- Feedback follows the feedback ladder (section 16): "Copied" under the answer, for about two seconds.
+- The setting covers the calculator's Copy and the Keep and share row's Copy. It is separate from Share, which sends the full story text.
+- Without commas removes only commas between digits (`stripCommas`).
+
+**Caveat:** only tested in code so far (`docs/TESTING.md` section 3, item 11).

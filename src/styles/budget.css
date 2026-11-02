@@ -140,3 +140,8 @@
 .empty .link-btn {
   margin-top: var(--s-2);
 }
+
+/* The shared label grows in a row; in this column it must keep its own height. */
+.budget__sum .result__label {
+  flex: none;
+}

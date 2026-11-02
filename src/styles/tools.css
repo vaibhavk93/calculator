@@ -79,6 +79,7 @@
 /* The answer follows you down a long form as a button at the bottom edge, so it can never be mistaken for a heading. */
 .answer {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-1) var(--s-4);
@@ -116,13 +117,14 @@
 }
 
 .answer__value {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
   margin-left: auto;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 1.25rem;
   font-weight: 500;
-  white-space: nowrap;
 }
 
 .tools__list {

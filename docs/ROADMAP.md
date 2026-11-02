@@ -62,7 +62,7 @@ Status marks: **Built** = in the code and tested. **Partly** = some of it works.
 | Research how to handle long sectioned lists | **Done** | Apple's inset grouped style (one wash around a section, heading to last row); one card per row for tables on a phone (works when rows are read one at a time, not compared) |
 | **A thorough UI audit of every page of every tool and the whole app**; find and fix bugs | **Built** | 76 pages checked by a scripted sweep at normal and 200% font; 10 kinds of bug fixed (`docs/UX-AUDIT.md` section 5). The sweep is saved as `e2e/audit-harness.js` |
 | **Guidelines for the page header, back, save, the information on a page, the result, the edit and the sharing sections** | **Built** | `docs/DESIGN-SYSTEM.md` section 14, "Page anatomy"; one shared `ScreenHeader`, enforced by a test |
-| **An information-sharing section** | **Built** | "Keep and share": Copy, Share (the phone's share sheet), To list, Remind me. The shared text carries the title, what was typed, the answers and the note |
+| **An information-sharing section** | **Built** | "Keep and share" is now one slim row of four icons: Copy, Share (the phone's share sheet), Add to a list, Remind me. The shared text carries the title, what was typed, the answers and the note |
 | **World time should look like a clock** | **Not built** | Still a table that does not tick. A redesign, listed above |
 
 ### Calculators that present themselves badly
@@ -78,7 +78,9 @@ Status marks: **Built** = in the code and tested. **Partly** = some of it works.
 | Asked for | Built? | If not, why |
 |---|---|---|
 | **Label a calculation** and assign it to a thing (credit card, travel, rent) | **Not built** | Planned next. The `memo` field already shipped is the foundation |
-| **Budget tracker** with pre-filled and user-made categories | **Planned** | See §3. The owner has asked for it; the risk is written down there honestly |
+| **Budget tracker** with pre-filled and user-made categories | **Built 2026-11-02, unproven** | A fifth tab. Limits per category, entries by date. Not yet seen on a phone and not used for a month. See §4 |
+| **Edit the calculator expression** (cursor, replace an operator, edit after "=") | **Built 2026-11-02, unproven** | Tested in code only. Needs a phone check |
+| **Choose how numbers are copied** (with or without commas) | **Built 2026-11-02, unproven** | Settings, Copying numbers; a "Copy as" sheet by default. Needs a phone check |
 | Notes should be multipurpose | **Not built** | "Multipurpose" has not been pinned down yet — needs one worked example |
 | Actions on History rows (To list, Remind me) | **Not built** | Only results and tool answers have them |
 
@@ -150,6 +152,26 @@ loans, tax, investments) → line chart (the heaviest, and no chart library is w
 **The owner has asked for this, so it is on the roadmap.** The risk is recorded here rather
 than argued about again later.
 
+### Status, 2026-11-02: built early, and unproven
+
+**The owner asked for it explicitly on 2026-11-02. That overrides the gate below** (a month of tag totals first).
+Steps 1 and 2 below were not built as written. What was built instead is a fifth **Budget** tab:
+
+- One monthly limit **per category** (not per month), and an optional overall limit.
+- Expense entries by date, a month switcher, soft delete with Undo, and **Uncategorised shown, never hidden**.
+- Starter categories: Rent, Food, Groceries, Transport, Bills, Health, Shopping, Travel, Loan EMI, Savings.
+- Code: `src/lib/budget.ts`, `src/features/budget/`. Saved in `PersistedData.budget`.
+
+**What is not proven:** it has not been seen on a real phone, and nobody has used it for a month. The risk
+quoted below still stands: budgeting is abandoned in week two. **Treat it as unproven until it has survived a month of real use.**
+
+**What the design is based on:** only the local `Financial Advisor` folder. The GitHub repo `vaibhavk93/financial-planner`
+returned 404 (private or renamed), so it was not read. If it turns up, check the design against it.
+
+**Left out on purpose (no evidence they are needed):** rollover, per-month limits, card cycles, SMS parsing, a ledger, 50/30/20.
+
+The step 1 and step 2 text below is kept as the original plan and for the reasoning.
+
 **The risk, from the owner's own earlier work** (`Financial Advisor/product-planning/13-master-feature-universe.md`):
 
 > Budgeting is a *behaviour-change* product (YNAB's business). Done badly it is abandoned
@@ -212,9 +234,9 @@ Only after a month of use without being asked: a monthly limit per category and 
 | **A — Make it readable** | Inputs vs outputs · section headers · accordion arrow · units on saved values | **Done 2026-11-02** (sections, tinted cards, row blocks, stable layout, pin icons). Still to judge on the phone |
 | **B — Put it on the phone** | Rebuild the APK, install, walk the checklist | Nothing above is proven until it is on the device |
 | **C — Draw the right picture** | World clock · split bar · date span | Turns named complaints into something better than a table |
-| **D — Label it** | Categories, one-tap assign, per-category totals | The budget question, answered safely |
+| **D — Label it** | Categories, one-tap assign, per-category totals | The budget question, answered safely. **Budget tab built early on 2026-11-02 at the owner's request; tag totals (step 1) are still not built** |
 | **E — Prove the promises** | Repair `e2e/smoke.mjs`, then the real end-to-end pass · reminder delivery test · live currency fetch | Each needs a working harness or a real device |
-| **F — Earned, not assumed** | Real budgets with limits · history row menu · share a row · exact alarms | Only after the evidence from A–E |
+| **F — Earned, not assumed** | Real budgets with limits (a first version already exists, see §4) · history row menu · share a row · exact alarms | Only after the evidence from A–E |
 
 ---
 

@@ -416,7 +416,8 @@ Grouping stays by hairline, not by box (section 5). No nested cards.
 
 *Added 2026-11-02 after a full audit of every page. Six hand-built headers had drifted apart (icon sizes, the label on
 Delete, a different style for the main action), and results, edits and sharing were mixed together. Every full screen now
-has the same parts in the same order. Code: `ScreenHeader`, `KeepAndShare`, and the sections in `ToolScreen`.*
+has the same parts in the same order. Code: `ScreenHeader`, `KeepAndShare`, and the sections in `ToolScreen`.
+Revised later the same day (0.5.0): Keep and share is now an icon row with no heading, and the floating answer is a bottom button.*
 
 ```
  +----------------------------------------------+
@@ -431,12 +432,11 @@ has the same parts in the same order. Code: `ScreenHeader`, `KeepAndShare`, and 
  |  |  Monthly EMI                 ₹43,391   |  |
  |  |  note, chart, table, how it works      |  |
  |  +----------------------------------------+  |
- |  Keep and share                              |
- |  +----------------------------------------+  |   4. KEEP AND SHARE   plain card
- |  |  Copy   Share   To list   Remind me    |  |
- |  +----------------------------------------+  |
+ |  [Copy] [Share] [List] [Remind]   Copied.    |   4. KEEP AND SHARE   one slim icon row, no heading
  +----------------------------------------------+
-   An answer bar floats under the header only while the Result is scrolled out of sight.
+ |  [ Monthly EMI  ₹43,391 ]                    |   floating answer: bordered button, bottom edge
+ +----------------------------------------------+
+   The answer button shows only while the Result is scrolled out of sight. Tap it to scroll to the Result.
 ```
 
 ### 14.1 Page header
@@ -486,23 +486,39 @@ There is no page-level intro text. The title and the blurb in the list already s
 | Rows | Label left, value right in mono. A value that does not fit **drops under its label**. Money never breaks; words wrap |
 | Tables | Two columns: label and value rows. Three or more: one block per row (heading, then labelled values). **Nothing scrolls sideways**, at any font size |
 | Chart | Only where it shows something the numbers cannot (a proportion, a trend). The numbers stay readable |
-| The floating answer bar | Shows the main answer under the header **only while the Result is scrolled out of sight**. It takes no room in the layout, and never duplicates an answer you can already see |
+| The floating answer | A **bordered button at the bottom edge** (not a sticky heading with an underline at the top). It shows the main answer **only while the Result is scrolled out of sight**. Tapping it scrolls to the Result. It takes no room in the layout, and never duplicates an answer you can already see. Tables have no sticky header either |
 
 ### 14.5 Keep and share section
 
-What to do with a finished answer. A plain card, heading "Keep and share", a grid of bordered buttons (`ink-3`, 48px).
+What to do with a finished answer. **One slim row of four icon buttons, with no heading and no card around it.**
+Each button is at least 44px, has a visible border (`ink-3`) and an accessible name. The status text sits beside the icons.
 
-| Button | Does | Shown |
-|---|---|---|
-| **Copy** | Copies the whole story as text | Always |
-| **Share** | Opens the phone's share sheet with the same text (copies, and says so, where there is none) | Always |
-| **To list** | Adds the amount to a list, as one line or several | Money answers only |
-| **Remind me** | Saves the calculator with a reminder | Always |
-| *Save* | *Lives in the page header, not here: it is the page's one main action* | |
+| Button (icon) | Name | Does | Shown |
+|---|---|---|---|
+| Copy | **Copy** | Copies the whole story as text. Follows the Copy setting (see UX 22) | Always |
+| Share | **Share** | Opens the phone's share sheet with the same text (copies, and says so, where there is none) | Always |
+| List | **Add to a list** | Adds the amount to a list, as one line or several | Money answers only |
+| Bell | **Remind me** | Saves the calculator with a reminder | Always |
+| *Save* | | *Lives in the page header, not here: it is the page's one main action* | |
 
 The text is built by `buildShareText`: the title, what was typed ("Loan amount: ₹50,00,000 · Rate: 8.5%"), the answers,
-the note, and "Worked out in Calc". A bare number means nothing in a chat. Feedback is one line under the buttons
-("Copied. Paste it anywhere."), cleared after about two seconds.
+the note, and "Worked out in Calc". A bare number means nothing in a chat. Feedback is one line beside the icons
+("Copied. Paste it anywhere."), cleared after about two seconds. An icon-only button must never rely on the icon alone:
+its name is read by screen readers.
+
+### 14.5a Pills (`.chip`) and touch area
+
+A pill is **32px tall to look at** and has a **44px touch area**, made with a `::before` pseudo-element that extends
+the hit box above and below. Do not make the pill itself 44px, and do not shrink the touch area to match. Neighbouring
+pills must not overlap their touch areas by more than the gap between them.
+
+### 14.5b Settings sections (and other sheets made of groups)
+
+Settings is a stack of **tinted cards**, one per section, each with a heading: Appearance (1), Numbers (2), Behaviour (3),
+Reminders (4), Your data (5), About (6). The tints come from the section colours (DS "Section colours") and follow the same
+rules: never red, green or the accent. The Save sheet follows the same pattern: four tinted cards (Title, Tags, Note,
+Reminder, where the reminder has a switch). History is one card per calculation: name, expression, "= answer", and the edit
+and delete icons in their own column. No nested cards: a card holds rows, not other cards.
 
 ### 14.6 Checklist: a page is done when
 
@@ -510,7 +526,8 @@ the note, and "Worked out in Calc". A bare number means nothing in a chat. Feedb
 - [ ] It shows no answer twice at the same time
 - [ ] Nothing scrolls sideways, at normal size **and at 200% font**
 - [ ] Every control is at least 44px and has a name
-- [ ] Only the Edit card is tinted; the Result card is plain
+- [ ] Only the Edit card is tinted; the Result card is plain (Settings and the Save sheet are the exception: their cards are all tinted, 14.5b)
+- [ ] Pills have a 44px touch area; Keep and share is the icon row with names for screen readers
 - [ ] Information is where 14.2 says, and a hint appears only on focus
 - [ ] The scripted audit (`e2e/audit-harness.js`) reports nothing
 

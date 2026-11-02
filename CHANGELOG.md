@@ -2,6 +2,32 @@
 
 All notable changes to Calc. Dates are when the work was done.
 
+## [0.5.0] - 2026-11-02
+
+### Calculator
+- **The expression line is now an editable text box.** It has a cursor and selection. Tap to move the cursor, type or delete there, or replace an operator in place (tap `+`, press `-`). After `=`, tap the line to edit the last expression. A lone number shows its edit line only after you tap the big number. Engine: `applyKeyAt` in `src/engine/expression/input.ts`. Store: `selection`, `setSelection`, `editLast`. `src/lib/format.ts` maps the cursor between the typed text and the grouped text (`caretMap`, `displayCaret`).
+- **Copying numbers is a setting.** Settings, Copying numbers: ask each time, with commas, or without commas. The default is Ask. Ask opens a "Copy as" sheet showing both texts. If both texts are the same, it copies straight away (`src/components/CopyAs.tsx`).
+
+### Pages
+- **Keep and share is one slim row of four icon buttons** (Copy, Share, Add to a list, Remind me). No heading. The status text sits beside the icons.
+- **The floating answer on calculator pages is a bordered button at the bottom edge.** Tapping it scrolls to the result. It replaces the sticky heading with an underline at the top. The sticky table header is gone too.
+- **Pills are 32px tall with a 44px touch area** (a pseudo-element).
+- **History is one card per calculation**: name, expression, "= answer", and the edit and delete icons in their own column.
+- **Settings sections are tinted cards**: Appearance, Numbers, Behaviour, Reminders, Your data, About. Fixed a toggle bug (a duplicate `::before` rule).
+- **The Save sheet is four tinted cards**: Title, Tags, Note, Reminder (with a switch).
+
+### Budget tab (new, the fifth tab)
+- One monthly limit **per category** (not per month), plus an optional overall limit. Expenses are entered by date. A month switcher shows any month. **Uncategorised is shown, never hidden.** Delete is soft, with Undo.
+- Starter categories: Rent, Food, Groceries, Transport, Bills, Health, Shopping, Travel, Loan EMI, Savings.
+- Data is in `src/lib/budget.ts` and saved in `PersistedData.budget`. The schema stays 3. Old data gets the starter categories.
+- **This overrides the ROADMAP gate** that said to wait a month of tag totals first. The owner asked for it explicitly on 2026-11-02.
+- **The design is based only on the local `Financial Advisor` folder.** The GitHub repo `vaibhavk93/financial-planner` returned 404 (private or renamed), so it was not read.
+- Left out on purpose, because there is no evidence they are needed: rollover, per-month limits, card cycles, SMS parsing, a ledger, the 50/30/20 rule.
+
+### Not verified
+- The Budget screen on a real phone. All of the above on a phone. A 200% font sweep of the new screens. The light theme.
+- Tests: 49 files, 1086 tests.
+
 ## [0.4.0] - 2026-11-02
 
 ### Reminder permissions
