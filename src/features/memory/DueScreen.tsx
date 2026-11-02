@@ -81,7 +81,7 @@ export function DueScreen() {
                     </>
                   ) : (
                     <>
-                      <button type="button" className="link-btn" onClick={() => markPaid(r.id)}>Mark paid</button>
+                      <button type="button" className="link-btn" onClick={() => markPaid(r.id)}>{card.kind === 'task' ? 'Done' : 'Mark paid'}</button>
                       <button type="button" className="link-btn" onClick={() => snooze(r.id, 1)}>Snooze 1 day</button>
                       <button type="button" className="link-btn link-btn--danger" onClick={() => setAskId(r.id)}>Remove</button>
                     </>
@@ -96,10 +96,12 @@ export function DueScreen() {
 
   return (
     <div className="tools">
-      <div className="due__total">
-        <span className="result__label">Due in the next 30 days</span>
-        <span className="tape__sum">{formatCell(total, 'money', { system, decimals })}</span>
-      </div>
+      {!total.isZero() && (
+        <div className="due__total">
+          <span className="result__label">Amounts due in the next 30 days</span>
+          <span className="tape__sum">{formatCell(total, 'money', { system, decimals })}</span>
+        </div>
+      )}
       <div className="tools__list sections">
         {section('Overdue', g.overdue, 8, true)}
         {section('This week', g.week, 5)}

@@ -57,3 +57,13 @@ Last updated: 2026-11-02 20:55. Round 4 running. At ~19:20 the account hit its 5
 - Checked the stored data afterwards (counts only): 6 expenses, 0 deleted, 0 settlements, 11 categories, 3 instruments, 6 notes, 22 history rows, calculator input empty. **Nothing was changed or lost.** The temporary copy of the data was deleted.
 - RULES for phone testing from now on: (1) take a screenshot and confirm the screen before EVERY batch of taps; (2) never tap in bulk on screens that have delete or save controls (Budget, Notes, Due, History); do bulk typing only on Calculate/Scientific after confirming; (3) wake the phone first (it may be locked and needs the owner's PIN); (4) the owner's real data is on the phone: read counts only, never contents.
 - Still to re-check on the phone: keypad stays still while typing a long expression; new Budget screens (limit scope, pills, UPI paid-from, heatmap).
+
+## Round 5 request (2 Nov 2026, ~21:20), saved verbatim
+> test all the features and the flows step by step and find 1. bugs 2. areas to improve 3. find what else can be added to system to make system better and improved 4. how flows can be improved 5. check how can we make different information easy to visualise 5. how can we make make things, flows, pages, section, app easy and more intuitive to use.
+
+Plan: main session tests live flows in the browser with seeded test data (never the owner's real data) and on the phone with a screenshot before every step; four read-only helpers write `docs/REVIEW-BUGS-STATIC.md`, `docs/REVIEW-FLOWS.md`, `docs/REVIEW-VISUALISATION.md`, `docs/REVIEW-NEW-FEATURES.md`. Then main merges everything into `docs/REVIEW-2026-11-02.md` and a critic checks the top feature suggestions (owner's global rule). Status: STARTED.
+
+## 21:45 finding on the phone (owner's real data)
+- The owner's Budget entry 'Rs 100, Food, UPI, HDFC, tiffin lost and found' (2 Nov) now reads 'Transfer between own accounts: Not counted as spending' (month total 58,310 -> 58,210). At 21:08 the stored data had NO transfers, so the save happened after that. Either the owner saved it or a later tap of mine did: unknown. DO NOT edit it without asking. Ask the owner; if they did not intend it, restore by opening the entry and choosing 'Spending' under 'What is this', then check category Food and Paid with UPI from HDFC are still set.
+- Verified working on the phone: keypad stays still while typing a long expression; result 9E+72 correct.
+- Idea from this: switching an entry to Transfer or Card bill changes totals silently; add a one-line confirmation or an 'Undo' snackbar after Save (see docs/REVIEW-LIVE-TEST.md).

@@ -320,6 +320,9 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
   // The floating answer bar shows only once the real answer has scrolled out of sight.
   const [mainSeen, setMainSeen] = useState(true)
   const showCard = useApp((s) => s.showCard)
+  const showLinkSnack = useApp((s) => s.showLinkSnack)
+  const toast = useApp((s) => s.toast)
+  const setTab = useApp((s) => s.setTab)
   // Once "More options" is open (by the user, or by itself because a field changed) it stays open.
   const [moreOpen, setMoreOpen] = useState(false)
   const [savedId, setSavedId] = useState<string | null>(card?.id ?? null)
@@ -333,6 +336,9 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
   // A spec that throws on odd input must not take the app down.
   const computed = useMemo(() => {
     try {
+      // An amount no real loan, price or salary reaches: say so, instead of printing 1.2E+25 rupees.
+      const tooBig = spec.fields.find((f) => f.kind === 'number' && f.unit === 'rupee' && (parseNum(values[f.id])?.abs().gt('1e13') ?? false))
+      if (tooBig) return { error: `${tooBig.label} is too large. Use ₹10 lakh crore or less` }
       return spec.compute(values)
     } catch {
       return { error: 'Check the numbers you entered' }
@@ -397,7 +403,11 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
           )
         }
         action={
-          <button type="button" className="link-btn" disabled={!ok} onClick={() => setSaving(true)}>
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => (ok ? setSaving(true) : toast(isError(computed) ? `${computed.error}. Then you can save it.` : 'Fill in the form first'))}
+          >
             {saved ? 'Update' : 'Save'}
           </button>
         }
@@ -464,7 +474,10 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
             setSaving(false)
             setReminding(false)
           }}
-          onSaved={setSavedId}
+          onSaved={(id) => {
+            setSavedId(id)
+            showLinkSnack(saved ? 'Updated in Notes' : 'Saved to Notes', { label: 'View', run: () => setTab('saved') })
+          }}
         />
       )}
     </div>

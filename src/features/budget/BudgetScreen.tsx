@@ -92,7 +92,7 @@ export function BudgetScreen() {
       <div className="tools__list sections">
         <section className="sect" style={tintStyle(3)} aria-label="Summary">
           <div className="budget__sum">
-            <span className="result__label">{s.overall ? 'Left this month' : 'Spent this month'}</span>
+            <span className="result__label">{`${s.overall ? 'Left' : 'Spent'} ${month === monthKey(new Date()) ? 'this month' : `in ${monthLabel(month)}`}`}</span>
             <span className="budget__hero">{money(over ? heroValue.abs() : heroValue)}</span>
             {s.overall ? (
               <>

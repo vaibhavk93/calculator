@@ -110,7 +110,7 @@ export function SettingsScreen() {
 
   const restore = (data: PersistedData) => {
     store.getState().restore(data)
-    setBackup({ state: 'done', text: `Restored ${data.history.length} calculations and your settings.` })
+    setBackup({ state: 'done', text: `Restored ${data.history.length} calculations, ${data.cards.length} notes and lists, ${data.reminders.length} reminders and ${data.budget.expenses.length} budget entries.` })
   }
 
   return (
@@ -235,16 +235,19 @@ export function SettingsScreen() {
         {backup.state === 'confirm' && (
           <div className="confirm" style={{ margin: '16px 16px 0' }}>
             <p>
-              Replace this phone&rsquo;s history and settings with the backup
-              {backup.exportedAt ? ` from ${new Date(backup.exportedAt).toLocaleDateString()}` : ''}? It holds {backup.data.history.length} calculations.
-              Export a backup first if you want to keep what is here.
+              Replace <strong>everything</strong> on this phone with the backup
+              {backup.exportedAt ? ` from ${new Date(backup.exportedAt).toLocaleDateString()}` : ''}? That means your calculations ({backup.data.history.length}), notes and lists ({backup.data.cards.length}), reminders ({backup.data.reminders.length}),
+              budget entries ({backup.data.budget.expenses.length}) and settings. What is on this phone now is lost. Save a backup of it first if you want to keep it.
             </p>
             <div className="confirm__actions">
               <button type="button" className="btn" onClick={() => setBackup({ state: 'idle' })}>
                 Cancel
               </button>
+              <button type="button" className="btn" onClick={() => void exportBackup()}>
+                Save a backup of this phone first
+              </button>
               <button type="button" className="btn btn--primary" onClick={() => restore(backup.data)}>
-                Restore
+                Replace everything
               </button>
             </div>
           </div>

@@ -237,6 +237,8 @@ export interface AppState {
   dismissSnack: (id: number) => void
   /** A short message with one tappable link, for outcomes the user may want to follow up ("Backup saved. Open folder"). */
   showLinkSnack: (text: string, link: { label: string; run: () => void }) => void
+  /** A plain short message at the bottom of any screen (the calculator's own notice line is only on Calculate). */
+  toast: (text: string) => void
   restore: (data: PersistedData) => void
   snapshot: () => PersistedData
 }
@@ -917,6 +919,8 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       clearNotice: (id) => {
         if (get().notice?.id === id) set({ notice: null })
       },
+      toast: (text) => set({ snack: { id: nextId(), text, canUndo: false } }),
+
       showLinkSnack: (text, link) => set({ snack: { id: nextId(), text, canUndo: false, link } }),
 
       dismissSnack: (id) => {
