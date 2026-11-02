@@ -894,3 +894,91 @@ export function paceLeft(left: Dec, month: string, today: Date): { perDay: Dec; 
   const days = daysInMonth(month) - today.getDate() + 1
   return { perDay: left.div(days), days }
 }
+
+// ---------------------------------------------------------------- pure helpers for the budget screens
+
+/** "Nov 2026". */
+export function monthShortLabel(key: string): string {
+  const [y = 1970, m = 1] = key.split('-').map(Number)
+  return new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' }).format(new Date(y, m - 1, 1))
+}
+
+/** `count` months around `centre`, oldest first, with `centre` in the middle (for 12: five before it, six after). */
+export const monthWindow = (centre: string, count = 12): string[] => Array.from({ length: count }, (_, i) => shiftMonth(centre, i - Math.ceil(count / 2) + 1))
+
+/**
+ * What a limit row says. `amount` is already formatted money, or null for "no limit".
+ * Every month: "Monthly limit ₹X". One month only: "Limit ₹X for Nov 2026 only".
+ */
+export function limitLabel(amount: string | null, scope: 'month' | 'always', month: string): string {
+  if (scope === 'month') return amount === null ? `No limit for ${monthShortLabel(month)} only` : `Limit ${amount} for ${monthShortLabel(month)} only`
+  return amount === null ? 'No limit' : `Monthly limit ${amount}`
+}
+
+/** The most recently used categories (newest entry first), at most `n`, each usable and active in `month`. Settlements do not count. */
+export function recentCategoryIds(budget: BudgetData, n: number, month: string): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  const ordered = budget.expenses.map((e, i) => ({ e, i })).sort((a, b) => (a.e.date === b.e.date ? a.i - b.i : a.e.date < b.e.date ? 1 : -1))
+  for (const { e } of ordered) {
+    if (out.length >= n) break
+    if (e.deletedAt !== null || e.settlement || e.categoryId === null || seen.has(e.categoryId)) continue
+    seen.add(e.categoryId)
+    if (categoryUsable(budget, e.categoryId) && categoryActiveIn(budget, e.categoryId, month)) out.push(e.categoryId)
+  }
+  return out
+}
+
+/** "Mon 3 Nov". */
+export function dayLongLabel(key: string): string {
+  const [y = 1970, m = 1, d = 1] = key.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  const part = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(undefined, o).format(date)
+  return `${part({ weekday: 'short' })} ${d} ${part({ month: 'short' })}`
+}
+
+/** A month as weeks that start on Monday: 7 slots a row, the day of the month or null for a slot outside the month. */
+export function monthWeeks(month: string): (number | null)[][] {
+  const [y = 1970, m = 1] = month.split('-').map(Number)
+  const lead = (new Date(y, m - 1, 1).getDay() + 6) % 7
+  const slots: (number | null)[] = [...Array<null>(lead).fill(null), ...Array.from({ length: daysInMonth(month) }, (_, i) => i + 1)]
+  while (slots.length % 7 !== 0) slots.push(null)
+  return Array.from({ length: slots.length / 7 }, (_, w) => slots.slice(w * 7, w * 7 + 7))
+}
+
+export interface DayTotal {
+  /** "YYYY-MM-DD". */
+  date: string
+  day: number
+  spent: Dec
+  /** Spending entries that day (settlements are not spending and are not counted). */
+  count: number
+  /** 0 for no spending, then 1 to 4 by the day's share of the month's biggest day: up to 25%, 50%, 75%, over 75%. */
+  level: 0 | 1 | 2 | 3 | 4
+}
+
+/** One row per day of the month with what was spent (same filter as the summary) and a 5-step intensity. Exact sums. */
+export function dailyTotals(budget: BudgetData, month: string, filter: Filter = {}): DayTotal[] {
+  const spent = new Map<number, { total: Dec; count: number }>()
+  for (const e of entriesIn(budget, month)) {
+    if (e.settlement || !entryMatches(budget, e, filter)) continue
+    const day = parseDay(e.date)
+    const cur = spent.get(day) ?? { total: ZERO(), count: 0 }
+    spent.set(day, { total: cur.total.plus(parse(e.amount) ?? ZERO()), count: cur.count + 1 })
+  }
+  const biggest = [...spent.values()].reduce((m, x) => (x.total.gt(m) ? x.total : m), ZERO())
+  return Array.from({ length: daysInMonth(month) }, (_, i) => {
+    const day = i + 1
+    const s = spent.get(day)
+    const total = s?.total ?? ZERO()
+    const level = total.gt(0) && biggest.gt(0) ? Math.min(4, Math.max(1, total.div(biggest).times(4).ceil().toNumber())) : 0
+    return { date: `${month}-${String(day).padStart(2, '0')}`, day, spent: total, count: s?.count ?? 0, level: level as DayTotal['level'] }
+  })
+}
+
+/** What a credit card owes, in words. `money` formats an amount. */
+export function owesWords(owed: Dec, money: (v: Dec) => string): string {
+  if (owed.gt(0)) return `Owes ${money(owed)}`
+  if (owed.lt(0)) return `Paid ${money(owed.abs())} ahead`
+  return 'Nothing owed'
+}

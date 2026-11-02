@@ -6,14 +6,17 @@ import { tintStyle } from '../../components/tint'
 import { useBackHandler } from '../../components/useBackHandler'
 import { D, type Dec } from '../../engine'
 import {
+  SETTLEMENT_LABEL,
   categoryName,
   compareLastMonth,
   dailyAverage,
+  dayLongLabel,
   instrumentLabel,
   limitState,
   modeLabel,
   monthKey,
   monthLabel,
+  monthShortLabel,
   shiftMonth,
   sharePercent,
   summarise,
@@ -26,6 +29,7 @@ import {
 import { formatCell } from '../../lib/toolFormat'
 import { Segmented } from '../settings/controls'
 import { FilterSheet, scopeKey, scopeLabel, type Scope } from './FilterSheet'
+import { Heatmap } from './Heatmap'
 import { ExpenseSheet } from './sheets'
 
 export type SummaryTab = 'summary' | 'entries'
@@ -62,11 +66,11 @@ export function Bar({ pct }: { pct: number }) {
 export function MonthNav({ month, onMonth }: { month: string; onMonth: (m: string) => void }) {
   return (
     <>
-      <button type="button" className="icon-btn" aria-label="Previous month" onClick={() => onMonth(shiftMonth(month, -1))}>
+      <button type="button" className="icon-btn" aria-label="Previous month" title="Previous month" onClick={() => onMonth(shiftMonth(month, -1))}>
         <Icon name="back" size={20} />
       </button>
       <span className="budget__month" aria-live="polite">{monthLabel(month)}</span>
-      <button type="button" className="icon-btn budget__next" aria-label="Next month" onClick={() => onMonth(shiftMonth(month, 1))}>
+      <button type="button" className="icon-btn budget__next" aria-label="Next month" title="Next month" onClick={() => onMonth(shiftMonth(month, 1))}>
         <Icon name="chevron" size={20} />
       </button>
     </>
@@ -83,24 +87,26 @@ export function limitWords(state: LimitState, left: Dec, limit: Dec, money: (v: 
   }
 }
 
-/** One entry: tap to edit, trash to remove (the snack bar offers Undo). */
+/** One entry: tap the row to edit it, the trash to remove it (the snack bar offers Undo). A bill payment or transfer says it is not spending. */
 export function EntryRow({ e, onEdit }: { e: BudgetExpense; onEdit: (id: string) => void }) {
   const budget = useApp((s) => s.budget)
   const remove = useApp((s) => s.deleteExpense)
   const money = useMoney()
   const amount = new D(e.amount)
-  const name = categoryName(budget, e.categoryId)
+  const name = e.settlement ? SETTLEMENT_LABEL[e.settlement] : categoryName(budget, e.categoryId)
   const inst = e.instrumentId === null ? undefined : budget.instruments.find((i) => i.id === e.instrumentId)
   const how = [e.mode ? modeLabel(e.mode) : '', inst ? instrumentLabel(inst) : ''].filter(Boolean).join(' · ')
-  const hint = [shortDate(e.date), how, e.note].filter(Boolean).join(' · ')
+  const hint = [shortDate(e.date), how, e.settlement ? 'Not counted as spending' : '', e.note].filter(Boolean).join(' · ')
+  const spoken = `${money(amount)} ${name}${e.settlement ? ', not counted as spending' : ''}`
   return (
     <div className="budget__entry">
-      <button type="button" className="budget__main" aria-label={`Edit ${money(amount)} ${name}`} onClick={() => onEdit(e.id)}>
+      <button type="button" className="budget__main tap-row" aria-label={`Edit ${spoken}`} onClick={() => onEdit(e.id)}>
         <span className="budget__amt spend__amt">{money(amount)}</span>
         <span className="row__label">{name}</span>
+        <Icon name="chevron" size={18} className="tap-row__chev" />
         <span className="row__hint">{hint}</span>
       </button>
-      <button type="button" className="icon-btn" aria-label={`Delete ${money(amount)} ${name}`} onClick={() => remove(e.id)}>
+      <button type="button" className="icon-btn" aria-label={`Delete ${spoken}`} title="Delete this entry" onClick={() => remove(e.id)}>
         <Icon name="trash" size={18} />
       </button>
     </div>
@@ -145,6 +151,7 @@ export function SpendSummary({
   const [scope, setScope] = useState<Scope>({})
   const [tab, setTab] = useState<SummaryTab>(initialTab)
   const [cat, setCat] = useState<string | null>(initialCategory)
+  const [day, setDay] = useState<string | null>(null)
   const [picking, setPicking] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   useBackHandler(editing !== null, () => setEditing(null))
@@ -152,20 +159,23 @@ export function SpendSummary({
   const today = new Date()
   const everything = scopeKey(scope) === 'all'
   const s = summarise(budget, month, scope)
-  const entries = cat ? summarise(budget, month, { ...scope, categoryId: cat }).entries : s.entries
+  const byCat = cat ? summarise(budget, month, { ...scope, categoryId: cat }).entries : s.entries
+  const entries = day ? byCat.filter((e) => e.date === day) : byCat
   const catLabel = cat ? categoryName(budget, cat) : ''
   const monthWord = monthName(month, 'long')
 
-  const showAll = () => { setScope({}); setCat(null) }
+  const showAll = () => { setScope({}); setCat(null); setDay(null) }
   const drill = (id: string) => { setCat(id); setTab('entries') }
+  const pickDay = (date: string) => { setDay(date); setTab('entries') }
+  const changeMonth = (m: string) => { setDay(null); onMonth(m) }
 
   const header = (
     <>
       <div className="spend__nav">
-        <MonthNav month={month} onMonth={onMonth} />
+        <MonthNav month={month} onMonth={changeMonth} />
       </div>
       <div className="spend__tools">
-        <button type="button" className="chip spend__scope" aria-haspopup="dialog" aria-label={`Showing: ${scopeLabel(budget, scope)}. Change.`} onClick={() => setPicking(true)}>
+        <button type="button" className="chip spend__scope" aria-haspopup="dialog" aria-label={`Showing: ${scopeLabel(budget, scope)}. Change.`} title="Change which accounts are shown" onClick={() => setPicking(true)}>
           <span>{scopeLabel(budget, scope)}</span>
           <Icon name="down" size={14} />
         </button>
@@ -176,22 +186,31 @@ export function SpendSummary({
           options={[{ value: 'summary', label: 'Summary' }, { value: 'entries', label: 'Entries' }]}
         />
       </div>
-      {tab === 'entries' && cat && (
-        <div className="spend__tools">
-          <button type="button" className="chip spend__scope" aria-label={`Remove the ${catLabel} filter`} onClick={() => setCat(null)}>
-            <span>{catLabel}</span>
-            <Icon name="close" size={14} />
-          </button>
+      {tab === 'entries' && (cat || day) && (
+        <div className="spend__tools spend__tools--chips">
+          {cat && (
+            <button type="button" className="chip spend__scope" aria-label={`Remove the ${catLabel} filter`} title={`Remove the ${catLabel} filter`} onClick={() => setCat(null)}>
+              <span>{catLabel}</span>
+              <Icon name="close" size={14} />
+            </button>
+          )}
+          {day && (
+            <button type="button" className="chip spend__scope" aria-label={`Remove the ${dayLongLabel(day)} filter`} title={`Remove the ${dayLongLabel(day)} filter`} onClick={() => setDay(null)}>
+              <span>{dayLongLabel(day)}</span>
+              <Icon name="close" size={14} />
+            </button>
+          )}
         </div>
       )}
     </>
   )
 
-  const emptyText = tab === 'entries' && cat ? `Nothing in ${catLabel} in ${monthWord}.` : everything ? `Nothing spent in ${monthWord}.` : `Nothing spent in ${monthWord} with this filter.`
+  const emptyText = tab === 'entries' && day ? `Nothing on ${dayLongLabel(day)}${cat ? ` in ${catLabel}` : ''}.` : tab === 'entries' && cat ? `Nothing in ${catLabel} in ${monthWord}.` : everything ? `Nothing spent in ${monthWord}.` : `Nothing spent in ${monthWord} with this filter.`
   const empty =
     (tab === 'summary' ? s.entries.length === 0 : entries.length === 0) ? (
       <div className="spend__empty">
         <p className="budget__none">{emptyText}</p>
+        {tab === 'entries' && day && <button type="button" className="link-btn" onClick={() => setDay(null)}>Show the whole month</button>}
         {tab === 'entries' && cat && <button type="button" className="link-btn" onClick={() => setCat(null)}>Show all categories</button>}
         {!everything && <button type="button" className="link-btn" onClick={showAll}>Show All accounts</button>}
       </div>
@@ -210,6 +229,7 @@ export function SpendSummary({
         : `${money(cmp.diff.abs())} ${cmp.diff.gt(0) ? 'more' : 'less'} than ${range}${cmp.pct === null ? '' : ` (${cmp.pct > 0 ? '+' : cmp.pct < 0 ? '-' : ''}${Math.abs(cmp.pct)}%)`}`
 
   const months = trend(budget, month, 6, scope)
+  const newestFirst = [...months].reverse()
   const peak = months.reduce((m, t) => (t.spent.gt(m) ? t.spent : m), new D(0))
   const thisMonth = monthKey(today)
 
@@ -226,21 +246,22 @@ export function SpendSummary({
       <button
         key={c.id}
         type="button"
-        className={sub ? 'budget__row spend__sub' : 'budget__row'}
+        className={sub ? 'budget__row tap-row spend__sub' : 'budget__row tap-row'}
         aria-label={`${c.name}, ${money(c.spent)}, ${sh.text.replace('%', ' percent')}${words ? `, ${words}` : ''}. Show its entries`}
         onClick={() => drill(c.id)}
       >
         <span className="row__label">{c.name}</span>
         <span className="budget__amt spend__amt">{money(c.spent)} <span className="spend__pct">{sh.text}</span></span>
+        <Icon name="chevron" size={18} className="tap-row__chev" />
         {!sub && <Bar pct={sh.pct} />}
         {words && <span className={state === 'over' ? 'budget__note budget__note--over' : 'budget__note'}>{words}</span>}
       </button>
     )
   }
 
-  const limitRows: { id: string; name: string; spent: Dec; limit: Dec }[] = []
+  const limitRows: { id: string; name: string; spent: Dec; limit: Dec; scope: 'month' | 'always' }[] = []
   const all = everything ? s : summarise(budget, month)
-  for (const p of all.lines) for (const c of [p, ...p.children]) if (c.limit) limitRows.push({ id: c.id, name: c.parentId ? `${p.name} › ${c.name}` : c.name, spent: c.spent, limit: c.limit })
+  for (const p of all.lines) for (const c of [p, ...p.children]) if (c.limit) limitRows.push({ id: c.id, name: c.parentId ? `${p.name} › ${c.name}` : c.name, spent: c.spent, limit: c.limit, scope: c.limitScope })
 
   const summaryCards = (
     <>
@@ -256,8 +277,12 @@ export function SpendSummary({
         </div>
       </section>
 
+      <Card tint={5} title="Day by day">
+        <Heatmap budget={budget} month={month} filter={scope} selected={day} onPick={pickDay} money={money} today={today} />
+      </Card>
+
       <Card tint={4} title="Last 6 months">
-        {months.map((t) => (
+        {newestFirst.map((t) => (
           <div className="budget__row budget__row--plain" key={t.month} aria-current={t.month === month ? 'true' : undefined}>
             <span className={t.month === month ? 'row__label spend__cur' : 'row__label'}>{monthName(t.month, 'strip')}</span>
             <span className="budget__amt spend__amt">{money(t.spent)}{t.month === thisMonth ? ' so far' : ''}</span>
@@ -329,6 +354,7 @@ export function SpendSummary({
             <span className="budget__amt spend__amt">{money(all.spent)}</span>
             <Bar pct={all.overall.pct} />
             <span className={all.overall.left.isNegative() ? 'budget__note budget__note--over' : 'budget__note'}>{limitWords(limitState(all.spent, all.overall.limit), all.overall.left, all.overall.limit, money)}</span>
+            {all.overall.scope === 'month' && <span className="budget__note">Limit for {monthShortLabel(month)} only</span>}
           </div>
         )}
         {limitRows.map((r) => {
@@ -340,6 +366,7 @@ export function SpendSummary({
               <span className="budget__amt spend__amt">{money(r.spent)}</span>
               <Bar pct={pct} />
               <span className={left.isNegative() ? 'budget__note budget__note--over' : 'budget__note'}>{limitWords(limitState(r.spent, r.limit), left, r.limit, money)}</span>
+              {r.scope === 'month' && <span className="budget__note">Limit for {monthShortLabel(month)} only</span>}
             </div>
           )
         })}

@@ -217,8 +217,11 @@ button:disabled {
  * takes the rest, which is why the keys are large.
  */
 .display {
-  flex: 0 1 auto;
-  min-height: 22dvh;
+  /* A fixed share of the screen, never "as tall as its content": when it grew with the expression, the whole keypad
+     slid down under the user's finger (seen on a real phone). The expression scrolls inside it instead. */
+  flex: none;
+  height: 26dvh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -458,8 +461,8 @@ button:disabled {
 
 .sci-screen .display {
   padding-bottom: var(--s-2);
-  /* Calculate gives its display a fifth of the screen; here the function keys need the room. */
-  min-height: 12dvh;
+  /* Calculate gives its display about a quarter of the screen; here the function keys need the room. */
+  height: 17dvh;
 }
 
 /*
@@ -514,6 +517,15 @@ button:disabled {
   }
   .sci-screen .display__echo {
     min-height: 1.25rem;
+  }
+}
+
+@media (max-height: 700px) {
+  .display {
+    height: 22dvh;
+  }
+  .sci-screen .display {
+    height: 14dvh;
   }
 }
 
@@ -1037,6 +1049,7 @@ button:disabled {
 
   .display {
     grid-area: display;
+    height: auto;
     padding-bottom: var(--s-2);
   }
 
@@ -1092,6 +1105,7 @@ button:disabled {
 
   .sci-screen .display {
     grid-area: display;
+    height: auto;
   }
 
   .sci-screen .sci {

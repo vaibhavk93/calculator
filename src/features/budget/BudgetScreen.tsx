@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { EmptyState } from '../../components/EmptyState'
+import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
 import { tintStyle } from '../../components/tint'
 import { useBackHandler } from '../../components/useBackHandler'
-import { limitState, monthKey, monthLabel, needsAttention, paceLeft, summarise } from '../../lib/budget'
+import { limitState, monthKey, monthLabel, monthShortLabel, needsAttention, paceLeft, summarise } from '../../lib/budget'
 import { ManageScreen } from './ManageScreen'
 import { ExpenseSheet } from './sheets'
 import { Bar, EntryRow, MonthNav, SpendSummary, limitWords, useMoney, type SummaryTab } from './SpendSummary'
@@ -47,7 +48,7 @@ export function BudgetScreen() {
   const pages = (
     <>
       {page === 'summary' && <SpendSummary month={month} onMonth={setMonth} onBack={() => setPage('home')} onManage={() => setPage('manage')} initialTab={open.tab} initialCategory={open.categoryId} />}
-      {page === 'manage' && <ManageScreen onBack={() => setPage('home')} />}
+      {page === 'manage' && <ManageScreen onBack={() => setPage('home')} month={month} />}
     </>
   )
 
@@ -60,6 +61,7 @@ export function BudgetScreen() {
             <>
               <button type="button" className="btn btn--primary" onClick={() => setSheet({ id: null })}>Add expense</button>
               <button type="button" className="link-btn" onClick={() => setPage('manage')}>Set a monthly limit</button>
+              <button type="button" className="link-btn" onClick={() => setPage('manage')}>Categories and cards</button>
             </>
           }
         >
@@ -98,6 +100,7 @@ export function BudgetScreen() {
                 <span className={over ? 'budget__note budget__note--over' : 'budget__note'}>
                   {over ? `Over by ${money(s.overall.left.abs())}` : `${money(s.spent)} spent of ${money(s.overall.limit)}`}
                 </span>
+                {s.overall.scope === 'month' && <span className="budget__note">Limit for {monthShortLabel(month)} only</span>}
                 {pace && paceDay && <span className="budget__note">About {money(paceDay.gt(0) ? paceDay : pace.perDay)} a day for the next {pace.days} {pace.days === 1 ? 'day' : 'days'}</span>}
               </>
             ) : null}
@@ -114,8 +117,9 @@ export function BudgetScreen() {
             <h2 className="sect__head"><span>Needs attention</span></h2>
             <div className="sect__body">
               {attention.map((a) => (
-                <button key={a.id} type="button" className="budget__row" aria-label={`${a.name}: ${limitWords(a.state, a.left, a.limit, money)}. Show its entries`} onClick={() => goSummary('entries', a.id)}>
+                <button key={a.id} type="button" className="budget__row tap-row" aria-label={`${a.name}: ${limitWords(a.state, a.left, a.limit, money)}. Show its entries`} onClick={() => goSummary('entries', a.id)}>
                   <span className="row__label">{a.name}</span>
+                  <Icon name="chevron" size={18} className="tap-row__chev" />
                   <span className={a.state === 'over' ? 'budget__note budget__note--over' : 'budget__note'}>{limitWords(limitState(a.spent, a.limit), a.left, a.limit, money)}</span>
                 </button>
               ))}
@@ -124,8 +128,9 @@ export function BudgetScreen() {
         )}
 
         <section className="sect" style={tintStyle(5)} aria-label="Spending summary">
-          <button type="button" className="budget__row" onClick={() => goSummary('summary')}>
+          <button type="button" className="budget__row tap-row" onClick={() => goSummary('summary')}>
             <span className="row__label">Spending summary</span>
+            <Icon name="chevron" size={18} className="tap-row__chev" />
             <span className="budget__note">
               {s.entries.length === 0
                 ? `Nothing spent in ${monthLabel(month)}`
@@ -143,7 +148,13 @@ export function BudgetScreen() {
           </div>
         </section>
 
-        <button type="button" className="link-btn spend__link spend__manage" onClick={() => setPage('manage')}>Categories and cards</button>
+        <section className="sect" style={tintStyle(7)} aria-label="Categories and cards">
+          <button type="button" className="budget__row tap-row" onClick={() => setPage('manage')}>
+            <span className="row__label">Categories and cards</span>
+            <Icon name="chevron" size={18} className="tap-row__chev" />
+            <span className="budget__note">Limits, subcategories, months, cards and accounts</span>
+          </button>
+        </section>
       </div>
       {sheets}
       {pages}

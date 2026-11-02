@@ -11,6 +11,7 @@ import { ACCENT_NAMES, ACCENTS } from '../../lib/theme'
 import { backupFilename, buildBackup, parseBackup } from '../../store/backup'
 import { TABS, type CopyFormat, type PersistedData, type Tab } from '../../store/types'
 import pkg from '../../../package.json'
+import { ManageScreen } from '../budget/ManageScreen'
 import { ALL_TOOLS } from '../tools/registry'
 import { GROUPS } from '../tools/groups'
 import { OptionRow, Row, Segmented, Toggle } from './controls'
@@ -85,6 +86,7 @@ export function SettingsScreen() {
 
   const fileRef = useRef<HTMLInputElement>(null)
   const [backup, setBackup] = useState<Backup>({ state: 'idle' })
+  const [manageBudget, setManageBudget] = useState(false)
 
   // Asks before the first save creates the Calc folder in Downloads. Resolves true to go ahead.
   const [folderAsk, setFolderAsk] = useState<((ok: boolean) => void) | null>(null)
@@ -206,6 +208,13 @@ export function SettingsScreen() {
         {notificationsSupported() && <ReminderPermissionRows />}
 
         <Section title="Your data">
+          <button type="button" className="row row--button tap-row" onClick={() => setManageBudget(true)}>
+            <span className="row__text">
+              <span className="row__label">Categories and cards</span>
+              <span className="row__hint">Budget limits, categories, cards and accounts</span>
+            </span>
+            <Icon name="chevron" size={18} className="tap-row__chev" />
+          </button>
           <button type="button" className="row row--button tap-row" onClick={() => void exportBackup()}>
             <span className="row__text">
               <span className="row__label">Export a backup</span>
@@ -252,6 +261,7 @@ export function SettingsScreen() {
           </Row>
         </Section>
       </div>
+      {manageBudget && <ManageScreen onBack={() => setManageBudget(false)} />}
       {folderAsk && (
         <Sheet
           title="Make a Calc folder?"

@@ -5,6 +5,7 @@ import { validateAmount, validateCategoryName, validateDate, validateExpense, va
 import {
   KNOWN_BANKS, UPI_DEFAULT_LABEL, activeCategories, cardOutstanding, categoryActiveIn, dropInapplicable, effectiveLimit, effectiveOverall, instrumentLabel, validateCategoryMonths, validateInstrumentFields,
 } from './budget'
+import { dailyTotals, dayLongLabel, limitLabel, monthShortLabel, monthWeeks, monthWindow, owesWords, recentCategoryIds } from './budget'
 import type { BudgetData, BudgetExpense, PayInstrument } from './budget'
 
 const cat = (id: string, limit: string | null = null, deletedAt: number | null = null, parentId: string | null = null) => ({ id, name: id, limit, parentId, deletedAt })
@@ -656,5 +657,120 @@ describe('settlements', () => {
     expect(validateExpense({ ...d, settlement: 'cardBill' }, b, new Date(2026, 10, 2)).paidWith).toBeDefined()
     expect(validateExpense({ ...d, settlement: 'cardBill', instrumentId: 'cc' }, b, new Date(2026, 10, 2))).toEqual({})
     expect(validateExpense({ ...d, settlement: 'transfer' }, b, new Date(2026, 10, 2))).toEqual({})
+  })
+})
+
+describe('screen helpers', () => {
+  const c = (id: string, over: Record<string, unknown> = {}) => ({ ...cat(id), ...over })
+  const e = (id: string, date: string, amount: string, categoryId: string | null, over: Partial<BudgetExpense> = {}): BudgetExpense => ({ ...exp(id, date, amount, categoryId), ...over })
+
+  it('monthWindow centres a month: five before, six after', () => {
+    const w = monthWindow('2026-11')
+    expect(w).toHaveLength(12)
+    expect(w[0]).toBe('2026-06')
+    expect(w[5]).toBe('2026-11')
+    expect(w[11]).toBe('2027-05')
+    expect(monthWindow('2026-02', 3)).toEqual(['2026-01', '2026-02', '2026-03'])
+  })
+
+  it('limitLabel says every-month and this-month-only limits differently', () => {
+    expect(limitLabel('₹4,000', 'always', '2026-11')).toBe('Monthly limit ₹4,000')
+    expect(limitLabel(null, 'always', '2026-11')).toBe('No limit')
+    expect(limitLabel('₹5,000', 'month', '2026-11')).toBe(`Limit ₹5,000 for ${monthShortLabel('2026-11')} only`)
+    expect(limitLabel(null, 'month', '2026-11')).toContain('only')
+    expect(monthShortLabel('2026-11')).toMatch(/2026/)
+  })
+
+  it('recentCategoryIds: newest first, distinct, usable, active in the month, no settlements or deleted', () => {
+    const b: BudgetData = {
+      overall: null,
+      instruments: [],
+      categories: [c('a'), c('b'), c('c'), c('d', { months: ['2026-10'] }), c('gone', { deletedAt: 1 })],
+      expenses: [
+        e('1', '2026-11-01', '1', 'a'),
+        e('2', '2026-11-05', '1', 'b'),
+        e('3', '2026-11-05', '1', 'c'),
+        e('4', '2026-11-09', '1', 'd'),
+        e('5', '2026-11-10', '1', 'gone'),
+        e('6', '2026-11-11', '1', 'a', { deletedAt: 9 }),
+        e('7', '2026-11-12', '1', 'c', { settlement: 'transfer' }),
+        e('8', '2026-11-03', '1', 'a'),
+        e('9', '2026-11-13', '1', null),
+      ],
+    }
+    expect(recentCategoryIds(b, 5, '2026-11')).toEqual(['b', 'c', 'a'])
+    expect(recentCategoryIds(b, 1, '2026-11')).toEqual(['b'])
+    expect(recentCategoryIds(b, 5, '2026-10')).toEqual(['d', 'b', 'c', 'a'])
+  })
+
+  it('monthWeeks starts on Monday and pads to whole weeks', () => {
+    // 1 Nov 2026 is a Sunday: six empty slots, then 1 on the Sunday.
+    const w = monthWeeks('2026-11')
+    expect(w[0]).toEqual([null, null, null, null, null, null, 1])
+    expect(w[1]![0]).toBe(2)
+    expect(w.every((r) => r.length === 7)).toBe(true)
+    expect(w.flat().filter((x) => x !== null)).toHaveLength(30)
+    // 1 Jun 2026 is a Monday: no padding at the start.
+    expect(monthWeeks('2026-06')[0]![0]).toBe(1)
+  })
+
+  it('dayLongLabel reads like "Mon 3 Nov"', () => {
+    expect(dayLongLabel('2026-11-02')).toMatch(/2\b.*\w/)
+    expect(dayLongLabel('2026-11-02')).toContain('2')
+  })
+
+  describe('dailyTotals', () => {
+    const inst = { id: 'cc', name: 'Neo', kind: 'credit' as const, network: 'rupay' as const, bank: '', last4: '', rewardNote: '', deletedAt: null }
+    const b: BudgetData = {
+      overall: null,
+      instruments: [inst],
+      categories: [c('food')],
+      expenses: [
+        e('1', '2026-11-03', '1000.10', 'food', { mode: 'credit', instrumentId: 'cc' }),
+        e('2', '2026-11-03', '199.90', 'food'),
+        e('3', '2026-11-04', '300', 'food'),
+        e('4', '2026-11-05', '600', 'food'),
+        e('5', '2026-11-06', '1', 'food'),
+        e('6', '2026-11-07', '5000', null, { settlement: 'transfer' }),
+        e('7', '2026-11-08', '99', 'food', { deletedAt: 3 }),
+        e('8', '2026-10-31', '900', 'food'),
+      ],
+    }
+    it('one row per day, exact sums, counts, levels relative to the biggest day', () => {
+      const d = dailyTotals(b, '2026-11')
+      expect(d).toHaveLength(30)
+      expect(d[2]!.date).toBe('2026-11-03')
+      expect(d[2]!.spent.toFixed(2)).toBe('1200.00')
+      expect(d[2]!.count).toBe(2)
+      expect(d[2]!.level).toBe(4)
+      expect(d[3]!.level).toBe(1) // 300 of 1200 = 25%
+      expect(d[4]!.level).toBe(2) // 600 of 1200 = 50%
+      expect(d[5]!.level).toBe(1) // 1 of 1200
+      expect(d[0]!.level).toBe(0)
+      expect(d[6]!.spent.toFixed()).toBe('0') // a settlement is not spending
+      expect(d[6]!.count).toBe(0)
+      expect(d[7]!.spent.toFixed()).toBe('0') // deleted
+    })
+    it('levels step up at 25, 50 and 75 percent', () => {
+      const mk = (a: string): BudgetData => ({ ...b, expenses: [e('x', '2026-11-01', '100', 'food'), e('y', '2026-11-02', a, 'food')] })
+      expect(dailyTotals(mk('25'), '2026-11')[1]!.level).toBe(1)
+      expect(dailyTotals(mk('25.01'), '2026-11')[1]!.level).toBe(2)
+      expect(dailyTotals(mk('75'), '2026-11')[1]!.level).toBe(3)
+      expect(dailyTotals(mk('75.01'), '2026-11')[1]!.level).toBe(4)
+    })
+    it('respects the filter and an empty month is all zero', () => {
+      const only = dailyTotals(b, '2026-11', { instrumentId: 'cc' })
+      expect(only[2]!.spent.toFixed(2)).toBe('1000.10')
+      expect(only[2]!.level).toBe(4)
+      expect(only[3]!.spent.toFixed()).toBe('0')
+      expect(dailyTotals(b, '2026-12').every((x) => x.level === 0 && x.count === 0)).toBe(true)
+    })
+  })
+
+  it('owesWords', () => {
+    const m = (v: InstanceType<typeof D>) => `₹${v.toFixed(2)}`
+    expect(owesWords(new D('1200.5'), m)).toBe('Owes ₹1200.50')
+    expect(owesWords(new D('-10'), m)).toBe('Paid ₹10.00 ahead')
+    expect(owesWords(new D(0), m)).toBe('Nothing owed')
   })
 })

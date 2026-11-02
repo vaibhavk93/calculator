@@ -45,3 +45,9 @@ Last updated: 2026-11-02 20:55. Round 4 running. At ~19:20 the account hit its 5
 1. `git status` and `npx tsc --noEmit -p .` first: helper agents may have left files half edited (SettingsScreen was mid-edit at 20:55).
 2. Check which helpers finished by looking for their reports in this file's status table; re-run any that did not.
 3. Then: `npm run check`, `scripts/build-android.sh install` (phone must be connected: File transfer, unlocked).
+
+## Phone test log (21:02 build, OnePlus, light theme)
+- Scientific portrait: all keys visible above the tab bar. FIXED and confirmed.
+- Huge number (eight 12-digit nines multiplied): result shows 9.99999E+41, no overflow. Confirmed.
+- BUG found and fixed in CSS (needs rebuild + phone re-check): the keypad slid DOWN as the expression grew because `.display` was as tall as its content. Now `.display` has a fixed height (26dvh; scientific 17dvh).
+- Budget home, Spending summary fit the real phone. Row tap cues come from agent C (running).
