@@ -2,6 +2,22 @@ import { describe, expect, it } from 'vitest'
 import { defaultValues, isError, type Field } from '../../lib/tool'
 import { ALL_TOOLS } from './registry'
 
+/** Every optional number field, by tool id, that reads with `?? 0` -- junk here must error, not vanish into 0. */
+const OPTIONAL_NUMBER_FIELDS: Record<string, string[]> = {
+  'goal-sip': ['existing'],
+  fd: ['slab'],
+  inflation: ['ret'],
+  'home-loan-tax': ['used123'],
+  'balance-transfer': ['fees'],
+  'card-emi': ['fee'],
+  gratuity: ['months'],
+  'income-tax': ['other', 'basicDa', 'employerNps', 'sec123', 'healthSelf', 'healthParents', 'ownNps', 'homeLoan', 'hra', 'pt'],
+  'in-hand-salary': ['ptMonthly', 'hra'],
+  'capital-gains': ['expenses', 'used'],
+  'advance-tax': ['tds', 'p1', 'p2', 'p3', 'p4'],
+  'presumptive-44ada': ['other'],
+}
+
 describe('every calculator spec', () => {
   it('has a unique id', () => {
     const ids = ALL_TOOLS.map((t) => t.id)
@@ -28,6 +44,15 @@ describe('every calculator spec', () => {
         const out = spec.compute(blank)
         expect(JSON.stringify(out)).not.toMatch(/NaN|Infinity/)
       })
+
+      for (const id of OPTIONAL_NUMBER_FIELDS[spec.id] ?? []) {
+        it(`junk in the optional field "${id}" is an error, not a silent 0`, () => {
+          const v = defaultValues(spec)
+          v[id] = '12abc'
+          const out = spec.compute(v)
+          expect(isError(out), `expected an error with junk in "${id}", got ${JSON.stringify(out).slice(0, 200)}`).toBe(true)
+        })
+      }
     })
   }
 })

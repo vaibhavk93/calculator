@@ -130,7 +130,7 @@ export function TodoScreen({ query, tag }: { query: string; tag: string | null }
 
       <div className="tools__list sections">
         {total === 0 ? (
-          <EmptyState title="No tasks yet">Write what needs doing in the box above. Give a task a date and it shows in Today and in the Due tab.</EmptyState>
+          <EmptyState title="No tasks yet" level="h2">Write what needs doing in the box above. Give a task a date and it shows in Today and in the Due tab.</EmptyState>
         ) : (
           <>
             {body}

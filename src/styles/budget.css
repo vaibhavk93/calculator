@@ -1,16 +1,6 @@
 /* Budget tab. */
 /* Budget tab. Money is mono and tabular; rows wrap rather than cut a figure off. */
 
-.budget__bar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--s-1);
-  min-height: 52px;
-  padding: var(--s-1) var(--s-3) var(--s-1) var(--s-4);
-}
-
 .budget__month {
   min-width: 0;
   font-size: 0.9375rem;

@@ -119,6 +119,16 @@ export function parseNum(text: string | string[][] | undefined): Dec | null {
   }
 }
 
+/** True for a box that has text which isn't blank but doesn't parse as a number -- "12abc", not "". An
+ * empty optional field is fine and means 0; junk in it must never silently become 0 too. */
+export const isJunk = (text: unknown): boolean => typeof text === 'string' && text.trim() !== '' && parseNum(text) === null
+
+/** For OPTIONAL number fields read with a `?? 0` default: the first one with junk in it, as an error. */
+export function junkOptional(values: Values, fields: { id: string; label: string }[]): { error: string } | null {
+  const bad = fields.find((f) => isJunk(values[f.id]))
+  return bad ? { error: `${bad.label} isn't a number` } : null
+}
+
 /** Reads required numbers by id. Returns the first missing label as an error, so the screen says what to fill in. */
 export function need(
   values: Values,

@@ -106,6 +106,9 @@ const unitSpec: ToolSpec = {
     const to = cat?.units.find((u) => u.id === v[`to_${cat.id}`])
     if (!cat || !from || !to) return { error: 'Pick the units to convert' }
     const value = r.n.value!
+    if (cat.id === 'temperature' && convertUnit('temperature', from.id, 'C', value)!.lt('-273.15')) {
+      return { error: "That's below absolute zero (−273.15°C), so it isn't a real temperature" }
+    }
     const out = convertUnit(cat.id, from.id, to.id, value)!
     const formula =
       cat.id === 'temperature'
@@ -217,6 +220,7 @@ const gstSpec: ToolSpec = {
     if (!r.ok) return r
     const rate = v.rate === 'custom' ? parseNum(v.custom) : parseNum(str(v, 'rate'))
     if (!rate) return { error: 'Enter the GST rate' }
+    if (rate.gt(100)) return { error: 'GST rate must be 100% or less -- the highest real slab is 40%' }
     const mode = v.mode === 'remove' ? 'remove' : 'add'
     const x = gst(r.n.amount!, rate, mode, v.supply === 'inter')
     if (!x) return { error: 'Amount and rate cannot be negative' }

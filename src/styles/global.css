@@ -795,6 +795,18 @@ button:disabled {
   padding: 0 var(--s-3) 0 var(--s-2);
 }
 
+/* A root tab screen's own title bar (Tools, Notes, Due, Budget) -- unlike .screen__bar, it has no
+   Back button, since tapping the tab you're already on is how you get back to the top of one. */
+.tabroot__bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+  min-height: 52px;
+  padding: var(--s-1) var(--s-3) var(--s-1) var(--s-4);
+}
+
 .screen__title {
   margin: 0;
   min-width: 0;

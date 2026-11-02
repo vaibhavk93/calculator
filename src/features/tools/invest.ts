@@ -2,7 +2,7 @@ import { D, type Dec } from '../../engine/decimal'
 import { formatDecimal } from '../../lib/format'
 import { cagr, epf, fd, goalSip, lumpsum, ppf, rd, sip, swp, xirr, type YearRow } from '../../engine/investments/invest'
 import { EXAMPLE, PPF } from '../../engine/investments/rates'
-import { need, parseNum, type Field, type Output, type ToolSpec } from '../../lib/tool'
+import { junkOptional, need, parseNum, type Field, type Output, type ToolSpec } from '../../lib/tool'
 
 /** Grouped the Indian way for the worked-out lines (1,50,000 and not 150000). */
 const s = (v: Dec, dp = 2) => formatDecimal(v.toDecimalPlaces(dp), { system: 'indian', decimals: 'auto' })
@@ -149,6 +149,8 @@ const goalSpec: ToolSpec = {
   compute: (v) => {
     const r = need(v, [{ id: 'target', label: 'Target amount' }, { id: 'rate', label: 'Expected return' }, { id: 'years', label: 'Years' }])
     if (!r.ok) return r
+    const junk = junkOptional(v, [{ id: 'existing', label: 'Already saved' }])
+    if (junk) return junk
     const existing = parseNum(v.existing) ?? new D(0)
     if (negative(r.n) || existing.isNegative()) return { error: 'Use positive numbers' }
     const y = wholeYears(r.n.years!)
@@ -235,6 +237,8 @@ const fdSpec: ToolSpec = {
   compute: (v) => {
     const r = need(v, [{ id: 'principal', label: 'Amount' }, { id: 'rate', label: 'Interest rate' }, { id: 'years', label: 'Years' }])
     if (!r.ok) return r
+    const junk = junkOptional(v, [{ id: 'slab', label: 'Your tax slab' }])
+    if (junk) return junk
     const slab = parseNum(v.slab) ?? new D(0)
     if (negative(r.n) || slab.isNegative()) return { error: 'Use positive numbers' }
     if (slab.gt(100)) return { error: 'Tax slab must be 100% or less' }
@@ -433,6 +437,8 @@ const inflationSpec: ToolSpec = {
     const r = need(v, [{ id: 'amount', label: 'Amount' }, { id: 'infl', label: 'Inflation' }, { id: 'years', label: 'Years' }])
     if (!r.ok) return r
     if (negative(r.n)) return { error: 'Use positive numbers' }
+    const junk = junkOptional(v, [{ id: 'ret', label: 'Your yearly return' }])
+    if (junk) return junk
     const f = new D(1).plus(r.n.infl!.div(100)).pow(r.n.years!)
     const ret = parseNum(v.ret)
     const rows: Output['rows'] = [

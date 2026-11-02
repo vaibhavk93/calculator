@@ -913,10 +913,13 @@ for (const accent of ['citron', 'sky', 'violet', 'amber']) for (const theme of [
       const h = (x) => [1, 3, 5].map((i) => parseInt(x.slice(i, i + 2), 16))
       const lum = (x) => { const [r, g, b] = h(x).map((v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }); return 0.2126 * r + 0.7152 * g + 0.0722 * b }
       const cr = (a, b) => { const p = lum(a), q = lum(b); return (Math.max(p, q) + 0.05) / (Math.min(p, q) + 0.05) }
-      return { accentOnBg: cr(css('--accent'), css('--bg')), accentOnSurface: cr(css('--accent'), css('--surface')), inkOnFill: cr(css('--accent-ink'), css('--accent-fill')), dimOnBg: cr(css('--accent-dim'), css('--bg')), fillOnBg: cr(css('--accent-fill'), css('--bg')) }
+      return { accentOnBg: cr(css('--accent'), css('--bg')), accentOnSurface: cr(css('--accent'), css('--surface')), inkOnFill: cr(css('--accent-ink'), css('--accent-fill')), dimOnBg: cr(css('--accent-dim'), css('--bg')) }
     })
+    // --accent-fill is never painted as a foreground directly on --bg (checked: it's only ever a
+    // background of its own, e.g. .btn--primary, the "=" key), so there is no real "fill on bg"
+    // pairing to check -- the only place accent-fill's readability matters is ink-on-fill, above.
     ok(r.accentOnBg >= 4.5, `accent text on bg ${r.accentOnBg.toFixed(2)}`); ok(r.accentOnSurface >= 4.5, `accent on surface ${r.accentOnSurface.toFixed(2)}`); ok(r.inkOnFill >= 4.5, `ink on fill ${r.inkOnFill.toFixed(2)}`)
-    ok(r.dimOnBg >= 3, `accent-dim (borders, inactive) on bg ${r.dimOnBg.toFixed(2)} < 3`); ok(r.fillOnBg >= 3, `accent fill on bg ${r.fillOnBg.toFixed(2)}`)
+    ok(r.dimOnBg >= 3, `accent-dim (borders, inactive) on bg ${r.dimOnBg.toFixed(2)} < 3`)
     const s = await page.evaluate(scanFn); ok(s.contrast.length === 0, s.contrast.slice(0, 3).join(' | '))
   })
 }

@@ -67,6 +67,10 @@ export function SavedScreen() {
   return (
     <div className="tools">
       <div className="saved__head">
+        {/* The Notes/To-do switch below is this screen's own visible title; this just gives it a
+            real heading for anyone navigating by headings, without a second, redundant title above it.
+            A card, a new list or Trash stacks on top without unmounting this, each with its own h1. */}
+        {view.kind === 'list' && <h1 className="sr-only">{mode === 'todo' ? 'To-do' : 'Notes'}</h1>}
         <Segmented
           label="Notes or To-do"
           value={mode}
@@ -99,6 +103,7 @@ export function SavedScreen() {
       ) : live.length === 0 ? (
         <EmptyState
           title="No notes yet"
+          level="h2"
           action={<button type="button" className="btn btn--primary" onClick={() => setTab('tools')}>Open calculators</button>}
         >
           Press Save on any calculator, or start a list for a running total. Add a reminder and the Due tab will keep track.

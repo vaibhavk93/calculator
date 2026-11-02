@@ -76,6 +76,13 @@ export function ToolsScreen() {
 
   return (
     <div className="tools">
+      {/* The group page, a calculator and Scientific stack on top below without unmounting this --
+          so their own h1 (from ScreenHeader) must be the only one while any is open, not two at once. */}
+      {!group && !spec && !nav.scientific && (
+        <header className="tabroot__bar">
+          <h1 className="screen__title">Tools</h1>
+        </header>
+      )}
       <div className="tools__search">
         <input
           className="field"

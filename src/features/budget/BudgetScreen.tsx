@@ -83,11 +83,15 @@ export function BudgetScreen() {
 
   return (
     <div className="tools">
-      <header className="budget__bar">
-        <h1 className="screen__title">Budget</h1>
-        <span className="screen__spacer" />
-        <MonthNav month={month} onMonth={setMonth} />
-      </header>
+      {/* Summary and Manage stack on top via {pages} below without unmounting this -- so their own
+          h1 (from ScreenHeader) must be the only one while either is open, not two at once. */}
+      {page === 'home' && (
+        <header className="tabroot__bar">
+          <h1 className="screen__title">Budget</h1>
+          <span className="screen__spacer" />
+          <MonthNav month={month} onMonth={setMonth} />
+        </header>
+      )}
 
       <div className="tools__list sections">
         <section className="sect" style={tintStyle(3)} aria-label="Summary">

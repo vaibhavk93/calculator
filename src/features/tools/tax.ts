@@ -5,7 +5,7 @@ import { capitalGains, type Asset } from '../../engine/tax/capitalGains'
 import { gratuity } from '../../engine/tax/gratuity'
 import { compareRegimes, inHandSalary, presumptive, type Regime, type TaxResult } from '../../engine/tax/incomeTax'
 import { RULES_FY2026_27 as R, taxNote, type AgeBand } from '../../engine/tax/rules.FY2026-27'
-import { need, parseNum, type Field, type ResultRow, type ResultTable, type ToolSpec, type Values } from '../../lib/tool'
+import { junkOptional, need, parseNum, type Field, type ResultRow, type ResultTable, type ToolSpec, type Values } from '../../lib/tool'
 
 // ---- shared ---------------------------------------------------------------------
 
@@ -91,6 +91,8 @@ const incomeTaxSpec: ToolSpec = {
     const r = need(v, [{ id: 'salary', label: 'Gross salary' }])
     if (!r.ok) return r
     const nums = ['other', 'basicDa', 'employerNps', 'sec123', 'healthSelf', 'healthParents', 'ownNps', 'homeLoan', 'hra', 'pt']
+    const junk = junkOptional(v, incomeTaxSpec.fields.filter((f) => nums.includes(f.id)))
+    if (junk) return junk
     if ([r.n.salary!, ...nums.map((id) => opt(v, id))].some((x) => x.isNegative())) return { error: 'Amounts cannot be negative' }
     const c = compareRegimes(
       {
@@ -161,6 +163,8 @@ const salarySpec: ToolSpec = {
       { id: 'pfPct', label: 'PF %' },
     ])
     if (!r.ok) return r
+    const junk = junkOptional(v, salarySpec.fields.filter((f) => ['ptMonthly', 'hra'].includes(f.id)))
+    if (junk) return junk
     if (opt(v, 'ptMonthly').isNegative() || opt(v, 'hra').isNegative()) return { error: 'Amounts cannot be negative' }
     const s = inHandSalary(
       {
@@ -246,6 +250,9 @@ const cgSpec: ToolSpec = {
       { id: 'sell', label: 'Sale price' },
     ])
     if (!r.ok) return r
+    const junkIds = v.asset === 'equity' ? ['expenses', 'used'] : ['expenses']
+    const junk = junkOptional(v, cgSpec.fields.filter((f) => junkIds.includes(f.id)))
+    if (junk) return junk
     const out = capitalGains(
       {
         asset: v.asset as Asset,
@@ -321,6 +328,8 @@ const advanceSpec: ToolSpec = {
       { id: 'months', label: 'Months' },
     ])
     if (!r.ok) return r
+    const junk = junkOptional(v, advanceSpec.fields.filter((f) => ['tds', 'p1', 'p2', 'p3', 'p4'].includes(f.id)))
+    if (junk) return junk
     const a = advanceTax(
       {
         tax: r.n.tax!,
@@ -392,6 +401,8 @@ const gratuitySpec: ToolSpec = {
       { id: 'years', label: 'Years of service' },
     ])
     if (!r.ok) return r
+    const junk = junkOptional(v, [{ id: 'months', label: 'Extra months' }])
+    if (junk) return junk
     const months = parseNum(v.months) ?? ZERO
     if (!r.n.years!.isInteger() || !months.isInteger()) return { error: 'Years and months must be whole numbers' }
     const covered = v.covered === 'yes'
@@ -446,6 +457,8 @@ const presumptiveSpec: ToolSpec = {
       { id: 'expenses', label: 'Expenses' },
     ])
     if (!r.ok) return r
+    const junk = junkOptional(v, presumptiveSpec.fields.filter((f) => f.id === 'other'))
+    if (junk) return junk
     const p = presumptive(
       { receipts: r.n.receipts!, cashPct: r.n.cashPct!, expenses: r.n.expenses!, otherIncome: opt(v, 'other'), regime: v.regime as Regime, age: v.age as AgeBand },
       R,

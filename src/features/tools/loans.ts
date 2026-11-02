@@ -19,7 +19,7 @@ import {
   type Row,
 } from '../../engine/loans/loan'
 import { CARD_GST_PCT, HOME_LOAN_TAX, LOAN_RULES_AS_OF, PRESETS, type LoanType } from '../../engine/loans/rules'
-import { need, parseNum, type Computed, type Field, type Output, type ResultTable, type ToolSpec, type Values } from '../../lib/tool'
+import { junkOptional, need, parseNum, type Computed, type Field, type Output, type ResultTable, type ToolSpec, type Values } from '../../lib/tool'
 
 // ---- shared fields and helpers ------------------------------------------------
 
@@ -491,6 +491,10 @@ const homeTaxSpec: ToolSpec = {
     const regime = v.regime as Regime
     const rent = occupancy === 'letOut' ? parseNum(v.rent) : new D(0)
     if (!rent) return { error: 'Enter the yearly rent' }
+    if (regime === 'old') {
+      const junk = junkOptional(v, [{ id: 'used123', label: 'Section 123 limit already used' }])
+      if (junk) return junk
+    }
     const used = regime === 'old' ? (parseNum(v.used123) ?? new D(0)) : new D(0)
     if (rent.lt(0) || used.lt(0)) return { error: "Amounts can't be negative" }
     const years = homeLoanTax(l.p, l.rate, l.n, slab, occupancy, regime, rent, used)
@@ -557,6 +561,8 @@ const transferSpec: ToolSpec = {
     ])
     if (!r.ok) return r
     const { balance, oldRate, months, newRate } = r.n as Record<string, Dec>
+    const junk = junkOptional(v, [{ id: 'fees', label: 'Switching costs' }])
+    if (junk) return junk
     const fees = parseNum(v.fees) ?? new D(0)
     if (balance!.lte(0)) return { error: 'Balance must be more than zero' }
     if (oldRate!.lt(0) || newRate!.lt(0) || oldRate!.gt(100) || newRate!.gt(100)) return { error: 'Enter yearly rates from 0 to 100%' }
@@ -675,6 +681,8 @@ const cardSpec: ToolSpec = {
     ])
     if (!r.ok) return r
     const { principal: p, rate, tenure } = r.n as Record<string, Dec>
+    const junk = junkOptional(v, [{ id: 'fee', label: 'Processing fee' }])
+    if (junk) return junk
     const fee = parseNum(v.fee) ?? new D(0)
     if (p!.lte(0)) return { error: 'Purchase amount must be more than zero' }
     if (rate!.lt(0) || rate!.gt(100)) return { error: 'Enter a yearly rate from 0 to 100%' }

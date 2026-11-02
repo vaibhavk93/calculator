@@ -96,6 +96,13 @@ export function DueScreen() {
 
   return (
     <div className="tools">
+      {/* CardView stacks on top below without unmounting this -- its own h1 (from ScreenHeader)
+          must be the only one while it's open, not two at once. */}
+      {!open && (
+        <header className="tabroot__bar">
+          <h1 className="screen__title">Due</h1>
+        </header>
+      )}
       {!total.isZero() && (
         <div className="due__total">
           <span className="result__label">Amounts due in the next 30 days</span>
