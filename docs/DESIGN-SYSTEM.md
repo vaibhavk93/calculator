@@ -87,6 +87,23 @@ Authored in OKLCH; hex is the compiled output.
 | `accent-fill` | `#CCD539` | Accent surfaces, with `#121300` ink |
 | `alert` | `#BE241F` | Overdue |
 
+
+### Light mode is not a recolour
+
+Inverting hex values produces a bad light theme. Two things change structurally:
+
+| Element | Dark | Light | Why |
+|---|---|---|---|
+| **Digit keys** | `raised` fill `#181818` — lighter than the ground | `#F2F2F2` fill — *darker* than the ground | In both themes the digits sit forward of the surface. Elevation reverses direction. |
+| **Operator keys** | `surface` `#0D0D0D` — recedes | **No fill at all**, `ink-2` text | On white, any fill would push operators forward. Removing it is what makes them recede. |
+| **`=` key** | `accent` fill `#CCD539` | `accent-fill` `#CCD539` — identical | The one element that stays the same in both themes, so the brand reads continuously |
+| **Accent for text/icons** | `#CCD539` | `#5C6100` (deep olive) | The bright citron fails contrast as text on white. Fills keep the bright value; text uses the dark one. |
+| **Undo bar** | `raised` `#181818` | `surface` `#F2F2F2` | Needs separation from the ground in both directions |
+
+**The principle:** elevation is a *relationship*, not a colour. Something
+"raised" moves away from the ground — lighter on dark, darker on light. Shadows
+are used in neither theme.
+
 ### Verified contrast
 
 Every pair computed, not eyeballed. WCAG AA needs 4.5:1 body, 3:1 large.

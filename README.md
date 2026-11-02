@@ -23,6 +23,7 @@ No ads. No account. No tracking. Works offline.
 | [`DESIGN-SYSTEM.md`](docs/DESIGN-SYSTEM.md) | **v2.** Colour, type and layout — plus a post-mortem of why v1 looked machine-made |
 | [`RESEARCH-FINDINGS.md`](docs/RESEARCH-FINDINGS.md) | Market, competitive, user-review and platform research. Four findings that corrected the plan, and the gaps I could not close |
 | [`DATA-FRESHNESS.md`](docs/DATA-FRESHNESS.md) | How the app stays correct as tax, GST, small-savings and currency rates change — and how reminders survive Android |
+| [`MODEL-GUIDE.md`](docs/MODEL-GUIDE.md) | Which Claude model to build each phase with, and why a detailed spec lets you drop a tier |
 
 ## Scope
 
