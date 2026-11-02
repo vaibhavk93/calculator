@@ -52,7 +52,7 @@ describe('saveBackupFile', () => {
     const confirm = vi.fn(async () => true)
     const r = await saveBackupFile('a.json', '{}', confirm)
     expect(r).toMatchObject({ ok: true, where: 'Download/Calc/a.json' })
-    if (r.ok) await r.open()
+    if (r.ok) await r.open?.()
     expect(h.plugin.openBackupFolder).toHaveBeenCalledWith({ uri: 'content://x' })
     await saveBackupFile('b.json', '{}', confirm)
     expect(confirm).toHaveBeenCalledTimes(1)

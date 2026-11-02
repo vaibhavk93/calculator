@@ -96,7 +96,8 @@ export function SettingsScreen() {
   const exportBackup = async () => {
     const r = await saveBackupFile(backupFilename(), buildBackup(store.getState().snapshot()), () => new Promise<boolean>((resolve) => setFolderAsk(() => resolve)))
     setFolderAsk(null)
-    if (r.ok) showLinkSnack(`Backup saved to ${r.where}`, { label: 'Open folder', run: () => void r.open() })
+    if (r.ok && r.open) showLinkSnack(`Backup saved to ${r.where}`, { label: 'Open folder', run: () => void r.open!() })
+    else if (r.ok) showNotice(`Backup saved to ${r.where}`, 'info')
     else if (r.reason === 'failed') showNotice(r.message, 'error')
     else showNotice('No backup was made', 'info')
   }

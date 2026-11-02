@@ -21,7 +21,9 @@ export const FOLDER_OK_KEY = 'vkcalc.backupFolderOk'
 const plugin = registerPlugin<BackupFilePlugin>('BackupFile')
 
 export type SaveBackupResult =
-  | { ok: true; where: string; open: () => Promise<void> }
+  // `open` is only present when there is somewhere real to open (the native Download/Calc folder);
+  // the web build just triggers a browser download, so there is no folder to open.
+  | { ok: true; where: string; open?: () => Promise<void> }
   | { ok: false; reason: 'declined' | 'failed'; message: string }
 
 export async function saveBackupFile(
@@ -32,7 +34,7 @@ export async function saveBackupFile(
   if (!Capacitor.isNativePlatform()) {
     try {
       downloadTextFile(filename, text)
-      return { ok: true, where: 'your downloads', open: async () => undefined }
+      return { ok: true, where: 'your downloads' }
     } catch (e) {
       return { ok: false, reason: 'failed', message: errText(e) }
     }

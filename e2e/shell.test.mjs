@@ -47,7 +47,7 @@ const manyExpenses = (n, extra = {}) => Array.from({ length: n }, (_, i) => ({ i
 
 // ------------------------------------------------------------------ opening the app (own copy of openApp so raw text, init scripts, media can be set)
 async function open(app, o = {}) {
-  const { raw, data, empty = false, settings = {}, theme = null, width = 360, height = 790, font = 100, colorScheme, reducedMotion, init, wait = true,
+  const { raw, data, empty = false, settings = {}, theme = null, width = 360, height = 790, font = 100, colorScheme, reducedMotion = 'reduce', init, wait = true,
     permissions, locale = 'en-IN', timezone = 'Asia/Kolkata', now = null, mobile = true, dsf = 2 } = o
   const context = await app.browser.newContext({ viewport: { width, height }, deviceScaleFactor: dsf, hasTouch: mobile, isMobile: mobile, locale, timezoneId: timezone, colorScheme, reducedMotion, acceptDownloads: true, permissions })
   CUR?.ctxs.push(context)

@@ -19,7 +19,10 @@ export function buildBackup(data: PersistedData, now: Date = new Date()): string
 }
 
 export function backupFilename(now: Date = new Date()): string {
-  return `vkcalc-backup-${now.toISOString().slice(0, 10)}.json`
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `vkcalc-backup-${y}-${m}-${d}.json`
 }
 
 export type ParsedBackup = { ok: true; data: PersistedData; exportedAt: string | null } | { ok: false; message: string }

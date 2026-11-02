@@ -124,7 +124,10 @@ export function sanitizeHistory(raw: unknown): HistoryEntry[] {
 export function sanitizeInput(raw: unknown): InputState {
   if (!isObject(raw)) return { ...INITIAL_INPUT }
   const expr = typeof raw.expr === 'string' && raw.expr.length <= 500 && RAW_EXPRESSION.test(raw.expr) ? raw.expr : ''
-  return { expr, fresh: expr !== '' && raw.fresh === true }
+  // `fresh: true` means expr is already a finished answer -- always a plain number, per
+  // equals() in input.ts, never a bare operator or function call like "sin(". A damaged or
+  // tampered file claiming otherwise white-screens the app (B-16): treat it as mid-typing instead.
+  return { expr, fresh: isPlainNumber(expr) && raw.fresh === true }
 }
 
 const str = (v: unknown, max: number, fallback = '') => (typeof v === 'string' ? v.slice(0, max) : fallback)

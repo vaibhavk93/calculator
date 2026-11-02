@@ -29,7 +29,10 @@ export async function startApp({ port = 4200 + Math.floor(Math.random() * 500), 
 
 /** A new page at phone size with optional stored data (written before the app starts), theme and font scale. */
 export async function openApp(app, { data = null, settings = {}, width = 360, height = 790, font = 100, theme = null, locale = 'en-IN', timezone = 'Asia/Kolkata', now = null } = {}) {
-  const context = await app.browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, locale, timezoneId: timezone })
+  // Every .screen slides in over 220ms (global.css); without this, a geometry check run right after
+  // navigation can catch the entrance transform mid-flight and report a few pixels of fake sideways
+  // overflow -- the app itself already turns this off via @media (prefers-reduced-motion: reduce).
+  const context = await app.browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, locale, timezoneId: timezone, reducedMotion: 'reduce' })
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))

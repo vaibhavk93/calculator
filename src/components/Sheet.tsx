@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { goBack } from '../lib/backStack'
 import { Icon } from './Icon'
 import { useBackHandler } from './useBackHandler'
 
@@ -33,10 +34,13 @@ export function Sheet({ title, onClose, action, footer, children }: SheetProps) 
     const previous = opener && opener !== document.body ? opener : null
     ref.current?.focus()
 
+    // Several sheets can be open at once (a picker on top of a form). Each one's keydown listener
+    // sits on `document`, so stopPropagation never stops a sibling listener on the same target --
+    // only the back stack knows which sheet is actually on top, so Escape routes through it too.
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
-        closeRef.current()
+        goBack()
       }
     }
     document.addEventListener('keydown', onKey)

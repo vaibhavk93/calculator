@@ -671,7 +671,7 @@ UISIZES.forEach(([label, w, h, font], i) => {
   }, { width: w, height: h, font })
   C(`CALC-35${i}`, 'UI', `Calculate and Scientific: no sideways overflow with a long expression: ${label}`, async ({ page }) => {
     await kb(page, '1234567+'.repeat(8) + '1'); let o = await overflowing(page); ok(o.length === 0, `calc: ${o.join('; ')}`)
-    await openSci(page); o = await overflowing(page); ok(o.length === 0, `sci: ${o.join('; ')}`)
+    await openSci(page); await wait(50); o = await overflowing(page); ok(o.length === 0, `sci: ${o.join('; ')}`)
   }, { width: w, height: h, font })
 })
 ;['light', 'dark'].forEach((theme, i) => {

@@ -98,6 +98,11 @@ describe('sanitizeInput', () => {
     expect(sanitizeInput({ expr: '<img src=x>' }).expr).toBe('')
     expect(sanitizeInput({ expr: '1'.repeat(501) }).expr).toBe('')
   })
+  it('"fresh" cannot be true on a half-typed function call (B-16, white-screened the app)', () => {
+    expect(sanitizeInput({ expr: 'sin(', fresh: true })).toEqual({ expr: 'sin(', fresh: false })
+    expect(sanitizeInput({ expr: '5+3', fresh: true })).toEqual({ expr: '5+3', fresh: false })
+    expect(sanitizeInput({ expr: '-12.5', fresh: true })).toEqual({ expr: '-12.5', fresh: true })
+  })
 })
 
 describe('migrate', () => {
@@ -162,8 +167,10 @@ describe('backup and restore', () => {
       expect(parsed.exportedAt).toBe('2026-11-02T10:00:00.000Z')
     }
   })
-  it('names the file by date', () => {
-    expect(backupFilename(new Date('2026-11-02T10:00:00Z'))).toBe('vkcalc-backup-2026-11-02.json')
+  it('names the file by the phone\'s local date, not UTC', () => {
+    expect(backupFilename(new Date(2026, 10, 2, 10, 0, 0))).toBe('vkcalc-backup-2026-11-02.json')
+    // Past 9pm IST (UTC+5:30) is still the same local day, but would roll to the next day in UTC.
+    expect(backupFilename(new Date(2026, 10, 2, 23, 30, 0))).toBe('vkcalc-backup-2026-11-02.json')
   })
   it('refuses files that are not backups, in plain words', () => {
     for (const text of ['hello', '[]', '{"a":1}', '{"kind":"something-else","data":{}}']) {

@@ -73,7 +73,7 @@ const open = async (data = seed(), o = {}) => {
 }
 /** Open with raw stored text (for damaged data). Returns the page even when the app never draws. */
 const openRaw = async (raw, o = {}) => {
-  const context = await APP.browser.newContext({ viewport: { width: 360, height: 790 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, locale: 'en-IN', timezoneId: 'Asia/Kolkata' })
+  const context = await APP.browser.newContext({ viewport: { width: 360, height: 790 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, locale: 'en-IN', timezoneId: 'Asia/Kolkata', reducedMotion: 'reduce' })
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))

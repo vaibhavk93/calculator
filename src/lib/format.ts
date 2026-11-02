@@ -148,7 +148,9 @@ export function formatExpression(raw: string, system: NumberSystem): string {
       prev = other.endsWith('(') ? 'open' : 'operand'
     }
   }
-  return out
+  // A dangling binary operator ("12 +") always renders with a trailing space before the next
+  // token exists; strip it so an incomplete expression never shows an invisible trailing space.
+  return out.trimEnd()
 }
 
 /*

@@ -686,7 +686,11 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
             ...budget,
             instruments: budget.instruments.map((i) => (i.id === id ? next : i)),
             // A kind or network change can make an old pairing invalid (a Visa credit card used for UPI): the entry keeps its mode, loses the instrument.
-            expenses: budget.expenses.map((x) => (x.instrumentId === id && (x.mode === null || !instrumentFitsMode(x.mode, next)) ? { ...x, instrumentId: null } : x)),
+            // A settlement (card bill, transfer) has no mode at all by design, so `mode === null` must
+            // never detach one -- that check is only for an ordinary spend whose mode no longer fits.
+            expenses: budget.expenses.map((x) =>
+              x.instrumentId === id && !x.settlement && (x.mode === null || !instrumentFitsMode(x.mode, next)) ? { ...x, instrumentId: null } : x,
+            ),
           },
           notice: null,
         })
@@ -804,7 +808,10 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const card = cards.find((c) => c.id === id)
         if (!card) return
         if (!card.pinned && cards.filter((c) => c.pinned && c.deletedAt === null).length >= MAX_PINNED) {
-          return set({ notice: { id: nextId(), text: `You can pin up to ${MAX_PINNED}. Unpin one first.`, tone: 'info' } })
+          const text = `You can pin up to ${MAX_PINNED}. Unpin one first.`
+          // `notice` is what the Calculate screen's own note line reads; `snack` is the one message
+          // box mounted everywhere else (the Notes list has no note line of its own to show `notice`).
+          return set({ notice: { id: nextId(), text, tone: 'info' }, snack: { id: nextId(), text, canUndo: false } })
         }
         set({ cards: cards.map((c) => (c.id === id ? { ...c, pinned: !c.pinned } : c)) })
       },

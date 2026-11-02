@@ -645,6 +645,15 @@ describe('budget', () => {
       expect(get().updateInstrument(cc, { last4: 'x' })).toBe(false)
       expect(get().updateInstrument('ghost', { name: 'x' })).toBe(false)
     })
+    it('updateInstrument never detaches a card-bill payment just because editing an unrelated field (B-04)', () => {
+      const { get } = make()
+      const cc = get().addInstrument(neo)!
+      get().addExpense(draft({ settlement: 'cardBill', instrumentId: cc }))
+      // A settlement has mode: null by design, not because its pairing broke -- editing the holder
+      // name (or anything else that leaves kind/network alone) must not read that as "lost its card".
+      expect(get().updateInstrument(cc, { holder: 'V Kumawat' })).toBe(true)
+      expect(get().budget.expenses[0]).toMatchObject({ settlement: 'cardBill', instrumentId: cc })
+    })
     it('a rename onto another instrument of the same kind is refused', () => {
       const { get } = make()
       get().addInstrument({ name: 'A', kind: 'wallet' })
