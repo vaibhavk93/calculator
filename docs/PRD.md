@@ -41,6 +41,7 @@ name, save and compare a calculation instead of re-entering it.
 4. Turn a stateless calculator into something that remembers: notes and reminders on any calculation.
 5. Fully offline except currency rates.
 6. Zero ads, zero paywall, zero account.
+7. Stay correct as rates and tax rules change, without shipping a release each time.
 
 ### Non-Goals
 - Monetisation, subscriptions, ads.
@@ -85,7 +86,8 @@ dependency and risk, not by cutting features.
 | **P3 — Loans** | Full EMI/loan suite (Section C) | The primary stated gap |
 | **P4 — Investments** | SIP/FD/PPF/NPS/EPF suite (Section D) | Pure math, no external data, low risk |
 | **P5 — Tax & Salary** | Income tax, HRA, capital gains, salary (Section E) | Highest maintenance risk — isolated behind a rules config |
-| **P6 — Memory layer + PM pack** | Notes, reminders, tapes, widgets, scenarios, NL input, export, product metrics (Sections F & G) | The differentiator. Depends on P1–P5 existing. |
+| **P6 — Memory layer + PM pack** | Notes, reminders, tapes, scenarios, NL input, export, product metrics (Sections F & G) | The differentiator. Depends on P1–P5 existing. |
+| **P7 — Platform & native** | Rules packs, delivery reliability, widgets (native Kotlin), tile, share intake, app lock (Section H) | Makes the differentiator actually work on real Indian phones |
 
 ---
 
@@ -232,6 +234,39 @@ fails.
 
 ---
 
+### H. Platform, Freshness & Reliability (P5–P7)
+
+> Added after research. Several of these **correct earlier assumptions** —
+> see `RESEARCH-FINDINGS.md`. Full design in `DATA-FRESHNESS.md`.
+
+| # | Feature | Inputs | Outputs |
+|---|---|---|---|
+| H1 | **Rules packs** | Signed JSON pack fetched weekly from a CDN | Tax slabs, GST rates, small-savings rates, CII kept current with no app release. Bundled → cached → downloaded resolution. |
+| H2 | **Freshness disclosure** | Pack date, current date | "Rates as of Oct 2026" on every affected result; escalating banner past a Budget or quarter boundary |
+| H3 | **Rate override** | User-entered rate | Any config rate can be overridden by hand. The pack is a convenience, never a lock-in. |
+| H4 | **Currency rate cache** | Frankfurter fetch, 6h TTL | Converted amount + rate age. Bundled snapshot ships in the APK so day-one offline works. |
+| H5 | **Inexact reminder scheduling** | Due date, lead days | Notification within a ±1h window. **Deliberately avoids `SCHEDULE_EXACT_ALARM`**, which Android 14+ denies by default and Play restricts to clock/calendar apps. |
+| H6 | **Delivery verification** | Fire log per reminder | Detects silently-dropped notifications and surfaces a fix. Counters aggressive OEM battery killers. |
+| H7 | **Guided OEM setup** | Detected manufacturer | Deep-link to that brand's autostart/battery page with specific instructions |
+| H8 | **Notification permission flow** | — | Asked *after* the first reminder is set, never at launch. Graceful denied path. |
+| H9 | **Home-screen widgets** | — | Next due, tape total, quick calculator. **Native Kotlin (Jetpack Glance) + storage bridge — Capacitor cannot render widgets.** Also the fallback channel when notifications are blocked. |
+| H10 | **Boot & timezone rescheduling** | System broadcasts | All reminders rescheduled on reboot and on timezone change |
+| H11 | **Quick Settings tile** | — | One-tap calculator from the notification shade |
+| H12 | **Share-sheet intake** | Selected text/number from any app | Opens with the number pre-filled |
+| H13 | **Biometric app lock** | — | Optional fingerprint/face lock. The app holds a map of your financial life. |
+| H14 | **Schema migration** | Stored data at version N | Migrated to N+1, each migration unit-tested against fixtures |
+
+**Corrections to the earlier plan:**
+
+1. Rule freshness is **quarterly, not annual** — small-savings rates reset every
+   quarter and GST changes on no schedule. The mechanism handles 4–8 updates/year.
+2. Widgets are **native work**, not a web task. Previously mis-scoped.
+3. Reminders must **not** use exact alarms — a Play policy risk that would have
+   surfaced at review.
+4. A static JSON file on a CDN gives us remote config **without** becoming a backend.
+
+---
+
 ## 8. Architecture
 
 ### Stack
@@ -311,6 +346,10 @@ or web version cheap.
 | **Currency API rate-limits or dies** | Medium | Medium | Cache aggressively, show rate age, degrade to last-known; API choice isolated behind one adapter |
 | **Scope: 70 features is a lot of surface** | Medium — half-finished app | Medium | Phased build; each phase is independently shippable and usable |
 | **Cannot test on a real Android device from here** | Medium | Certain | Full headless browser verification + unit tests here; you do a device smoke test per phase before I proceed |
+| **OEM battery killers drop reminders** (Xiaomi, Vivo, Oppo, Realme — dominant in India) | **Critical** | High | Four-layer defence: guided autostart, delivery verification, widget fallback, in-app agenda. See `DATA-FRESHNESS.md` §4. |
+| **Play rejects the app over alarm permissions** | High | Low (now) | Designed out — we use inexact scheduling and request no restricted permission |
+| **Up to half of users never grant notification permission** | High | Medium | Contextual ask after first reminder; widget + in-app badge fallback |
+| **Rates/slabs go stale and give wrong answers** | High | Certain without a mechanism | Signed rules packs from a CDN, freshness disclosed on every result, user override always available |
 | **Capital gains / indexation rules are genuinely complex** | Medium — subtle wrong answers | Medium | Explicitly scope to common cases; flag unsupported edge cases in-app rather than guessing |
 | **WebView feel disappoints vs native** | Low | Low | Native-feeling keypad with haptics; if it disappoints, engine ports to Flutter unchanged |
 
@@ -349,6 +388,7 @@ or web version cheap.
 | P3 | Full loan suite with amortisation tables | Tests validated against a bank EMI table |
 | P4 | Investment suite with charts | Tests validated against official scheme calculators |
 | P5 | Tax & salary with FY2026-27 rules | Tests validated against published slab examples |
-| P6 | Memory layer (notes, reminders, tapes, widgets), scenarios, NL input, export, PM pack | Tests + screenshots + reminder fires on a real device |
-| P7 | Capacitor Android build → installable APK | Gradle build succeeds; you install and smoke-test |
+| P6 | Memory layer (notes, reminders, tapes), scenarios, NL input, export, PM pack | Tests + screenshots + reminder fires on a real device |
+| P7 | Rules packs, OEM reliability layer, native widgets, tile, app lock | Reminder verified firing on a Xiaomi/Realme device, not just Pixel |
+| P8 | Capacitor Android build → installable APK | Gradle build succeeds; you install and smoke-test |
 | Later | iOS target | Requires a Mac — your machine or a CI runner |

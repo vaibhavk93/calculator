@@ -1,7 +1,12 @@
 # UI/UX Guidelines — VK Calc
 
-**Status:** v1.0
-**Purpose:** The design contract. Every screen gets built against this.
+**Status:** v1.1
+**Purpose:** Interaction, copy, accessibility and behaviour rules.
+
+> ⚠️ **Sections 4 (Design System) and the colour/type rules here are superseded
+> by [`DESIGN-SYSTEM.md`](DESIGN-SYSTEM.md) v2.** The v1 palette (teal on white)
+> and type choices were generic; v2 documents why and what replaced them. The
+> interaction, copy, accessibility and research sections below still stand.
 
 ---
 

@@ -20,6 +20,9 @@ No ads. No account. No tracking. Works offline.
 | [`MEMORY-LAYER.md`](docs/MEMORY-LAYER.md) | The differentiator: notes, reminders, tapes. 30 mapped use cases, data model, privacy position |
 | [`GTM-STRATEGY.md`](docs/GTM-STRATEGY.md) | How this competes for #1 downloads — positioning, ASO, retention mechanics, monetisation, launch sequence, honest counter-argument |
 | [`TECH-DECISIONS.md`](docs/TECH-DECISIONS.md) | Every technical call explained in plain language, with cost and reversibility |
+| [`DESIGN-SYSTEM.md`](docs/DESIGN-SYSTEM.md) | **v2.** Colour, type and layout — plus a post-mortem of why v1 looked machine-made |
+| [`RESEARCH-FINDINGS.md`](docs/RESEARCH-FINDINGS.md) | Market, competitive, user-review and platform research. Four findings that corrected the plan, and the gaps I could not close |
+| [`DATA-FRESHNESS.md`](docs/DATA-FRESHNESS.md) | How the app stays correct as tax, GST, small-savings and currency rates change — and how reminders survive Android |
 
 ## Scope
 
@@ -31,7 +34,8 @@ No ads. No account. No tracking. Works offline.
 | D | Investments & savings | 13 |
 | E | Tax & salary (India) | 7 |
 | F | Personalisation + product metrics | 13 |
-| G | Memory layer — notes, reminders, tapes, widgets | 12 |
+| G | Memory layer — notes, reminders, tapes | 12 |
+| H | Platform, freshness & reliability | 14 |
 
 ## Why it's different
 
