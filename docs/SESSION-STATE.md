@@ -51,3 +51,9 @@ Last updated: 2026-11-02 20:55. Round 4 running. At ~19:20 the account hit its 5
 - Huge number (eight 12-digit nines multiplied): result shows 9.99999E+41, no overflow. Confirmed.
 - BUG found and fixed in CSS (needs rebuild + phone re-check): the keypad slid DOWN as the expression grew because `.display` was as tall as its content. Now `.display` has a fixed height (26dvh; scientific 17dvh).
 - Budget home, Spending summary fit the real phone. Row tap cues come from agent C (running).
+
+## Phone test at 21:06 (build ea10474): incident and rules
+- Install OK (21:06:42). I typed a long expression by sending adb taps at coordinates taken from a screenshot. The app was no longer on the Calculate screen when the taps landed; they opened the Budget 'Edit expense' sheet instead (unsaved) and the phone screen then went black (locked).
+- Checked the stored data afterwards (counts only): 6 expenses, 0 deleted, 0 settlements, 11 categories, 3 instruments, 6 notes, 22 history rows, calculator input empty. **Nothing was changed or lost.** The temporary copy of the data was deleted.
+- RULES for phone testing from now on: (1) take a screenshot and confirm the screen before EVERY batch of taps; (2) never tap in bulk on screens that have delete or save controls (Budget, Notes, Due, History); do bulk typing only on Calculate/Scientific after confirming; (3) wake the phone first (it may be locked and needs the owner's PIN); (4) the owner's real data is on the phone: read counts only, never contents.
+- Still to re-check on the phone: keypad stays still while typing a long expression; new Budget screens (limit scope, pills, UPI paid-from, heatmap).
