@@ -83,11 +83,11 @@ dependency and risk, not by cutting features.
 |---|---|---|
 | **P1 — Foundation** | Core calculator engine, history, settings, navigation shell, theming, Indian number format | Everything else renders inside this shell |
 | **P1.1 — History power-ups** | Row menu, lock, memo, edit entry, share entry (A16–A20) | Found better in the reference app; small; and the seed of the memory layer (see below) |
-| **P2 — Everyday** | All converters & utilities (Section B) | Highest daily-use frequency; ClevCalc parity achieved here |
-| **P3 — Loans** | Full EMI/loan suite (Section C) | The primary stated gap |
-| **P4 — Investments** | SIP/FD/PPF/NPS/EPF suite (Section D) | Pure math, no external data, low risk |
-| **P5 — Tax & Salary** | Income tax, HRA, capital gains, salary (Section E) | Highest maintenance risk — isolated behind a rules config |
-| **P6 — Memory layer + PM pack** | Notes, reminders, tapes, spend categories and payment modes, scenarios, NL input, export, product metrics (Sections F & G) | The differentiator. Depends on P1–P5 existing. |
+| **P2 — Everyday** | All converters & utilities (Section B), plus Use-result-in and per-calculator drafts (A22–A23) | Highest daily-use frequency; ClevCalc parity achieved here |
+| **P3 — Loans** | Full EMI/loan suite (Section C), including runway, multi-loan portfolio, card payoff and annual-fee verdict (C12–C15) | The primary stated gap |
+| **P4 — Investments** | SIP/FD/PPF/NPS/EPF suite (Section D), plus net worth, debt-to-income, emergency fund and savings rate (D14–D17) | Pure math, no external data, low risk |
+| **P5 — Tax & Salary** | Income tax, HRA, capital gains, salary, exit settlement (Section E) | Highest maintenance risk — isolated behind a rules config |
+| **P6 — Memory layer + PM pack** | Notes, reminders, tapes, spend categories and payment modes, settlement lines, scenarios, NL input, export, product metrics (Sections F & G) | The differentiator. Depends on P1–P5 existing. |
 | **P7 — Platform & native** | Rules packs, delivery reliability, widgets (native Kotlin), tile, share intake, app lock (Section H) | Makes the differentiator actually work on real Indian phones |
 
 ---
@@ -122,6 +122,8 @@ the engine and UI are built against.
 | A19 | Edit entry *(P1.1)* | Memo, expression, date-time | Expression re-evaluated by the engine on save; invalid input blocks save with plain words ("Can't divide by zero"). Result is never typed by hand. |
 | A20 | Share entry *(P1.1)* | A history row | Plain text `expression = result` through the system share sheet. No promotional footer. |
 | A21 | **Landscape layout** *(built, P1 shell)* | Phone rotated, height ≤ 520px | Tab bar becomes a left rail; display + utilities in the middle pane; keypad full-height on the right; history opens as a right-hand side panel; Undo bar sits under it. Rotating keeps the expression and result. Tablets and desktop keep the single column. |
+| A22 | **Use result in…** *(P2)* | A result on the keypad | A "Use in…" action lists calculator fields that take an amount; one tap inserts the value at full precision. Works from the keypad into any calculator, so a quick sum never gets retyped. |
+| A23 | **Resume per calculator** *(P2)* | Any calculator form | Reopening a calculator restores its unsaved inputs and the focused field. "Reset" clears it. Drafts are separate from Saved cards (G1). |
 
 **Reference-app review (ClevCalc, 5 screenshots, 2 Nov 2026).** A16–A20 come from its history
 screens. Reviewed and **not** adopted:
@@ -162,7 +164,7 @@ screens. Reviewed and **not** adopted:
 | # | Calculator | Inputs | Outputs |
 |---|---|---|---|
 | C1 | EMI | Principal, annual rate %, tenure (months\|years) | Monthly EMI, total interest, total payable, principal-vs-interest split |
-| C2 | Amortisation schedule | (from C1) | Month-by-month table: EMI, principal, interest, closing balance; yearly roll-up |
+| C2 | Amortisation schedule | (from C1) | Month-by-month table: EMI, principal, interest, closing balance; yearly roll-up. **Closes in exactly N instalments:** the rounding residue goes into the final instalment, never an extra one (a naive schedule shows a 241st instalment on a 240-month loan). |
 | C3 | Prepayment impact | Loan inputs + prepayment amount, month, mode (reduce EMI \| reduce tenure) | New tenure/EMI, interest saved, months saved, revised schedule |
 | C4 | Reverse EMI (affordability) | Affordable EMI, rate, tenure | Maximum loan eligible |
 | C5 | Rate change simulator | Loan inputs, rate delta, effective month | New EMI or new tenure, cost delta |
@@ -172,6 +174,10 @@ screens. Reviewed and **not** adopted:
 | C9 | Simple vs compound interest | Principal, rate, time, compounding frequency | SI, CI, difference, growth table |
 | C10 | Credit card EMI | Purchase amount, rate, tenure, processing fee | True EMI incl. 18% GST on interest + fee, effective annual cost |
 | C11 | Loan presets | Type (home/car/personal/education/gold) | Pre-filled typical rate & tenure ranges |
+| C12 | **Runway** | Net payout (typed, or from E8), liquid savings, monthly living cost, optional new monthly income, loans from C13 | Months the money lasts (whole months, rounded **down**, plus remaining days), net monthly burn, months the EMIs alone would last, "indefinite" when income covers the burn, and which loan is best to part-pay from the payout |
+| C13 | **Multi-loan portfolio** | 2 or more loans (outstanding, rate, remaining tenure or EMI) | Total EMI, total interest remaining, debt-free date; payoff order under **avalanche** (highest rate first) vs **snowball** (smallest balance first), with the interest difference for a given extra monthly amount |
+| C14 | **Credit-card payoff / minimum-due trap** | Statement balance, minimum due, monthly rate (user-entered, never assumed), planned payment | Months to clear and total interest when paying only the minimum, vs paying a fixed amount or the full balance. The interest model is stated on the screen. |
+| C15 | **Card annual fee: worth it?** | Annual fee, waiver spend threshold, spend on the card, rewards earned and your value per point | Net benefit and a verdict: worth it · not worth it · **cannot say** (shown when no point value is entered; a figure is never invented) |
 
 ### D. Investments & Savings (P4)
 
@@ -190,6 +196,10 @@ screens. Reviewed and **not** adopted:
 | D11 | Inflation / real return | Amount, inflation %, years | Future value of today's money, today's value of future money |
 | D12 | CAGR / XIRR | Start value, end value, years — or dated cashflow list | CAGR % / XIRR % |
 | D13 | Growth visualiser | (shared component) | Stacked chart: invested vs returns over time |
+| D14 | **Net worth** | List of assets (name, value, as-of date) and liabilities | Net worth, totals, and each value's age; a value older than its set staleness limit is labelled stale, not hidden |
+| D15 | **Debt-to-income** | Monthly gross income, monthly EMIs and obligations | DTI %, with the band thresholds shown and editable |
+| D16 | **Emergency fund** | Monthly essential expenses, target months (editable), liquid savings | Target amount, shortfall or surplus, months currently covered |
+| D17 | **Savings rate** | Monthly income and monthly spend (or savings) | Savings rate %, annualised amount |
 
 ### E. Tax & Salary — India (P5)
 
@@ -206,6 +216,7 @@ screens. Reviewed and **not** adopted:
 | E5 | Advance tax | Estimated annual income & tax, TDS already paid | Quarterly instalment amounts and due dates, shortfall interest (234B/C) |
 | E6 | Gratuity | Last basic+DA, years of service, covered\|not covered under Act | Gratuity payable, tax-exempt portion |
 | E7 | Freelancer / 44ADA | Gross receipts, actual expenses, other income | Presumptive vs actual-books comparison, tax under each, recommendation |
+| E8 | **Exit settlement (full and final)** | Basic, DA, retaining allowance, other allowances, joining and last working date, leave balance, notice shortfall, per-day divisor (26 / 30 / actual), leave-encashment base (basic / basic+DA / gross), recoveries | Revised wage base (including the add-back when basic+DA+retaining is under half of pay), gratuity with eligibility shown, leave encashment, notice recovery, gross settlement, exempt vs taxable portions, estimated TDS, net settlement. Every figure shows its formula and the assumption behind it; divisors and bases are editable defaults, not constants. |
 
 ### F. Personalisation & Product Metrics (P6)
 
@@ -255,6 +266,7 @@ screens. Reviewed and **not** adopted:
 | G17 | Category budgets *(not V1)* | Monthly limit per category | "₹X left" / "₹X over", stated in words and sign, not colour |
 | G18 | Manage your lists | Settings → Categories & payment methods: add, rename, hide/unhide a category, subcategory, payment mode or instrument | Changes appear in every picker immediately. Nothing is ever hard-deleted. "Restore defaults" re-adds seeded items without touching yours. |
 | G19 | Pick, don't type | Tap a field on a tape line (Category, Subcategory, Payment method, Instrument) | A picker lists recents first, then everything; typing only filters the list. A final "Add \"…\"" row creates the item in place and selects it, without leaving the entry. Entries store ids, so there are no typos or near-duplicates. |
+| G20 | **Settlement lines** | Mark a tape line as a card-bill payment or a transfer between your own accounts | Left out of every category and payment-mode total; a bill payment against a credit-card instrument reduces that card's outstanding. Never counted as spend. |
 
 **Design rule:** saving must take **two taps**. If saving a calculation is more
 effort than redoing it, nobody saves anything and the entire differentiator
@@ -292,6 +304,27 @@ fails.
 3. Reminders must **not** use exact alarms — a Play policy risk that would have
    surfaced at review.
 4. A static JSON file on a CDN gives us remote config **without** becoming a backend.
+
+### Additions imported from the earlier finance repos (2 Nov 2026)
+
+A22–A23, C12–C15, D14–D17, E8 and G20 come from reading `EMI-Calculator`, `financial-planner` and
+`credit-card-optimiser`. Tax and labour-law figures in those repos are **their research, not
+verified here**. Per the project rule, a calculator that depends on an unchecked rule does not ship.
+
+| Item | Source and its state there | Before it ships |
+|---|---|---|
+| C2 rounding rule, C13, C12 | `EMI-Calculator` `core-calc`: built in Kotlin, 73 tests. Reference check there: ₹80L at 8% for 240 months gives an EMI of ₹66,915. | Re-implement in TypeScript on `decimal.js`; reproduce that figure and the 240-row schedule as tests |
+| E8 | `EMI-Calculator` `core-calc/fnf`: built in Kotlin. Rests on the Labour Codes in force from 21 Nov 2025, whose rules were still being notified. | Every rule value goes in the rules config with a primary-source link. Verify the wage-base, gratuity and exemption rules against the Ministry of Labour and the Income Tax Act before building. |
+| C14, C15, D14–D17 | `financial-planner` catalogue and engine: specified, partly built | Plain arithmetic; thresholds and rates are inputs the user can edit |
+| A22, A23 | `EMI-Calculator` plan | UI behaviour; no external rule |
+| G20 | `financial-planner` handoff: a single-entry total overstated spending by ₹9,270 (51%) by counting a card bill payment on top of the purchases | Test: ₹10,000 of card purchases plus a ₹10,000 bill payment shows spend of ₹10,000 |
+
+Test data: `financial-planner/product-planning/27-financial-golden-test-cases.csv` has 74 cases, status
+"Specified". Treat expected values as claims to verify, not as ground truth.
+
+Not adopted (see the backlog discussion): SMS, email and statement capture, the double-entry ledger,
+ESOP/RSU tax, and the card-routing engine. Capture breaks the "no account, almost no permissions"
+promise; the others are separate products or later work.
 
 ---
 
@@ -396,7 +429,7 @@ or web version cheap.
 - [ ] Debug APK builds successfully and is installable
 - [ ] Cold start < 800 ms on device
 - [ ] Backup export → wipe → restore round-trips without data loss
-- [ ] All 99 features (sections A–G) and 14 platform items (section H) present and functional
+- [ ] All 111 features (sections A–G) and 14 platform items (section H) present and functional
 
 ## 11. Open Questions
 
@@ -413,11 +446,11 @@ or web version cheap.
 |---|---|---|
 | P1 | Working app shell + core calculator, runs in browser | Screenshots + engine unit tests. **DONE**: 395 unit tests, 42 real-browser checks, see README |
 | P1.1 | History power-ups A16–A20. Adds `memo?` and `locked?` to `HistoryEntry`; bumps `CURRENT_SCHEMA` with a migration and fixture test. The 200-cap must evict unlocked entries only (today it is `.slice(0, MAX_HISTORY)`, which would drop locked rows). | Unit tests: lock survives clear-all and the cap, locked row cannot be deleted, edit re-evaluates, invalid edit rejected, backup round-trip, v-previous fixture migrates. `e2e/smoke.mjs` extended; screenshots at 360×640 and 200% font size. |
-| P2 | All 15 everyday calculators | Unit tests + screenshots |
-| P3 | Full loan suite with amortisation tables | Tests validated against a bank EMI table |
-| P4 | Investment suite with charts | Tests validated against official scheme calculators |
-| P5 | Tax & salary with FY2026-27 rules | Tests validated against published slab examples |
-| P6 | Memory layer (notes, reminders, tapes), **spend categories + payment methods, user-managed lists and pickers (G13–G16, G18–G19)**, scenarios, NL input, export, PM pack | Tests + screenshots + reminder fires on a real device. Categories: a credit-card tape totals match the sum of its lines to the paisa; renaming or hiding a subcategory never orphans an entry; entry stays at amount + label + at most 2 taps. |
+| P2 | All 15 everyday calculators, plus Use-result-in and per-calculator drafts (A22–A23) | Unit tests + screenshots; a keypad result lands in a calculator field at full precision; closing and reopening a calculator restores its unsaved inputs |
+| P3 | Full loan suite with amortisation tables, plus runway, multi-loan portfolio, card payoff and annual-fee verdict (C12–C15) | Tests validated against a bank EMI table. ₹80L at 8% over 240 months gives ₹66,915 with exactly 240 rows and a zero closing balance. Runway rounds months down, never up. Card payoff states its interest model and never assumes a rate. |
+| P4 | Investment suite with charts, plus net worth, debt-to-income, emergency fund and savings rate (D14–D17) | Tests validated against official scheme calculators. Net worth shows each value's as-of date. |
+| P5 | Tax & salary with FY2026-27 rules, plus exit settlement (E8) | Tests validated against published slab examples. Settlement: every figure shows its formula and assumption; rule values come from the rules config with a primary-source link; the calculator does not ship until those sources are checked. |
+| P6 | Memory layer (notes, reminders, tapes), **spend categories + payment methods, user-managed lists and pickers, settlement lines (G13–G16, G18–G20)**, scenarios, NL input, export, PM pack | Tests + screenshots + reminder fires on a real device. Categories: a credit-card tape totals match the sum of its lines to the paisa; renaming or hiding a subcategory never orphans an entry; entry stays at amount + label + at most 2 taps. |
 | P7 | Rules packs, OEM reliability layer, native widgets, tile, app lock | Reminder verified firing on a Xiaomi/Realme device, not just Pixel |
 | P8 | Capacitor Android build → installable APK | Gradle build succeeds; you install and smoke-test |
 | Later | iOS target | Requires a Mac — your machine or a CI runner |

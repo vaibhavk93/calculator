@@ -50,7 +50,7 @@ that is checked in P8.
 
 | Doc | What's in it |
 |---|---|
-| [`PRD.md`](docs/PRD.md) | Full product requirements — input/output contract for all 99 calculators and features, phased build sequence, risks, definition of done |
+| [`PRD.md`](docs/PRD.md) | Full product requirements — input/output contract for all 111 calculators and features, phased build sequence, risks, definition of done |
 | [`UX-GUIDELINES.md`](docs/UX-GUIDELINES.md) | Design principles, researched good/bad practices from the category, colour and type tokens, keypad spec, accessibility rules, review checklist |
 | [`MEMORY-LAYER.md`](docs/MEMORY-LAYER.md) | The differentiator: notes, reminders, tapes. 30 mapped use cases, data model, privacy position |
 | [`GTM-STRATEGY.md`](docs/GTM-STRATEGY.md) | How this competes for #1 downloads — positioning, ASO, retention mechanics, monetisation, launch sequence, honest counter-argument |
@@ -64,13 +64,13 @@ that is checked in P8.
 
 | Section | Contents | Count |
 |---|---|---|
-| A | Core calculator engine, history, settings, theming, landscape | 21 |
+| A | Core calculator engine, history, settings, theming, landscape, use-result-in, drafts | 23 |
 | B | Everyday converters and utilities | 15 |
-| C | Loans & EMI | 11 |
-| D | Investments & savings | 13 |
-| E | Tax & salary (India) | 7 |
+| C | Loans & EMI, runway, portfolio, card payoff | 15 |
+| D | Investments & savings, net worth, DTI, emergency fund | 17 |
+| E | Tax & salary (India), exit settlement | 8 |
 | F | Personalisation + product metrics | 13 |
-| G | Memory layer — notes, reminders, tapes, spend categories, payment methods, user-managed lists | 19 |
+| G | Memory layer — notes, reminders, tapes, spend categories, payment methods, user-managed lists, settlement lines | 20 |
 | H | Platform, freshness & reliability | 14 |
 
 ## Why it's different
