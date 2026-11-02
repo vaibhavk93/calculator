@@ -31,9 +31,6 @@ const FNS: FnKey[] = [
   { label: 'e', name: 'Euler’s number', keys: ['e'] },
 ]
 
-/** Tall phones keep two past lines; short ones need every pixel for the keys. */
-const pastLinesFor = () => (window.innerHeight < 760 ? 0 : 2)
-
 /** The scientific calculator: the same input, history and settings as Calculate, with functions and memory. */
 export function ScientificScreen({ onBack }: { onBack: () => void }) {
   const press = useApp((s) => s.press)
@@ -43,7 +40,7 @@ export function ScientificScreen({ onBack }: { onBack: () => void }) {
   const memoryAdd = useApp((s) => s.memoryAdd)
   const memoryRecall = useApp((s) => s.memoryRecall)
   const memoryClear = useApp((s) => s.memoryClear)
-  const core = useCalcCore(pastLinesFor())
+  const core = useCalcCore()
   const backspace = useBackspace(press, haptics)
 
   useBackHandler(true, onBack)
@@ -68,8 +65,6 @@ export function ScientificScreen({ onBack }: { onBack: () => void }) {
         view={core.view}
         fresh={core.input.fresh}
         onCopy={() => void core.doCopy()}
-        past={core.past}
-        onPastTap={core.pickPast}
       />
 
       <div className="sci" role="group" aria-label="Functions and memory">

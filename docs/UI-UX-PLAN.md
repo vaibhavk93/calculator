@@ -26,7 +26,7 @@ sections 11 to 19). References look like **DS 9** (design system) and **UX 12** 
 | 10 | Scientific as a separate calculator | **Done** | Own screen from the top of Tools, with memory keys. Seen. Missing: Paste, Copy, Undo there (backlog 10) |
 | 11 | Keep the basic calculator very clean | **Done** | Seen |
 | 12 | "Opens on" should pick a calculator | **Built** | Settings has a picker with every calculator. Not looked at |
-| 13 | "=" is meaningless, and details are lost | **Done** | While typing the answer is dimmed and has no "=". After "=" it is full strength with "23 × 36 =". "=" again does nothing. Past lines stay above. Seen and tested |
+| 13 | "=" is meaningless, and details are lost | **Done, then changed** | While typing the answer is dimmed and has no "=". After "=" it is full strength with "23 × 36 =". "=" again does nothing. I first kept earlier calculations faded above the line; **the owner then asked for History only**, so they now appear only in the History sheet. Tested |
 | 14 | Brand name "Calc" | **Built, Phone** | Header, page title, Android app name, Settings About, backup messages. The phone still shows the old name until rebuilt. The internal storage key and backup file marker keep the old id so old data and backups still load |
 
 ### From the second message (acting on a number)
@@ -57,7 +57,7 @@ Each row is one small step a person takes. "Guideline" names the rule that gover
 | Type an operator | Bordered key, not filled | DS 9 | Done |
 | Watch the live answer | Dimmed preview, no "=" | UX 15 | Done |
 | Press "=" | Full-strength answer, "23 × 36 =", one history entry, "=" again does nothing | UX 15 | Done |
-| Start the next sum | Previous lines stay above, up to 3 (1 on short screens). Tap one to reuse its result | UX 15 | Done |
+| Start the next sum | Starts clean. The finished one is in History only, opened from the clock icon | UX 15 | Done |
 | Clear | "C" clears the current line only | UX 15 | Done |
 | Act on the answer | Chips: To list, Remind me. Appear only after "=" | UX 13, DS 12 | Done |
 | Paste a calculation | Native clipboard, "Paste here" fallback, forgiving parser, lists summed with a notice | UX 17 | Built, Phone |
@@ -133,5 +133,5 @@ Each row is one small step a person takes. "Guideline" names the rule that gover
 | UX 18 | Writing form copy |
 | UX 19 | A log of where the older text was corrected |
 
-**Unproven:** the past-lines display, summing a pasted list, hints only on focus, and Scientific living under Tools are my
+**Unproven:** summing a pasted list, hints only on focus, and Scientific living under Tools are my
 choices. They follow your feedback but have not been used for a week. Revisit after real use.

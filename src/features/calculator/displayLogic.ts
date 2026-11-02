@@ -88,26 +88,3 @@ function wordsOf(value: InstanceType<typeof D>, system: Settings['numberSystem']
   const words = magnitudeWords(value, system)
   return words ? { text: words, tone: 'info' } : null
 }
-
-/** A finished calculation shown faded above the current line. `id` is null when it is not from history. */
-export interface PastLine {
-  id: string | null
-  expression: string
-  result: string
-}
-
-/**
- * The finished calculations to show above the current line, oldest first. `source` is newest first (history, or the last commit when history is off).
- * The calculation the big number is showing right now is not repeated above it.
- */
-export function recentWork(
-  input: InputState,
-  lastExpression: string | null,
-  source: PastLine[],
-  max: number,
-): PastLine[] {
-  const newest = source[0]
-  const showingNewest = input.fresh && newest !== undefined && newest.expression === lastExpression && newest.result === input.expr
-  const skip = showingNewest ? 1 : 0
-  return source.slice(skip, skip + Math.max(0, max)).reverse()
-}

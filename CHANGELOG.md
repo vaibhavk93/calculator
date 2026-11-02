@@ -8,7 +8,7 @@ All notable changes to Calc. Dates are when the work was done.
 - Renamed to **Calc**. Operators, C, ( ), % and the utility buttons are bordered; digits stay filled; "=" stays accent.
 - The "..." and chevron panels are gone. The basic calculator is clean: Paste, Copy, Undo, Backspace.
 - **Scientific calculator** is its own screen, at the top of Tools, with memory keys.
-- Past calculations stay visible above the current line. The live answer is dimmed; "=" makes it full strength. "=" again does nothing.
+- The live answer is dimmed; "=" makes it full strength. "=" again does nothing. Earlier calculations are shown **only in History**, never on the calculator while you work.
 - **Paste works**: native clipboard on the phone, a "Paste here" sheet if reading fails, and a forgiving parser (`23*36`, `Rent 25000 + 3000`, lists are summed).
 - After "=": **To list** and **Remind me** chips.
 

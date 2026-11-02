@@ -6,7 +6,7 @@ import { useBackHandler } from '../../components/useBackHandler'
 import { parseClipboardExpression } from '../../lib/clipboard'
 import { copyText, haptic, readClipboardText } from '../../lib/device'
 import type { AppState } from '../../store/app'
-import { computeDisplay, recentWork, type PastLine } from './displayLogic'
+import { computeDisplay } from './displayLogic'
 import { useRepeatingPress } from './Keypad'
 
 /**
@@ -21,39 +21,18 @@ export function applyPaste(s: Pick<AppState, 'insertExpression' | 'showNotice'>,
   return null
 }
 
-/** Everything the basic and the scientific calculator share: the display, copy, paste, the past lines. */
-export function useCalcCore(maxPast: number) {
+/** Everything the basic and the scientific calculator share: the display, copy and paste. Finished calculations live in History only. */
+export function useCalcCore() {
   const input = useApp((s) => s.input)
   const lastExpression = useApp((s) => s.lastExpression)
   const settings = useApp((s) => s.settings)
-  const history = useApp((s) => s.history)
   const showNotice = useApp((s) => s.showNotice)
   const insertExpression = useApp((s) => s.insertExpression)
-  const insertPlain = useApp((s) => s.insertPlain)
-  const reuseResult = useApp((s) => s.reuseResult)
 
   const view = useMemo(
     () => computeDisplay(input, lastExpression, settings),
     // Only the fields the display depends on, so unrelated settings don't recompute it.
     [input, lastExpression, settings.numberSystem, settings.decimals, settings.angle],
-  )
-
-  // With history off, the last finished calculation is still worth keeping on screen.
-  const lastCommit = useRef<PastLine | null>(null)
-  if (input.fresh && lastExpression) lastCommit.current = { id: null, expression: lastExpression, result: input.expr }
-
-  const past = useMemo(() => {
-    const source: PastLine[] = settings.keepHistory
-      ? history.slice(0, maxPast + 1).map((h) => ({ id: h.id, expression: h.expression, result: h.result }))
-      : lastCommit.current
-        ? [lastCommit.current]
-        : []
-    return recentWork(input, lastExpression, source, maxPast)
-  }, [settings.keepHistory, history, input, lastExpression, maxPast])
-
-  const pickPast = useCallback(
-    (line: PastLine) => (line.id ? reuseResult(line.id) : insertPlain(line.result)),
-    [reuseResult, insertPlain],
   )
 
   const doCopy = useCallback(async () => {
@@ -71,7 +50,7 @@ export function useCalcCore(maxPast: number) {
     if (problem) showNotice(problem, 'error')
   }, [insertExpression, showNotice])
 
-  return { input, view, past, pickPast, doCopy, doPaste, pasteOpen, closePaste: () => setPasteOpen(false) }
+  return { input, view, doCopy, doPaste, pasteOpen, closePaste: () => setPasteOpen(false) }
 }
 
 /** Paste, Copy, Undo, Backspace: the row above the keypad. */

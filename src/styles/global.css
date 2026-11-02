@@ -320,54 +320,6 @@ button:disabled {
   color: var(--accent);
 }
 
-/* Finished calculations above the current line: faded, tappable, the first thing to give way. */
-.display__past {
-  flex: 0 100 auto;
-  min-height: 0;
-  width: 100%;
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.display__past::-webkit-scrollbar {
-  display: none;
-}
-
-.past {
-  width: 100%;
-  display: flex;
-  align-items: baseline;
-  gap: var(--s-3);
-  padding: 3px 0;
-  color: var(--ink-3);
-  text-align: left;
-  border-radius: var(--r-sm);
-}
-
-.past:active {
-  background: var(--key-op-pressed);
-}
-
-.past__expr {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.8125rem;
-}
-
-.past__result {
-  flex: none;
-  max-width: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: 0.9375rem;
-  font-variant-numeric: tabular-nums;
-}
-
 /* While typing, the big number is only a preview. "=" makes it the answer, at full strength. */
 .display__result[data-preview='true'] {
   color: var(--ink-3);

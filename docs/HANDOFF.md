@@ -19,7 +19,7 @@ analytics, nothing leaves the device except (later) currency rates. Visible name
 
 | Area | State | Where |
 |---|---|---|
-| Calculator: brackets, live preview, history, past lines above the current line, Paste and Copy, bordered keys | Built, tested, seen in browser | `src/features/calculator/`, `src/engine/expression/` |
+| Calculator: brackets, live preview, history (shown only from the History sheet), Paste and Copy, bordered keys | Built, tested, seen in browser | `src/features/calculator/`, `src/engine/expression/` |
 | Scientific calculator (separate screen, memory keys) | Built, seen in browser | `ScientificScreen.tsx`, opened from the top of Tools |
 | 51 calculators in 9 groups, one shared screen | Built, all open and show a result | `src/features/tools/`, `src/engine/{convert,everyday,loans,investments,tax,metrics}` |
 | Tools UI: groups, search, sticky answer bar, grouped digits, "More options", tap-the-tab-to-go-back | Built, seen in browser | `ToolsScreen.tsx`, `ToolScreen.tsx`, `groups.ts` |

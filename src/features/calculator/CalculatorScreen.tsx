@@ -6,12 +6,9 @@ import { Display } from './Display'
 import { Keypad } from './Keypad'
 import { useKeyboard } from './useKeyboard'
 
-/** Short phones keep one past line so the current one never gets squeezed. */
-const pastLinesFor = () => (window.innerHeight < 700 ? 1 : 3)
-
 export function CalculatorScreen() {
   const setOverlay = useApp((s) => s.setOverlay)
-  const core = useCalcCore(pastLinesFor())
+  const core = useCalcCore()
 
   useKeyboard(() => core.view.copyText, (s) => s.tab === 'calculate' && !s.nav.scientific)
 
@@ -31,8 +28,6 @@ export function CalculatorScreen() {
         view={core.view}
         fresh={core.input.fresh}
         onCopy={() => void core.doCopy()}
-        past={core.past}
-        onPastTap={core.pickPast}
       />
 
       {core.input.fresh && <ResultActions value={core.input.expr} />}

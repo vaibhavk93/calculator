@@ -389,10 +389,10 @@ Any finished number can become something in **one visible step**.
 | Typing | The expression, and a **dimmed** live answer with no "=" |
 | After "=" | "23 × 36 =" and the answer at full strength: "=" commits it |
 | "=" pressed again | Nothing changes. No duplicate history entry |
-| Next digit | A new calculation starts. The finished one stays above |
-| Next operator | Continues from the answer. The finished one stays above |
+| Next digit | A new calculation starts. The finished one is in History |
+| Next operator | Continues from the answer |
 | "C" | Clears the current line only |
-| Past lines | Up to 3 above (1 on screens under 700px tall), faded. Tap one to reuse its result. If history is off, the last one only |
+| Earlier calculations | **Never shown while you work.** They are in History (the clock icon) and appear only when you open it |
 
 The answer announces itself to screen readers only when it is committed.
 
@@ -445,4 +445,5 @@ Where the earlier text of this document changed on 2026-11-02, and why.
 | 4.5 motion | Count-up tween on the result | Crossfade | DS 6 says a number that animates cannot be read yet. The two documents disagreed |
 | 5.1 input | Quick-chips and sliders described as present | Marked not built | They do not exist yet |
 | 5.2 results | "Save, Share, Reset" on every result | "Save, To list". Share and Reset not built | Matches the build |
+| 15 display | *(New)* Earlier calculations faded above the current line | Removed: History only | The owner: history should show only when asked for, not while calculating |
 | 6 navigation | Tabs Calc, Tools, Saved, Reminders. 74 calculators. Favourites | Calculate, Tools, Notes, Due. 51 calculators in 9 groups | Matches the build and the owner's words |
