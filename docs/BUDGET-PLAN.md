@@ -211,12 +211,7 @@ expense    { id:"e-9", date:"2026-11-02", amount:"849.00", categoryId:"cat-deliv
 Pure functions over live entries in `src/lib/budget.ts` (no browser API, `Dec` for money, strings in storage):
 `scope(filter)`, `byCategory`, `byMode`, `byInstrument`, `trend(filter, month, 6)`.
 
-| Rule | |
-|---|---|
-| Parent total = own entries + children. Computed, never stored | No stale totals |
-| Settlements dropped before any sum | G20: ₹10,000 of purchases plus a ₹10,000 bill payment reads ₹10,000 |
-| Entry in a hidden category counts under that name; unknown id counts as Uncategorised | See D7 |
-| The month is the `YYYY-MM` of the entry date | As today |
+Rules: a parent total is computed, never stored. Settlements are dropped before any sum (G20: ₹10,000 of purchases plus a ₹10,000 bill payment reads ₹10,000). An entry in a hidden category counts under that name; an unknown id counts as Uncategorised (D7). The month is the `YYYY-MM` of the entry date, as today.
 
 ### D6. Backup compatibility
 
@@ -264,12 +259,7 @@ plan changes a built behaviour (open question 3).
 spend, the card used, and each card's rate per category. After P1 and P2 the app has the first two.
 Only the third is risky.
 
-| Store now | Why it matters later |
-|---|---|
-| Category tree + leaf on every entry | "What do I spend on Dining?" |
-| `instrumentId` and `mode` on every entry | Spend per card; UPI-on-credit often earns less or nothing |
-| Instrument `network`, `bank`, `last4`, `rewardNotes` | Identify the card; notes are the user's own words |
-| `billDay`, `dueDay` | Statement-month totals, bill reminder amounts |
+**Store now (cheap, useful on its own):** the category tree with the leaf on every entry ("what do I spend on Dining?"); `instrumentId` and `mode` on every entry (spend per card; UPI on a credit card often earns less or nothing); instrument `network`, `bank`, `last4` and the user's own `rewardNotes`; `billDay` and `dueDay` (statement-month totals, bill reminder amounts).
 
 **Store later (P6), only if the owner types rates:** `rewardRules` per instrument: category id, rate as
 a **decimal string**, unit (percent or points per ₹100), optional monthly cap, `enteredOn` date.
@@ -298,8 +288,7 @@ date. A rule older than 90 days shows "Check this rate is still right" (90 is a 
 | Subcategory | One monthly amount; counts only its own entries |
 | Every month | Same amount, as built. No rollover or per-month overrides (left out in ROADMAP) |
 | Child limits sum above the parent's | Allowed with a note: "Subcategory limits add up to ₹16,000, above the Food limit of ₹15,000." Never blocked |
-| Parent has no limit, child does | Allowed |
-| Limit below what is already spent | Allowed; shows over at once |
+| Parent has none but child does; limit below what is spent | Both allowed; the second shows over at once |
 
 **Alert wording** (in words, never colour alone; computed on exact decimals, so 99.6% never says "reached"):
 
@@ -309,7 +298,7 @@ date. A rule older than 90 days shows "Check this rate is still right" (90 is a 
 | Close | 80% up to the limit | "Close to the limit: ₹800 left of ₹15,000" |
 | Reached | spent equals limit | "Limit reached" |
 | Over | spent above limit | "Over by ₹400" |
-| Pace | limit set, days left, money left | "₹620 a day for the next 20 days" (not shown if left is zero or less) |
+| Pace | limit, days and money left | "₹620 a day for the next 20 days" (not shown if left is zero or less) |
 
 Shown on rows, in "Needs attention" on the home, and as a one-line snack after saving an entry that
 crosses 80% or 100% ("Food is now ₹400 over its limit"), once per crossing per month. **No push
@@ -337,8 +326,7 @@ Each rule is enforced in the store **and** again in `sanitize` on load and impor
 | Instrument name | 1 to 30; unique among live instruments of the same kind, ignoring case; at most 30 instruments | "You already have a card named that" / "Hide one you no longer use" |
 | Kind, network | Kind required. Network optional, needed for a credit card on UPI | "Pick what this is" |
 | Last four | Blank or exactly 4 digits. Longer is **refused, not shortened** | "Enter only the last 4 digits. Calc never keeps a full card number" |
-| Bank | At most 30 | |
-| Reward notes | At most 300; a run of 13 or more digits refused | "Remove the long number. Calc does not store card numbers" |
+| Bank, reward notes | Bank at most 30. Notes at most 300; a run of 13 or more digits refused | "Remove the long number. Calc does not store card numbers" |
 | Bill day, due day | Whole number 1 to 31 or blank | "Enter a day from 1 to 31" |
 | Import and load | Duplicate ids dropped; unknown references null; wrong types dropped; sizes capped | Silent, with a count shown if anything was dropped |
 
@@ -360,11 +348,9 @@ that changes a screen also needs the browser pass with screenshots. **`e2e/smoke
 | **P5** | **Settlements and card outstanding.** "Card bill payment" entry; outstanding = charges minus payments; `billDay`/`dueDay` for a statement-month view and a pre-filled bill reminder (A1) | M | P1, P2 | G20 test; statement-month sum equals its lines | **Unproven**; depends on open question 1 |
 | **P6** | **Rewards helper.** User-entered `rewardRules`; "best card for this category" with entry dates and a stale warning | L | P2, a month of card data | Cap and rate maths; no suggestion without a rule | **Unproven and risky.** Start only after the owner has typed rates for two cards by hand |
 
-**Order:** P0, P1, P2, P3; then P4 and P5 in either order; P6 last. **Cut line:** P0 to P3 is the
-feature described; P4 to P6 are separate decisions.
+**Order:** P0 to P3, then P4 and P5 in either order, P6 last. P0 to P3 is the feature described; P4 to P6 are separate decisions.
 
-**Note:** `CLAUDE.md` says nothing since the UI revamp has run on a device. Put the current Budget on
-the phone (ROADMAP stage B) before P3, or P3 is built on a guess.
+**Note:** nothing since the UI revamp has run on a device (`CLAUDE.md`). Put Budget on the phone (ROADMAP stage B) before P3.
 
 ---
 
@@ -386,33 +372,13 @@ the phone (ROADMAP stage B) before P3, or P3 is built on a guess.
 
 ## Sources
 
-**Indian apps (low to medium confidence):** [Paytm spend summary](https://paytm.com/blog/payments/paytm-introduces-automatic-spend-categorization-and-monthly-spend-summary-for-smarter-expense-tracking) ·
-[Paytm monthly tracking](https://paytm.com/blog/payments/how-to-track-your-monthly-expenses-with-paytm) ·
-[PhonePe history (Hans India)](https://www.thehansindia.com/business/tips-for-managing-finances-effectively-using-phonepe-transaction-history-850763) ·
-[Ask Google Pay (Tech2)](https://www.tech2.com/apps/google-pay-gets-a-gemini-powered-chatbot-for-spending-insights-in-india-text-10240689.html) ·
-[Google Pay 2020 review](https://www.crowdfundinsider.com/2021/01/170868-google-pay-users-in-india-can-easily-review-analyze-all-transactions-from-2020-apple-pay-support-rolled-out-at-ny-subway-stations/) ·
-[Indian card spend tools incl. CRED](https://cardtrail.pages.dev/rewards/credit-card-spend-analysis-india) ·
-[SBI Card Spend Analyzer](https://www.cardexpert.in/sbicard-spend-analyzer/) ·
-[Walnut (Inc42)](https://inc42.com/startups/walnut) ·
-[Fold (App Store)](https://apps.apple.com/in/app/id1626994334)
+**Indian apps (low to medium confidence):** [Paytm spend summary](https://paytm.com/blog/payments/paytm-introduces-automatic-spend-categorization-and-monthly-spend-summary-for-smarter-expense-tracking) · [Paytm monthly tracking](https://paytm.com/blog/payments/how-to-track-your-monthly-expenses-with-paytm) · [PhonePe history (Hans India)](https://www.thehansindia.com/business/tips-for-managing-finances-effectively-using-phonepe-transaction-history-850763) · [Ask Google Pay (Tech2)](https://www.tech2.com/apps/google-pay-gets-a-gemini-powered-chatbot-for-spending-insights-in-india-text-10240689.html) · [Google Pay 2020 review](https://www.crowdfundinsider.com/2021/01/170868-google-pay-users-in-india-can-easily-review-analyze-all-transactions-from-2020-apple-pay-support-rolled-out-at-ny-subway-stations/) · [Indian card spend tools incl. CRED](https://cardtrail.pages.dev/rewards/credit-card-spend-analysis-india) · [SBI Card Spend Analyzer](https://www.cardexpert.in/sbicard-spend-analyzer/) · [Walnut (Inc42)](https://inc42.com/startups/walnut) · [Fold (App Store)](https://apps.apple.com/in/app/id1626994334)
 
-**Global apps:** [Monarch Using Reports](https://help.monarch.com/hc/en-us/articles/21846787088916-Using-Reports) ·
-[Monarch Cash Flow](https://help.monarch.com/hc/en-us/articles/20504904768020-Cash-Flow) ·
-[YNAB dictionary](https://www.ynab.com/the-ynab-dictionary-for-budgeting) ·
-[YNAB Spending Trends](https://support.ynab.com/en_us/spending-trends-H1inlhzAc.md) ·
-[Money Manager](https://apps.apple.com/app/id560481810) ·
-[Spendee all-wallets budgets](https://medium.com/spendee/introducing-all-wallets-budgets-1f7ccf55b9d3) ·
-[Spendee review (alerts, labels)](https://theworkmaster.blogspot.com/2024/01/spendee-review.html) ·
-[Mint shutdown (NerdWallet)](https://www.nerdwallet.com/article/finance/mint-app-closing-what-it-means-how-to-pick-a-new-budget-service) ·
-[Splitwise](https://apps.apple.com/us/app/splitwise/id458023433) ·
-[Zoho Expense Android analytics](https://www.zoho.com/us/expense/kb/android/analytical-reports/)
+**Global apps:** [Monarch Using Reports](https://help.monarch.com/hc/en-us/articles/21846787088916-Using-Reports) · [Monarch Cash Flow](https://help.monarch.com/hc/en-us/articles/20504904768020-Cash-Flow) · [YNAB dictionary](https://www.ynab.com/the-ynab-dictionary-for-budgeting) · [YNAB Spending Trends](https://support.ynab.com/en_us/spending-trends-H1inlhzAc.md) · [Money Manager](https://apps.apple.com/app/id560481810) · [Spendee all-wallets budgets](https://medium.com/spendee/introducing-all-wallets-budgets-1f7ccf55b9d3) · [Spendee review (alerts, labels)](https://theworkmaster.blogspot.com/2024/01/spendee-review.html) · [Mint shutdown (NerdWallet)](https://www.nerdwallet.com/article/finance/mint-app-closing-what-it-means-how-to-pick-a-new-budget-service) · [Splitwise](https://apps.apple.com/us/app/splitwise/id458023433) · [Zoho Expense Android analytics](https://www.zoho.com/us/expense/kb/android/analytical-reports/)
 
-**RuPay on UPI:** [NPCI operating circular](https://www.npci.org.in/PDF/npci/rupay/2022/Operating-circular-for-RuPay-Credit-Cards-linked-to-UPI.pdf) ·
-[Razorpay](https://razorpay.com/docs/payments/payment-methods/upi/cc-on-upi/)
+**RuPay on UPI:** [NPCI operating circular](https://www.npci.org.in/PDF/npci/rupay/2022/Operating-circular-for-RuPay-Credit-Cards-linked-to-UPI.pdf) · [Razorpay](https://razorpay.com/docs/payments/payment-methods/upi/cc-on-upi/)
 
-**Reward terms change:** [CardTrail devaluation 2025](https://cardtrail.pages.dev/rewards/reward-devaluation-hdfc-axis-icici-2025) ·
-[Business Today 2026](https://www.businesstoday.in/personal-finance/banking/story/credit-card-rewards-reset-hdfc-sbi-axis-tighten-benefits-spend-linked-perks-take-centre-stage-524485-2026-04-07) ·
-[Business Standard on SBI](https://www.business-standard.com/finance/personal-finance/sbi-card-reduces-reward-points-on-simplyclick-and-other-credit-cards-125031900403_1.html)
+**Reward terms change:** [CardTrail devaluation 2025](https://cardtrail.pages.dev/rewards/reward-devaluation-hdfc-axis-icici-2025) · [Business Today 2026](https://www.businesstoday.in/personal-finance/banking/story/credit-card-rewards-reset-hdfc-sbi-axis-tighten-benefits-spend-linked-perks-take-centre-stage-524485-2026-04-07) · [Business Standard on SBI](https://www.business-standard.com/finance/personal-finance/sbi-card-reduces-reward-points-on-simplyclick-and-other-credit-cards-125031900403_1.html)
 
 ---
 
@@ -431,5 +397,4 @@ the phone (ROADMAP stage B) before P3, or P3 is built on a guess.
 2. **Track card bill payments and refunds now?** Without a "bill payment" entry type, logging both purchases and the payment double counts. Without refunds, a returned item cannot be taken off. Both change the entry sheet.
 3. **Is "delete becomes hide and keep the name" right?** Today deleting a category makes its entries "Uncategorised" and moves old totals. The plan keeps old totals and offers "Move entries" as a choice.
 
-*No critic pass was run: the owner asked for these features, and the risky parts (P5, P6, deletion
-behaviour) are labelled and gated.*
+*No critic pass was run: the owner asked for these features; risky parts (P5, P6, deletion) are labelled and gated.*

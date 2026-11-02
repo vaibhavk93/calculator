@@ -1,5 +1,6 @@
 import { useCallback, useState, type ReactNode } from 'react'
 import { copyText } from '../lib/device'
+import { Icon } from './Icon'
 import { Sheet } from './Sheet'
 import { useApp } from './StoreProvider'
 
@@ -20,6 +21,8 @@ interface Pending {
 export function useCopyAs(): { copy: (withCommas: string, without?: string) => Promise<void>; sheet: ReactNode } {
   const format = useApp((s) => s.settings.copyFormat)
   const showNotice = useApp((s) => s.showNotice)
+  const updateSettings = useApp((s) => s.updateSettings)
+  const [remember, setRemember] = useState(false)
   const [pending, setPending] = useState<Pending | null>(null)
 
   const write = useCallback(
@@ -39,23 +42,33 @@ export function useCopyAs(): { copy: (withCommas: string, without?: string) => P
     [format, write],
   )
 
-  const pick = (text: string) => {
+  const pick = (text: string, choice: 'with' | 'without') => {
     setPending(null)
+    if (remember) updateSettings({ copyFormat: choice })
     void write(text)
   }
 
   const sheet = pending && (
     <Sheet title="Copy as" onClose={() => setPending(null)}>
-      <div className="copyas">
-        <button type="button" className="copyas__opt" onClick={() => pick(pending.withCommas)}>
-          <span className="copyas__name">With commas</span>
-          <span className="copyas__text">{pending.withCommas}</span>
+      <div className="copyas" role="group" aria-label="Copy as">
+        <button type="button" className="copyas__opt" onClick={() => pick(pending.withCommas, 'with')}>
+          <span className="copyas__text">
+            <span className="copyas__name">With commas</span>
+            <span className="copyas__sample">{pending.withCommas}</span>
+          </span>
+          <Icon name="copy" size={18} />
         </button>
-        <button type="button" className="copyas__opt" onClick={() => pick(pending.without)}>
-          <span className="copyas__name">Without commas</span>
-          <span className="copyas__text">{pending.without}</span>
+        <button type="button" className="copyas__opt" onClick={() => pick(pending.without, 'without')}>
+          <span className="copyas__text">
+            <span className="copyas__name">Without commas</span>
+            <span className="copyas__sample">{pending.without}</span>
+          </span>
+          <Icon name="copy" size={18} />
         </button>
-        <p className="copyas__tip">Change the default in Settings, Copying numbers.</p>
+        <label className="copyas__remember">
+          <span>Use this choice every time</span>
+          <button type="button" role="switch" aria-checked={remember} aria-label="Use this choice every time" className="toggle" onClick={() => setRemember(!remember)} />
+        </label>
       </div>
     </Sheet>
   )

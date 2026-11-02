@@ -24,6 +24,9 @@ Capacitor for the stores. **Read the docs before writing code.**
 | How each formula was checked | `docs/VERIFICATION.md` |
 | UX audit and the screen-by-screen plan | `docs/UX-AUDIT.md`, `docs/UI-UX-PLAN.md`, `docs/TOOLS-UX-REVIEW.md` |
 | The logo and icon rules | `docs/BRAND.md` |
+| Forms, pickers, sheets, validation, back navigation, headings (**follow for every new input or pop-up**) | `docs/FORMS-AND-SHEETS.md` |
+| Budget: what is built, Spend Summary, payment methods, phases | `docs/BUDGET-PLAN.md` |
+| Notes + To-do plan | `docs/NOTES-TODO-PLAN.md` |
 
 ## Commands
 
@@ -87,6 +90,7 @@ Do not work around it.
   ship until a primary source is checked. A missing calculator is recoverable; a confidently
   wrong tax figure is not.
 
+- **The system back button is never required.** Every screen has a visible Back and every sheet a close (X) at the top right; the one main action of a sheet is a footer button, never in the header. Never use a native `<select>` (use `PickerSelect`); mark required fields with `*` (`FormField`). Details: `docs/FORMS-AND-SHEETS.md`.
 - A screen with a "back" calls `useBackHandler`; tapping the tab you are on resets it (`tabTap`). Android back is a stack (`src/lib/backStack.ts`).
 - `npx cap sync android` after any web or plugin change, or the phone gets an old app. The company proxy (Zscaler) breaks Java HTTPS: `docs/BUILD-ANDROID.md` section 3.
 

@@ -972,45 +972,65 @@ textarea.field {
   text-align: right;
 }
 
-/* Copy as: two big options that show the text you would get. */
+/* Copy as: two compact rows showing the text you would get, and a switch to remember the choice. */
 .copyas {
   display: flex;
   flex-direction: column;
-  gap: var(--s-2);
 }
 
 .copyas__opt {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
   min-height: 56px;
-  padding: var(--s-2) var(--s-3);
-  border: 1px solid var(--ink-3);
-  border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-1);
+  border-bottom: 1px solid var(--line);
   text-align: left;
+  color: var(--ink);
+}
+
+.copyas__opt:active {
+  background: var(--key-op-pressed);
+}
+
+.copyas__opt .icon {
+  flex: none;
+  color: var(--accent);
+}
+
+.copyas__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .copyas__name {
   font-size: 0.8125rem;
+  font-weight: 500;
   color: var(--ink-2);
 }
 
-.copyas__text {
-  max-width: 100%;
+.copyas__sample {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 1.0625rem;
+  font-size: 1rem;
   overflow-wrap: anywhere;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   white-space: pre-line;
 }
 
-.copyas__tip {
-  margin: var(--s-1) 0 0;
-  font-size: 0.8125rem;
-  color: var(--ink-3);
+.copyas__remember {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  min-height: 52px;
+  padding: 0 var(--s-1);
+  font-size: 0.875rem;
+  color: var(--ink-2);
 }
+

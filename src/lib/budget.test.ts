@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { categoryName, cleanInstrument, dayKey, eligibleInstruments, instrumentFitsMode, modeLabel, monthKey, paymentError, shiftMonth, suggestFor, summarise, PAYMENT_MODES } from './budget'
+import { D } from '../engine'
+import { CLOSE_AT, categoryName, compareLastMonth, dailyAverage, daysInMonth, limitState, needsAttention, paceLeft, sharePercent, spentIn, topEntries, trend, cleanInstrument, dayKey, eligibleInstruments, instrumentFitsMode, modeLabel, monthKey, paymentError, shiftMonth, suggestFor, summarise, PAYMENT_MODES } from './budget'
+import { validateAmount, validateCategoryName, validateDate, validateExpense, validateInstrumentDraft, validateLimit } from './budget'
 import type { BudgetData, PayInstrument } from './budget'
 
 const cat = (id: string, limit: string | null = null, deletedAt: number | null = null, parentId: string | null = null) => ({ id, name: id, limit, parentId, deletedAt })
@@ -277,5 +279,204 @@ describe('summaries by instrument, network and filter', () => {
     const n = (instrumentId: string | null, mode: 'upi' | 'credit') => ({ ...e('x', '1', mode, instrumentId), note: 'fuel' })
     expect(suggestFor({ ...b, expenses: [n('neo', 'upi')] }, 'fuel')!.instrumentId).toBe('neo')
     expect(suggestFor({ ...b, expenses: [n('old', 'credit')] }, 'fuel')!.instrumentId).toBeNull()
+  })
+})
+
+describe('spend summary maths', () => {
+  const ex = (id: string, date: string, amount: string, categoryId: string | null = null, mode: 'upi' | 'credit' | null = null, instrumentId: string | null = null) => ({ id, date, amount, categoryId, mode, instrumentId, note: '', deletedAt: null })
+  const b: BudgetData = {
+    overall: null,
+    instruments: [{ id: 'c1', name: 'Card', kind: 'credit', network: 'rupay', bank: '', last4: '', rewardNote: '', deletedAt: null }],
+    categories: [cat('food', '100'), cat('eat', '50', null, 'food')],
+    expenses: [
+      ex('a', '2026-11-02', '0.1', 'eat'),
+      ex('b', '2026-11-20', '0.2', 'food', 'credit', 'c1'),
+      ex('c', '2026-10-01', '10', 'food'),
+      ex('d', '2026-10-21', '5', 'food', 'upi', 'c1'),
+      ex('e', '2026-10-20', '5', 'food'),
+    ],
+  }
+  const today = new Date(2026, 10, 20)
+  it('sums exactly, up to a day, with a filter', () => {
+    expect(spentIn(b, '2026-11').toString()).toBe('0.3')
+    expect(spentIn(b, '2026-11', {}, 10).toString()).toBe('0.1')
+    expect(spentIn(b, '2026-10', { kind: 'credit' }).toString()).toBe('5')
+    expect(spentIn(b, '2026-11', { kind: 'debit' }).toString()).toBe('0')
+  })
+  it('trend is oldest first and ends at the month', () => {
+    expect(trend(b, '2026-11', 3).map((t) => [t.month, t.spent.toString()])).toEqual([['2026-09', '0'], ['2026-10', '20'], ['2026-11', '0.3']])
+  })
+  it('daily average: today for this month, all days for a past one, none for the future', () => {
+    expect(dailyAverage(new D(40), '2026-11', today)).toMatchObject({ days: 20 })
+    expect(dailyAverage(new D(30), '2026-10', today)!.days).toBe(31)
+    expect(dailyAverage(new D(30), '2026-12', today)).toBeNull()
+    expect(daysInMonth('2026-02')).toBe(28)
+  })
+  it('compares the same days last month, not the whole month', () => {
+    const c = compareLastMonth(b, '2026-11', today)!
+    expect(c.throughDay).toBe(20)
+    expect(c.previous.toString()).toBe('15') // 1 Oct + 20 Oct + not 21 Oct
+    expect(c.diff.toString()).toBe('-14.7')
+    expect(c.pct).toBe(-98)
+    expect(compareLastMonth(b, '2026-10', today)!.previous.toString()).toBe('0')
+    expect(compareLastMonth(b, '2026-10', today)!.pct).toBeNull()
+    expect(compareLastMonth(b, '2026-12', today)).toBeNull()
+  })
+  it('topEntries: biggest first, ties newest first', () => {
+    expect(topEntries(b.expenses, 3).map((e) => e.id)).toEqual(['c', 'd', 'e'])
+  })
+  it('share percent and limit states are exact at the edges', () => {
+    expect(sharePercent(new D(1), new D(3))).toBe(33)
+    expect(sharePercent(new D(1), new D(0))).toBe(0)
+    expect(CLOSE_AT).toBe(0.8)
+    expect(limitState(new D('79.99'), new D(100))).toBe('fine')
+    expect(limitState(new D(80), new D(100))).toBe('close')
+    expect(limitState(new D('99.99'), new D(100))).toBe('close')
+    expect(limitState(new D(100), new D(100))).toBe('reached')
+    expect(limitState(new D('100.01'), new D(100))).toBe('over')
+  })
+  it('needs attention lists parents and subcategories at 80% or more, worst first', () => {
+    const s = summarise({ ...b, expenses: [ex('x', '2026-11-02', '45', 'eat'), ex('y', '2026-11-03', '50', 'food')] }, '2026-11')
+    expect(needsAttention(s.lines).map((i) => [i.name, i.state])).toEqual([['food', 'close'], ['food › eat', 'close']])
+  })
+  it('pace only for this month with money left', () => {
+    expect(paceLeft(new D(110), '2026-11', today)).toMatchObject({ days: 11 })
+    expect(paceLeft(new D(0), '2026-11', today)).toBeNull()
+    expect(paceLeft(new D(10), '2026-10', today)).toBeNull()
+  })
+})
+
+describe('validateAmount and validateLimit', () => {
+  it('needs a number above zero', () => {
+    for (const bad of ['', ' ', '0', '0.00', 'abc', '-5', '1e3', '.', '1.2.3']) expect(validateAmount(bad), bad).toBe('Enter an amount above zero')
+    for (const ok of ['1', '0.01', '1,50,000', '₹ 99.5', '.5', '5.']) expect(validateAmount(ok), ok).toBeNull()
+  })
+  it('allows 2 decimals at most, but trailing zeros are fine', () => {
+    expect(validateAmount('1.234')).toBe('Use up to 2 decimal places')
+    expect(validateAmount('1.500')).toBeNull()
+  })
+  it('stops at 10 crore exactly', () => {
+    expect(validateAmount('100000000')).toBeNull()
+    expect(validateAmount('100000000.01')).toBe("Amount can't be more than ₹10 crore")
+  })
+  it('a limit may be empty, otherwise follows the same rules', () => {
+    expect(validateLimit('')).toBeNull()
+    expect(validateLimit('0')).toBe('Enter a limit above zero, or leave it empty')
+    expect(validateLimit('abc')).toBe('Enter a limit above zero, or leave it empty')
+    expect(validateLimit('1.234')).toBe('Use up to 2 decimal places')
+    expect(validateLimit('100000001')).toBe("A limit can't be more than ₹10 crore")
+    expect(validateLimit('5000')).toBeNull()
+  })
+})
+
+describe('validateDate', () => {
+  const today = new Date(2026, 10, 2) // 2 Nov 2026
+  it('needs a real calendar day', () => {
+    for (const bad of ['', '2026-13-01', '2026-02-30', '26-11-02', 'today']) expect(validateDate(bad, today), bad).toBe('Pick a date')
+    expect(validateDate('2028-02-29', new Date(2027, 5, 1))).toBeNull() // a real leap day
+  })
+  it('does not go before 2000', () => {
+    expect(validateDate('1999-12-31', today)).toBe('Pick a date from the year 2000 onward')
+    expect(validateDate('2000-01-01', today)).toBeNull()
+  })
+  it('allows up to one year ahead, no more', () => {
+    expect(validateDate('2027-11-02', today)).toBeNull()
+    expect(validateDate('2027-11-03', today)).toBe('That date is in the far future')
+    expect(validateDate('2026-11-02', today)).toBeNull()
+  })
+})
+
+describe('validateExpense', () => {
+  const today = new Date(2026, 10, 2)
+  const b: BudgetData = {
+    overall: null,
+    categories: [cat('food'), cat('swiggy', null, null, 'food'), cat('gone', null, 5), cat('orphan', null, null, 'gone')],
+    instruments: [{ id: 'sbi', name: 'SBI', kind: 'bank', network: null, bank: '', last4: '', rewardNote: '', deletedAt: null }],
+    expenses: [],
+  }
+  const ok = { amount: '100', date: '2026-11-02', categoryId: 'food', mode: 'upi' as const, instrumentId: 'sbi' }
+  it('a good entry has no errors', () => expect(validateExpense(ok, b, today)).toEqual({}))
+  it('reports each field on its own', () => {
+    expect(validateExpense({ ...ok, amount: '0', date: 'x' }, b, today)).toEqual({ amount: 'Enter an amount above zero', date: 'Pick a date' })
+  })
+  it('refuses a deleted category, or a subcategory whose parent was deleted; accepts a live subcategory and none', () => {
+    expect(validateExpense({ ...ok, categoryId: 'gone' }, b, today).category).toBe('Pick a category from the list')
+    expect(validateExpense({ ...ok, categoryId: 'orphan' }, b, today).category).toBe('Pick a category from the list')
+    expect(validateExpense({ ...ok, categoryId: 'nope' }, b, today).category).toBe('Pick a category from the list')
+    expect(validateExpense({ ...ok, categoryId: 'swiggy' }, b, today)).toEqual({})
+    expect(validateExpense({ ...ok, categoryId: null }, b, today)).toEqual({})
+  })
+  it('refuses a card that does not fit the mode', () => {
+    expect(validateExpense({ ...ok, mode: 'credit' }, b, today).paidWith).toBe('Pick a credit card for Credit card')
+    expect(validateExpense({ ...ok, mode: null }, b, today).paidWith).toBe('Pick how it was paid first')
+    expect(validateExpense({ ...ok, mode: 'cash', instrumentId: null }, b, today)).toEqual({})
+  })
+})
+
+describe('validateCategoryName', () => {
+  const b: BudgetData = {
+    overall: null,
+    instruments: [],
+    expenses: [],
+    categories: [cat('Food'), cat('Travel'), cat('Swiggy', null, null, 'Food'), cat('Old', null, 9)],
+  }
+  it('needs a name of 1 to 40 characters', () => {
+    expect(validateCategoryName('  ', b)).toBe('Give it a name')
+    expect(validateCategoryName('x'.repeat(41), b)).toBe("Name can't be more than 40 characters")
+    expect(validateCategoryName('x'.repeat(40), b)).toBeNull()
+  })
+  it('keeps "Uncategorised" for entries with no category', () => {
+    expect(validateCategoryName('uncategorised', b)).toBe('That name is kept for entries with no category')
+  })
+  it('refuses a duplicate among siblings only, ignoring case and deleted ones', () => {
+    expect(validateCategoryName('food', b)).toBe('That name is already used here')
+    expect(validateCategoryName('swiggy', b, 'Food')).toBe('That name is already used here')
+    expect(validateCategoryName('Swiggy', b, 'Travel')).toBeNull()
+    expect(validateCategoryName('Old', b)).toBeNull()
+  })
+  it('a rename may keep its own name', () => expect(validateCategoryName('Food', b, null, 'Food')).toBeNull())
+  it('subcategories go under a live top-level category only, up to 12', () => {
+    expect(validateCategoryName('X', b, 'Swiggy')).toBe("Subcategories can't have their own subcategories")
+    expect(validateCategoryName('X', b, 'Old')).toBe('That category was removed')
+    const many: BudgetData = { ...b, categories: [cat('Food'), ...Array.from({ length: 12 }, (_, i) => cat(`s${i}`, null, null, 'Food'))] }
+    expect(validateCategoryName('Thirteenth', many, 'Food')).toBe('A category can have up to 12 subcategories')
+    expect(validateCategoryName('s0', many, 'Food', 's0')).toBeNull()
+  })
+  it('caps all categories at 60', () => {
+    const full: BudgetData = { ...b, categories: Array.from({ length: 60 }, (_, i) => cat(`c${i}`)) }
+    expect(validateCategoryName('One more', full)).toBe('You can have up to 60 categories')
+  })
+})
+
+describe('validateInstrumentDraft', () => {
+  const inst = (id: string, name: string, kind: PayInstrument['kind'], deletedAt: number | null = null): PayInstrument => ({ id, name, kind, network: null, bank: '', last4: '', rewardNote: '', deletedAt })
+  const b = { instruments: [inst('a', 'Tata Neo', 'credit'), inst('b', 'Gone', 'credit', 3)] }
+  it('needs a kind and a name', () => {
+    expect(validateInstrumentDraft({ name: '', kind: null }, b)).toEqual({ kind: 'Pick what this is', name: 'Give it a name' })
+    expect(validateInstrumentDraft({ name: 'x'.repeat(41), kind: 'bank' }, b).name).toBe("Name can't be more than 40 characters")
+  })
+  it('refuses a name already used for the same kind, not another kind, not a deleted one', () => {
+    expect(validateInstrumentDraft({ name: 'tata neo', kind: 'credit' }, b).name).toBe('You already have one with that name')
+    expect(validateInstrumentDraft({ name: 'Tata Neo', kind: 'debit' }, b)).toEqual({})
+    expect(validateInstrumentDraft({ name: 'Gone', kind: 'credit' }, b)).toEqual({})
+    expect(validateInstrumentDraft({ name: 'Tata Neo', kind: 'credit' }, b, 'a')).toEqual({})
+  })
+  it('last four is blank or exactly four digits; a longer number is refused, not shortened', () => {
+    expect(validateInstrumentDraft({ name: 'x', kind: 'bank', last4: '' }, b)).toEqual({})
+    expect(validateInstrumentDraft({ name: 'x', kind: 'bank', last4: '4321' }, b)).toEqual({})
+    expect(validateInstrumentDraft({ name: 'x', kind: 'bank', last4: '123' }, b).last4).toBe('Last 4 digits must be exactly 4 numbers')
+    expect(validateInstrumentDraft({ name: 'x', kind: 'bank', last4: '12ab' }, b).last4).toBe('Last 4 digits must be exactly 4 numbers')
+    expect(validateInstrumentDraft({ name: 'x', kind: 'bank', last4: '4111111111111111' }, b).last4).toBe('Enter only the last 4 digits. Calc never keeps a full card number')
+    expect(cleanInstrument({ name: 'x', kind: 'bank', last4: '4111111111111111' }).ok).toBe(false)
+  })
+  it('limits the bank and the reward notes, and refuses a long number in the notes', () => {
+    expect(validateInstrumentDraft({ name: 'x', kind: 'bank', bank: 'b'.repeat(41) }, b).bank).toBe("Bank can't be more than 40 characters")
+    expect(validateInstrumentDraft({ name: 'x', kind: 'bank', rewardNote: 'n'.repeat(201) }, b).rewardNote).toBe("Notes can't be more than 200 characters")
+    expect(validateInstrumentDraft({ name: 'x', kind: 'bank', rewardNote: '5% on dining, 4111 1111 1111 1111' }, b).rewardNote).toBe('Remove the long number. Calc does not store card numbers')
+    expect(validateInstrumentDraft({ name: 'x', kind: 'bank', rewardNote: '5% on dining, cap 1500 a month' }, b)).toEqual({})
+  })
+  it('caps the number of cards at 40', () => {
+    const full = { instruments: Array.from({ length: 40 }, (_, i) => inst(`i${i}`, `Card ${i}`, 'debit')) }
+    expect(validateInstrumentDraft({ name: 'One more', kind: 'debit' }, full).name).toContain('up to 40')
   })
 })

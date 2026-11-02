@@ -114,22 +114,152 @@ export interface InstrumentDraft {
   rewardNote?: string
 }
 
+export const MAX_BANK_NAME = 40
+export const MAX_SUBCATEGORIES = 12
+export const MAX_CATEGORY_NAME = 40
+export const MAX_NOTE = 200
+/** Most one entry may be: ₹10 crore. */
+export const MAX_AMOUNT = '100000000'
+export const MIN_DATE = '2000-01-01'
+
+export interface InstrumentErrors {
+  kind?: string
+  name?: string
+  bank?: string
+  last4?: string
+  rewardNote?: string
+}
+
+/** What a field check can say. Each message names the fix. Null means the value is fine. */
+const moneyProblem = (text: string, optional: boolean): string | null => {
+  const clean = text.replace(/[,₹\s]/g, '')
+  const what = optional ? 'Enter a limit above zero, or leave it empty' : 'Enter an amount above zero'
+  if (clean === '' && optional) return null
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(clean)) return what
+  const v = new D(clean)
+  if (v.isZero()) return what
+  if (v.decimalPlaces() > 2) return 'Use up to 2 decimal places'
+  if (v.gt(MAX_AMOUNT)) return optional ? "A limit can't be more than ₹10 crore" : "Amount can't be more than ₹10 crore"
+  return null
+}
+
+/** An amount for an entry: required, above zero, 2 decimals at most, up to ₹10 crore. */
+export const validateAmount = (text: string): string | null => moneyProblem(text, false)
+
+/** A monthly limit: empty means none, otherwise the same rules as an amount. */
+export const validateLimit = (text: string): string | null => moneyProblem(text, true)
+
+/** A real calendar day, from 2000-01-01 to one year after `today`. */
+export function validateDate(date: string, today: Date = new Date()): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
+  if (!m) return 'Pick a date'
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  const real = new Date(y, mo - 1, d)
+  if (real.getFullYear() !== y || real.getMonth() !== mo - 1 || real.getDate() !== d) return 'Pick a date'
+  if (date < MIN_DATE) return 'Pick a date from the year 2000 onward'
+  if (date > dayKey(new Date(today.getFullYear() + 1, today.getMonth(), today.getDate()))) return 'That date is in the far future'
+  return null
+}
+
+export interface ExpenseErrors {
+  amount?: string
+  date?: string
+  category?: string
+  paidWith?: string
+}
+
+/** Every problem with an entry, by field. An empty object means it can be saved. The store checks again before saving. */
+export function validateExpense(
+  d: { amount: string; date: string; categoryId: string | null; mode: PaymentModeId | null; instrumentId: string | null },
+  budget: Pick<BudgetData, 'categories' | 'instruments'>,
+  today: Date = new Date(),
+): ExpenseErrors {
+  const out: ExpenseErrors = {}
+  const amount = validateAmount(d.amount)
+  if (amount) out.amount = amount
+  const date = validateDate(d.date, today)
+  if (date) out.date = date
+  if (d.categoryId !== null) {
+    const c = budget.categories.find((x) => x.id === d.categoryId && x.deletedAt === null)
+    const parentOk = !c || c.parentId === null || budget.categories.some((x) => x.id === c.parentId && x.deletedAt === null)
+    if (!c || !parentOk) out.category = 'Pick a category from the list'
+  }
+  const pay = paymentError(budget, d.mode, d.instrumentId)
+  if (pay) out.paidWith = pay
+  return out
+}
+
+/** Null when `name` can be a category name, or the reason it cannot. `selfId` is the category being renamed. */
+export function validateCategoryName(
+  name: string,
+  budget: Pick<BudgetData, 'categories'>,
+  parentId: string | null = null,
+  selfId?: string,
+): string | null {
+  const clean = name.trim()
+  if (!clean) return 'Give it a name'
+  if (clean.length > MAX_CATEGORY_NAME) return `Name can't be more than ${MAX_CATEGORY_NAME} characters`
+  if (clean.toLowerCase() === 'uncategorised') return "That name is kept for entries with no category"
+  const live = budget.categories.filter((c) => c.deletedAt === null)
+  if (parentId !== null) {
+    const parent = live.find((c) => c.id === parentId)
+    if (!parent) return 'That category was removed'
+    if (parent.parentId !== null) return "Subcategories can't have their own subcategories"
+  }
+  if (live.some((c) => c.id !== selfId && c.parentId === parentId && c.name.toLowerCase() === clean.toLowerCase())) return 'That name is already used here'
+  if (selfId === undefined && parentId !== null && live.filter((c) => c.parentId === parentId).length >= MAX_SUBCATEGORIES) {
+    return `A category can have up to ${MAX_SUBCATEGORIES} subcategories`
+  }
+  if (selfId === undefined && live.length >= MAX_CATEGORIES) return `You can have up to ${MAX_CATEGORIES} categories`
+  return null
+}
+
+/** The checks that need no other data: what is typed in the fields. */
+export function validateInstrumentFields(d: { name?: string; kind?: string | null; bank?: string; last4?: string; rewardNote?: string }): InstrumentErrors {
+  const out: InstrumentErrors = {}
+  if (!isInstrumentKind(d.kind)) out.kind = 'Pick what this is'
+  const name = String(d.name ?? '').trim()
+  if (!name) out.name = 'Give it a name'
+  else if (name.length > MAX_INSTRUMENT_NAME) out.name = `Name can't be more than ${MAX_INSTRUMENT_NAME} characters`
+  if (String(d.bank ?? '').trim().length > MAX_BANK_NAME) out.bank = `Bank can't be more than ${MAX_BANK_NAME} characters`
+  const last4 = String(d.last4 ?? '').trim()
+  if (last4 !== '' && !/^\d{4}$/.test(last4)) {
+    out.last4 = /^\d{5,}$/.test(last4) ? 'Enter only the last 4 digits. Calc never keeps a full card number' : 'Last 4 digits must be exactly 4 numbers'
+  }
+  const note = String(d.rewardNote ?? '')
+  if (note.length > MAX_REWARD_NOTE) out.rewardNote = `Notes can't be more than ${MAX_REWARD_NOTE} characters`
+  else if (/\d{13,}/.test(note.replace(/[\s-]/g, ''))) out.rewardNote = 'Remove the long number. Calc does not store card numbers'
+  return out
+}
+
+/** The field checks plus the ones that look at the other cards: a name already used for this kind, and the cap. `selfId` is the one being edited. */
+export function validateInstrumentDraft(
+  d: { name?: string; kind?: string | null; bank?: string; last4?: string; rewardNote?: string },
+  budget: Pick<BudgetData, 'instruments'>,
+  selfId?: string,
+): InstrumentErrors {
+  const out = validateInstrumentFields(d)
+  const live = budget.instruments.filter((i) => i.deletedAt === null)
+  const name = String(d.name ?? '').trim().toLowerCase()
+  if (!out.name && live.some((i) => i.id !== selfId && i.kind === d.kind && i.name.toLowerCase() === name)) out.name = 'You already have one with that name'
+  if (!out.name && selfId === undefined && live.length >= MAX_INSTRUMENTS) out.name = `You can have up to ${MAX_INSTRUMENTS} cards, accounts and wallets. Delete one you no longer use`
+  return out
+}
+
 /** Trims and checks a draft. Returns the clean fields or the reason it is not acceptable. Network is kept only for cards. */
 export function cleanInstrument(d: InstrumentDraft): { ok: true; value: Omit<PayInstrument, 'id' | 'deletedAt'> } | { ok: false; error: string } {
-  const name = String(d.name ?? '').trim().slice(0, MAX_INSTRUMENT_NAME)
-  if (!name) return { ok: false, error: 'Give it a name' }
-  if (!isInstrumentKind(d.kind)) return { ok: false, error: 'Pick what kind it is' }
-  const last4 = String(d.last4 ?? '').trim()
-  if (last4 !== '' && !/^\d{4}$/.test(last4)) return { ok: false, error: 'Last 4 digits must be exactly 4 numbers' }
+  const bad = validateInstrumentFields({ ...d, bank: String(d.bank ?? '').trim().slice(0, MAX_BANK_NAME), rewardNote: String(d.rewardNote ?? '').trim().slice(0, MAX_REWARD_NOTE) })
+  const first = bad.name ?? bad.kind ?? bad.last4 ?? bad.rewardNote
+  if (first) return { ok: false, error: first }
   const card = d.kind === 'credit' || d.kind === 'debit'
   return {
     ok: true,
     value: {
-      name,
+      name: String(d.name).trim(),
       kind: d.kind,
       network: card && isNetwork(d.network) ? d.network : null,
-      bank: String(d.bank ?? '').trim().slice(0, 40),
-      last4,
+      bank: String(d.bank ?? '').trim().slice(0, MAX_BANK_NAME),
+      last4: String(d.last4 ?? '').trim(),
       rewardNote: String(d.rewardNote ?? '').trim().slice(0, MAX_REWARD_NOTE),
     },
   }
@@ -223,6 +353,8 @@ export interface CategoryLine {
 
 export interface Filter {
   modeId?: PaymentModeId
+  /** The instrument's kind, whatever the mode: "all credit cards" is kind 'credit'. */
+  kind?: InstrumentKind
   instrumentId?: string
   network?: NetworkId
   /** A top-level id matches it and all its subcategories; a subcategory id matches only itself. */
@@ -277,16 +409,20 @@ export function categoryName(budget: Pick<BudgetData, 'categories'>, id: string 
 const ZERO = () => new D(0)
 const bySpentDesc = (a: { spent: Dec }, b: { spent: Dec }) => b.spent.comparedTo(a.spent)
 
+/** True when a live entry passes the filter. One rule for the summary, the trend and the entries list. */
+export function entryMatches(budget: Pick<BudgetData, 'instruments' | 'categories'>, e: BudgetExpense, filter: Filter): boolean {
+  const inst = e.instrumentId === null ? undefined : budget.instruments.find((i) => i.id === e.instrumentId)
+  if (filter.modeId !== undefined && e.mode !== filter.modeId) return false
+  if (filter.instrumentId !== undefined && e.instrumentId !== filter.instrumentId) return false
+  if (filter.kind !== undefined && inst?.kind !== filter.kind) return false
+  if (filter.network !== undefined && inst?.network !== filter.network) return false
+  if (filter.categoryId !== undefined && e.categoryId !== filter.categoryId && (e.categoryId === null || budget.categories.find((c) => c.id === e.categoryId)?.parentId !== filter.categoryId)) return false
+  return true
+}
+
 export function summarise(budget: BudgetData, month: string, filter: Filter = {}): MonthSummary {
   const instById = new Map(budget.instruments.map((i) => [i.id, i]))
-  const catById = new Map(budget.categories.map((c) => [c.id, c]))
-  const entries = entriesIn(budget, month).filter((e) => {
-    if (filter.modeId !== undefined && e.mode !== filter.modeId) return false
-    if (filter.instrumentId !== undefined && e.instrumentId !== filter.instrumentId) return false
-    if (filter.network !== undefined && (e.instrumentId === null || instById.get(e.instrumentId)?.network !== filter.network)) return false
-    if (filter.categoryId !== undefined && e.categoryId !== filter.categoryId && (e.categoryId === null || catById.get(e.categoryId)?.parentId !== filter.categoryId)) return false
-    return true
-  })
+  const entries = entriesIn(budget, month).filter((e) => entryMatches(budget, e, filter))
   const tops = budget.categories.filter((c) => c.deletedAt === null && c.parentId === null)
   const topIds = new Set(tops.map((c) => c.id))
   // A subcategory counts only while its parent is live; otherwise its entries show as uncategorised.
@@ -369,4 +505,124 @@ export function suggestFor(
     mode: best.mode,
     instrumentId: paymentError(budget, best.mode, best.instrumentId) === null ? best.instrumentId : null,
   }
+}
+
+// ---------------------------------------------------------------- spend summary maths
+
+const parseDay = (key: string): number => Number(key.slice(8, 10))
+
+/** Days in a "YYYY-MM" month. */
+export function daysInMonth(month: string): number {
+  const [y = 1970, m = 1] = month.split('-').map(Number)
+  return new Date(y, m, 0).getDate()
+}
+
+/** Sum of the live entries in a month that match the filter, optionally only up to and including `throughDay`. */
+export function spentIn(budget: BudgetData, month: string, filter: Filter = {}, throughDay = 31): Dec {
+  let total = ZERO()
+  for (const e of entriesIn(budget, month)) {
+    if (parseDay(e.date) <= throughDay && entryMatches(budget, e, filter)) total = total.plus(parse(e.amount) ?? ZERO())
+  }
+  return total
+}
+
+/** The `count` months ending at `month`, oldest first, same filter. Exact sums. */
+export function trend(budget: BudgetData, month: string, count: number, filter: Filter = {}): { month: string; spent: Dec }[] {
+  return Array.from({ length: count }, (_, i) => shiftMonth(month, i - count + 1)).map((m) => ({ month: m, spent: spentIn(budget, m, filter) }))
+}
+
+/** Whether `month` is before, the same as, or after the month of `today`. */
+const monthCmp = (month: string, today: Date): number => {
+  const t = monthKey(today)
+  return month < t ? -1 : month === t ? 0 : 1
+}
+
+/**
+ * Average per day. This month: spent over the day of the month today (inclusive). A past month: over all its days.
+ * A future month: null. Never divided by "days with entries".
+ */
+export function dailyAverage(spent: Dec, month: string, today: Date): { perDay: Dec; days: number } | null {
+  const c = monthCmp(month, today)
+  if (c > 0) return null
+  const days = c === 0 ? today.getDate() : daysInMonth(month)
+  return { perDay: spent.div(days), days }
+}
+
+export interface MonthCompare {
+  /** The earlier month it is compared with. */
+  prevMonth: string
+  /** Last day compared in both months, or null for whole months. */
+  throughDay: number | null
+  current: Dec
+  previous: Dec
+  /** current minus previous; negative means less. */
+  diff: Dec
+  /** Whole percent change, or null when the earlier figure is zero. */
+  pct: number | null
+}
+
+/**
+ * This month against last month. For the current month only the same days are compared (1st to today), because half a
+ * month against a whole one would say "down 50%" in week two. A past month is compared whole to whole. Future: null.
+ */
+export function compareLastMonth(budget: BudgetData, month: string, today: Date, filter: Filter = {}): MonthCompare | null {
+  const c = monthCmp(month, today)
+  if (c > 0) return null
+  const prevMonth = shiftMonth(month, -1)
+  const throughDay = c === 0 ? Math.min(today.getDate(), daysInMonth(prevMonth)) : null
+  const current = spentIn(budget, month, filter, c === 0 ? today.getDate() : 31)
+  const previous = spentIn(budget, prevMonth, filter, throughDay ?? 31)
+  const diff = current.minus(previous)
+  return { prevMonth, throughDay, current, previous, diff, pct: previous.isZero() ? null : Math.round(diff.div(previous).times(100).toNumber()) }
+}
+
+/** The biggest `n` entries by amount. Ties: newest date first, then stored order. */
+export function topEntries(entries: BudgetExpense[], n: number): BudgetExpense[] {
+  return entries
+    .map((e, i) => ({ e, i, a: parse(e.amount) ?? ZERO() }))
+    .sort((x, y) => y.a.comparedTo(x.a) || (x.e.date === y.e.date ? x.i - y.i : x.e.date < y.e.date ? 1 : -1))
+    .slice(0, n)
+    .map((x) => x.e)
+}
+
+/** Whole percent of `part` in `total`; 0 when the total is zero. Callers show "under 1%" when part is above zero and this is 0. */
+export const sharePercent = (part: Dec, total: Dec): number => (total.isZero() ? 0 : Math.round(part.div(total).times(100).toNumber()))
+
+/** Where spending stands against a limit. The 80% line is a guess (unproven): keep it in this one constant. */
+export const CLOSE_AT = 0.8
+export type LimitState = 'fine' | 'close' | 'reached' | 'over'
+export function limitState(spent: Dec, limit: Dec): LimitState {
+  if (spent.gt(limit)) return 'over'
+  if (spent.eq(limit)) return 'reached'
+  return spent.gte(limit.times(CLOSE_AT)) ? 'close' : 'fine'
+}
+
+export interface AttentionItem {
+  id: string
+  /** "Food" or "Food › Delivery". */
+  name: string
+  spent: Dec
+  limit: Dec
+  left: Dec
+  state: Exclude<LimitState, 'fine'>
+}
+
+/** Categories and subcategories with a limit that are at 80% or more of it, worst first, at most `max`. */
+export function needsAttention(lines: CategoryLine[], max = 3): AttentionItem[] {
+  const out: AttentionItem[] = []
+  for (const p of lines) {
+    for (const c of [p, ...p.children]) {
+      if (!c.limit) continue
+      const state = limitState(c.spent, c.limit)
+      if (state !== 'fine') out.push({ id: c.id, name: c.parentId ? `${p.name} › ${c.name}` : c.name, spent: c.spent, limit: c.limit, left: c.limit.minus(c.spent), state })
+    }
+  }
+  return out.sort((a, b) => b.spent.div(b.limit).comparedTo(a.spent.div(a.limit))).slice(0, max)
+}
+
+/** About how much can be spent each remaining day (today included) to stay inside the limit. Null when not applicable. */
+export function paceLeft(left: Dec, month: string, today: Date): { perDay: Dec; days: number } | null {
+  if (monthCmp(month, today) !== 0 || !left.gt(0)) return null
+  const days = daysInMonth(month) - today.getDate() + 1
+  return { perDay: left.div(days), days }
 }

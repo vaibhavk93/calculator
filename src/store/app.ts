@@ -12,7 +12,7 @@ import {
   type Key,
 } from '../engine'
 import { parseNum } from '../lib/tool'
-import { cleanInstrument, instrumentFitsMode, paymentError, type ExpenseDraft } from '../lib/budget'
+import { MAX_SUBCATEGORIES, cleanInstrument, instrumentFitsMode, validateExpense, type ExpenseDraft } from '../lib/budget'
 import { sanitizeSettings } from './persistence'
 import {
   MAX_CATEGORIES,
@@ -279,18 +279,17 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       return false
     }
 
-    /** A plain positive amount, a real calendar day, a category that exists, a mode and instrument that go together. Or the reason it is not. */
+    /** The final guard before an entry is saved: the same checks the sheet shows (validateExpense). Returns the clean entry, or the first problem in words. */
     const checkedExpense = (d: ExpenseDraft) => {
-      const amount = parseNum(d.amount)
-      if (!amount || !amount.isPositive() || amount.isZero()) return 'Enter an amount above zero'
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date) || Number.isNaN(new Date(`${d.date}T00:00:00`).getTime())) return 'Pick a date'
       const { budget } = get()
-      const categoryId = d.categoryId !== null && budget.categories.some((c) => c.id === d.categoryId && c.deletedAt === null) ? d.categoryId : null
       const mode = isPaymentMode(d.mode) ? d.mode : null
       const instrumentId = d.instrumentId ?? null
-      const bad = paymentError(budget, mode, instrumentId)
-      if (bad) return bad
-      return { amount: toPlain(amount), categoryId, mode, instrumentId, date: d.date, note: d.note.trim().slice(0, 200) }
+      // A category that no longer exists falls back to Uncategorised here; the sheet already told the person.
+      const categoryId = d.categoryId !== null && validateExpense({ ...d, amount: '1', mode, instrumentId: null }, budget).category === undefined ? d.categoryId : null
+      const bad = validateExpense({ amount: d.amount, date: d.date, categoryId, mode, instrumentId }, budget)
+      const first = bad.amount ?? bad.date ?? bad.paidWith
+      if (first) return first
+      return { amount: toPlain(parseNum(d.amount)!), categoryId, mode, instrumentId, date: d.date, note: d.note.trim().slice(0, 200) }
     }
 
     const cleanLimit = (limit: string | null) => {
@@ -508,6 +507,10 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         }
         const live = budget.categories.find((c) => c.deletedAt === null && c.parentId === parentId && c.name.toLowerCase() === clean.toLowerCase())
         if (live) return live.id
+        if (parentId !== null && budget.categories.filter((c) => c.deletedAt === null && c.parentId === parentId).length >= MAX_SUBCATEGORIES) {
+          fail(`A category can have up to ${MAX_SUBCATEGORIES} subcategories.`)
+          return null
+        }
         const id = deps.newId()
         set({ budget: { ...budget, categories: [...budget.categories, { id, name: clean, limit: null, parentId, deletedAt: null }] } })
         return id

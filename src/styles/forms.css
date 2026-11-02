@@ -235,3 +235,26 @@
 .sect--settings .row {
   gap: var(--s-2) var(--s-3);
 }
+
+/* The last row of a picker that can add: a new name, typed in place. */
+.pick__opt--add {
+  color: var(--accent);
+}
+
+.pick__add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding-top: var(--s-3);
+}
+
+.pick__addrow {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-end;
+}
+
+.pick__addrow .field {
+  flex: 1 1 auto;
+  min-width: 0;
+}

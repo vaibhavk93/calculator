@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { Icon } from './Icon'
+import { useBackHandler } from './useBackHandler'
 
 interface SheetProps {
   title: string
@@ -21,6 +22,8 @@ export function Sheet({ title, onClose, action, footer, children }: SheetProps) 
   const titleId = useId()
   const closeRef = useRef(onClose)
   closeRef.current = onClose
+  // The phone's back button closes this sheet and nothing else. It is never the only way out: the X does the same.
+  useBackHandler(true, () => closeRef.current())
 
   useEffect(() => {
     // Return focus to the opener afterwards, but only if it still holds focus now, which is true
