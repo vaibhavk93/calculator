@@ -36,7 +36,7 @@ fine, because there is nothing left to infer.
 
 That is the real return on the planning work. You now have:
 
-- Input→output contracts for all 86 calculators (`PRD.md`)
+- Input→output contracts for all 91 calculators (`PRD.md`)
 - Exact tokens, type rules and layout rules (`DESIGN-SYSTEM.md`)
 - Nine built screens to copy patterns from (the design canvas)
 - A phased build order with a definition of done per phase
