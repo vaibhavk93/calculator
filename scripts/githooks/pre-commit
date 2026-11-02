@@ -1,0 +1,21 @@
+#!/bin/sh
+# Blocks a commit whose code does not typecheck or whose tests fail.
+#
+# Enable it in a fresh clone with:
+#   git config core.hooksPath scripts/githooks
+#
+# Skip it for one commit with `git commit --no-verify` (use that for a
+# work-in-progress commit you intend to fix up, not to get past a real failure).
+
+# Doc-only commits do not need the suite; `npm run check` takes about 25s.
+if ! git diff --cached --name-only --diff-filter=ACMR | grep -qE '\.(ts|tsx|css|json)$'; then
+  echo "pre-commit: no code staged, skipping npm run check"
+  exit 0
+fi
+
+echo "pre-commit: npm run check"
+if ! npm run check; then
+  echo ""
+  echo "pre-commit: FAILED. Fix the above, or commit with --no-verify if this is deliberate."
+  exit 1
+fi
