@@ -251,3 +251,80 @@ A screen ships only if every line passes:
 - [ ] Works at 360dp, in both themes, at 200% font size
 - [ ] All primary actions in the bottom 60%
 - [ ] Could a user fluent in Linear/Raycast/Stripe sit down and trust this?
+
+
+---
+
+## 9. Controls: hierarchy and borders
+
+*Added 2026-11-02 after the owner used the app on a phone. Operators looked inert next to filled digits.*
+
+Three treatments say three different things. Never mix them.
+
+| Role | Treatment | Examples |
+|---|---|---|
+| A value you enter | Filled `key-digit` ground, no border | 0 to 9, 00, . |
+| Something that acts on values | No fill, **1px `ink-3` border**, `ink-2` text | + − × ÷, ( ), %, C, Paste, Copy, Undo, chips, steppers |
+| The one primary action | `accent-fill` ground, `accent-ink` text | =, Done, Add |
+| Destructive | `alert` text | C, Delete |
+| A quiet text action in a bar | `accent` text, no border | Save, Update, To list, Remind me on a list |
+
+**Border colour.** A control's border and an input's underline use `ink-3`: measured 5.2:1 on the dark ground and 6.6:1 on
+light. `line` is only 1.3:1, which is right for a separator and too faint for a control (WCAG non-text contrast asks for 3:1).
+`line` is for separators only. A disabled control keeps `line` for its border and `ink-3` for its text. An input's underline
+turns `accent` on focus.
+
+**Pressed state.** Every pressable thing visibly responds: keys darken to `key-digit-pressed` and scale to 0.96 over 90ms;
+rows darken to `key-digit-pressed`. State is never carried by colour alone: add a tick, a weight change or words.
+
+**Size.** At least 44px in one direction. A function key may be 36px high if it is at least 62px wide.
+
+## 10. Rows and lists
+
+| Kind | Layout |
+|---|---|
+| Drill-down row (Tools home) | 56px. Name left. A small count (`ink-3`, mono) and a chevron right. Hairline below. No description at this level |
+| Detail row (inside a group) | Title, and at most one dim line of 7 words or fewer |
+| Ledger row (Notes, Due) | Title, one summary line, then tags and due state on one dim line. Amount right, mono |
+| Search | One compact field, 8px under the status bar. While it has text, show a flat list with the group name dimmed on the right |
+| Checkbox line | A 48px hit area around a 22px box (`accent-color`). A done line dims to `ink-3`. No strikethrough, so the amount stays readable |
+| Progress header | Left: "N of M done · ₹X left" in `ink-2`. Right: the collected amount, large, mono. Under it: "collected of ₹Y" |
+| Empty state | A title, one sentence, one button (UX 5.4) |
+
+Grouping stays by hairline, not by box (section 5). No nested cards.
+
+## 11. Forms (the calculator screens)
+
+| Rule | Detail |
+|---|---|
+| Label | Above the field, `ink-2`, 0.8125rem, 5 words or fewer, sentence case |
+| Value | Plex Mono. 16px side gutters, 16px between fields |
+| Unit | Beside the value in `ink-3`: ₹ before, % and years after |
+| Amounts | Digits group as you type using the Indian or international setting. Rupee fields show the amount in words under the field ("50 lakh"). The stored value stays plain digits |
+| Hint | Shown only while the field is focused or when it caused an error. 12 words or fewer. Only if it prevents a wrong number |
+| Choices | 2 or 3 short options: a segmented control with an underline on the chosen one. 4 or more: the phone's own dropdown |
+| Rare fields | Under a closed "More options" line. At most 5 fields show by default. The line opens by itself if a hidden field differs from its default, and stays open once opened |
+| The answer | A sticky bar under the header always shows the main result while you edit. The full list sits below the form |
+| Defaults | Realistic, and they give a real result. A hidden example value says it is an example |
+| Dates | The phone's native date input |
+
+## 12. Chips, steppers, checkboxes and sheets
+
+| Component | Spec |
+|---|---|
+| Chip | 44px high, 1px `ink-3` border, radius `r-md`, 0.875rem. Selected: `accent` text, `accent-dim` border, `aria-pressed`. Result chips appear after "=" only |
+| Stepper | "−  value  +" in one bordered group. 48px buttons, mono value, a button is disabled at its limit |
+| Bottom sheet | Grab handle, title left, the primary action right ("Done", "Add"). Content scrolls. One sheet at a time. Closes on scrim tap, Escape or the back button |
+| Sticky answer bar | Label left (it wraps), value right (mono, never wraps), an optional quiet text action at the far right |
+| Money value | Never breaks across lines. The label wraps instead |
+
+## 13. Review checklist: additions
+
+- [ ] Operators and utilities are bordered with `ink-3`, digits filled, one accent action
+- [ ] Every control's border and every input underline is `ink-3`, never `line`
+- [ ] Every pressable has a visible pressed state
+- [ ] No money value wraps
+- [ ] Hints show on focus only, and are 12 words or fewer
+- [ ] No more than 5 fields show by default
+- [ ] A screen with a "back" registers `useBackHandler`
+- [ ] Checked at 360px, in both themes, and at 200% font size

@@ -156,7 +156,7 @@ sign (`+`/`−`) or an icon, for colour-blind users.
 │                      1,24,500       │  expression  (24dp, muted)
 │                      = 1,24,500     │  live result (56dp, text)
 │                                     │
-│   ⋯        ^        ↶        ⌫      │  utility row
+│  Paste     Copy      ↶        ⌫      │  utility row
 ├─────────────────────────────────────┤
 │   C    │   ( )  │   %    │   ÷      │
 │   7    │   8    │   9    │   ×      │
@@ -175,7 +175,7 @@ sign (`+`/`−`) or an icon, for colour-blind users.
 | Long-press `C` | Clear everything (with undo snackbar) | Power action, discoverable via hint |
 | Long-press `⌫` | Clear the current line | Common expectation |
 | Digit keys | `surface`, `text` | Neutral, highest frequency |
-| Operators | `surface`, `accent` text | Scannable without shouting |
+| Operators | No fill, 1px `ink-3` border, `ink-2` text | Reads as an action, not a value (see DS 9) |
 | `=` | `accent` fill, white text | The one primary action on the screen |
 
 ### 4.5 Motion
@@ -183,7 +183,7 @@ sign (`+`/`−`) or an icon, for colour-blind users.
 | Interaction | Animation | Duration |
 |---|---|---|
 | Key press | Scale 0.96 | 80ms |
-| Result update | Count-up tween on the number | 180ms |
+| Result update | Opacity crossfade, no counting animation | 140ms |
 | Screen push | Slide from right | 220ms, ease-out |
 | Bottom sheet | Slide up + scrim fade | 240ms |
 | Snackbar | Slide up from bottom | 160ms |
@@ -199,16 +199,15 @@ changes, never removed entirely (users still need the state-change signal).
 ### 5.1 Input
 - Numeric fields open the **numeric keypad**, never the full QWERTY.
 - Amount fields format **as you type**: typing `150000` shows `1,50,000`.
-- Every amount field has a `₹` prefix and quick-chips: `+1K  +10K  +1L`.
-- Percentage and tenure fields pair a text input with a **slider** — type for
-  precision, drag to explore. Dragging updates the result live.
+- Every amount field has a `₹` prefix. *(Quick-chips `+1K +10K +1L` are not built yet.)*
+- Percentage and tenure fields pair a text input with a **slider**. *(Sliders are not built yet.)*
 - Fields have sensible defaults pre-filled. An empty form is a hostile form.
 
 ### 5.2 Results
 - The headline number is huge and alone. Supporting numbers are secondary.
 - Below every result: a **"How this was calculated"** expander showing the
   formula and substituted values.
-- Every result screen has exactly three actions: **Save**, **Share**, **Reset**.
+- Every result has **Save** and **To list**. Share and Reset are not built yet.
 - Long tables (amortisation) collapse to yearly by default; expand to monthly.
 
 ### 5.3 Errors
@@ -240,17 +239,17 @@ Four tabs. Never more.
 
 ```
 ┌──────────┬──────────┬──────────┬──────────┐
-│   Calc   │   Tools  │  Saved   │ Reminders│
+│ Calculate│  Tools   │  Notes   │   Due    │
 │    ▣     │    ⊞     │    ◈     │    ◔     │
 └──────────┴──────────┴──────────┴──────────┘
 ```
 
 | Tab | Contains | Why it's a tab |
 |---|---|---|
-| **Calc** | The basic/scientific calculator + history drawer | Opens here. 70% of sessions never leave it. |
-| **Tools** | All 74 calculators, grouped, searchable, with Favourites pinned on top | Breadth without burying the basics |
-| **Saved** | Saved cards, notes, tallies, scenario comparisons | The memory layer — the differentiator |
-| **Reminders** | Upcoming and overdue money events | The reason to re-open the app when you weren't calculating |
+| **Calculate** | The basic calculator + history sheet (Scientific lives at the top of Tools) | Opens here. 70% of sessions never leave it. |
+| **Tools** | All 51 calculators in 9 groups, searchable | Breadth without burying the basics |
+| **Notes** | Notes, lists with checkboxes, calculator cards | The memory layer — the differentiator |
+| **Due** | Upcoming and overdue money events | The reason to re-open the app when you weren't calculating |
 
 **Rules:**
 - Max 2 taps from launch to any calculator.
@@ -321,3 +320,129 @@ Every screen must pass before it ships:
 - [ ] Primary actions in the bottom 60% of the screen
 - [ ] Screen-reader labels on every interactive element
 - [ ] No spinner for anything that is pure arithmetic
+
+
+---
+
+## 11. Vocabulary: one name per thing
+
+*Added 2026-11-02. The owner calls saved things "notes", so the tab is Notes.*
+
+| Use | Avoid | Meaning |
+|---|---|---|
+| **Calculate**, **Tools**, **Notes**, **Due** | Saved, Reminders (as tab names) | The four tabs |
+| **List** | tape, tally, card | A set of lines with a total, optionally with checkboxes |
+| **Calculator** | tool, widget | One of the 51 under Tools |
+| **To list** | split, export | Send a number to a list, as one line or several |
+| **Remind me** | schedule, alert | Attach a reminder |
+| **Done** | paid (in the interface), complete | A ticked line. "Paid" may appear in a person's own list names |
+
+Internal ids (`saved`, `tape`) may differ. Only the words a person reads follow this table.
+
+## 12. Navigation rules
+
+| Rule | Detail |
+|---|---|
+| Tap the tab you are on | Returns that tab to its start (Tools to the top; Notes and Due close any open item) |
+| Android back | Closes Settings or History first, then goes up one level on the current screen, then goes to Calculate, then leaves the app |
+| Depth | Tools is at most three deep: home, a group, a calculator |
+| Every screen with a "back" | Registers `useBackHandler`. No screen traps the user |
+| Opens on | Any tab, or any single calculator |
+| Keep my work | Values typed in a calculator survive a trip to another tab for the session |
+| Tab bar | Always visible, never hidden by a full-screen view |
+| Hard to reach | Primary actions in the top bar are duplicated near the result where it matters (To list in the answer bar) |
+
+## 13. Acting on a number
+
+Any finished number can become something in **one visible step**.
+
+| Where | What is offered | How |
+|---|---|---|
+| After "=" on the calculator | **To list**, **Remind me** | Two chips under the answer, only after "=" |
+| A calculator's answer | **To list** | A quiet action in the sticky bar |
+| A History row | To list, Remind me | *(Planned)* |
+
+- "To list" opens one sheet: how many lines (a stepper), a name for the lines, which list (new or existing), and a tick for
+  "tick lines off as they are paid" (on by default when there is more than one line). The sheet shows the sum:
+  "5 lines of ₹1,000.00 = ₹5,000.00".
+- "Remind me" saves the number as a one-line list with a reminder switched on.
+- Copy stays where it is, because it is the most common action.
+- Never a blocking dialog. Never more than two chips.
+- Why "To list" and not "Split": by the time the sheet opens, the number has already been divided. The job is to give each
+  person a line.
+
+## 14. Lists and checklists
+
+- A list is lines of `label amount`. Typing "Flights 24000" adds a line. A tap on a line edits it.
+- A **checklist** is the same list with checkboxes. Turn them on or off with "Show checkboxes" and "Hide checkboxes".
+- A list made by sharing a number across several lines starts as a checklist.
+- Totals are exact. Three lines of 100 ÷ 3 add back to exactly 100, because amounts keep full precision and only the display rounds.
+- The header shows progress: "2 of 5 done · ₹3,000.00 left", with the collected amount large.
+- **Copy as text** includes ✔ or ☐ per line and "Collected X of Y", so it can go straight into a group chat.
+- A reminder belongs to the **list**, not to a number: "remind me Friday" is about the people who have not paid.
+- A deleted list goes to Trash for 7 days with Undo.
+
+## 15. The calculator display
+
+| Moment | What shows |
+|---|---|
+| Typing | The expression, and a **dimmed** live answer with no "=" |
+| After "=" | "23 × 36 =" and the answer at full strength: "=" commits it |
+| "=" pressed again | Nothing changes. No duplicate history entry |
+| Next digit | A new calculation starts. The finished one stays above |
+| Next operator | Continues from the answer. The finished one stays above |
+| "C" | Clears the current line only |
+| Past lines | Up to 3 above (1 on screens under 700px tall), faded. Tap one to reuse its result. If history is off, the last one only |
+
+The answer announces itself to screen readers only when it is committed.
+
+## 16. The feedback ladder
+
+Use the lightest feedback that is honest.
+
+| Level | Used for | Example |
+|---|---|---|
+| Haptic | Every key press | 10ms tick |
+| Inline notice (2.2s, under the answer) | Small confirmations and soft errors | "Copied", "Added 3 lines" |
+| Snackbar with **Undo** (6s) | Anything removed | "Moved to Trash. Undo" |
+| Snackbar | A save | "Saved. Undo" *(planned)* |
+| Confirmation sheet | What cannot be undone | Clear all history (type CLEAR) |
+
+Errors say what to do. Silent failure is the worst case: if something might not have worked (a reminder on a phone that
+kills background apps), give the person a way to test it.
+
+## 17. Clipboard
+
+- On the phone, use the native clipboard plugin. In a browser, use the browser clipboard.
+- If reading fails or is empty, open a small sheet with a focused text box ("Paste here") and a "Use" button. A normal text
+  box always supports the system long-press paste. Never show "can't read the clipboard, try Ctrl+V".
+- The parser forgives: `23*36`, `23 x 36`, `23 × 36`, `1,50,000 + 2,500`, `₹1,200 - ₹300`, `(5+3)*2`, `12%`, a leading label
+  ("Rent 25000 + 3000"), a leading "=" or a trailing "= result", unicode minus, accounting negatives `(500)`.
+- Several lines, each with a number, are **summed**, and a notice says "Added 3 lines". A line starting with "-" subtracts.
+- Pasted text is never run with `eval` or `Function`. It is turned into the engine's own expression form and checked.
+- Length is capped at 500 characters.
+
+## 18. Writing form copy
+
+| Item | Rule |
+|---|---|
+| Calculator title | Short, plain, unique ("Loan EMI", not "EMI calc"). Jargon words stay in search keywords |
+| Blurb | 7 words or fewer |
+| Field label | 5 words or fewer, says what to type ("Yearly interest rate") |
+| Hint | 12 words or fewer, only if it prevents a wrong number, never repeats the label |
+| Result label | Plain English. Explain jargon in the label itself ("Annual return (XIRR)") |
+| Note | At most 2 sentences. Keeps every disclaimer: "Estimate for FY2026-27. Verify with a CA", "as of <date>", "example rate" |
+| Defaults | Realistic, give a real result |
+| Ids | Never change a tool id or a field id. Saved items depend on them |
+
+## 19. Corrections log
+
+Where the earlier text of this document changed on 2026-11-02, and why.
+
+| Section | Was | Now | Why |
+|---|---|---|---|
+| 4.4 keypad | Utility row "⋯ ^ ↶ ⌫"; operators in `accent` text | "Paste Copy ↶ ⌫"; operators bordered | The panels hid information. Operators looked inert |
+| 4.5 motion | Count-up tween on the result | Crossfade | DS 6 says a number that animates cannot be read yet. The two documents disagreed |
+| 5.1 input | Quick-chips and sliders described as present | Marked not built | They do not exist yet |
+| 5.2 results | "Save, Share, Reset" on every result | "Save, To list". Share and Reset not built | Matches the build |
+| 6 navigation | Tabs Calc, Tools, Saved, Reminders. 74 calculators. Favourites | Calculate, Tools, Notes, Due. 51 calculators in 9 groups | Matches the build and the owner's words |
