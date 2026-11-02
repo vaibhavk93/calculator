@@ -249,7 +249,10 @@ function Result({ out }: { out: Output }) {
   const decimals = useApp((s) => s.settings.decimals)
   const fmt = (c: Parameters<typeof formatCell>[0], f?: Fmt) => formatCell(c, f, { system, decimals })
   return (
-    <section className="result">
+    <section className="result" aria-labelledby="result-head">
+      <h2 className="section-head" id="result-head">
+        Result
+      </h2>
       {out.rows.map((r) => (
         <div key={r.label} className={r.main ? 'result__row result__row--main' : 'result__row'}>
           <span className="result__label">{r.label}</span>
@@ -321,8 +324,15 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
     inputs: values,
     summary: main ? `${main.label}: ${formatCell(main.value, main.fmt, { system, decimals })}` : '',
     amount: main && typeof main.value !== 'string' && main.value.isFinite() ? main.value.toFixed() : null,
+    // Carried so the card can draw the number as what it is. Without this a date
+    // difference was saved as a bare number and shown as "₹300".
+    amountFmt: main?.fmt ?? 'number',
     lines: [],
   }
+
+  // A list is a list of *amounts*: it totals them and shows "₹3,000 left". Offering it
+  // for 300 days apart, or a BMI of 24.5, produced "₹300" and made no sense.
+  const listableAmount = draft.amountFmt === 'money' ? draft.amount : null
 
   useBackHandler(true, onBack)
 
@@ -352,7 +362,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
           <>
             <span className="answer__label">{main.label}</span>
             <span className="answer__value">{formatCell(main.value, main.fmt, { system, decimals })}</span>
-            {draft.amount !== null && (
+            {listableAmount !== null && (
               <button type="button" className="link-btn answer__act" onClick={() => setListing(true)}>
                 To list
               </button>
@@ -363,7 +373,10 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
         )}
       </div>
       <div className="screen__body tool">
-        <form className="tool__form" onSubmit={(e) => e.preventDefault()}>
+        <h2 className="section-head" id="inputs-head">
+          What you are working out
+        </h2>
+        <form className="tool__form" aria-labelledby="inputs-head" onSubmit={(e) => e.preventDefault()}>
           {visible.map((f) => (
             <FieldRow key={f.id} field={f} values={values} set={set} error={error} />
           ))}
@@ -380,7 +393,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
         </form>
         {!isError(computed) && <Result out={computed} />}
       </div>
-      {listing && draft.amount !== null && <ToListSheet value={draft.amount} onClose={() => setListing(false)} onDone={showCard} />}
+      {listing && listableAmount !== null && <ToListSheet value={listableAmount} onClose={() => setListing(false)} onDone={showCard} />}
       {saving && <SaveSheet draft={draft} card={saved} reminder={reminder} onClose={() => setSaving(false)} onSaved={setSavedId} />}
     </div>
   )

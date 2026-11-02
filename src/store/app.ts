@@ -65,7 +65,7 @@ export interface Snack {
 
 /** What the user fills in to keep something. Everything but the title can stay empty. */
 export type CardDraft = Pick<SavedCard, 'title' | 'kind' | 'toolId' | 'inputs' | 'summary' | 'amount' | 'lines'> &
-  Partial<Pick<SavedCard, 'note' | 'tags'>>
+  Partial<Pick<SavedCard, 'note' | 'tags' | 'amountFmt'>>
 
 export interface ReminderDraft {
   dueAt: number

@@ -259,6 +259,24 @@
   border-top: 1px solid var(--line);
 }
 
+/*
+ * A section says what it is. Before this, the boxes you fill in and the answers
+ * you read were told apart only by a hairline, so an input you could change
+ * looked like a result you could not.
+ */
+.section-head {
+  margin: 0;
+  padding: var(--s-4) var(--s-4) var(--s-2);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.result .section-head {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .result__row {
   display: flex;
   align-items: baseline;
@@ -394,10 +412,39 @@
   color: var(--ink-2);
 }
 
+/*
+ * `display: flex` on a <summary> removes the browser's own disclosure triangle,
+ * which left "How this is worked out" looking like a dead line of text. The
+ * marker is drawn back by hand so it is visibly a thing you can open, and it
+ * turns to point down once it is open.
+ */
 .formula summary {
   min-height: 44px;
   display: flex;
   align-items: center;
+  gap: var(--s-2);
+  cursor: pointer;
+}
+
+.formula summary::marker,
+.formula summary::-webkit-details-marker {
+  display: none;
+  content: '';
+}
+
+.formula summary::before {
+  content: '';
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 150ms var(--ease-out);
+}
+
+.formula[open] summary::before {
+  transform: rotate(45deg);
 }
 
 .formula p {

@@ -89,19 +89,27 @@ export function ToolsScreen() {
             </div>
           )
         ) : (
-          <div className="group">
-            <button type="button" className="navrow" onClick={() => setNav({ scientific: true })}>
-              <span className="navrow__label">Scientific calculator</span>
-              <Icon name="chevron" size={18} className="navrow__chev" />
-            </button>
-            {GROUPS.map((g) => (
-              <button key={g.id} type="button" className="navrow" onClick={() => setNav({ category: g.id })}>
-                <span className="navrow__label">{g.name}</span>
-                <span className="navrow__meta">{g.tools.length}</span>
+          <>
+            {/* A whole calculator and a group of calculators are different things.
+                They used to render as the same row, so the list read as one wall. */}
+            <h2 className="section-head">Calculators</h2>
+            <div className="group">
+              <button type="button" className="navrow" onClick={() => setNav({ scientific: true })}>
+                <span className="navrow__label">Scientific calculator</span>
                 <Icon name="chevron" size={18} className="navrow__chev" />
               </button>
-            ))}
-          </div>
+            </div>
+            <h2 className="section-head">Browse by what you need</h2>
+            <div className="group">
+              {GROUPS.map((g) => (
+                <button key={g.id} type="button" className="navrow" onClick={() => setNav({ category: g.id })}>
+                  <span className="navrow__label">{g.name}</span>
+                  <span className="navrow__meta">{g.tools.length}</span>
+                  <Icon name="chevron" size={18} className="navrow__chev" />
+                </button>
+              ))}
+            </div>
+          </>
         )}
       </div>
       {group && <GroupPage group={group} onBack={() => setNav({ category: null })} onOpen={(id) => setNav({ tool: id })} />}

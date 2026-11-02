@@ -30,6 +30,12 @@ export interface SavedCard {
   summary: string
   /** The headline number as a plain decimal, used for reminders and totals. Null when there isn't one. */
   amount: string | null
+  /**
+   * What `amount` *is*. Without it everything was drawn as rupees, so a date
+   * difference of 300 days read as "₹300" and a BMI of 24.5 as "₹24.50".
+   * Absent means money, which is what every card saved before this existed was.
+   */
+  amountFmt?: 'money' | 'percent' | 'number' | 'int' | 'text'
   /** For kind 'tape'. */
   lines: TapeLine[]
   /** For kind 'tape': show a checkbox on each line, and "done / left" totals. Absent means off. */

@@ -260,6 +260,22 @@ describe('sanitizeCards and sanitizeReminders', () => {
   })
 })
 
+describe('a saved amount knows what it is', () => {
+  const base = { id: 'c1', kind: 'tool', toolId: 'date', title: 'Days apart', summary: '', amount: '300', lines: [], note: '', tags: [], createdAt: 1, updatedAt: 1, deletedAt: null }
+
+  it('keeps the unit, so 300 days is not drawn as money', () => {
+    expect(sanitizeCards([{ ...base, amountFmt: 'int' }])[0]!.amountFmt).toBe('int')
+  })
+
+  it('leaves it absent on a card saved before units existed, which means money', () => {
+    expect(sanitizeCards([base])[0]!.amountFmt).toBeUndefined()
+  })
+
+  it('drops a unit it does not recognise rather than trusting the file', () => {
+    expect(sanitizeCards([{ ...base, amountFmt: 'rupees-ish' }])[0]!.amountFmt).toBeUndefined()
+  })
+})
+
 describe('checklist fields on stored lists', () => {
   const card = (over: object = {}) => ({ id: 'c1', title: 'Split', kind: 'tape', toolId: null, inputs: null, summary: '', amount: '2000', note: '', tags: [], pinned: false, createdAt: 1, updatedAt: 1, deletedAt: null, ...over })
   it('keeps the checklist flag and ticked lines, and an old list without them is simply not a checklist', () => {

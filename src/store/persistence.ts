@@ -140,6 +140,10 @@ export function sanitizeCards(raw: unknown): SavedCard[] {
       inputs: kind === 'tool' ? sanitizeValues(c.inputs) : null,
       summary: str(c.summary, 200),
       amount: isPlainNumber(c.amount) ? c.amount : null,
+      // Absent on anything saved before units existed: those were all money.
+      ...(typeof c.amountFmt === 'string' && ['money', 'percent', 'number', 'int', 'text'].includes(c.amountFmt)
+        ? { amountFmt: c.amountFmt as SavedCard['amountFmt'] }
+        : {}),
       lines: kind === 'tape' ? sanitizeLines(c.lines) : [],
       ...(kind === 'tape' && c.checklist === true ? { checklist: true } : {}),
       note: str(c.note, 5000),

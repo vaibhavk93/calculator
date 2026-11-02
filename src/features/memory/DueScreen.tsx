@@ -58,7 +58,7 @@ export function DueScreen() {
                     {r.repeat !== 'none' ? ` · ${r.repeat}` : ''}
                   </span>
                 </button>
-                {card.amount !== null && <span className="result__value">{formatCell(new D(card.amount), 'money', { system, decimals })}</span>}
+                {card.amount !== null && <span className="result__value">{formatCell(new D(card.amount), card.amountFmt ?? 'money', { system, decimals })}</span>}
                 <div className="due__actions">
                   <button type="button" className="link-btn" onClick={() => markPaid(r.id)}>Mark paid</button>
                   <button type="button" className="link-btn" onClick={() => snooze(r.id, 1)}>Snooze 1 day</button>
