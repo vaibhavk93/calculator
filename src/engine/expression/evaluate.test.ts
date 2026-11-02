@@ -208,3 +208,15 @@ describe('closing a half-typed expression', () => {
     expect(!r.ok && r.code).toBe('empty')
   })
 })
+
+describe('scientific notation, as the calculator writes it', () => {
+  it('reads a capital E with an exponent', () => {
+    expect(val('1.2345E+25')).toBe('12345000000000000000000000')
+    expect(val('5E-3')).toBe('0.005')
+    expect(val('2E3*2')).toBe('4000')
+    expect(val('1E+15+1')).toBe('1000000000000001')
+  })
+  it('a lowercase e stays Euler\'s number, so "2e+3" is 2 x e + 3', () => {
+    expect(Number(val('2e+3'))).toBeCloseTo(2 * Math.E + 3, 10)
+  })
+})

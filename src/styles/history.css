@@ -29,6 +29,7 @@
 
 .hrow__memo {
   grid-area: memo;
+  min-width: 0;
   padding-top: var(--s-2);
   font-size: 0.8125rem;
   font-weight: 500;
@@ -38,6 +39,7 @@
 
 .hrow__expr {
   grid-area: expr;
+  min-width: 0;
   min-height: 36px;
   padding: var(--s-2) 0 0;
   font-family: var(--font-mono);
@@ -51,6 +53,7 @@
 
 .hrow__result {
   grid-area: result;
+  min-width: 0;
   min-height: 40px;
   padding: 0 0 var(--s-2);
   font-family: var(--font-mono);
@@ -91,4 +94,119 @@
 .hrow__edit .field {
   flex: 1 1 10rem;
   min-width: 0;
+}
+
+/* ------------------------------------------------ row menu, lock, filter */
+
+.hrow__acts .hrow__more {
+  color: var(--accent);
+}
+
+.hrow__acts .icon-btn:disabled {
+  color: var(--ink-3);
+}
+
+.hrow__memo {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-width: 0;
+}
+
+.hrow__lock {
+  color: var(--ink-2);
+}
+
+.hfilter {
+  margin-bottom: var(--s-3);
+}
+
+.hmenu__summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  min-width: 0;
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.hmenu__expr {
+  font-size: 0.875rem;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.hmenu__result {
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.hmenu__result::before {
+  content: '=\00a0';
+  color: var(--ink-3);
+}
+
+.hmenu {
+  display: flex;
+  flex-direction: column;
+}
+
+.hmenu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+  min-height: 48px;
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  color: var(--ink);
+}
+
+.hmenu__item > .icon {
+  color: var(--accent);
+}
+
+.hmenu__item:active:not(:disabled) {
+  background: var(--key-op-pressed);
+}
+
+.hmenu__item:disabled {
+  color: var(--ink-3);
+}
+
+.hmenu__item:disabled > .icon {
+  color: var(--ink-3);
+}
+
+.hmenu__item--danger:not(:disabled) {
+  color: var(--alert);
+}
+
+.hmenu__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hmenu__label {
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.hmenu__hint {
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.hrow__input {
+  width: 100%;
+  min-width: 0;
+  font-family: var(--font-mono);
 }

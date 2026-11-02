@@ -7,6 +7,7 @@ import {
   defaultPersisted,
   loadPersisted,
   migrate,
+  sanitizeBudget,
   sanitizeCards,
   sanitizeReminders,
   sanitizeHistory,
@@ -335,6 +336,49 @@ describe('budget data', () => {
     expect(out.budget.categories).toEqual([{ id: 'c1', name: 'Food', limit: '4000', parentId: null, deletedAt: null }])
     expect(out.budget.instruments).toEqual([])
     expect(out.budget.expenses[0]).toMatchObject({ id: 'e1', mode: 'upi', instrumentId: null, amount: '120.50' })
+  })
+  it('a budget with none of the new fields round-trips equal', () => {
+    const budget = {
+      overall: '500',
+      categories: [{ id: 'c1', name: 'Food', limit: '4000', parentId: null, deletedAt: null }, { id: 'c2', name: 'Swiggy', limit: null, parentId: 'c1', deletedAt: null }],
+      instruments: [{ id: 'i1', name: 'Neo', kind: 'credit', network: 'rupay', bank: 'Tata', last4: '1234', rewardNote: '', deletedAt: null }],
+      expenses: [{ id: 'e1', date: '2026-11-02', amount: '120.50', categoryId: 'c2', mode: 'credit', instrumentId: 'i1', note: 'tea', deletedAt: null }],
+    }
+    expect(sanitizeBudget(JSON.parse(JSON.stringify(budget)))).toEqual(budget)
+    expect(sanitizeBudget(sanitizeBudget(budget))).toEqual(budget)
+  })
+  it('keeps month limits, category months, card details and settlements; drops damaged ones', () => {
+    const out = sanitizeBudget({
+      overall: '500',
+      overallByMonth: { '2026-11': '900', '2026-12': null, 'nov': '5', '2027-01': '-4' },
+      categories: [
+        { id: 'p', name: 'Diwali', limit: null, deletedAt: null, months: ['2026-12', '2026-11', 'x', '2026-11'], limitByMonth: { '2026-11': '100', bad: '1' } },
+        { id: 'k', name: 'Sweets', limit: null, parentId: 'p', deletedAt: null, months: ['2027-05'] }, // outside its parent: follows the parent
+        { id: 'k2', name: 'Lamps', limit: null, parentId: 'p', deletedAt: null, months: ['2026-11'] },
+      ],
+      instruments: [
+        { id: 'cc', name: 'HDFC', kind: 'credit', variant: 'Regalia', holder: 'A', statementDay: 5, dueDay: 29, creditLimit: '200000', annualFee: '-1', upiHandle: 'a@b', accountType: 'savings' },
+        { id: 'bk', name: 'Savings', kind: 'bank', upiHandle: 'me@okhdfc', accountType: 'salary', creditLimit: '5' },
+      ],
+      expenses: [
+        { id: 'e1', date: '2026-11-20', amount: '100', categoryId: 'p', instrumentId: 'cc', settlement: 'cardBill' },
+        { id: 'e2', date: '2026-11-21', amount: '100', instrumentId: 'bk', mode: 'upi', settlement: 'weird' },
+      ],
+    })
+    expect(out.overallByMonth).toEqual({ '2026-11': '900', '2026-12': null })
+    expect(out.categories[0]).toMatchObject({ months: ['2026-11', '2026-12'], limitByMonth: { '2026-11': '100' } })
+    expect('months' in out.categories[1]!).toBe(false)
+    expect(out.categories[2]!.months).toEqual(['2026-11'])
+    expect(out.instruments[0]).toMatchObject({ variant: 'Regalia', holder: 'A', statementDay: 5, creditLimit: '200000' })
+    expect(out.instruments[0]).not.toHaveProperty('dueDay')
+    expect(out.instruments[0]).not.toHaveProperty('annualFee')
+    expect(out.instruments[0]).not.toHaveProperty('upiHandle')
+    expect(out.instruments[0]).not.toHaveProperty('accountType')
+    expect(out.instruments[1]).toMatchObject({ upiHandle: 'me@okhdfc', accountType: 'salary' })
+    expect(out.instruments[1]).not.toHaveProperty('creditLimit')
+    expect(out.expenses[0]).toMatchObject({ settlement: 'cardBill', categoryId: null, instrumentId: 'cc' })
+    expect(out.expenses[1]).toMatchObject({ mode: 'upi', instrumentId: 'bk' })
+    expect(out.expenses[1]).not.toHaveProperty('settlement')
   })
   it('keeps two-level categories; flattens deeper, missing and circular parents', () => {
     const c = (id: string, parentId?: unknown, deletedAt: number | null = null) => ({ id, name: id, limit: null, parentId, deletedAt })

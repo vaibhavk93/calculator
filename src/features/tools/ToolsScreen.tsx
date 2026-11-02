@@ -35,7 +35,7 @@ function GroupPage({ group, onBack, onOpen }: { group: ToolGroup; onBack: () => 
                 .map((id) => ALL_TOOLS.find((t) => t.id === id))
                 .filter((t): t is ToolSpec => !!t)
                 .map((t) => (
-                  <button key={t.id} type="button" className="navrow" onClick={() => onOpen(t.id)}>
+                  <button key={t.id} type="button" className="navrow tap-row" onClick={() => onOpen(t.id)}>
                     <span className="row__text">
                       <span className="row__label">{t.title}</span>
                       <span className="row__hint">{t.blurb}</span>
@@ -93,17 +93,18 @@ export function ToolsScreen() {
           ) : (
             <div className="group">
               {found.map((t) => (
-                <button key={t.id} type="button" className="navrow" style={tintStyle(groupOfTool(t.id)?.tint ?? 8)} onClick={() => setNav({ tool: t.id })}>
+                <button key={t.id} type="button" className="navrow tap-row" style={tintStyle(groupOfTool(t.id)?.tint ?? 8)} onClick={() => setNav({ tool: t.id })}>
                   <span className="dot" aria-hidden="true" />
                   <span className="navrow__label">{t.title}</span>
                   <span className="navrow__meta">{groupOfTool(t.id)?.name}</span>
+                  <Icon name="chevron" size={18} className="navrow__chev" />
                 </button>
               ))}
             </div>
           )
         ) : (
           <>
-            <button type="button" className="hero" onClick={() => setNav({ scientific: true })}>
+            <button type="button" className="hero tap-row" onClick={() => setNav({ scientific: true })}>
               <span>Scientific calculator</span>
               <Icon name="chevron" size={18} className="navrow__chev" />
             </button>
@@ -112,7 +113,10 @@ export function ToolsScreen() {
               {GROUPS.map((g) => (
                 <button key={g.id} type="button" className="tile" style={tintStyle(g.tint)} onClick={() => setNav({ category: g.id })}>
                   <span className="tile__name">{g.name}</span>
-                  <span className="tile__meta">{g.tools.length} calculators</span>
+                  <span className="tile__foot">
+                    <span className="tile__meta">{g.tools.length} calculators</span>
+                    <Icon name="chevron" size={18} className="tap-row__chev" />
+                  </span>
                 </button>
               ))}
             </div>

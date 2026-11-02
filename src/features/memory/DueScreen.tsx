@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Icon } from '../../components/Icon'
 import { EmptyState } from '../../components/EmptyState'
 import { useApp } from '../../components/StoreProvider'
 import { tintStyle } from '../../components/tint'
@@ -23,6 +24,8 @@ export function DueScreen() {
   const remove = useApp((s) => s.removeReminder)
   const setTab = useApp((s) => s.setTab)
   const [openId, setOpenId] = useState<string | null>(null)
+  // A reminder cannot be brought back once removed, so Remove asks first (the store has no undo for reminders).
+  const [askId, setAskId] = useState<string | null>(null)
   const tabTap = useApp((s) => s.tabTap)
 
   // Tapping the Due tab while on it closes an open card.
@@ -58,18 +61,31 @@ export function DueScreen() {
             const card = cards.find((c) => c.id === r.cardId)!
             return (
               <div className="due" key={r.id}>
-                <button type="button" className="due__main" onClick={() => setOpenId(card.id)}>
-                  <span className="row__label">{card.title}</span>
-                  <span className={overdue ? 'row__hint due__alert' : 'row__hint'}>
-                    {dueLabel(r.dueAt, now)} · {WHEN.format(r.dueAt)}
-                    {r.repeat !== 'none' ? ` · ${r.repeat}` : ''}
+                <button type="button" className="due__main tap-row" onClick={() => setOpenId(card.id)}>
+                  <span className="row__text">
+                    <span className="row__label">{card.title}</span>
+                    <span className={overdue ? 'row__hint due__alert' : 'row__hint'}>
+                      {dueLabel(r.dueAt, now)} · {WHEN.format(r.dueAt)}
+                      {r.repeat !== 'none' ? ` · ${r.repeat}` : ''}
+                    </span>
                   </span>
+                  <Icon name="chevron" size={18} className="tap-row__chev" />
                 </button>
                 {card.amount !== null && <span className="result__value">{formatCell(new D(card.amount), card.amountFmt ?? 'money', { system, decimals })}</span>}
                 <div className="due__actions">
-                  <button type="button" className="link-btn" onClick={() => markPaid(r.id)}>Mark paid</button>
-                  <button type="button" className="link-btn" onClick={() => snooze(r.id, 1)}>Snooze 1 day</button>
-                  <button type="button" className="link-btn link-btn--danger" onClick={() => remove(r.id)}>Remove</button>
+                  {askId === r.id ? (
+                    <>
+                      <span className="due__ask" role="alert">Remove this reminder? The note stays.</span>
+                      <button type="button" className="link-btn" onClick={() => setAskId(null)}>Keep it</button>
+                      <button type="button" className="link-btn link-btn--danger" onClick={() => { remove(r.id); setAskId(null) }}>Yes, remove</button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" className="link-btn" onClick={() => markPaid(r.id)}>Mark paid</button>
+                      <button type="button" className="link-btn" onClick={() => snooze(r.id, 1)}>Snooze 1 day</button>
+                      <button type="button" className="link-btn link-btn--danger" onClick={() => setAskId(r.id)}>Remove</button>
+                    </>
+                  )}
                 </div>
               </div>
             )

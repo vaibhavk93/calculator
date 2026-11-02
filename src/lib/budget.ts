@@ -11,6 +11,10 @@ export interface BudgetCategory {
   /** The top-level category this is a subcategory of, or null for a top-level one. */
   parentId: string | null
   deletedAt: number | null
+  /** "This month only" limits: 'YYYY-MM' -> amount, or null for "no limit this month". An entry here wins over `limit`. */
+  limitByMonth?: Record<string, string | null>
+  /** Months this category exists in ('YYYY-MM'). Null or absent: every month. A subcategory without its own list uses its parent's. */
+  months?: string[] | null
 }
 
 /** How an entry was paid. The six modes are fixed; the cards, accounts and wallets under them are the user's own (PayInstrument). */
@@ -58,14 +62,48 @@ export interface PayInstrument {
   last4: string
   rewardNote: string
   deletedAt: number | null
+  /** The product name, e.g. "Neo". */
+  variant?: string
+  holder?: string
+  /** Day of the month the statement is made (credit cards), 1 to 28. */
+  statementDay?: number | null
+  dueDay?: number | null
+  /** Plain decimal string. Credit cards only. */
+  creditLimit?: string | null
+  annualFee?: string | null
+  /** "name@handle". Bank accounts and wallets only. */
+  upiHandle?: string
+  /** Bank accounts only. */
+  accountType?: AccountType | null
 }
+
+export const ACCOUNT_TYPES = [
+  { id: 'savings', label: 'Savings' },
+  { id: 'current', label: 'Current' },
+  { id: 'salary', label: 'Salary' },
+] as const
+export type AccountType = (typeof ACCOUNT_TYPES)[number]['id']
+export const isAccountType = (v: unknown): v is AccountType => ACCOUNT_TYPES.some((a) => a.id === v)
+
+/** Common Indian banks and card issuers for pickers. Free text is still allowed. */
+export const KNOWN_BANKS = [
+  'HDFC Bank', 'ICICI Bank', 'State Bank of India', 'Axis Bank', 'Kotak Mahindra Bank', 'Yes Bank', 'IDFC First Bank', 'IndusInd Bank',
+  'Punjab National Bank', 'Bank of Baroda', 'Canara Bank', 'Union Bank of India', 'Federal Bank', 'RBL Bank', 'AU Small Finance Bank',
+  'Standard Chartered', 'HSBC', 'American Express', 'Tata Neu', 'Bank of India', 'Indian Bank', 'IDBI Bank', 'Bandhan Bank', 'South Indian Bank', 'Paytm Payments Bank',
+] as const
+
+/** Shown for UPI with no card or account picked. */
+export const UPI_DEFAULT_LABEL = 'Bank account (default)'
 
 export const MAX_INSTRUMENTS = 40
 export const MAX_INSTRUMENT_NAME = 40
+export const MAX_VARIANT = 40
+export const MAX_HOLDER = 40
+export const MAX_UPI_HANDLE = 40
 export const MAX_REWARD_NOTE = 200
 
-/** "Tata Neo ••4321" */
-export const instrumentLabel = (i: PayInstrument): string => (i.last4 ? `${i.name} ••${i.last4}` : i.name)
+/** "Tata Neo ••4321", or with a product name "HDFC Regalia Gold ••4321". */
+export const instrumentLabel = (i: PayInstrument): string => [i.name, i.variant?.trim(), i.last4 ? `••${i.last4}` : ''].filter(Boolean).join(' ')
 
 /**
  * Which instruments a mode accepts. Credit, debit, net banking and wallet take their own kind.
@@ -101,9 +139,18 @@ export function paymentError(budget: Pick<BudgetData, 'instruments'>, mode: Paym
   return instrumentFitsMode(mode, i) ? null : MODE_HINT[mode]
 }
 
-/** Live instruments a picker should offer for a mode, in the order they were added. */
-export const eligibleInstruments = (budget: Pick<BudgetData, 'instruments'>, mode: PaymentModeId | null): PayInstrument[] =>
-  mode === null ? [] : budget.instruments.filter((i) => i.deletedAt === null && instrumentFitsMode(mode, i))
+const UPI_ORDER: Record<InstrumentKind, number> = { bank: 0, debit: 1, wallet: 2, credit: 3 }
+
+/**
+ * Live instruments a picker should offer for a mode, in the order they were added.
+ * For UPI: bank accounts, debit cards, wallets, then RuPay credit cards (added order inside each group).
+ * UPI with none picked is also fine: it means UPI_DEFAULT_LABEL.
+ */
+export function eligibleInstruments(budget: Pick<BudgetData, 'instruments'>, mode: PaymentModeId | null): PayInstrument[] {
+  if (mode === null) return []
+  const list = budget.instruments.filter((i) => i.deletedAt === null && instrumentFitsMode(mode, i))
+  return mode === 'upi' ? list.map((i, n) => ({ i, n })).sort((a, b) => UPI_ORDER[a.i.kind] - UPI_ORDER[b.i.kind] || a.n - b.n).map((x) => x.i) : list
+}
 
 export interface InstrumentDraft {
   name: string
@@ -112,6 +159,15 @@ export interface InstrumentDraft {
   bank?: string
   last4?: string
   rewardNote?: string
+  variant?: string
+  holder?: string
+  /** A number or a typed string; blank, null and undefined mean "not set". */
+  statementDay?: number | string | null
+  dueDay?: number | string | null
+  creditLimit?: string | null
+  annualFee?: string | null
+  upiHandle?: string
+  accountType?: AccountType | string | null
 }
 
 export const MAX_BANK_NAME = 40
@@ -128,6 +184,14 @@ export interface InstrumentErrors {
   bank?: string
   last4?: string
   rewardNote?: string
+  variant?: string
+  holder?: string
+  statementDay?: string
+  dueDay?: string
+  creditLimit?: string
+  annualFee?: string
+  upiHandle?: string
+  accountType?: string
 }
 
 /** What a field check can say. Each message names the fix. Null means the value is fine. */
@@ -168,26 +232,114 @@ export interface ExpenseErrors {
   paidWith?: string
 }
 
-/** Every problem with an entry, by field. An empty object means it can be saved. The store checks again before saving. */
+/** True when the category is live and, for a subcategory, so is its parent. */
+export function categoryUsable(budget: Pick<BudgetData, 'categories'>, id: string): boolean {
+  const c = budget.categories.find((x) => x.id === id && x.deletedAt === null)
+  return !!c && (c.parentId === null || budget.categories.some((x) => x.id === c.parentId && x.deletedAt === null))
+}
+
+/**
+ * Every problem with an entry, by field. An empty object means it can be saved. The store checks again before saving.
+ * `keepCategoryId` is the category the entry already has when it is being edited: it stays allowed even if the category
+ * is not active in the date's month (entries are never dropped).
+ */
 export function validateExpense(
-  d: { amount: string; date: string; categoryId: string | null; mode: PaymentModeId | null; instrumentId: string | null },
+  d: { amount: string; date: string; categoryId: string | null; mode: PaymentModeId | null; instrumentId: string | null; settlement?: Settlement | null },
   budget: Pick<BudgetData, 'categories' | 'instruments'>,
   today: Date = new Date(),
+  keepCategoryId: string | null = null,
 ): ExpenseErrors {
   const out: ExpenseErrors = {}
   const amount = validateAmount(d.amount)
   if (amount) out.amount = amount
   const date = validateDate(d.date, today)
   if (date) out.date = date
+  if (d.settlement) {
+    if (d.settlement === 'cardBill') {
+      const card = d.instrumentId === null ? undefined : budget.instruments.find((i) => i.id === d.instrumentId && i.deletedAt === null)
+      if (!card || card.kind !== 'credit') out.paidWith = 'Pick the credit card this bill is for'
+    }
+    return out
+  }
   if (d.categoryId !== null) {
-    const c = budget.categories.find((x) => x.id === d.categoryId && x.deletedAt === null)
-    const parentOk = !c || c.parentId === null || budget.categories.some((x) => x.id === c.parentId && x.deletedAt === null)
-    if (!c || !parentOk) out.category = 'Pick a category from the list'
+    if (!categoryUsable(budget, d.categoryId)) out.category = 'Pick a category from the list'
+    else if (!date && d.categoryId !== keepCategoryId && !categoryActiveIn(budget, d.categoryId, d.date.slice(0, 7))) out.category = `That category is not used in ${monthLabel(d.date.slice(0, 7))}`
   }
   const pay = paymentError(budget, d.mode, d.instrumentId)
   if (pay) out.paidWith = pay
   return out
 }
+
+const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/
+export const isMonthKey = (v: unknown): v is string => typeof v === 'string' && MONTH_KEY.test(v)
+
+/** Months a category is limited to, its own or its parent's; null means every month. */
+export function categoryMonths(budget: Pick<BudgetData, 'categories'>, c: BudgetCategory): string[] | null {
+  if (c.months && c.months.length > 0) return c.months
+  const p = c.parentId === null ? undefined : budget.categories.find((x) => x.id === c.parentId)
+  return p?.months && p.months.length > 0 ? p.months : null
+}
+
+/** Whether a category exists in `month` ('YYYY-MM'). Unknown ids are treated as active. */
+export function categoryActiveIn(budget: Pick<BudgetData, 'categories'>, id: string, month: string): boolean {
+  const c = budget.categories.find((x) => x.id === id)
+  if (!c) return true
+  const m = categoryMonths(budget, c)
+  return m === null || m.includes(month)
+}
+
+/** Live categories and subcategories the Add-expense picker should offer for an entry in `month`. */
+export const activeCategories = (budget: Pick<BudgetData, 'categories'>, month: string): BudgetCategory[] =>
+  budget.categories.filter((c) => c.deletedAt === null && categoryUsable(budget, c.id) && categoryActiveIn(budget, c.id, month))
+
+/** "only for Nov 2026" / "only for Nov 2026, Dec 2026" */
+export function onlyForLabel(months: string[]): string {
+  const short = (k: string) => { const [y = 1970, m = 1] = k.split('-').map(Number); return new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' }).format(new Date(y, m - 1, 1)) }
+  return `only for ${months.map(short).join(', ')}`
+}
+
+/**
+ * Null when `months` is fine for the category. Checks the format, that at least one month is chosen, that a subcategory stays
+ * inside its parent's months, and that a parent's new months still cover its subcategories' own months.
+ */
+export function validateCategoryMonths(budget: Pick<BudgetData, 'categories'>, id: string, months: string[] | null): string | null {
+  if (months === null) return null
+  if (!Array.isArray(months) || months.length === 0) return 'Pick at least one month'
+  if (!months.every(isMonthKey)) return 'Pick real months'
+  const c = budget.categories.find((x) => x.id === id && x.deletedAt === null)
+  if (!c) return 'That category was removed'
+  if (c.parentId !== null) {
+    const p = budget.categories.find((x) => x.id === c.parentId)
+    if (p?.months && p.months.length > 0 && !months.every((m) => p.months!.includes(m))) return `The months must be inside ${p.name}'s months`
+  } else {
+    const kid = budget.categories.find((x) => x.parentId === id && x.deletedAt === null && x.months && x.months.some((m) => !months.includes(m)))
+    if (kid) return `${kid.name} is used in months outside these. Change it first`
+  }
+  return null
+}
+
+/** Null when `months` can be given to a new subcategory of `parentId` (or a new top-level category when null). */
+export function validateNewCategoryMonths(budget: Pick<BudgetData, 'categories'>, parentId: string | null, months: string[] | null): string | null {
+  if (months === null) return null
+  if (!Array.isArray(months) || months.length === 0) return 'Pick at least one month'
+  if (!months.every(isMonthKey)) return 'Pick real months'
+  const p = parentId === null ? undefined : budget.categories.find((x) => x.id === parentId)
+  if (p?.months && p.months.length > 0 && !months.every((m) => p.months!.includes(m))) return `The months must be inside ${p.name}'s months`
+  return null
+}
+
+/** The limit in force for `month`: a "this month only" entry (even null, meaning none) wins over the every-month limit. */
+export function effectiveLimit(c: Pick<BudgetCategory, 'limit' | 'limitByMonth'>, month: string): string | null {
+  return c.limitByMonth && Object.hasOwn(c.limitByMonth, month) ? (c.limitByMonth[month] ?? null) : c.limit
+}
+
+export function effectiveOverall(budget: Pick<BudgetData, 'overall' | 'overallByMonth'>, month: string): string | null {
+  return budget.overallByMonth && Object.hasOwn(budget.overallByMonth, month) ? (budget.overallByMonth[month] ?? null) : budget.overall
+}
+
+/** Whether `month` has its own limit (or its own "no limit") instead of the every-month one. */
+export const hasMonthLimit = (x: { limitByMonth?: Record<string, string | null>; overallByMonth?: Record<string, string | null> }, month: string): boolean =>
+  Object.hasOwn(x.limitByMonth ?? x.overallByMonth ?? {}, month)
 
 /** Null when `name` can be a category name, or the reason it cannot. `selfId` is the category being renamed. */
 export function validateCategoryName(
@@ -214,8 +366,29 @@ export function validateCategoryName(
   return null
 }
 
-/** The checks that need no other data: what is typed in the fields. */
-export function validateInstrumentFields(d: { name?: string; kind?: string | null; bank?: string; last4?: string; rewardNote?: string }): InstrumentErrors {
+type InstrumentFields = Omit<Partial<InstrumentDraft>, 'kind'> & { kind?: string | null }
+
+const blank = (v: unknown): boolean => v === undefined || v === null || String(v).trim() === ''
+const dayProblem = (v: unknown): string | null => {
+  if (blank(v)) return null
+  const t = String(v).trim()
+  return /^\d{1,2}$/.test(t) && Number(t) >= 1 && Number(t) <= 28 ? null : 'Enter a day from 1 to 28'
+}
+/** Optional plain decimal. `allowZero` is for a fee, which may be free. */
+const optionalMoney = (v: unknown, what: string, allowZero: boolean): string | null => {
+  if (blank(v)) return null
+  const clean = String(v).replace(/[,₹\s]/g, '')
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(clean)) return `Enter ${what} as a number`
+  const n = new D(clean)
+  if (!allowZero && n.isZero()) return `Enter ${what} above zero, or leave it empty`
+  if (n.decimalPlaces() > 2) return 'Use up to 2 decimal places'
+  if (n.gt(MAX_AMOUNT)) return "That is more than ₹10 crore"
+  return null
+}
+const UPI_HANDLE = /^[A-Za-z0-9._-]{2,}@[A-Za-z][A-Za-z0-9]{1,}$/
+
+/** The checks that need no other data: what is typed in the fields. Fields that do not belong to the kind are an error only when filled in. */
+export function validateInstrumentFields(d: InstrumentFields): InstrumentErrors {
   const out: InstrumentErrors = {}
   if (!isInstrumentKind(d.kind)) out.kind = 'Pick what this is'
   const name = String(d.name ?? '').trim()
@@ -229,15 +402,36 @@ export function validateInstrumentFields(d: { name?: string; kind?: string | nul
   const note = String(d.rewardNote ?? '')
   if (note.length > MAX_REWARD_NOTE) out.rewardNote = `Notes can't be more than ${MAX_REWARD_NOTE} characters`
   else if (/\d{13,}/.test(note.replace(/[\s-]/g, ''))) out.rewardNote = 'Remove the long number. Calc does not store card numbers'
+  if (String(d.variant ?? '').trim().length > MAX_VARIANT) out.variant = `Card name can't be more than ${MAX_VARIANT} characters`
+  if (String(d.holder ?? '').trim().length > MAX_HOLDER) out.holder = `Name can't be more than ${MAX_HOLDER} characters`
+  const statement = dayProblem(d.statementDay)
+  if (statement) out.statementDay = statement
+  const due = dayProblem(d.dueDay)
+  if (due) out.dueDay = due
+  if (!blank(d.creditLimit)) out.creditLimit = d.kind !== 'credit' ? 'Only credit cards have a credit limit' : (optionalMoney(d.creditLimit, 'the limit', false) ?? undefined)
+  const fee = optionalMoney(d.annualFee, 'the fee', true)
+  if (fee) out.annualFee = fee
+  const handle = String(d.upiHandle ?? '').trim()
+  if (handle !== '') {
+    if (d.kind !== 'bank' && d.kind !== 'wallet') out.upiHandle = 'Only bank accounts and wallets have a UPI ID'
+    else if (handle.length > MAX_UPI_HANDLE || !UPI_HANDLE.test(handle)) out.upiHandle = 'UPI ID looks like name@bank'
+  }
+  if (!blank(d.accountType)) out.accountType = d.kind !== 'bank' ? 'Only bank accounts have an account type' : isAccountType(d.accountType) ? undefined : 'Pick savings, current or salary'
+  for (const k of Object.keys(out) as (keyof InstrumentErrors)[]) if (out[k] === undefined) delete out[k]
+  return out
+}
+
+/** Drops the fields a kind does not have (after the kind was changed), so an edit does not trip the checks above. */
+export function dropInapplicable<T extends InstrumentFields>(d: T): T {
+  const out = { ...d }
+  if (d.kind !== 'credit') out.creditLimit = null
+  if (d.kind !== 'bank' && d.kind !== 'wallet') out.upiHandle = ''
+  if (d.kind !== 'bank') out.accountType = null
   return out
 }
 
 /** The field checks plus the ones that look at the other cards: a name already used for this kind, and the cap. `selfId` is the one being edited. */
-export function validateInstrumentDraft(
-  d: { name?: string; kind?: string | null; bank?: string; last4?: string; rewardNote?: string },
-  budget: Pick<BudgetData, 'instruments'>,
-  selfId?: string,
-): InstrumentErrors {
+export function validateInstrumentDraft(d: InstrumentFields, budget: Pick<BudgetData, 'instruments'>, selfId?: string): InstrumentErrors {
   const out = validateInstrumentFields(d)
   const live = budget.instruments.filter((i) => i.deletedAt === null)
   const name = String(d.name ?? '').trim().toLowerCase()
@@ -246,10 +440,14 @@ export function validateInstrumentDraft(
   return out
 }
 
-/** Trims and checks a draft. Returns the clean fields or the reason it is not acceptable. Network is kept only for cards. */
+const orUndef = (v: string): string | undefined => (v === '' ? undefined : v)
+const plainMoney = (v: unknown): string | null => (blank(v) ? null : new D(String(v).replace(/[,₹\s]/g, '')).toFixed())
+const dayOrNull = (v: unknown): number | null => (blank(v) ? null : Number(String(v).trim()))
+
+/** Trims and checks a draft. Returns the clean fields or the reason it is not acceptable. Network is kept only for cards. Unset optional fields come back undefined. */
 export function cleanInstrument(d: InstrumentDraft): { ok: true; value: Omit<PayInstrument, 'id' | 'deletedAt'> } | { ok: false; error: string } {
   const bad = validateInstrumentFields({ ...d, bank: String(d.bank ?? '').trim().slice(0, MAX_BANK_NAME), rewardNote: String(d.rewardNote ?? '').trim().slice(0, MAX_REWARD_NOTE) })
-  const first = bad.name ?? bad.kind ?? bad.last4 ?? bad.rewardNote
+  const first = Object.values({ name: bad.name, kind: bad.kind, last4: bad.last4, rewardNote: bad.rewardNote, variant: bad.variant, holder: bad.holder, statementDay: bad.statementDay, dueDay: bad.dueDay, creditLimit: bad.creditLimit, annualFee: bad.annualFee, upiHandle: bad.upiHandle, accountType: bad.accountType }).find(Boolean)
   if (first) return { ok: false, error: first }
   const card = d.kind === 'credit' || d.kind === 'debit'
   return {
@@ -261,6 +459,14 @@ export function cleanInstrument(d: InstrumentDraft): { ok: true; value: Omit<Pay
       bank: String(d.bank ?? '').trim().slice(0, MAX_BANK_NAME),
       last4: String(d.last4 ?? '').trim(),
       rewardNote: String(d.rewardNote ?? '').trim().slice(0, MAX_REWARD_NOTE),
+      variant: orUndef(String(d.variant ?? '').trim()),
+      holder: orUndef(String(d.holder ?? '').trim()),
+      statementDay: dayOrNull(d.statementDay) ?? undefined,
+      dueDay: dayOrNull(d.dueDay) ?? undefined,
+      creditLimit: d.kind === 'credit' ? (plainMoney(d.creditLimit) ?? undefined) : undefined,
+      annualFee: plainMoney(d.annualFee) ?? undefined,
+      upiHandle: d.kind === 'bank' || d.kind === 'wallet' ? orUndef(String(d.upiHandle ?? '').trim()) : undefined,
+      accountType: d.kind === 'bank' && isAccountType(d.accountType) ? d.accountType : undefined,
     },
   }
 }
@@ -278,11 +484,22 @@ export interface BudgetExpense {
   instrumentId: string | null
   note: string
   deletedAt: number | null
+  /**
+   * A card bill payment or a transfer between your own accounts. It is not spending: left out of every spend total,
+   * but listed. A 'cardBill' has `instrumentId` = the credit card that was paid off, and no category.
+   */
+  settlement?: Settlement | null
 }
+
+export type Settlement = 'cardBill' | 'transfer'
+export const isSettlement = (v: unknown): v is Settlement => v === 'cardBill' || v === 'transfer'
+export const SETTLEMENT_LABEL: Record<Settlement, string> = { cardBill: 'Card bill payment', transfer: 'Transfer between own accounts' }
 
 export interface BudgetData {
   /** One limit for all spending in a month, or null. */
   overall: string | null
+  /** "This month only" overall limits: 'YYYY-MM' -> amount, or null for "no limit this month". Wins over `overall`. */
+  overallByMonth?: Record<string, string | null>
   categories: BudgetCategory[]
   instruments: PayInstrument[]
   expenses: BudgetExpense[]
@@ -296,6 +513,8 @@ export interface ExpenseDraft {
   instrumentId?: string | null
   date: string
   note: string
+  /** A card bill payment (instrumentId is the card) or an own-account transfer. Not spending. */
+  settlement?: Settlement | null
 }
 
 export const MAX_EXPENSES = 20000
@@ -349,6 +568,10 @@ export interface CategoryLine {
   pct: number | null
   /** Live subcategories (empty for a subcategory line). */
   children: CategoryLine[]
+  /** Whether `limit` is for this month only, or the every-month one. */
+  limitScope: 'month' | 'always'
+  /** "only for Nov 2026" when the category is not active in the month but entries were recorded on it. Else null. */
+  note: string | null
 }
 
 export interface Filter {
@@ -365,7 +588,7 @@ export interface MonthSummary {
   month: string
   /** Everything spent in the month that matches the filter. */
   spent: Dec
-  overall: { limit: Dec; left: Dec; pct: number } | null
+  overall: { limit: Dec; left: Dec; pct: number; scope: 'month' | 'always' } | null
   /** Live top-level categories, each with its subcategories as `children`. */
   lines: CategoryLine[]
   /** Spent in the month on entries with no category, or whose category was deleted. Never hidden. */
@@ -378,6 +601,11 @@ export interface MonthSummary {
   byInstrument: { instrument: PayInstrument; spent: Dec; count: number }[]
   /** Per card network with spend (from the instrument's network), biggest first. */
   byNetwork: { id: NetworkId; label: string; spent: Dec; count: number }[]
+  /** UPI entries with no card or account picked: "UPI from my bank" (UPI_DEFAULT_LABEL). Already counted under UPI in byMode. */
+  upiDefault: { spent: Dec; count: number }
+  /** Every entry with no card or account (cash, default UPI, no mode). Instrument-less spend, so byInstrument plus this equals `spent`. */
+  noInstrument: { spent: Dec; count: number }
+  /** Every live entry in the month that matches the filter, settlements included (they are not in any total). */
   entries: BudgetExpense[]
 }
 
@@ -433,10 +661,13 @@ export function summarise(budget: BudgetData, month: string, filter: Filter = {}
   let uncategorised = ZERO()
   let spent = ZERO()
   let noMode = ZERO()
+  const upiDefault = { spent: ZERO(), count: 0 }
+  const noInstrument = { spent: ZERO(), count: 0 }
   const modeSpent = new Map<PaymentModeId, Dec>()
   const instSpent = new Map<string, { spent: Dec; count: number }>()
   const netSpent = new Map<NetworkId, { spent: Dec; count: number }>()
   for (const e of entries) {
+    if (e.settlement) continue // a bill payment or own-account transfer is not spending
     const amount = parse(e.amount) ?? ZERO()
     spent = spent.plus(amount)
     if (e.mode === null) noMode = noMode.plus(amount)
@@ -451,32 +682,68 @@ export function summarise(budget: BudgetData, month: string, filter: Filter = {}
         const n = netSpent.get(inst.network) ?? { spent: ZERO(), count: 0 }
         netSpent.set(inst.network, { spent: n.spent.plus(amount), count: n.count + 1 })
       }
+    } else {
+      noInstrument.spent = noInstrument.spent.plus(amount)
+      noInstrument.count += 1
+      if (e.mode === 'upi') {
+        upiDefault.spent = upiDefault.spent.plus(amount)
+        upiDefault.count += 1
+      }
     }
   }
 
   const line = (c: BudgetCategory, own: Dec, total: Dec, children: CategoryLine[]): CategoryLine => {
-    const limit = parse(c.limit)
-    return { id: c.id, name: c.name, parentId: c.parentId, spent: total, direct: own, limit, left: limit ? limit.minus(total) : null, pct: limit ? pctOf(total, limit) : null, children }
+    const raw = effectiveLimit(c, month)
+    const limit = parse(raw)
+    const months = categoryMonths(budget, c)
+    return {
+      id: c.id, name: c.name, parentId: c.parentId, spent: total, direct: own, limit, left: limit ? limit.minus(total) : null, pct: limit ? pctOf(total, limit) : null, children,
+      limitScope: hasMonthLimit(c, month) ? 'month' : 'always',
+      note: months && !months.includes(month) ? onlyForLabel(months) : null,
+    }
   }
-  const lines = tops.map((c) => {
-    const children = subs.filter((s) => s.parentId === c.id).map((s) => { const v = spentBy.get(s.id) ?? ZERO(); return line(s, ZERO(), v, []) })
-    const own = spentBy.get(c.id) ?? ZERO()
-    return line(c, own, children.reduce((t, k) => t.plus(k.spent), own), children)
-  })
+  // A category outside its months is hidden, unless entries were recorded on it: those are never dropped.
+  const lines = tops
+    .map((c) => {
+      const children = subs
+        .filter((s) => s.parentId === c.id)
+        .map((s) => line(s, ZERO(), spentBy.get(s.id) ?? ZERO(), []))
+        .filter((k) => categoryActiveIn(budget, k.id, month) || k.spent.gt(0))
+      const own = spentBy.get(c.id) ?? ZERO()
+      return line(c, own, children.reduce((t, k) => t.plus(k.spent), own), children)
+    })
+    .filter((l) => categoryActiveIn(budget, l.id, month) || l.spent.gt(0))
 
-  const overallLimit = parse(budget.overall)
+  const overallLimit = parse(effectiveOverall(budget, month))
   return {
     month,
     spent,
-    overall: overallLimit ? { limit: overallLimit, left: overallLimit.minus(spent), pct: pctOf(spent, overallLimit) } : null,
+    overall: overallLimit ? { limit: overallLimit, left: overallLimit.minus(spent), pct: pctOf(spent, overallLimit), scope: hasMonthLimit({ overallByMonth: budget.overallByMonth }, month) ? 'month' : 'always' } : null,
     lines,
     uncategorised,
     byMode: PAYMENT_MODES.filter((m) => modeSpent.get(m.id)?.gt(0)).map((m) => ({ id: m.id, label: m.label, spent: modeSpent.get(m.id)! })),
     noMode,
     byInstrument: budget.instruments.filter((i) => instSpent.has(i.id)).map((i) => ({ instrument: i, ...instSpent.get(i.id)! })).sort(bySpentDesc),
     byNetwork: NETWORKS.filter((n) => netSpent.has(n.id)).map((n) => ({ id: n.id, label: n.label, ...netSpent.get(n.id)! })).sort(bySpentDesc),
+    upiDefault,
+    noInstrument,
     entries,
   }
+}
+
+/**
+ * What a credit card still owes: its charges (mode credit, or UPI from that card; not deleted, not a settlement) minus the
+ * bill payments recorded for it. Exact. Negative means paid in advance. All time, not one month.
+ */
+export function cardOutstanding(budget: Pick<BudgetData, 'expenses'>, instrumentId: string): Dec {
+  let owed = ZERO()
+  for (const e of budget.expenses) {
+    if (e.deletedAt !== null || e.instrumentId !== instrumentId) continue
+    const amount = parse(e.amount) ?? ZERO()
+    if (e.settlement === 'cardBill') owed = owed.minus(amount)
+    else if (!e.settlement && (e.mode === 'credit' || e.mode === 'upi')) owed = owed.plus(amount)
+  }
+  return owed
 }
 
 /**
@@ -492,7 +759,7 @@ export function suggestFor(
   if (!key) return null
   let best: BudgetExpense | null = null
   for (const e of budget.expenses) {
-    if (e.deletedAt !== null || e.note.trim().toLowerCase() !== key) continue
+    if (e.deletedAt !== null || e.settlement || e.note.trim().toLowerCase() !== key) continue
     if (!best || e.date > best.date) best = e
   }
   if (!best) return null
@@ -521,7 +788,7 @@ export function daysInMonth(month: string): number {
 export function spentIn(budget: BudgetData, month: string, filter: Filter = {}, throughDay = 31): Dec {
   let total = ZERO()
   for (const e of entriesIn(budget, month)) {
-    if (parseDay(e.date) <= throughDay && entryMatches(budget, e, filter)) total = total.plus(parse(e.amount) ?? ZERO())
+    if (!e.settlement && parseDay(e.date) <= throughDay && entryMatches(budget, e, filter)) total = total.plus(parse(e.amount) ?? ZERO())
   }
   return total
 }
@@ -579,6 +846,7 @@ export function compareLastMonth(budget: BudgetData, month: string, today: Date,
 /** The biggest `n` entries by amount. Ties: newest date first, then stored order. */
 export function topEntries(entries: BudgetExpense[], n: number): BudgetExpense[] {
   return entries
+    .filter((e) => !e.settlement)
     .map((e, i) => ({ e, i, a: parse(e.amount) ?? ZERO() }))
     .sort((x, y) => y.a.comparedTo(x.a) || (x.e.date === y.e.date ? x.i - y.i : x.e.date < y.e.date ? 1 : -1))
     .slice(0, n)

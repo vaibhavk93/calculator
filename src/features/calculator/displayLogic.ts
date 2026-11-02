@@ -1,7 +1,7 @@
 import { D, evaluatePreview, type InputState } from '../../engine'
 import { createLogger } from '../../lib/logger'
 
-import { formatDecimal, formatExpression, formatForCopy, formatPlain, magnitudeWords } from '../../lib/format'
+import { formatCompact, formatDecimal, formatExpression, formatForCopy, formatPlain, isHuge, magnitudeWords } from '../../lib/format'
 import type { Settings } from '../../store/types'
 
 export interface DisplayView {
@@ -9,6 +9,11 @@ export interface DisplayView {
   exprLine: string
   /** The big line. */
   resultLine: string
+  /**
+   * The same number in short scientific form ("1.2345E+25"), for when the big line cannot fit even at the smallest
+   * font. Null when there is nothing shorter to say.
+   */
+  compactLine: string | null
   /** Plain text for the clipboard, or null when there is nothing worth copying. */
   copyText: string | null
   /** "1.67 crore", or an error from the live preview. */
@@ -36,13 +41,14 @@ export function computeDisplay(
   const logger = createLogger('Calculator')
   logger.debug('Compute display', { expr, lastExpression, fresh, settings })
 
-  if (expr === '') return { exprLine: '', resultLine: '0', copyText: null, echo: null, preview: false }
+  if (expr === '') return { exprLine: '', resultLine: '0', compactLine: null, copyText: null, echo: null, preview: false }
 
   if (fresh) {
     const value = new D(expr)
     return {
       exprLine: lastExpression ? `${formatExpression(lastExpression, fmt.system)} =` : '',
       resultLine: formatPlain(expr, fmt),
+      compactLine: compactOf(value),
       copyText: formatForCopy(value, fmt.decimals),
       echo: wordsOf(value, fmt.system),
       preview: false,
@@ -50,12 +56,15 @@ export function computeDisplay(
   }
 
   if (BARE_NUMBER.test(expr)) {
+    const typed = new D(expr)
     return {
       exprLine: '',
-      // Shown as typed, so "1.50" and "12." keep their trailing characters while you work.
-      resultLine: formatExpression(expr, fmt.system),
-      copyText: formatForCopy(new D(expr), fmt.decimals),
-      echo: wordsOf(new D(expr), fmt.system),
+      // Shown as typed, so "1.50" and "12." keep their trailing characters while you work. From 1e15 up the
+      // digits are shortened ("1.234E+17"), as on a pocket calculator.
+      resultLine: isHuge(typed) ? formatCompact(typed) : formatExpression(expr, fmt.system),
+      compactLine: compactOf(typed),
+      copyText: formatForCopy(typed, fmt.decimals),
+      echo: wordsOf(typed, fmt.system),
       preview: false,
     }
   }
@@ -67,6 +76,7 @@ export function computeDisplay(
     return {
       exprLine,
       resultLine: formatDecimal(preview.value, fmt),
+      compactLine: compactOf(preview.value),
       copyText: formatForCopy(preview.value, fmt.decimals),
       echo: wordsOf(preview.value, fmt.system),
       preview: true,
@@ -78,6 +88,7 @@ export function computeDisplay(
   return {
     exprLine,
     resultLine: '',
+    compactLine: null,
     copyText: null,
     echo: worthSaying ? { text: preview.message, tone: 'error' } : null,
     preview: false,
@@ -87,4 +98,8 @@ export function computeDisplay(
 function wordsOf(value: InstanceType<typeof D>, system: Settings['numberSystem']): DisplayView['echo'] {
   const words = magnitudeWords(value, system)
   return words ? { text: words, tone: 'info' } : null
+}
+
+function compactOf(value: InstanceType<typeof D>): string | null {
+  return value.isFinite() && !value.isZero() ? formatCompact(value) : null
 }

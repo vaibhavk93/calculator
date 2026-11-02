@@ -7,9 +7,15 @@ import { ScreenHeader } from '../../components/ScreenHeader'
 import { useBackHandler } from '../../components/useBackHandler'
 import { matchesCard } from '../../lib/cardSearch'
 import { dueLabel } from '../../lib/reminders'
+import { groupTasks, taskItems, todayCount } from '../../lib/tasks'
 import type { SavedCard } from '../../store/types'
 import { CardView } from './CardView'
+import { Segmented } from '../settings/controls'
 import { TapeScreen } from './TapeScreen'
+import { TodoScreen } from './TodoScreen'
+
+/** Which side of the Notes tab was last open. Kept while the app runs, forgotten on restart. */
+let lastMode: 'notes' | 'todo' = 'notes'
 
 type View = { kind: 'list' } | { kind: 'card'; id: string } | { kind: 'newTape' } | { kind: 'trash' }
 
@@ -19,6 +25,12 @@ export function SavedScreen() {
   const togglePin = useApp((s) => s.togglePin)
   const setTab = useApp((s) => s.setTab)
   const [view, setView] = useState<View>({ kind: 'list' })
+  const [mode, setModeState] = useState(lastMode)
+  const setMode = (m: 'notes' | 'todo') => {
+    lastMode = m
+    setModeState(m)
+    setTag(null)
+  }
   const [query, setQuery] = useState('')
   const [tag, setTag] = useState<string | null>(null)
   const tabTap = useApp((s) => s.tabTap)
@@ -36,10 +48,13 @@ export function SavedScreen() {
   useEffect(() => {
     if (!openCard) return
     setView({ kind: 'card', id: openCard })
+    setMode(cards.find((c) => c.id === openCard)?.kind === 'task' ? 'todo' : 'notes')
     showCard(null)
   }, [openCard, showCard])
 
-  const live = useMemo(() => cards.filter((c) => c.deletedAt === null), [cards])
+  // Tasks live on the To-do side; every card is Notes or To-do, never both.
+  const live = useMemo(() => cards.filter((c) => c.deletedAt === null && (c.kind === 'task') === (mode === 'todo')), [cards, mode])
+  const openToday = useMemo(() => todayCount(groupTasks(taskItems(cards, reminders), Date.now())), [cards, reminders])
   const trashed = cards.filter((c) => c.deletedAt !== null)
   const tags = useMemo(() => [...new Set(live.flatMap((c) => c.tags))].sort(), [live])
   const shown = live
@@ -52,9 +67,18 @@ export function SavedScreen() {
   return (
     <div className="tools">
       <div className="saved__head">
-        <input className="field" type="search" placeholder="Search notes" aria-label="Search notes" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <Segmented
+          label="Notes or To-do"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'notes', label: 'Notes' },
+            { value: 'todo', label: openToday > 0 ? `To-do (${openToday})` : 'To-do' },
+          ]}
+        />
+        <input className="field" type="search" placeholder={mode === 'todo' ? 'Search tasks' : 'Search notes'} aria-label={mode === 'todo' ? 'Search tasks' : 'Search notes'} value={query} onChange={(e) => setQuery(e.target.value)} />
         <div className="saved__actions">
-          <button type="button" className="link-btn" onClick={() => setView({ kind: 'newTape' })}>New list</button>
+          {mode === 'notes' && <button type="button" className="link-btn" onClick={() => setView({ kind: 'newTape' })}>New list</button>}
           {trashed.length > 0 && (
             <button type="button" className="link-btn" onClick={() => setView({ kind: 'trash' })}>Trash ({trashed.length})</button>
           )}
@@ -70,7 +94,9 @@ export function SavedScreen() {
         )}
       </div>
 
-      {live.length === 0 ? (
+      {mode === 'todo' ? (
+        <TodoScreen query={query} tag={tag} />
+      ) : live.length === 0 ? (
         <EmptyState
           title="No notes yet"
           action={<button type="button" className="btn btn--primary" onClick={() => setTab('tools')}>Open calculators</button>}
@@ -140,14 +166,15 @@ function TrashScreen({ onBack }: { onBack: () => void }) {
   const cards = useApp((s) => s.cards.filter((c) => c.deletedAt !== null))
   const restore = useApp((s) => s.restoreCard)
   const empty = useApp((s) => s.emptyTrash)
+  const [asking, setAsking] = useState(false)
   return (
     <div className="screen" role="dialog" aria-modal="true" aria-label="Trash">
       <ScreenHeader
         title="Trash"
         onBack={onBack}
         action={
-          cards.length > 0 && (
-            <button type="button" className="link-btn link-btn--danger" onClick={() => { empty(); onBack() }}>
+          cards.length > 0 && !asking && (
+            <button type="button" className="link-btn link-btn--danger" onClick={() => setAsking(true)}>
               Empty Trash
             </button>
           )
@@ -155,6 +182,15 @@ function TrashScreen({ onBack }: { onBack: () => void }) {
       />
       <div className="screen__body">
         <p className="result__note tape__hint">Deleted items stay here for 7 days, then go for good.</p>
+        {asking && cards.length > 0 && (
+          <div className="confirm todo__confirm" role="group" aria-label="Empty Trash">
+            <p>Empty Trash? This deletes {cards.length} {cards.length === 1 ? 'item' : 'items'} for good. You cannot undo it.</p>
+            <div className="confirm__actions">
+              <button type="button" className="btn" autoFocus onClick={() => setAsking(false)}>Keep them</button>
+              <button type="button" className="btn btn--danger" onClick={() => { empty(); onBack() }}>Empty Trash</button>
+            </div>
+          </div>
+        )}
         <div className="group">
           {cards.map((c) => (
             <div className="row" key={c.id}>

@@ -28,6 +28,13 @@ Capacitor for the stores. **Read the docs before writing code.**
 | Budget: what is built, Spend Summary, payment methods, phases | `docs/BUDGET-PLAN.md` |
 | Notes + To-do plan | `docs/NOTES-TODO-PLAN.md` |
 
+## How to work with the owner (rules they set)
+
+- **Think at app level, always.** A request that names one screen or one number is a sample of a pattern. Find every place with the same pattern, fix them all, and list what else you found. Think from several angles (other screens, other users, other sizes of number, other months) before building.
+- Ask only when a choice is expensive or cannot be undone. Otherwise decide, build and report. Say plainly what you decided.
+- **Keep `docs/SESSION-STATE.md` current between steps** (the last prompt, and a status table), so the owner can switch accounts or sessions and resume without losing context.
+- Close what you started and no longer need (dev servers, previews, daemons). Do not touch the owner's own background tools.
+
 ## Commands
 
 ```bash

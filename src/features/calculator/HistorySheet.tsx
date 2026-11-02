@@ -3,7 +3,8 @@ import { Icon } from '../../components/Icon'
 import { Sheet } from '../../components/Sheet'
 import { useApp } from '../../components/StoreProvider'
 import { formatExpression, formatPlain } from '../../lib/format'
-import { MAX_MEMO } from '../../store/types'
+import { MAX_MEMO, isKept } from '../../store/types'
+import { HistoryRowSheet } from './HistoryRowSheet'
 
 export function HistorySheet() {
   const history = useApp((s) => s.history)
@@ -20,10 +21,15 @@ export function HistorySheet() {
   const [typed, setTyped] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
+  const [rowId, setRowId] = useState<string | null>(null)
+  const [lockedOnly, setLockedOnly] = useState(false)
 
   const fmt = { system, decimals }
   const armed = typed.trim().toUpperCase() === 'CLEAR'
-  const clearable = history.filter((h) => !h.memo).length
+  const clearable = history.filter((h) => !isKept(h)).length
+  const lockedCount = history.filter((h) => h.locked).length
+  const keptCount = history.length - clearable
+  const shown = lockedOnly && lockedCount > 0 ? history.filter((h) => h.locked) : history
 
   const close = () => setOverlay('none')
   const cancelClear = () => {
@@ -63,8 +69,9 @@ export function HistorySheet() {
           }}
         >
           <p>
-            Type CLEAR to remove {clearable} calculation{clearable === 1 ? '' : 's'}. Named calculations are kept.
-            You will have a few seconds to undo.
+            Type CLEAR to remove {clearable} calculation{clearable === 1 ? '' : 's'}.
+            {lockedCount > 0 ? ` ${lockedCount} locked ${lockedCount === 1 ? 'row is' : 'rows are'} kept.` : ''}
+            {keptCount > lockedCount ? ' Named calculations are kept.' : ''} You will have a few seconds to undo.
           </p>
           <input
             className="field"
@@ -91,8 +98,19 @@ export function HistorySheet() {
           Nothing here yet. Calculations you finish with = are kept here, and you can tap one to use it again.
         </p>
       ) : (
+        <>
+          {lockedCount > 0 ? (
+            <div className="chips hfilter" role="group" aria-label="Show">
+              <button type="button" className="chip" aria-pressed={!lockedOnly} onClick={() => setLockedOnly(false)}>
+                All
+              </button>
+              <button type="button" className="chip" aria-pressed={lockedOnly} onClick={() => setLockedOnly(true)}>
+                Locked
+              </button>
+            </div>
+          ) : null}
         <ul className="hlist">
-          {history.map((h) => {
+          {shown.map((h) => {
             const expression = formatExpression(h.expression, system)
             const result = formatPlain(h.result, fmt)
             const editing = editingId === h.id
@@ -123,7 +141,13 @@ export function HistorySheet() {
                   </form>
                 ) : (
                   <>
-                    {h.memo ? <span className="hrow__memo">{h.memo}</span> : null}
+                    {h.memo || h.locked ? (
+                      <span className="hrow__memo">
+                        {h.locked ? <Icon name="lock" size={14} className="hrow__lock" /> : null}
+                        {h.locked ? <span className="sr-only">Locked. </span> : null}
+                        {h.memo}
+                      </span>
+                    ) : null}
                     <button type="button" className="hrow__expr" aria-label={`Use expression ${expression}`} onClick={() => reuseExpression(h.id)}>
                       {expression}
                     </button>
@@ -135,12 +159,29 @@ export function HistorySheet() {
                         type="button"
                         className="icon-btn"
                         aria-label={h.memo ? `Rename ${expression}` : `Name ${expression}`}
+                        title={h.memo ? 'Rename' : 'Name'}
                         onClick={() => startEdit(h.id, h.memo)}
                       >
                         <Icon name="edit" size={18} />
                       </button>
-                      <button type="button" className="icon-btn" aria-label={`Delete ${expression}`} onClick={() => deleteHistory(h.id)}>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        aria-label={h.locked ? `Delete ${expression} (unlock it first)` : `Delete ${expression}`}
+                        title={h.locked ? 'Unlock to delete' : 'Delete'}
+                        disabled={h.locked}
+                        onClick={() => deleteHistory(h.id)}
+                      >
                         <Icon name="trash" size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn hrow__more"
+                        aria-label={`More for ${expression}`}
+                        title="More"
+                        onClick={() => setRowId(h.id)}
+                      >
+                        <Icon name="more" size={18} />
                       </button>
                     </span>
                   </>
@@ -149,7 +190,9 @@ export function HistorySheet() {
             )
           })}
         </ul>
+        </>
       )}
+      {rowId ? <HistoryRowSheet id={rowId} onClose={() => setRowId(null)} /> : null}
     </Sheet>
   )
 }

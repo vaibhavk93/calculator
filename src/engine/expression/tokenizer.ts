@@ -49,6 +49,10 @@ export function tokenize(src: string): Token[] {
       }
       // "1.2.3" and a lone "." are not numbers.
       if (digits === 0 || src.charAt(j) === '.') throw new ExprError('syntax')
+      // Scientific notation as the calculator itself writes it ("1.2345E+25"): capital E only, since a lowercase
+      // "e" typed on the keypad is Euler's number and "2e+3" must stay 2 x e + 3.
+      const exp = /^E[+-]?\d{1,4}(?!\d)/.exec(src.slice(j))
+      if (exp) j += exp[0].length
       out.push({ t: 'num', v: src.slice(i, j) })
       i = j
       continue

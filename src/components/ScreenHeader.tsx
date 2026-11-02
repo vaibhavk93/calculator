@@ -30,7 +30,7 @@ export function ScreenHeader({
 }) {
   return (
     <header className="screen__bar">
-      <button type="button" className="icon-btn" aria-label="Back" onClick={onBack}>
+      <button type="button" className="icon-btn" aria-label="Back" title="Back" onClick={onBack}>
         <Icon name="back" size={20} />
       </button>
       {titleSlot ?? <h1 className={tint ? 'screen__title screen__title--tint' : 'screen__title'}>{title}</h1>}

@@ -4,6 +4,7 @@ import {
   INITIAL_INPUT,
   applyKey,
   applyKeyAt,
+  evaluateExpression,
   evaluatePreview,
   insertExpressionAt,
   insertNumber,
@@ -12,8 +13,20 @@ import {
   type Key,
 } from '../engine'
 import { parseNum } from '../lib/tool'
-import { MAX_SUBCATEGORIES, cleanInstrument, instrumentFitsMode, validateExpense, type ExpenseDraft } from '../lib/budget'
-import { sanitizeSettings } from './persistence'
+import {
+  MAX_SUBCATEGORIES,
+  categoryUsable,
+  cleanInstrument,
+  dropInapplicable,
+  instrumentFitsMode,
+  isMonthKey,
+  validateCategoryMonths,
+  validateExpense,
+  validateLimit,
+  validateNewCategoryMonths,
+  type ExpenseDraft,
+} from '../lib/budget'
+import { capHistory, isRawExpression, sanitizeSettings } from './persistence'
 import {
   MAX_CATEGORIES,
   MAX_EXPENSES,
@@ -23,7 +36,9 @@ import {
   type PayInstrument,
   MAX_CARDS,
   MAX_HISTORY,
+  MAX_LOCKED,
   MAX_MEMO,
+  isKept,
   MAX_PINNED,
   MAX_UNDO,
   TRASH_DAYS,
@@ -37,20 +52,8 @@ import {
   type BudgetData,
 } from './types'
 import { advance } from '../lib/reminders'
+import { isTaskDone, nextOccurrence, shortDate } from '../lib/tasks'
 import { listSummary, repeatLines, tapeTotal } from '../lib/tape'
-
-/**
- * Caps history at `max`, but a named row is never evicted this way (only Clear all's
- * confirmation, or deleting it directly, removes one). When over the cap, the oldest
- * unnamed rows go first; `entries` is newest-first.
- */
-function capHistory(entries: HistoryEntry[], max: number): HistoryEntry[] {
-  if (entries.length <= max) return entries
-  const named = entries.filter((e) => e.memo)
-  const budget = Math.max(0, max - named.length)
-  const keepUnnamed = new Set(entries.filter((e) => !e.memo).slice(0, budget).map((e) => e.id))
-  return entries.filter((e) => e.memo || keepUnnamed.has(e.id))
-}
 
 export type Overlay = 'none' | 'settings' | 'history'
 export type Panel = 'none' | 'more' | 'scientific'
@@ -94,6 +97,9 @@ export interface ToolsNav {
   /** Whether the scientific calculator is open. */
   scientific: boolean
 }
+
+/** Where a limit applies: every month, or one month only. */
+export type LimitScope = { kind: 'always' } | { kind: 'month'; month: string }
 
 export const TOOLS_HOME: ToolsNav = { category: null, tool: null, scientific: false }
 
@@ -144,15 +150,19 @@ export interface AppState {
   /** Removes an entry; the snackbar offers Undo. */
   deleteExpense: (id: string) => void
   /** A monthly limit for one category, or null to remove it. */
-  setCategoryLimit: (id: string, limit: string | null) => void
+  setCategoryLimit: (id: string, limit: string | null, scope?: LimitScope) => boolean
   /** One limit for everything spent in a month, or null to remove it. */
-  setOverallLimit: (limit: string | null) => void
+  setOverallLimit: (limit: string | null, scope?: LimitScope) => boolean
+  /** Goes back to the every-month limit for one month. `target` is a category id or 'overall'. */
+  clearMonthLimit: (target: string, month: string) => void
+  /** Which months a category exists in ('YYYY-MM'), or null for every month. Returns false (and says why) when refused. */
+  setCategoryMonths: (id: string, months: string[] | null) => boolean
   /**
    * Adds a category, or a subcategory when `parentId` is given. Returns its id, or the id of the live one with the
    * same name (ignoring case) under the same parent. Returns null for a blank name, the cap, or a parent that is
    * missing or is itself a subcategory.
    */
-  addCategory: (name: string, parentId?: string | null) => string | null
+  addCategory: (name: string, parentId?: string | null, months?: string[] | null) => string | null
   renameCategory: (id: string, name: string) => void
   /** Deleting a top-level category deletes its subcategories too. Entries stay, shown as Uncategorised. */
   deleteCategory: (id: string) => void
@@ -178,6 +188,10 @@ export interface AppState {
   reuseResult: (id: string) => void
   /** Sets or clears the name on a history row. An empty string clears it. */
   renameHistory: (id: string, memo: string) => void
+  /** Locks or unlocks a row. Locked rows survive Clear all and the history cap. At the limit, says so and does nothing. */
+  setHistoryLocked: (id: string, locked: boolean) => void
+  /** Re-evaluates a new expression for a row. Returns a plain-words error (and changes nothing), or null when saved. */
+  editHistoryExpression: (id: string, expression: string) => string | null
   deleteHistory: (id: string) => void
   clearHistory: () => void
   undoRemoval: () => void
@@ -201,6 +215,13 @@ export interface AppState {
   markPaid: (reminderId: string) => void
   snooze: (reminderId: string, days: number) => void
   removeReminder: (reminderId: string) => void
+  /**
+   * To-do. Ticks a task done, or back to open. A repeating task moves to its next date instead of finishing.
+   * Returns false when there is no such task. Ticking done offers Undo in the snackbar.
+   */
+  setTaskDone: (id: string, done: boolean) => boolean
+  /** Moves every finished task to Trash (undoable). Returns how many. */
+  clearDoneTasks: () => number
 
   updateSettings: (patch: Partial<Settings>) => void
   setTab: (tab: Tab) => void
@@ -247,6 +268,8 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
   const keepIds = new Set(keep.map((c) => c.id))
   let removedCardId: string | null = null
   let removedExpenseId: string | null = null
+  /** A task tick or "Clear done" that the snackbar's Undo can reverse; only valid while its own snackbar is showing. */
+  let taskUndo: { snackId: number; run: () => void } | null = null
 
   return createStore<AppState>()((set, get) => {
     /** Records the current input so it can be undone, if the next state actually differs. */
@@ -280,22 +303,40 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
     }
 
     /** The final guard before an entry is saved: the same checks the sheet shows (validateExpense). Returns the clean entry, or the first problem in words. */
-    const checkedExpense = (d: ExpenseDraft) => {
+    const checkedExpense = (d: ExpenseDraft, keepCategoryId: string | null = null) => {
       const { budget } = get()
-      const mode = isPaymentMode(d.mode) ? d.mode : null
-      const instrumentId = d.instrumentId ?? null
+      const settlement = d.settlement === 'cardBill' || d.settlement === 'transfer' ? d.settlement : undefined
+      // A bill payment or own-account transfer is not spending: no category, no payment mode, and only a card bill keeps a card.
+      const mode = settlement ? null : isPaymentMode(d.mode) ? d.mode : null
+      const instrumentId = settlement === 'transfer' ? null : (d.instrumentId ?? null)
       // A category that no longer exists falls back to Uncategorised here; the sheet already told the person.
-      const categoryId = d.categoryId !== null && validateExpense({ ...d, amount: '1', mode, instrumentId: null }, budget).category === undefined ? d.categoryId : null
-      const bad = validateExpense({ amount: d.amount, date: d.date, categoryId, mode, instrumentId }, budget)
-      const first = bad.amount ?? bad.date ?? bad.paidWith
+      const categoryId = !settlement && d.categoryId !== null && categoryUsable(budget, d.categoryId) ? d.categoryId : null
+      const bad = validateExpense({ amount: d.amount, date: d.date, categoryId, mode, instrumentId, settlement }, budget, new Date(), keepCategoryId)
+      const first = bad.amount ?? bad.date ?? bad.category ?? bad.paidWith
       if (first) return first
-      return { amount: toPlain(parseNum(d.amount)!), categoryId, mode, instrumentId, date: d.date, note: d.note.trim().slice(0, 200) }
+      return { amount: toPlain(parseNum(d.amount)!), categoryId, mode, instrumentId, date: d.date, note: d.note.trim().slice(0, 200), settlement }
     }
 
-    const cleanLimit = (limit: string | null) => {
-      if (limit === null) return null
-      const v = parseNum(limit)
-      return v && v.isPositive() && !v.isZero() ? toPlain(v) : null
+    /** A limit as a clean string, null for "none", or undefined (and a notice) when it is not acceptable. */
+    const cleanLimit = (limit: string | null): string | null | undefined => {
+      if (limit === null || limit.trim() === '') return null
+      const bad = validateLimit(limit)
+      if (bad) return void fail(bad)
+      return toPlain(parseNum(limit.replace(/[,₹\s]/g, ''))!)
+    }
+
+    /** Applies a limit to the every-month field or to one month's override. Returns the new pair, or null when refused. */
+    const placeLimit = (
+      limit: string | null,
+      scope: LimitScope,
+      standing: string | null,
+      byMonth: Record<string, string | null> | undefined,
+    ): { limit: string | null; byMonth: Record<string, string | null> | undefined } | null => {
+      const v = cleanLimit(limit)
+      if (v === undefined) return null
+      if (scope.kind === 'always') return { limit: v, byMonth }
+      if (!isMonthKey(scope.month)) return (fail('Pick a real month'), null)
+      return { limit: standing, byMonth: { ...byMonth, [scope.month]: v } }
     }
 
     const currentValue = () => {
@@ -436,11 +477,32 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         })
       },
 
+      setHistoryLocked: (id, locked) => {
+        const { history } = get()
+        if (locked && history.filter((h) => h.locked).length >= MAX_LOCKED) {
+          return set({ notice: { id: nextId(), text: 'Unlock one to lock another.', tone: 'info' } })
+        }
+        set({ history: history.map((h) => (h.id === id ? (locked ? { ...h, locked: true } : { ...h, locked: undefined }) : h)) })
+      },
+
+      editHistoryExpression: (id, expression) => {
+        const expr = expression.trim()
+        if (expr === '') return 'Type an expression'
+        if (!isRawExpression(expr)) return 'Check the expression'
+        const r = evaluateExpression(expr, { angle: get().settings.angle })
+        if (!r.ok) return r.message
+        const result = toPlain(r.value)
+        if (!/^-?\d{1,110}(\.\d{1,110})?$/.test(result)) return 'Too large to show'
+        set({ history: get().history.map((h) => (h.id === id ? { ...h, expression: expr, result } : h)) })
+        return null
+      },
+
       deleteHistory: (id) => {
         const { history } = get()
         const index = history.findIndex((h) => h.id === id)
         const entry = history[index]
         if (index === -1 || !entry) return
+        if (entry.locked) return set({ notice: { id: nextId(), text: 'Unlock it first to delete it.', tone: 'info' } })
         set({
           history: history.filter((h) => h.id !== id),
           removed: [{ entry, index }],
@@ -450,11 +512,11 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
 
       clearHistory: () => {
         const { history } = get()
-        // Named rows are kept: clearing is for the clutter, not for what you bothered to name.
-        const toRemove = history.map((entry, index) => ({ entry, index })).filter((r) => !r.entry.memo)
+        // Named and locked rows are kept: clearing is for the clutter, not for what you bothered to keep.
+        const toRemove = history.map((entry, index) => ({ entry, index })).filter((r) => !isKept(r.entry))
         if (toRemove.length === 0) return
         set({
-          history: history.filter((h) => h.memo),
+          history: history.filter(isKept),
           removed: toRemove,
           snack: { id: nextId(), text: `Cleared ${toRemove.length} calculations`, canUndo: true },
         })
@@ -465,15 +527,17 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         if (typeof e === 'string') return fail(e)
         const { budget } = get()
         if (budget.expenses.length >= MAX_EXPENSES) return fail(`You can keep up to ${MAX_EXPENSES} entries.`)
-        set({ budget: { ...budget, expenses: [{ id: deps.newId(), ...e, deletedAt: null }, ...budget.expenses] }, notice: null })
+        const { settlement, ...rest } = e
+        set({ budget: { ...budget, expenses: [{ id: deps.newId(), ...rest, deletedAt: null, ...(settlement ? { settlement } : {}) }, ...budget.expenses] }, notice: null })
         return true
       },
 
       updateExpense: (id, draft) => {
-        const e = checkedExpense(draft)
-        if (typeof e === 'string') return fail(e)
         const { budget } = get()
-        set({ budget: { ...budget, expenses: budget.expenses.map((x) => (x.id === id ? { ...x, ...e } : x)) } })
+        const e = checkedExpense(draft, budget.expenses.find((x) => x.id === id)?.categoryId ?? null)
+        if (typeof e === 'string') return fail(e)
+        const { settlement, ...rest } = e
+        set({ budget: { ...budget, expenses: budget.expenses.map((x) => { if (x.id !== id) return x; const { settlement: _old, ...keep } = x; return { ...keep, ...rest, ...(settlement ? { settlement } : {}) } }) } })
         return true
       },
 
@@ -489,14 +553,64 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         })
       },
 
-      setCategoryLimit: (id, limit) => {
+      setCategoryLimit: (id, limit, scope = { kind: 'always' }) => {
         const { budget } = get()
-        set({ budget: { ...budget, categories: budget.categories.map((c) => (c.id === id ? { ...c, limit: cleanLimit(limit) } : c)) } })
+        const cur = budget.categories.find((c) => c.id === id)
+        if (!cur) return false
+        const r = placeLimit(limit, scope, cur.limit, cur.limitByMonth)
+        if (!r) return false
+        set({ budget: { ...budget, categories: budget.categories.map((c) => (c.id === id ? { ...c, limit: r.limit, ...(r.byMonth ? { limitByMonth: r.byMonth } : {}) } : c)) }, notice: null })
+        return true
       },
 
-      setOverallLimit: (limit) => set({ budget: { ...get().budget, overall: cleanLimit(limit) } }),
+      setOverallLimit: (limit, scope = { kind: 'always' }) => {
+        const { budget } = get()
+        const r = placeLimit(limit, scope, budget.overall, budget.overallByMonth)
+        if (!r) return false
+        set({ budget: { ...budget, overall: r.limit, ...(r.byMonth ? { overallByMonth: r.byMonth } : {}) }, notice: null })
+        return true
+      },
 
-      addCategory: (name, parentId = null) => {
+      clearMonthLimit: (target, month) => {
+        const { budget } = get()
+        const without = (m: Record<string, string | null> | undefined) => {
+          if (!m || !Object.hasOwn(m, month)) return m
+          const { [month]: _gone, ...left } = m
+          return Object.keys(left).length > 0 ? left : undefined
+        }
+        if (target === 'overall') {
+          const { overallByMonth: _o, ...rest } = budget
+          const next = without(budget.overallByMonth)
+          return set({ budget: { ...rest, ...(next ? { overallByMonth: next } : {}) } })
+        }
+        set({
+          budget: {
+            ...budget,
+            categories: budget.categories.map((c) => {
+              if (c.id !== target) return c
+              const { limitByMonth: _l, ...rest } = c
+              const next = without(c.limitByMonth)
+              return { ...rest, ...(next ? { limitByMonth: next } : {}) }
+            }),
+          },
+        })
+      },
+
+      setCategoryMonths: (id, months) => {
+        const { budget } = get()
+        const cur = budget.categories.find((c) => c.id === id && c.deletedAt === null)
+        if (!cur) return false
+        const bad = validateCategoryMonths(budget, id, months)
+        if (bad) return fail(bad)
+        const clean = months === null ? null : [...new Set(months)].sort()
+        set({
+          budget: { ...budget, categories: budget.categories.map((c) => { if (c.id !== id) return c; const { months: _m, ...rest } = c; return clean ? { ...rest, months: clean } : rest }) },
+          notice: null,
+        })
+        return true
+      },
+
+      addCategory: (name, parentId = null, months = null) => {
         const clean = name.trim().slice(0, 40)
         const { budget } = get()
         if (!clean) return null
@@ -511,8 +625,14 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
           fail(`A category can have up to ${MAX_SUBCATEGORIES} subcategories.`)
           return null
         }
+        const badMonths = validateNewCategoryMonths(budget, parentId, months)
+        if (badMonths) {
+          fail(badMonths)
+          return null
+        }
         const id = deps.newId()
-        set({ budget: { ...budget, categories: [...budget.categories, { id, name: clean, limit: null, parentId, deletedAt: null }] } })
+        const own = months ? [...new Set(months)].sort() : null
+        set({ budget: { ...budget, categories: [...budget.categories, { id, name: clean, limit: null, parentId, deletedAt: null, ...(own ? { months: own } : {}) }] } })
         return id
       },
 
@@ -552,7 +672,8 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const { budget } = get()
         const cur = budget.instruments.find((i) => i.id === id && i.deletedAt === null)
         if (!cur) return false
-        const r = cleanInstrument({ ...cur, ...patch })
+        const merged = { ...cur, ...patch }
+        const r = cleanInstrument(patch.kind && patch.kind !== cur.kind ? dropInapplicable(merged) : merged)
         if (!r.ok) return fail(r.error)
         if (budget.instruments.some((i) => i.id !== id && i.deletedAt === null && i.kind === r.value.kind && i.name.toLowerCase() === r.value.name.toLowerCase())) {
           return fail('You already have one with that name')
@@ -583,6 +704,12 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       },
 
       undoRemoval: () => {
+        if (taskUndo && taskUndo.snackId === get().snack?.id) {
+          const t = taskUndo
+          taskUndo = null
+          set({ snack: null })
+          return t.run()
+        }
         if (removedExpenseId) {
           const id = removedExpenseId
           removedExpenseId = null
@@ -602,13 +729,14 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         for (const { entry, index } of [...removed].sort((a, b) => a.index - b.index)) {
           restored.splice(Math.min(index, restored.length), 0, entry)
         }
-        set({ history: restored.slice(0, MAX_HISTORY), removed: null, snack: null })
+        set({ history: capHistory(restored, MAX_HISTORY), removed: null, snack: null })
       },
 
       saveCard: (draft, reminder) => {
         const { cards } = get()
         if (cards.filter((c) => c.deletedAt === null).length >= MAX_CARDS) {
-          set({ notice: { id: nextId(), text: `You can keep up to ${MAX_CARDS} saved items. Delete some first.`, tone: 'error' } })
+          const text = draft.kind === 'task' ? `You can keep up to ${MAX_CARDS} notes and tasks. Delete some first.` : `You can keep up to ${MAX_CARDS} saved items. Delete some first.`
+          set({ notice: { id: nextId(), text, tone: 'error' } })
           return null
         }
         const now = deps.now()
@@ -711,6 +839,59 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         set({ reminders: get().reminders.map((r) => (r.id === reminderId ? { ...r, dueAt: Math.max(r.dueAt, deps.now()) + days * DAY } : r)) }),
 
       removeReminder: (reminderId) => set({ reminders: get().reminders.filter((r) => r.id !== reminderId) }),
+
+      setTaskDone: (id, done) => {
+        const { cards, reminders } = get()
+        const card = cards.find((c) => c.id === id && c.kind === 'task' && c.deletedAt === null)
+        if (!card) return false
+        const rem = reminders.find((r) => r.cardId === id)
+        const now = deps.now()
+        const setCard = (next: SavedCard) => set({ cards: get().cards.map((c) => (c.id === id ? next : c)) })
+        const setRem = (next: Reminder | undefined) => set({ reminders: [...get().reminders.filter((r) => r.cardId !== id), ...(next ? [next] : [])] })
+        if (!done) {
+          const { done: _d, doneAt: _t, ...rest } = card
+          setCard({ ...rest, updatedAt: now })
+          if (rem?.done) setRem({ ...rem, done: false })
+          return true
+        }
+        const next = rem && !rem.done ? nextOccurrence(rem, now) : null
+        let text: string
+        if (rem && next !== null) {
+          // A repeating task is never "done": it moves on, and the tick is logged.
+          setRem({ ...rem, dueAt: next, history: [...rem.history, { paidAt: now, amount: null }].slice(-200) })
+          text = `Done. Next on ${shortDate(next)}`
+        } else {
+          setCard({ ...card, done: true, doneAt: now, updatedAt: now })
+          if (rem) setRem({ ...rem, done: true })
+          text = `Done: "${card.title}"`
+        }
+        const snackId = nextId()
+        taskUndo = {
+          snackId,
+          run: () => {
+            set({ cards: get().cards.map((c) => (c.id === id ? card : c)) })
+            setRem(rem)
+          },
+        }
+        set({ snack: { id: snackId, text, canUndo: true } })
+        return true
+      },
+
+      clearDoneTasks: () => {
+        const { cards, reminders } = get()
+        const at = deps.now()
+        const doneIds = new Set(cards.filter((c) => c.kind === 'task' && c.deletedAt === null && isTaskDone(c, reminders.find((r) => r.cardId === c.id))).map((c) => c.id))
+        if (doneIds.size === 0) return 0
+        const before = new Map(cards.filter((c) => doneIds.has(c.id)).map((c) => [c.id, c]))
+        const snackId = nextId()
+        taskUndo = { snackId, run: () => set({ cards: get().cards.map((c) => before.get(c.id) ?? c) }) }
+        set({
+          cards: cards.map((c) => (doneIds.has(c.id) ? { ...c, deletedAt: at, pinned: false } : c)),
+          removed: null,
+          snack: { id: snackId, text: `Moved ${doneIds.size} done ${doneIds.size === 1 ? 'task' : 'tasks'} to Trash`, canUndo: true },
+        })
+        return doneIds.size
+      },
 
       updateSettings: (patch) => set({ settings: sanitizeSettings({ ...get().settings, ...patch }) }),
 

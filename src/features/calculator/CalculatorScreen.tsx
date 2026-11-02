@@ -16,10 +16,10 @@ export function CalculatorScreen() {
     <div className="calc">
       <header className="calc__bar">
         <span className="calc__title">Calc</span>
-        <button type="button" className="icon-btn" aria-label="History" onClick={() => setOverlay('history')}>
+        <button type="button" className="icon-btn" aria-label="History" title="History" onClick={() => setOverlay('history')}>
           <Icon name="history" size={21} />
         </button>
-        <button type="button" className="icon-btn" aria-label="Settings" onClick={() => setOverlay('settings')}>
+        <button type="button" className="icon-btn" aria-label="Settings" title="Settings" onClick={() => setOverlay('settings')}>
           <Icon name="menu" size={21} />
         </button>
       </header>

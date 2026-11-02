@@ -49,9 +49,15 @@ export interface HistoryEntry {
   at: number
   /** A short name you gave this calculation. A named row is never removed by Clear all or the history cap. */
   memo?: string
+  /** A locked row is never removed by Clear all or the history cap, and cannot be deleted until unlocked. */
+  locked?: boolean
 }
 
 export const MAX_MEMO = 80
+export const MAX_LOCKED = 100
+
+/** Rows that Clear all and the history cap leave alone: named or locked. */
+export const isKept = (h: HistoryEntry) => Boolean(h.memo || h.locked)
 
 export const MAX_HISTORY = 200
 export const MAX_UNDO = 100
@@ -59,8 +65,13 @@ export const MAX_UNDO = 100
 export * from '../lib/memory'
 
 /** Everything that survives a restart, and everything in a backup file. */
-export type { BudgetCategory, BudgetData, BudgetExpense, InstrumentDraft, InstrumentKind, NetworkId, PayInstrument, PaymentModeId } from '../lib/budget'
+export type { AccountType, BudgetCategory, BudgetData, BudgetExpense, InstrumentDraft, InstrumentKind, NetworkId, PayInstrument, PaymentModeId, Settlement } from '../lib/budget'
 export {
+  ACCOUNT_TYPES,
+  KNOWN_BANKS,
+  UPI_DEFAULT_LABEL,
+  isAccountType,
+  isSettlement,
   INSTRUMENT_KINDS,
   MAX_CATEGORIES,
   MAX_EXPENSES,

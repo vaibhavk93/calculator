@@ -30,3 +30,17 @@ describe('formatCell', () => {
     expect(formatCell('Home loan', undefined, IN)).toBe('Home loan')
   })
 })
+
+describe('formatCell with huge amounts', () => {
+  it('money turns scientific from 1e15 and stays short', () => {
+    expect(formatCell(new D('999999999999999'), 'money', IN)).toBe('₹99,99,99,99,99,99,999.00')
+    expect(formatCell(new D('1e30'), 'money', IN)).toBe('₹1E+30')
+    expect(formatCell(new D('-1.5e40'), 'money', INT)).toBe('−₹1.5E+40')
+    expect(formatCell(new D('1.2345678912e40'), 'money', IN)).toBe('₹1.234567891E+40')
+  })
+  it('numbers, ints and percentages follow the same rule', () => {
+    expect(formatCell(new D('1e40'), 'number', IN)).toBe('1E+40')
+    expect(formatCell(new D('1e40'), 'int', IN)).toBe('1E+40')
+    expect(formatCell(new D('1e40'), 'percent', IN)).toBe('1E+40%')
+  })
+})

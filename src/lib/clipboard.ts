@@ -56,6 +56,7 @@ function parseLine(line: string): string | null {
     .replace(/[÷]/g, '/')
     .replace(/[₹$€£]|\b(?:rs\.?|inr)(?=\s*[\d(])/gi, '')
     .replace(/(\d),(?=\d)/g, '$1') // 1,50,000 and 1,234,567
+    .replace(/(\d)e([+-]?\d)/g, '$1E$2') // 1.2e+25 from a spreadsheet; the calculator writes a capital E
     .trim()
     .replace(/^=\s*/, '') // "= 828"
     .replace(/=.*$/, '') // "23*36 = 828" or "23*36 ="
@@ -77,7 +78,7 @@ function parseLine(line: string): string | null {
   // Two numbers with only a space between them ("12 34") are not a calculation.
   if (!/[\d.]\s+[\d.]/.test(body)) {
     body = body.replace(/\s+/g, '').replace(/^\+/, '')
-    if (/^[\d.+\-*/()%^]+$/.test(body) && wellFormed(body)) return negated(body)
+    if (/^[\d.+\-*/()%^]+$/.test(body.replace(/(?<=\d)E[+-]?\d+/g, '')) && wellFormed(body)) return negated(body)
   }
 
   // A label in the middle ("Item 3 costs 500"): fall back to the last number on the line.

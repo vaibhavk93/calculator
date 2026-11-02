@@ -137,7 +137,7 @@ function FieldRow({ field, values, set, error }: { field: Field; values: Values;
               </label>
             ))}
             {rows.length > field.min && (
-              <button type="button" className="icon-btn" aria-label={`Remove row ${r + 1}`} onClick={() => set(field.id, rows.filter((_, i) => i !== r))}>
+              <button type="button" className="icon-btn" aria-label={`Remove row ${r + 1}`} title={`Remove row ${r + 1}`} onClick={() => set(field.id, rows.filter((_, i) => i !== r))}>
                 <Icon name="close" size={18} />
               </button>
             )}
@@ -391,7 +391,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
         onBack={onBack}
         icons={
           saved && (
-            <button type="button" className="icon-btn" aria-label={`Delete ${saved.title}`} onClick={() => { deleteCard(saved.id); onBack() }}>
+            <button type="button" className="icon-btn" aria-label={`Delete ${saved.title}`} title={`Delete ${saved.title}`} onClick={() => { deleteCard(saved.id); onBack() }}>
               <Icon name="trash" size={20} />
             </button>
           )
@@ -448,6 +448,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
             <button type="button" className="answer" aria-label={`${main.label}: ${formatCell(main.value, main.fmt, opts)}. Show the result.`} onClick={() => mainRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
               <span className="answer__label">{main.label}</span>
               <span className="answer__value">{formatCell(main.value, main.fmt, opts)}</span>
+              <Icon name="down" size={18} className="answer__icon" />
             </button>
           )}
         </div>

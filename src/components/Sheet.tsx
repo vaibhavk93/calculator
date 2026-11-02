@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Icon } from './Icon'
 import { useBackHandler } from './useBackHandler'
 
@@ -45,7 +46,11 @@ export function Sheet({ title, onClose, action, footer, children }: SheetProps) 
     }
   }, [])
 
-  return (
+  // Drawn into the app root, not where it was opened, so the scrim and the sheet cover the tab bar too.
+  const root = typeof document !== 'undefined' ? (document.querySelector('.app') ?? document.body) : null
+  if (!root) return null
+
+  return createPortal(
     <>
       <div className="scrim" onClick={onClose} aria-hidden="true" />
       <div ref={ref} className="sheet" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
@@ -55,13 +60,14 @@ export function Sheet({ title, onClose, action, footer, children }: SheetProps) 
             {title}
           </h2>
           {action}
-          <button type="button" className="icon-btn sheet__close" aria-label={`Close ${title}`} onClick={onClose}>
+          <button type="button" className="icon-btn sheet__close" aria-label={`Close ${title}`} title={`Close ${title}`} onClick={onClose}>
             <Icon name="close" size={20} />
           </button>
         </div>
         <div className="sheet__body">{children}</div>
         {footer && <div className="sheet__foot">{footer}</div>}
       </div>
-    </>
+    </>,
+    root,
   )
 }

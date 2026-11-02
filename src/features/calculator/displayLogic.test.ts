@@ -99,3 +99,63 @@ describe('preview versus answer', () => {
   it('a bare number being typed is not dimmed', () => expect(show('828').preview).toBe(false))
   it('nothing computable is not a preview', () => expect(show('5/0').preview).toBe(false))
 })
+
+describe('big results', () => {
+  const nines = (n: number) => Array(n).fill('9').join('*')
+  it('plain digits at 15 integer digits, scientific from 1e15, with a compact fallback', () => {
+    expect(show('999999999999999', true, '1+1').resultLine).toBe('99,99,99,99,99,99,999')
+    const v = show('1000000000000000', true, '1+1')
+    expect(v.resultLine).toBe('1E+15')
+    expect(v.echo).toEqual({ text: '1 padma', tone: 'info' })
+    expect(v.copyText).toBe('1E+15')
+  })
+  it('a live preview of 9*9*...*9 (40 factors) is scientific and named only where a name exists', () => {
+    const v = show(nines(40))
+    expect(v.resultLine).toBe('1.478088294E+38')
+    expect(v.compactLine).toBe('1.478088294E+38')
+    expect(v.echo).toBeNull() // Indian names end at shankh
+    expect(show(nines(40), false, null, { ...S, numberSystem: 'international' }).echo).toBeNull() // 1e38 is past decillion
+    expect(show(nines(20), false, null, { ...S, numberSystem: 'international' }).echo).toEqual({ text: '12.16 quintillion', tone: 'info' })
+  })
+  it('the copy text of a huge preview pastes back as a number', () => {
+    expect(show(nines(40)).copyText).toMatch(/^1\.4780882941434\d*E\+38$/)
+  })
+  it('a typed number of 16+ digits is shortened like a pocket calculator, with the words line', () => {
+    const v = show('1234567890123456')
+    expect(v.resultLine).toBe('1.23456789E+15')
+    expect(v.echo?.text).toBe('1.23 padma')
+    expect(show('123456789012345').resultLine).toBe('12,34,56,78,90,12,345')
+  })
+  it('still says "Too large to show" in plain words only past the engine limit', () => {
+    expect(show('9^99').resultLine).not.toBe('')
+    expect(show('9^105').echo).toEqual({ text: 'Too large to show', tone: 'error' })
+    expect(show('9^105').resultLine).toBe('')
+  })
+  it('a normal number has no compact line needing to differ in meaning, and zero has none', () => {
+    expect(show('0', true, '1-1').compactLine).toBeNull()
+    expect(show('', false).compactLine).toBeNull()
+  })
+})
+
+describe('pressing 9 x 9 x ... with the real keys, = after each step', () => {
+  it('never throws and always shows safe text, even past the 1e100 limit', async () => {
+    const { applyKey, INITIAL_INPUT } = await import('../../engine')
+    let state = INITIAL_INPUT
+    let last: string | null = null
+    for (let i = 0; i < 120; i++) {
+      for (const k of i === 0 ? ['9'] : ['*', '9', '=']) {
+        const r = applyKey(state, k as never, { angle: 'deg' })
+        if (r.error) {
+          expect(r.error).toBe('Too large to show')
+          return
+        }
+        if (r.commit) last = r.commit.expression
+        state = r.state
+      }
+      const v = computeDisplay(state, last, S)
+      expect(v.resultLine).toMatch(/^[−0-9.,E+-]+$/)
+      expect(v.resultLine.length).toBeLessThanOrEqual(22)
+      expect(v.exprLine.length).toBeLessThanOrEqual(60)
+    }
+  })
+})

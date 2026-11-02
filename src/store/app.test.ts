@@ -430,13 +430,83 @@ describe('budget', () => {
     expect(get().budget.expenses).toHaveLength(1)
     expect(get().budget.categories.find((c) => c.id === cat)!.deletedAt).not.toBeNull()
   })
-  it('a limit must be a positive number, otherwise it is cleared', () => {
+  it('a limit must be a positive number; a bad one is refused with a message and the old limit stays', () => {
     const { get } = make()
     const cat = get().budget.categories[0]!.id
-    get().setCategoryLimit(cat, '4,000')
+    expect(get().setCategoryLimit(cat, '4,000')).toBe(true)
     expect(get().budget.categories[0]!.limit).toBe('4000')
-    get().setCategoryLimit(cat, '0')
+    expect(get().setCategoryLimit(cat, '0')).toBe(false)
+    expect(get().notice?.text).toBe('Enter a limit above zero, or leave it empty')
+    expect(get().budget.categories[0]!.limit).toBe('4000')
+    expect(get().setCategoryLimit(cat, null)).toBe(true)
     expect(get().budget.categories[0]!.limit).toBeNull()
+  })
+  it('a limit can be for every month or one month only, and a month can go back to the standing one', () => {
+    const { get } = make()
+    const cat = get().budget.categories[0]!.id
+    get().setCategoryLimit(cat, '4000')
+    get().setCategoryLimit(cat, '6000', { kind: 'month', month: '2026-11' })
+    get().setCategoryLimit(cat, null, { kind: 'month', month: '2026-12' })
+    expect(get().budget.categories[0]).toMatchObject({ limit: '4000', limitByMonth: { '2026-11': '6000', '2026-12': null } })
+    get().clearMonthLimit(cat, '2026-11')
+    get().clearMonthLimit(cat, '2026-12')
+    expect(get().budget.categories[0]!.limitByMonth).toBeUndefined()
+    expect(get().setCategoryLimit(cat, '5', { kind: 'month', month: 'nov' })).toBe(false)
+    get().setOverallLimit('90000')
+    get().setOverallLimit('120000', { kind: 'month', month: '2026-11' })
+    expect(get().budget).toMatchObject({ overall: '90000', overallByMonth: { '2026-11': '120000' } })
+    expect(get().setOverallLimit('abc')).toBe(false)
+    get().clearMonthLimit('overall', '2026-11')
+    expect(get().budget.overallByMonth).toBeUndefined()
+  })
+  it('categories can be for chosen months, and a subcategory stays inside its parent', () => {
+    const { get } = make()
+    const food = get().budget.categories[0]!.id
+    const diwali = get().addCategory('Diwali', null, ['2026-11'])!
+    expect(get().budget.categories.find((c) => c.id === diwali)!.months).toEqual(['2026-11'])
+    expect(get().addCategory('Gifts', diwali, ['2026-12'])).toBeNull()
+    expect(get().notice?.text).toContain('inside Diwali')
+    const sweets = get().addCategory('Sweets', diwali, ['2026-11'])!
+    expect(sweets).toBeTruthy()
+    expect(get().setCategoryMonths(diwali, ['2026-12'])).toBe(false)
+    expect(get().setCategoryMonths(diwali, ['2026-11', '2026-12'])).toBe(true)
+    expect(get().setCategoryMonths(diwali, null)).toBe(true)
+    expect('months' in get().budget.categories.find((c) => c.id === diwali)!).toBe(false)
+    expect(get().setCategoryMonths(food, [])).toBe(false)
+    expect(get().addExpense(draft({ categoryId: sweets, date: '2026-11-03' }))).toBe(true)
+  })
+  it('an entry on a category outside its months is refused, but an old entry can still be edited', () => {
+    const { get } = make()
+    const diwali = get().addCategory('Diwali', null, ['2026-11'])!
+    expect(get().addExpense(draft({ categoryId: diwali, date: '2026-12-03' }))).toBe(false)
+    expect(get().notice?.text).toContain('not used in')
+    get().addExpense(draft({ categoryId: diwali, date: '2026-11-03' }))
+    get().setCategoryMonths(diwali, ['2026-11', '2026-12'])
+    get().setCategoryMonths(diwali, ['2026-11'])
+    const id = get().budget.expenses[0]!.id
+    expect(get().updateExpense(id, draft({ categoryId: diwali, date: '2026-11-04', note: 'x' }))).toBe(true)
+  })
+  it('settlements: a card bill has no category or mode, keeps its card, and an edit can clear the flag', () => {
+    const { get } = make()
+    const cc = get().addInstrument({ name: 'Neo', kind: 'credit', network: 'rupay' })!
+    const food = get().budget.categories[0]!.id
+    expect(get().addExpense(draft({ settlement: 'cardBill', instrumentId: cc, categoryId: food, mode: 'cash' }))).toBe(true)
+    expect(get().budget.expenses[0]).toMatchObject({ settlement: 'cardBill', instrumentId: cc, categoryId: null, mode: null })
+    expect(get().addExpense(draft({ settlement: 'cardBill' }))).toBe(false)
+    get().addExpense(draft({ settlement: 'transfer', instrumentId: cc }))
+    expect(get().budget.expenses[0]).toMatchObject({ settlement: 'transfer', instrumentId: null })
+    get().updateExpense(get().budget.expenses[0]!.id, draft({ mode: 'cash' }))
+    expect(get().budget.expenses[0]!.settlement).toBeUndefined()
+  })
+  it('card details are saved, and a kind change drops the fields the new kind does not have', () => {
+    const { get } = make()
+    const id = get().addInstrument({ name: 'HDFC', kind: 'credit', network: 'visa', variant: 'Regalia', statementDay: 5, dueDay: '25', creditLimit: '2,00,000', annualFee: '2500' })!
+    expect(get().budget.instruments[0]).toMatchObject({ variant: 'Regalia', statementDay: 5, dueDay: 25, creditLimit: '200000', annualFee: '2500' })
+    expect(get().addInstrument({ name: 'Bad', kind: 'credit', statementDay: 31 })).toBeNull()
+    expect(get().updateInstrument(id, { kind: 'debit' })).toBe(true)
+    expect(get().budget.instruments[0]!.creditLimit).toBeUndefined()
+    expect(get().updateInstrument(id, { variant: '' })).toBe(true)
+    expect(get().budget.instruments[0]!.variant).toBeUndefined()
   })
   it('adding a category twice gives the same one', () => {
     const { get } = make()

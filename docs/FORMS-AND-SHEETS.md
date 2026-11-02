@@ -360,3 +360,23 @@ Read from `src/features` and `src/components` on 2026-11-02. Nothing here has be
 | Back button | A sheet should never need system back | **Done.** `Sheet` closes on the system back button too (it registers itself), and the X always works. |
 | Heading weight | Only Plex Sans 400/500/600 were loaded | **700 is now loaded** (`latin-700.css`), so headings are truly bold, not faked. |
 | Colours | n/a | **One calm tint (`--tint-7`) for Settings and for form cards inside sheets.** Section tints (1 to 8) identify sections in Tools, Notes, Due and Budget only. |
+
+---
+
+## 12. Tappable things must look tappable (owner rule, 2 Nov 2026)
+
+The owner opened a "set a limit" sheet by accident because a row did not look like a button. **Any element that does something when tapped must say so before it is tapped.** Colour alone is not enough (accent = tappable, but plain text in accent can read as a label).
+
+| Element | Must have |
+|---|---|
+| A row or card that opens a screen or a sheet | A trailing chevron icon in the accent colour (`<Icon name="chevron" />`), a pressed state (`:active` background `--key-op-pressed`), and a `min-height: 48px`. Class `tap-row`. |
+| A row that opens a choice list | A trailing `down` icon in the accent colour (that is what `PickerSelect` does). |
+| A link-style action (Change limits, Clear all, Remove) | A verb label in the accent colour **and** an underline (`.link-btn` underlines). Never an unlabelled word. |
+| A pill that filters or selects | A 1px `--ink-3` border (see `.chip`); the selected one has the accent border and text and a tick or `aria-pressed`. |
+| An icon-only button | A visible 44px hit area, an `aria-label`, and a `title`. |
+| A number or value you can tap to copy or edit | A small icon beside it (copy, edit), or a label "Tap to edit". |
+| Something that is NOT tappable | Never gets a chevron, an accent colour, a border like a button or a pressed state. |
+
+Shared CSS (`global.css`): `.tap-row` on the button and `<Icon name="chevron" size={18} className="tap-row__chev" />` last inside it. Disabled buttons use a quiet border and text from the tokens (`.btn:disabled`), never opacity, and show `cursor: not-allowed`. The selected tab has a 2px line on top as well as bold text. An unchosen option row shows `.radio-ring`. The full list of elements and what each needs is in `docs/TAP-AUDIT.md`.
+
+Audit rule: for every `onClick` in `src/features`, the element it is on must match one line above. Apply the same rule to every new screen.

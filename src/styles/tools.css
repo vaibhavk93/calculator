@@ -41,7 +41,7 @@
 
 /* The whole row changes, so it is clear which one you touched. */
 .navrow:active {
-  background: var(--key-digit-pressed);
+  background: var(--key-op-pressed);
 }
 
 .navrow__label {
@@ -60,7 +60,8 @@
 
 .navrow__chev {
   flex: none;
-  color: var(--ink-3);
+  margin-left: auto;
+  color: var(--accent);
 }
 
 .navrow > .row__text {
@@ -109,6 +110,12 @@
   width: auto;
 }
 
+.answer__icon {
+  flex: none;
+  color: var(--accent);
+  align-self: center;
+}
+
 .answer__label {
   flex: 1 1 8rem;
   min-width: 0;
@@ -124,7 +131,8 @@
   font-variant-numeric: tabular-nums;
   font-size: 1.0625rem;
   font-weight: 500;
-  white-space: nowrap;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .tools__list {
@@ -214,8 +222,14 @@
   align-items: center;
   min-height: 48px;
   list-style: none;
+  cursor: pointer;
   font-size: 0.9375rem;
-  color: var(--ink-2);
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.more > summary:active {
+  background: var(--key-op-pressed);
 }
 
 .more > summary::-webkit-details-marker {
@@ -226,7 +240,8 @@
   content: '+';
   margin-left: auto;
   font-family: var(--font-mono);
-  color: var(--ink-3);
+  font-size: 1.25rem;
+  color: var(--accent);
 }
 
 .more[open] > summary::after {
@@ -325,8 +340,10 @@
   font-variant-numeric: tabular-nums;
   margin-left: auto;
   text-align: right;
-  /* A money value must never break across lines; the row wraps around it instead. */
-  white-space: nowrap;
+  /* A money value never breaks while it fits: the row wraps around it instead. Only when it is wider than the
+     whole row (a huge number at 200% type) may it break, which beats being clipped. */
+  max-width: 100%;
+  overflow-wrap: anywhere;
   flex: none;
 }
 
@@ -454,11 +471,17 @@
  * turns to point down once it is open.
  */
 .formula summary {
-  min-height: 44px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   gap: var(--s-2);
   cursor: pointer;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.formula summary:active {
+  background: var(--key-op-pressed);
 }
 
 .formula summary::marker,
@@ -558,6 +581,10 @@
   content: '';
   position: absolute;
   inset: -6px -2px;
+}
+
+.chip:active {
+  background: var(--key-op-pressed);
 }
 
 .chip[aria-pressed='true'] {
@@ -695,11 +722,19 @@ textarea.field {
 
 .due__main {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-height: 44px;
-  justify-content: center;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 48px;
   text-align: left;
+}
+
+.due__main:active {
+  background: var(--key-op-pressed);
+}
+
+.due__ask {
+  font-size: 0.875rem;
+  color: var(--ink-2);
 }
 
 .due__actions {
@@ -741,7 +776,7 @@ textarea.field {
 }
 
 .hero:active {
-  background: var(--key-digit-pressed);
+  background: var(--key-op-pressed);
 }
 
 .tiles {
@@ -768,6 +803,13 @@ textarea.field {
 .tile:active {
   transform: scale(0.98);
   border-color: var(--tint-ink);
+}
+
+.tile__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
 }
 
 .tile__name {
@@ -891,7 +933,8 @@ textarea.field {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 0.875rem;
-  white-space: nowrap;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 /* ------------------------------------------------------------------ pin */
@@ -929,7 +972,8 @@ textarea.field {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 0.875rem;
-  white-space: nowrap;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .tool__error {
@@ -955,12 +999,13 @@ textarea.field {
   flex: none;
   width: 44px;
   height: 44px;
+  border: 1px solid var(--ink-3);
   border-radius: var(--r-md);
   color: var(--accent);
 }
 
 .keep__btn:active {
-  background: var(--key-digit-pressed);
+  background: var(--key-op-pressed);
 }
 
 .keep__msg {

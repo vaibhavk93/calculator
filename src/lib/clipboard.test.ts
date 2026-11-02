@@ -92,3 +92,12 @@ describe('parseClipboardExpression', () => {
     expect(raw('constructor')).toBeNull()
   })
 })
+
+describe('pasting scientific notation', () => {
+  it('keeps a number the calculator copied, and reads a spreadsheet\'s lowercase e', () => {
+    expect(parseClipboardExpression('1.2345E+25')).toMatchObject({ raw: '1.2345E+25' })
+    expect(parseClipboardExpression('1.2345e+25')).toMatchObject({ raw: '1.2345E+25' })
+    expect(parseClipboardExpression('-1E-11')).toMatchObject({ raw: '-1E-11' })
+    expect(parseClipboardExpression('2E+3*4')).toMatchObject({ raw: '2E+3*4' })
+  })
+})

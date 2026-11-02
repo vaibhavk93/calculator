@@ -118,3 +118,127 @@
 .row--split > .row__pin {
   align-self: center;
 }
+
+/* ---- To-do, inside the Notes tab (.todo__*) and the Notes switch (.notes__*) */
+
+.todo {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.todo__add {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-3) var(--s-4) 0;
+}
+
+.todo__addrow {
+  display: flex;
+  gap: var(--s-3);
+  align-items: center;
+}
+
+.todo__more {
+  align-self: flex-start;
+}
+
+.todo__views {
+  flex: none;
+  padding: 0 var(--s-4);
+}
+
+/* A task row: a tick you can hit, then text that opens the task. A chevron says the text is tappable (docs/FORMS-AND-SHEETS.md section 12). */
+.todo__row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-height: 48px;
+  padding: 0 var(--s-2) 0 var(--s-2);
+  border-top: 1px solid var(--line);
+}
+
+.todo__main {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-2);
+  text-align: left;
+}
+
+.todo__main:active {
+  background: var(--key-op-pressed);
+}
+
+.todo__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.todo__text .row__label {
+  overflow-wrap: anywhere;
+}
+
+.todo__chev {
+  flex: none;
+  display: inline-flex;
+  color: var(--accent);
+}
+
+.todo__chev--open {
+  transform: rotate(90deg);
+}
+
+.todo__row--done .row__label {
+  text-decoration: line-through;
+  color: var(--ink-3);
+}
+
+.todo__donehead {
+  padding: 0;
+}
+
+.todo__toggle {
+  flex: 1;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 0 var(--s-4);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.todo__toggle .sect__count {
+  margin-right: auto;
+}
+
+.todo__toggle:active {
+  background: var(--key-op-pressed);
+}
+
+.todo__clear-row {
+  display: flex;
+  padding: var(--s-1) var(--s-4);
+  border-top: 1px solid var(--line);
+}
+
+.todo__confirm {
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--line);
+}
+
+.todo__clear,
+.todo__delete {
+  align-self: flex-start;
+}

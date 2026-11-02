@@ -43,7 +43,13 @@ export function Display({ view, fresh, onCopy }: DisplayProps) {
   const sel = selection && !input.fresh && selection.expr === input.expr ? selection : null
   const resultRef = useRef<HTMLButtonElement>(null)
 
-  useFitText(resultRef, view.resultLine)
+  // Too long for the smallest font: show the scientific form, as a pocket calculator does. Keyed by the line it
+  // was decided for, so the next number starts in full again.
+  const [compactFor, setCompactFor] = useState<string | null>(null)
+  const shown = view.compactLine && compactFor === view.resultLine ? view.compactLine : view.resultLine
+  useFitText(resultRef, shown, () => {
+    if (view.compactLine && shown !== view.compactLine) setCompactFor(view.resultLine)
+  })
 
   // Keep the box the right height for its text (up to the CSS cap), and keep the cursor where the store says. And if
   // there is not room for even one whole line, hide it: half a line looks like a glitch, and the live result

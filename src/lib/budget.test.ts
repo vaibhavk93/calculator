@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { D } from '../engine'
 import { CLOSE_AT, categoryName, compareLastMonth, dailyAverage, daysInMonth, limitState, needsAttention, paceLeft, sharePercent, spentIn, topEntries, trend, cleanInstrument, dayKey, eligibleInstruments, instrumentFitsMode, modeLabel, monthKey, paymentError, shiftMonth, suggestFor, summarise, PAYMENT_MODES } from './budget'
 import { validateAmount, validateCategoryName, validateDate, validateExpense, validateInstrumentDraft, validateLimit } from './budget'
-import type { BudgetData, PayInstrument } from './budget'
+import {
+  KNOWN_BANKS, UPI_DEFAULT_LABEL, activeCategories, cardOutstanding, categoryActiveIn, dropInapplicable, effectiveLimit, effectiveOverall, instrumentLabel, validateCategoryMonths, validateInstrumentFields,
+} from './budget'
+import type { BudgetData, BudgetExpense, PayInstrument } from './budget'
 
 const cat = (id: string, limit: string | null = null, deletedAt: number | null = null, parentId: string | null = null) => ({ id, name: id, limit, parentId, deletedAt })
 const exp = (id: string, date: string, amount: string, categoryId: string | null, deletedAt: number | null = null) => ({ id, date, amount, categoryId, mode: null, instrumentId: null, note: '', deletedAt })
@@ -209,7 +212,7 @@ describe('mode and instrument rules', () => {
   })
   it('eligibleInstruments lists live matches for a mode', () => {
     expect(eligibleInstruments(withInst, 'credit').map((i) => i.id)).toEqual(['neo', 'swiggy', 'amex'])
-    expect(eligibleInstruments(withInst, 'upi').map((i) => i.id)).toEqual(['neo', 'hdfcdc', 'hdfc', 'amzpay'])
+    expect(eligibleInstruments(withInst, 'upi').map((i) => i.id)).toEqual(['hdfc', 'hdfcdc', 'amzpay', 'neo']) // bank, debit, wallet, then RuPay credit
     expect(eligibleInstruments(withInst, 'wallet').map((i) => i.id)).toEqual(['amzpay'])
     expect(eligibleInstruments(withInst, 'cash')).toEqual([])
     expect(eligibleInstruments(withInst, null)).toEqual([])
@@ -478,5 +481,180 @@ describe('validateInstrumentDraft', () => {
   it('caps the number of cards at 40', () => {
     const full = { instruments: Array.from({ length: 40 }, (_, i) => inst(`i${i}`, `Card ${i}`, 'debit')) }
     expect(validateInstrumentDraft({ name: 'One more', kind: 'debit' }, full).name).toContain('up to 40')
+  })
+})
+
+
+describe('limits: every month or this month only', () => {
+  const b: BudgetData = {
+    overall: '10000',
+    overallByMonth: { '2026-12': '15000', '2027-01': null },
+    instruments: [],
+    categories: [{ ...cat('food', '4000'), limitByMonth: { '2026-11': '6000', '2026-12': null } }, cat('rent')],
+    expenses: [exp('1', '2026-11-02', '5000', 'food'), exp('2', '2026-12-02', '5000', 'food')],
+  }
+  it('a month override wins, even "no limit this month"; other months keep the standing limit', () => {
+    expect(effectiveLimit(b.categories[0]!, '2026-11')).toBe('6000')
+    expect(effectiveLimit(b.categories[0]!, '2026-12')).toBeNull()
+    expect(effectiveLimit(b.categories[0]!, '2027-02')).toBe('4000')
+    expect(effectiveOverall(b, '2026-12')).toBe('15000')
+    expect(effectiveOverall(b, '2027-01')).toBeNull()
+    expect(effectiveOverall(b, '2026-11')).toBe('10000')
+  })
+  it('summarise, needsAttention and limitState use the limit of the month shown', () => {
+    const nov = summarise(b, '2026-11')
+    const food = nov.lines.find((l) => l.id === 'food')!
+    expect(food.limit!.toFixed()).toBe('6000')
+    expect(food.limitScope).toBe('month')
+    expect(limitState(food.spent, food.limit!)).toBe('close')
+    expect(needsAttention(nov.lines).map((x) => x.state)).toEqual(['close'])
+    const dec = summarise(b, '2026-12')
+    expect(dec.lines.find((l) => l.id === 'food')!.limit).toBeNull()
+    expect(needsAttention(dec.lines)).toEqual([])
+    expect(dec.overall!.limit.toFixed()).toBe('15000')
+    expect(dec.overall!.scope).toBe('month')
+    expect(nov.overall!.scope).toBe('always')
+    expect(summarise(b, '2027-01').overall).toBeNull()
+    expect(paceLeft(food.left!, '2026-11', new Date(2026, 10, 10))!.days).toBe(21)
+  })
+})
+
+describe('categories for selected months only', () => {
+  const diwali = { ...cat('diwali'), months: ['2026-11'] }
+  const b: BudgetData = {
+    overall: null,
+    instruments: [],
+    categories: [cat('food'), diwali, { ...cat('sweets', null, null, 'diwali') }, { ...cat('lamps', null, null, 'food'), months: ['2026-11', '2026-12'] }],
+    expenses: [exp('1', '2026-11-05', '800', 'diwali'), exp('2', '2026-12-05', '50', 'diwali'), exp('3', '2026-11-06', '30', 'sweets')],
+  }
+  it('is active only in its months; a subcategory inherits its parent', () => {
+    expect(categoryActiveIn(b, 'diwali', '2026-11')).toBe(true)
+    expect(categoryActiveIn(b, 'diwali', '2026-12')).toBe(false)
+    expect(categoryActiveIn(b, 'sweets', '2026-12')).toBe(false)
+    expect(categoryActiveIn(b, 'lamps', '2026-12')).toBe(true)
+    expect(categoryActiveIn(b, 'food', '2030-01')).toBe(true)
+  })
+  it('the picker for an entry date offers only active categories', () => {
+    expect(activeCategories(b, '2026-11').map((c) => c.id)).toEqual(['food', 'diwali', 'sweets', 'lamps'])
+    expect(activeCategories(b, '2026-12').map((c) => c.id)).toEqual(['food', 'lamps'])
+  })
+  it('is hidden from a month with no entries on it, shown with a note when entries exist, and entries are never dropped', () => {
+    expect(summarise(b, '2026-11').lines.find((l) => l.id === 'diwali')!.note).toBeNull()
+    expect(summarise(b, '2026-10').lines.map((l) => l.id)).toEqual(['food'])
+    const dec = summarise(b, '2026-12')
+    const line = dec.lines.find((l) => l.id === 'diwali')!
+    expect(line.spent.toFixed()).toBe('50')
+    expect(line.note).toMatch(/^only for /)
+    expect(dec.spent.toFixed()).toBe('50')
+    expect(dec.uncategorised.toFixed()).toBe('0')
+  })
+  it('a new entry on a category that is not active that month is refused; editing an old one is allowed', () => {
+    const d = { amount: '10', date: '2026-12-05', categoryId: 'diwali', mode: null, instrumentId: null }
+    expect(validateExpense(d, b).category).toContain('not used in')
+    expect(validateExpense(d, b, new Date(2026, 11, 5), 'diwali')).toEqual({})
+    expect(validateExpense({ ...d, date: '2026-11-05' }, b, new Date(2026, 10, 5))).toEqual({})
+  })
+  it('a subcategory must stay inside its parent, and a parent must still cover its children', () => {
+    expect(validateCategoryMonths(b, 'sweets', ['2026-11'])).toBeNull()
+    expect(validateCategoryMonths(b, 'sweets', ['2026-12'])).toContain('inside diwali')
+    expect(validateCategoryMonths(b, 'lamps', ['2026-11'])).toBeNull()
+    expect(validateCategoryMonths(b, 'food', ['2026-11'])).toContain('lamps')
+    expect(validateCategoryMonths(b, 'food', [])).toBe('Pick at least one month')
+    expect(validateCategoryMonths(b, 'food', ['2026-13'])).toBe('Pick real months')
+    expect(validateCategoryMonths(b, 'food', null)).toBeNull()
+  })
+})
+
+describe('card details and UPI default', () => {
+  it('knows common Indian banks', () => {
+    expect(KNOWN_BANKS).toContain('HDFC Bank')
+    expect(KNOWN_BANKS.length).toBeGreaterThanOrEqual(20)
+  })
+  it('the label shows name, product name and last four', () => {
+    const i: PayInstrument = { id: 'a', name: 'Tata', kind: 'credit', network: 'rupay', bank: '', last4: '4321', rewardNote: '', deletedAt: null, variant: 'Neo' }
+    expect(instrumentLabel(i)).toBe('Tata Neo ••4321')
+    expect(instrumentLabel({ ...i, variant: undefined, last4: '' })).toBe('Tata')
+  })
+  it('checks the new fields', () => {
+    const ok = { name: 'x', kind: 'credit' as const, statementDay: 5, dueDay: '28', creditLimit: '2,50,000', annualFee: '0' }
+    expect(validateInstrumentFields(ok)).toEqual({})
+    expect(validateInstrumentFields({ ...ok, statementDay: 29 }).statementDay).toBe('Enter a day from 1 to 28')
+    expect(validateInstrumentFields({ ...ok, dueDay: 0 }).dueDay).toBeDefined()
+    expect(validateInstrumentFields({ ...ok, dueDay: 2.5 }).dueDay).toBeDefined()
+    expect(validateInstrumentFields({ ...ok, statementDay: null, dueDay: '' })).toEqual({})
+    expect(validateInstrumentFields({ ...ok, creditLimit: '0' }).creditLimit).toBeDefined()
+    expect(validateInstrumentFields({ ...ok, annualFee: 'abc' }).annualFee).toBeDefined()
+    expect(validateInstrumentFields({ ...ok, variant: 'v'.repeat(41) }).variant).toBeDefined()
+    expect(validateInstrumentFields({ ...ok, holder: 'h'.repeat(41) }).holder).toBeDefined()
+    expect(validateInstrumentFields({ ...ok, kind: 'debit' }).creditLimit).toBe('Only credit cards have a credit limit')
+    expect(validateInstrumentFields({ name: 'x', kind: 'bank', upiHandle: 'me@okhdfc', accountType: 'salary' })).toEqual({})
+    expect(validateInstrumentFields({ name: 'x', kind: 'bank', upiHandle: 'nohandle' }).upiHandle).toBeDefined()
+    expect(validateInstrumentFields({ name: 'x', kind: 'credit', upiHandle: 'me@okhdfc' }).upiHandle).toBeDefined()
+    expect(validateInstrumentFields({ name: 'x', kind: 'wallet', accountType: 'savings' }).accountType).toBeDefined()
+    expect(validateInstrumentFields({ name: 'x', kind: 'bank', accountType: 'joint' }).accountType).toBeDefined()
+  })
+  it('cleans money to plain decimal strings, keeps only fields that fit the kind', () => {
+    const r = cleanInstrument({ name: 'x', kind: 'credit', creditLimit: '2,50,000', annualFee: '499.50', statementDay: '5', variant: ' Neo ', upiHandle: '' })
+    expect(r.ok && r.value).toMatchObject({ creditLimit: '250000', annualFee: '499.5', statementDay: 5, variant: 'Neo' })
+    const bank = cleanInstrument({ name: 'HDFC Savings', kind: 'bank', bank: 'HDFC Bank', last4: '1234', upiHandle: 'me@okhdfc', accountType: 'savings' })
+    expect(bank.ok && bank.value).toMatchObject({ upiHandle: 'me@okhdfc', accountType: 'savings', last4: '1234' })
+    expect(dropInapplicable({ name: 'x', kind: 'debit', creditLimit: '5', accountType: 'savings', upiHandle: 'a@b' })).toMatchObject({ creditLimit: null, accountType: null, upiHandle: '' })
+  })
+  it('UPI with no instrument is valid, counted under UPI and under No instrument', () => {
+    expect(UPI_DEFAULT_LABEL).toBe('Bank account (default)')
+    const b: BudgetData = { overall: null, categories: [], instruments: [], expenses: [{ ...exp('1', '2026-11-02', '200', null), mode: 'upi' }, { ...exp('2', '2026-11-03', '50', null), mode: 'cash' }] }
+    expect(paymentError(b, 'upi', null)).toBeNull()
+    expect(validateExpense({ amount: '5', date: '2026-11-02', categoryId: null, mode: 'upi', instrumentId: null }, b, new Date(2026, 10, 2))).toEqual({})
+    const s = summarise(b, '2026-11')
+    expect(s.byMode.find((m) => m.id === 'upi')!.spent.toFixed()).toBe('200')
+    expect(s.upiDefault.spent.toFixed()).toBe('200')
+    expect(s.upiDefault.count).toBe(1)
+    expect(s.noInstrument.spent.toFixed()).toBe('250')
+    expect(s.byInstrument).toEqual([])
+  })
+})
+
+describe('settlements', () => {
+  const card: PayInstrument = { id: 'cc', name: 'Neo', kind: 'credit', network: 'rupay', bank: '', last4: '', rewardNote: '', deletedAt: null }
+  const e = (id: string, date: string, amount: string, over: Partial<BudgetExpense> = {}): BudgetExpense => ({ ...exp(id, date, amount, 'food'), ...over })
+  const b: BudgetData = {
+    overall: null,
+    instruments: [card],
+    categories: [cat('food')],
+    expenses: [
+      e('1', '2026-11-02', '6000.10', { mode: 'credit', instrumentId: 'cc' }),
+      e('2', '2026-11-03', '3999.90', { mode: 'upi', instrumentId: 'cc' }),
+      e('3', '2026-11-20', '10000', { categoryId: null, instrumentId: 'cc', settlement: 'cardBill' }),
+      e('4', '2026-11-21', '5000', { categoryId: null, settlement: 'transfer' }),
+    ],
+  }
+  it('10,000 of purchases plus a 10,000 bill payment shows spend 10,000 and outstanding 0', () => {
+    const s = summarise(b, '2026-11')
+    expect(s.spent.toFixed(2)).toBe('10000.00')
+    expect(cardOutstanding(b, 'cc').toFixed(2)).toBe('0.00')
+  })
+  it('settlements are listed but in no total, average, category, mode, instrument or top list', () => {
+    const s = summarise(b, '2026-11')
+    expect(s.entries.map((x) => x.id)).toEqual(['4', '3', '2', '1'])
+    expect(s.uncategorised.toFixed()).toBe('0')
+    expect(s.noMode.toFixed()).toBe('0')
+    expect(s.byMode.reduce((t, m) => t.plus(m.spent), new D(0)).toFixed(2)).toBe('10000.00')
+    expect(s.byInstrument[0]!.spent.toFixed(2)).toBe('10000.00')
+    expect(spentIn(b, '2026-11').toFixed(2)).toBe('10000.00')
+    expect(dailyAverage(s.spent, '2026-11', new Date(2026, 11, 1))!.perDay.toFixed(2)).toBe('333.33')
+    expect(topEntries(s.entries, 5).map((x) => x.id)).toEqual(['1', '2'])
+    expect(suggestFor({ ...b, expenses: [e('9', '2026-11-22', '1', { note: 'bill', settlement: 'cardBill' })] }, 'bill')).toBeNull()
+  })
+  it('outstanding is exact, can go negative, and ignores deleted entries', () => {
+    expect(cardOutstanding({ expenses: b.expenses.slice(0, 2) }, 'cc').toFixed(2)).toBe('10000.00')
+    expect(cardOutstanding({ expenses: [...b.expenses, e('5', '2026-11-22', '0.10', { categoryId: null, instrumentId: 'cc', settlement: 'cardBill' })] }, 'cc').toFixed(2)).toBe('-0.10')
+    expect(cardOutstanding({ expenses: [{ ...b.expenses[0]!, deletedAt: 1 }] }, 'cc').toFixed(2)).toBe('0.00')
+    expect(cardOutstanding({ expenses: [e('6', '2026-11-02', '70', { mode: 'cash' })] }, 'cc').toFixed(2)).toBe('0.00')
+  })
+  it('a card bill must name a credit card; a transfer needs nothing', () => {
+    const d = { amount: '10', date: '2026-11-02', categoryId: null, mode: null, instrumentId: null }
+    expect(validateExpense({ ...d, settlement: 'cardBill' }, b, new Date(2026, 10, 2)).paidWith).toBeDefined()
+    expect(validateExpense({ ...d, settlement: 'cardBill', instrumentId: 'cc' }, b, new Date(2026, 10, 2))).toEqual({})
+    expect(validateExpense({ ...d, settlement: 'transfer' }, b, new Date(2026, 10, 2))).toEqual({})
   })
 })

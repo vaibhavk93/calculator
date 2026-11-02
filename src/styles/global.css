@@ -75,7 +75,7 @@ button {
 }
 
 button:disabled {
-  cursor: default;
+  cursor: not-allowed;
   color: var(--ink-3);
 }
 
@@ -129,6 +129,7 @@ button:disabled {
 }
 
 .tab {
+  position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
@@ -142,6 +143,18 @@ button:disabled {
 
 .tab[aria-current='page'] {
   color: var(--ink);
+  font-weight: 600;
+}
+
+/* The tab you are on: a 2px line along its top edge, so it is not told apart by colour alone. */
+.tab[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 20%;
+  right: 20%;
+  height: 2px;
+  background: var(--ink);
 }
 
 .tab span {
@@ -445,6 +458,18 @@ button:disabled {
 
 .sci-screen .display {
   padding-bottom: var(--s-2);
+  /* Calculate gives its display a fifth of the screen; here the function keys need the room. */
+  min-height: 12dvh;
+}
+
+/*
+ * The keys give way before the page overflows. Found on a real phone (about 790px tall): the bottom row of keys sat
+ * under the tab bar because the keypad's rows could not shrink below 52px and the display kept 22% of the height.
+ */
+.sci-screen .keypad {
+  flex: 1 1 0;
+  min-height: 0;
+  grid-auto-rows: minmax(44px, 1fr);
 }
 
 /* Five across is about 62px wide at 360px, so the short rows still clear 44px in width. */
@@ -559,6 +584,12 @@ button:disabled {
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.link-btn:active {
+  background: var(--key-op-pressed);
 }
 
 .link-btn--danger {
@@ -567,6 +598,7 @@ button:disabled {
 
 .link-btn:disabled {
   color: var(--ink-3);
+  text-decoration: none;
 }
 
 /* ----------------------------------------------------------------- history */
@@ -631,8 +663,52 @@ button:disabled {
   color: var(--alert);
 }
 
-.btn:disabled {
-  opacity: 0.5;
+/* Disabled: quiet border and text from the tokens, still readable. No opacity trick. */
+.btn:disabled,
+.btn--primary:disabled,
+.btn--danger:disabled {
+  background: none;
+  border-color: var(--line);
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+
+.btn:active:not(:disabled) {
+  background: var(--key-op-pressed);
+}
+
+.btn--primary:active:not(:disabled) {
+  background: var(--accent-fill);
+  transform: scale(0.98);
+}
+
+/*
+ * tap-row: any row, card or tile that opens a screen or a sheet. Add the class to the <button>, and put
+ * <Icon name="chevron" className="tap-row__chev" /> last inside it. The chevron is in the accent colour
+ * because accent means "you can act on this". 48px tall, a pressed state, and the focus ring is global.
+ * Never put it on something that is only read. See docs/FORMS-AND-SHEETS.md section 12.
+ */
+.tap-row {
+  min-height: 48px;
+  cursor: pointer;
+}
+
+.tap-row:active {
+  background: var(--key-op-pressed);
+}
+
+.tap-row:disabled {
+  cursor: not-allowed;
+}
+
+.tap-row__chev {
+  flex: none;
+  margin-left: auto;
+  color: var(--accent);
+}
+
+.tap-row:disabled .tap-row__chev {
+  color: var(--ink-3);
 }
 
 /* ---------------------------------------------------------------- snackbar */
@@ -784,8 +860,18 @@ button:disabled {
   min-height: 44px;
   padding: 0;
   font-size: 0.875rem;
-  color: var(--ink-3);
-  border-bottom: 2px solid transparent;
+  color: var(--ink-2);
+  border-bottom: 2px solid var(--line);
+}
+
+/* An unselected choice row shows an empty ring, so a row of options reads as a choice, not as text. */
+.radio-ring {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 1px;
+  border: 1.5px solid var(--ink-3);
+  border-radius: var(--r-lg);
 }
 
 .seg__opt[aria-checked='true'] {

@@ -1,6 +1,6 @@
 # Plan: Notes + To-do
 
-**Written:** 2026-11-02. **Status:** a plan only. No code has been changed.
+**Written:** 2026-11-02. **Status:** Phase 1 built on 2 Nov 2026 (`src/lib/tasks.ts`, `TodoScreen.tsx`, `TaskSheet.tsx`). Not browser-checked. Repeat offers only the existing none / monthly / quarterly / yearly. Phases 2 and 3 not started.
 **Evidence level:** app research comes from help pages, store listings and blog reviews (mostly second-hand). Code facts were read in this repo on this date.
 **Reviewed by one critic** (see "What the critic changed" at the end). Its main point is adopted: build the **smallest** version, then use it.
 

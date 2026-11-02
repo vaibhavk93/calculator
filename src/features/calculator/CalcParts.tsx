@@ -104,6 +104,7 @@ export function PasteSheet({ onClose }: { onClose: () => void }) {
   }, [])
 
   const use = () => {
+    if (text.trim() === '') return setProblem('Paste or type a calculation')
     const reason = applyPaste({ insertExpression, showNotice }, text)
     if (reason) return setProblem(reason)
     onClose()
@@ -140,7 +141,7 @@ export function PasteSheet({ onClose }: { onClose: () => void }) {
             {problem}
           </p>
         )}
-        <button type="submit" className="btn btn--primary" disabled={text.trim() === ''}>
+        <button type="submit" className="btn btn--primary">
           Use
         </button>
       </form>

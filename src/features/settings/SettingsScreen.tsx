@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Icon } from '../../components/Icon'
 import { tintStyle } from '../../components/tint'
 import { PickerSelect, type PickOption } from '../../components/PickerSelect'
 import { ScreenHeader } from '../../components/ScreenHeader'
@@ -41,21 +42,23 @@ function ReminderPermissionRows() {
   if (!perm) return null
   return (
     <Section title="Reminders">
-        <button type="button" className="row row--button" disabled={perm.notifications} onClick={() => void ensurePermission().then(refresh)}>
+        <button type="button" className="row row--button tap-row" disabled={perm.notifications} onClick={() => void ensurePermission().then(refresh)}>
           <span className="row__text">
             <span className="row__label">Notifications: {perm.notifications ? 'allowed' : 'not allowed'}</span>
             <span className="row__hint">
               {perm.notifications ? 'Reminders can show on your screen' : 'Tap to allow. If nothing appears, open Android Settings, Apps, Calc, Notifications'}
             </span>
           </span>
+          {!perm.notifications && <Icon name="chevron" size={18} className="tap-row__chev" />}
         </button>
-        <button type="button" className="row row--button" disabled={perm.exact} onClick={() => void openExactAlarmSettings().then(refresh)}>
+        <button type="button" className="row row--button tap-row" disabled={perm.exact} onClick={() => void openExactAlarmSettings().then(refresh)}>
           <span className="row__text">
             <span className="row__label">Alarms and reminders: {perm.exact ? 'allowed' : 'not allowed'}</span>
             <span className="row__hint">
               {perm.exact ? 'Reminders arrive on time' : 'Tap, then switch on "Allow setting alarms and reminders". Without it a reminder can be late'}
             </span>
           </span>
+          {!perm.exact && <Icon name="chevron" size={18} className="tap-row__chev" />}
         </button>
     </Section>
   )
@@ -203,17 +206,19 @@ export function SettingsScreen() {
         {notificationsSupported() && <ReminderPermissionRows />}
 
         <Section title="Your data">
-          <button type="button" className="row row--button" onClick={() => void exportBackup()}>
+          <button type="button" className="row row--button tap-row" onClick={() => void exportBackup()}>
             <span className="row__text">
               <span className="row__label">Export a backup</span>
               <span className="row__hint">History and settings, as one file you keep</span>
             </span>
+            <Icon name="chevron" size={18} className="tap-row__chev" />
           </button>
-          <button type="button" className="row row--button" onClick={() => fileRef.current?.click()}>
+          <button type="button" className="row row--button tap-row" onClick={() => fileRef.current?.click()}>
             <span className="row__text">
               <span className="row__label">Restore from a backup</span>
               <span className="row__hint">Replaces what is on this phone now</span>
             </span>
+            <Icon name="chevron" size={18} className="tap-row__chev" />
           </button>
           <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" aria-label="Choose a backup file" tabIndex={-1} onChange={(e) => void chooseFile(e.target.files?.[0])} />
         </Section>

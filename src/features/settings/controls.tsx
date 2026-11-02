@@ -68,7 +68,7 @@ export function OptionRow({
         <span className="row__label">{label}</span>
         <span className="row__value">{sample}</span>
       </span>
-      {checked && <Icon name="check" size={20} className="check" />}
+      {checked ? <Icon name="check" size={20} className="check" /> : <span className="radio-ring" aria-hidden="true" />}
     </button>
   )
 }

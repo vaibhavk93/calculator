@@ -1,12 +1,15 @@
 import { INITIAL_INPUT, type InputState } from '../engine'
 import { ACCENT_NAMES, type AccentName, type ThemePreference } from '../lib/theme'
 import type { KeyValueStorage } from '../lib/storage'
+import { isAccountType, isMonthKey, isSettlement } from '../lib/budget'
 import {
   DEFAULT_SETTINGS,
   MAX_HISTORY,
   MAX_MEMO,
+  isKept,
   TABS,
   MAX_CARDS,
+  MAX_TASK_TAGS,
   MAX_PINNED,
   REPEATS,
   MAX_CATEGORIES,
@@ -81,7 +84,20 @@ export function sanitizeSettings(raw: unknown): Settings {
 const PLAIN_NUMBER = /^-?\d{1,110}(\.\d{1,110})?$/
 const RAW_EXPRESSION = /^[0-9a-z.+\-*/^()%!π√−×÷ ]*$/i
 
+export const isRawExpression = (v: string) => v.length <= 500 && RAW_EXPRESSION.test(v)
+
 export const isPlainNumber = (v: unknown): v is string => typeof v === 'string' && PLAIN_NUMBER.test(v)
+
+/**
+ * Caps history at `max`. Named and locked rows are never evicted (only Clear all's confirmation, or deleting
+ * an unlocked one, removes them); the oldest plain rows go first. `entries` is newest-first.
+ */
+export function capHistory(entries: HistoryEntry[], max: number): HistoryEntry[] {
+  if (entries.length <= max) return entries
+  const kept = entries.filter(isKept).length
+  const room = new Set(entries.filter((e) => !isKept(e)).slice(0, Math.max(0, max - kept)).map((e) => e.id))
+  return entries.filter((e) => isKept(e) || room.has(e.id))
+}
 
 export function sanitizeHistory(raw: unknown): HistoryEntry[] {
   if (!Array.isArray(raw)) return []
@@ -95,10 +111,9 @@ export function sanitizeHistory(raw: unknown): HistoryEntry[] {
     if (!isPlainNumber(result)) continue
     seen.add(id)
     const memo = typeof item.memo === 'string' ? item.memo.trim().slice(0, MAX_MEMO) : ''
-    out.push({ id, expression, result, at: typeof at === 'number' && Number.isFinite(at) ? at : 0, ...(memo ? { memo } : {}) })
-    if (out.length >= MAX_HISTORY) break
+    out.push({ id, expression, result, at: typeof at === 'number' && Number.isFinite(at) ? at : 0, ...(memo ? { memo } : {}), ...(item.locked === true ? { locked: true } : {}) })
   }
-  return out
+  return capHistory(out, MAX_HISTORY)
 }
 
 export function sanitizeInput(raw: unknown): InputState {
@@ -140,9 +155,11 @@ export function sanitizeCards(raw: unknown): SavedCard[] {
   let pinned = 0
   for (const c of raw) {
     if (!isObject(c) || !goodId(c.id) || seen.has(c.id)) continue
-    const kind = oneOf(c.kind, ['tool', 'tape'] as const, 'tool')
+    const kind = oneOf(c.kind, ['tool', 'tape', 'task'] as const, 'tool')
     const toolId = typeof c.toolId === 'string' ? c.toolId.slice(0, 64) : null
     if (kind === 'tool' && !toolId) continue
+    // A task with no name has nothing to show: drop it, as a calculation with no calculator is dropped.
+    if (kind === 'task' && (typeof c.title !== 'string' || !c.title.trim())) continue
     seen.add(c.id)
     const wantsPin = c.pinned === true && c.deletedAt == null && pinned < MAX_PINNED
     if (wantsPin) pinned++
@@ -160,8 +177,9 @@ export function sanitizeCards(raw: unknown): SavedCard[] {
         : {}),
       lines: kind === 'tape' ? sanitizeLines(c.lines) : [],
       ...(kind === 'tape' && c.checklist === true ? { checklist: true } : {}),
+      ...(kind === 'task' && c.done === true ? { done: true, ...(typeof c.doneAt === 'number' && Number.isFinite(c.doneAt) ? { doneAt: c.doneAt } : {}) } : {}),
       note: str(c.note, 5000),
-      tags: Array.isArray(c.tags) ? c.tags.filter((t): t is string => typeof t === 'string').map((t) => t.slice(0, 30)).slice(0, 10) : [],
+      tags: Array.isArray(c.tags) ? c.tags.filter((t): t is string => typeof t === 'string').map((t) => t.slice(0, 30)).slice(0, kind === 'task' ? MAX_TASK_TAGS : 10) : [],
       pinned: wantsPin,
       createdAt: ts(c.createdAt),
       updatedAt: ts(c.updatedAt),
@@ -200,6 +218,25 @@ export function sanitizeReminders(raw: unknown, cards: SavedCard[]): Reminder[] 
   return out
 }
 
+/** 'YYYY-MM' -> plain amount or null. Empty or damaged gives undefined, so old data stays unchanged. */
+const limitMap = (v: unknown): Record<string, string | null> | undefined => {
+  if (!isObject(v)) return undefined
+  const out: Record<string, string | null> = {}
+  for (const [k, x] of Object.entries(v).slice(0, 240)) {
+    if (!isMonthKey(k)) continue
+    if (x === null) out[k] = null
+    else if (isPlainNumber(x) && !x.startsWith('-')) out[k] = x
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+const monthList = (v: unknown): string[] | undefined => {
+  if (!Array.isArray(v)) return undefined
+  const out = [...new Set(v.filter(isMonthKey))].sort().slice(0, 240)
+  return out.length > 0 ? out : undefined
+}
+const day28 = (v: unknown): number | undefined => (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 28 ? v : undefined)
+const ifSet = <T extends object>(o: T): Partial<T> => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>
+
 const DAY_KEY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
 
 export function sanitizeBudget(raw: unknown): BudgetData {
@@ -215,7 +252,7 @@ export function sanitizeBudget(raw: unknown): BudgetData {
     if (!name) continue
     catIds.add(c.id)
     found.push({
-      cat: { id: c.id, name, limit: isPlainNumber(c.limit) && !c.limit.startsWith('-') ? c.limit : null, parentId: null, deletedAt: num(c.deletedAt) },
+      cat: { id: c.id, name, limit: isPlainNumber(c.limit) && !c.limit.startsWith('-') ? c.limit : null, parentId: null, deletedAt: num(c.deletedAt), ...ifSet({ limitByMonth: limitMap(c.limitByMonth), months: monthList(c.months) }) },
       rawParent: c.parentId,
     })
     if (found.length >= MAX_CATEGORIES) break
@@ -225,7 +262,10 @@ export function sanitizeBudget(raw: unknown): BudgetData {
   const cats = found.map(({ cat, rawParent }) => {
     const parent = typeof rawParent === 'string' && rawParent !== cat.id ? topIds.get(rawParent) : undefined
     if (!parent) return cat
-    return { ...cat, parentId: parent.id, deletedAt: parent.deletedAt !== null ? (cat.deletedAt ?? parent.deletedAt) : cat.deletedAt }
+    // A subcategory's own months must sit inside its parent's; otherwise it just follows the parent.
+    const { months: own, ...rest } = cat
+    const months = own && parent.months && !own.every((m) => parent.months!.includes(m)) ? undefined : own
+    return { ...rest, ...(months ? { months } : {}), parentId: parent.id, deletedAt: parent.deletedAt !== null ? (cat.deletedAt ?? parent.deletedAt) : cat.deletedAt }
   })
 
   const instruments: PayInstrument[] = []
@@ -244,6 +284,16 @@ export function sanitizeBudget(raw: unknown): BudgetData {
       last4: typeof i.last4 === 'string' && /^\d{4}$/.test(i.last4) ? i.last4 : '',
       rewardNote: str(i.rewardNote, 200),
       deletedAt: num(i.deletedAt),
+      ...ifSet({
+        variant: str(i.variant, 40).trim() || undefined,
+        holder: str(i.holder, 40).trim() || undefined,
+        statementDay: day28(i.statementDay),
+        dueDay: day28(i.dueDay),
+        creditLimit: i.kind === 'credit' && isPlainNumber(i.creditLimit) && !i.creditLimit.startsWith('-') ? i.creditLimit : undefined,
+        annualFee: isPlainNumber(i.annualFee) && !i.annualFee.startsWith('-') ? i.annualFee : undefined,
+        upiHandle: (i.kind === 'bank' || i.kind === 'wallet') && /^[A-Za-z0-9._-]{2,}@[A-Za-z][A-Za-z0-9]{1,}$/.test(str(i.upiHandle, 40).trim()) ? str(i.upiHandle, 40).trim() : undefined,
+        accountType: i.kind === 'bank' && isAccountType(i.accountType) ? i.accountType : undefined,
+      }),
     }
     instruments.push(inst)
     instById.set(inst.id, inst)
@@ -258,21 +308,27 @@ export function sanitizeBudget(raw: unknown): BudgetData {
     seen.add(e.id)
     const mode = isPaymentMode(e.mode) ? e.mode : null
     const inst = typeof e.instrumentId === 'string' ? instById.get(e.instrumentId) : undefined
+    const settlement = isSettlement(e.settlement) ? e.settlement : undefined
     expenses.push({
       id: e.id,
       date: e.date,
       amount: e.amount,
       // A category that no longer exists is "Uncategorised"; the entry is kept.
-      categoryId: typeof e.categoryId === 'string' && catIds.has(e.categoryId) ? e.categoryId : null,
+      // A settlement is not spending, so it has no category.
+      categoryId: !settlement && typeof e.categoryId === 'string' && catIds.has(e.categoryId) ? e.categoryId : null,
       mode,
-      // A deleted or unknown instrument, or one the mode does not accept, is dropped; the entry is kept.
-      instrumentId: inst && inst.deletedAt === null && mode !== null && instrumentFitsMode(mode, inst) ? inst.id : null,
+      // A deleted or unknown instrument, or one the mode does not accept, is dropped; the entry is kept. A card bill keeps the card it paid off.
+      instrumentId:
+        settlement === 'cardBill' ? (inst && inst.deletedAt === null && inst.kind === 'credit' ? inst.id : null)
+        : settlement ? null
+        : inst && inst.deletedAt === null && mode !== null && instrumentFitsMode(mode, inst) ? inst.id : null,
       note: str(e.note, 200),
       deletedAt: num(e.deletedAt),
+      ...(settlement ? { settlement } : {}),
     })
     if (expenses.length >= MAX_EXPENSES) break
   }
-  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, categories: cats, instruments, expenses }
+  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, ...ifSet({ overallByMonth: limitMap(raw.overallByMonth) }), categories: cats, instruments, expenses }
 }
 
 type Migration = (data: Record<string, unknown>) => Record<string, unknown>

@@ -22,7 +22,7 @@ export interface TapeLine {
 export interface SavedCard {
   id: string
   title: string
-  kind: 'tool' | 'tape'
+  kind: 'tool' | 'tape' | 'task'
   /** For kind 'tool': which calculator, and the form exactly as it was. */
   toolId: string | null
   inputs: Values | null
@@ -40,6 +40,9 @@ export interface SavedCard {
   lines: TapeLine[]
   /** For kind 'tape': show a checkbox on each line, and "done / left" totals. Absent means off. */
   checklist?: boolean
+  /** For kind 'task': ticked off. Its date, if any, is an ordinary Reminder on this card. */
+  done?: boolean
+  doneAt?: number
   note: string
   tags: string[]
   pinned: boolean
@@ -71,4 +74,7 @@ export interface Reminder {
 export const MAX_PINNED = 5
 export const TRASH_DAYS = 7
 export const MAX_CARDS = 500
+/** A task title is at most this long, like every card title. */
+export const MAX_TASK_TITLE = 120
+export const MAX_TASK_TAGS = 5
 export const DEFAULT_TAGS = ['Credit Card', 'Loan', 'Rent', 'Investment', 'Tax', 'Travel', 'Work', 'Shopping'] as const
