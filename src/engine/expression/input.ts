@@ -196,3 +196,25 @@ export function insertNumber(state: InputState, plain: string): InputState {
   const base = seg ? state.expr.slice(0, state.expr.length - seg.length) : state.expr
   return { expr: base + text, fresh: false }
 }
+
+/**
+ * Puts a whole past calculation into what is being typed, rather than replacing it.
+ *
+ * Tapping "9*9" from History while "1+2+3+" is on screen should give
+ * "1+2+3+(9*9)", not throw the typing away. The brackets are what make that
+ * safe: appended bare, "5*" + "1+2" would read as "5*1+2" = 7, when the point
+ * of reusing a calculation is to reuse *its value*, 15. A single number needs
+ * no brackets and does not get them.
+ *
+ * Replacing is still right in two cases: nothing has been typed, or the screen
+ * is showing a finished answer (`fresh`), where the next thing typed starts over.
+ */
+export function insertExpressionAt(state: InputState, expression: string): InputState {
+  const bare = expression.trim()
+  if (bare === '') return state
+  // A lone number (possibly negative or decimal) carries no precedence of its own.
+  const isLoneNumber = /^-?(?:\d+\.?\d*|\.\d+)$/.test(bare)
+  const text = isLoneNumber ? bare : `(${bare})`
+  if (state.fresh || state.expr === '') return { expr: bare.slice(0, 500), fresh: false }
+  return { expr: (state.expr + text).slice(0, 500), fresh: false }
+}

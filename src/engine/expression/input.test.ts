@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyKey, insertNumber, INITIAL_INPUT } from './index'
+import { applyKey, insertNumber, insertExpressionAt, INITIAL_INPUT } from './index'
 import type { InputResult, InputState, Key } from './index'
 
 const OPTS = { angle: 'deg' } as const
@@ -239,5 +239,40 @@ describe('insertNumber (memory recall, paste)', () => {
   })
   it('pasted decimals survive', () => {
     expect(insertNumber(INITIAL_INPUT, '1234.56').expr).toBe('1234.56')
+  })
+})
+
+describe('insertExpressionAt: reusing a past calculation', () => {
+  it('adds to what is being typed instead of replacing it', () => {
+    // The owner's case: "1+2+3+" on screen, pick "9*9" from History.
+    expect(insertExpressionAt({ expr: '1+2+3+', fresh: false }, '9*9')).toEqual({ expr: '1+2+3+(9*9)', fresh: false })
+  })
+
+  it('brackets the past calculation so its value survives the surrounding precedence', () => {
+    // Bare, "5*" + "1+2" would read as 5*1+2 = 7. The point of reuse is the value, 15.
+    expect(insertExpressionAt({ expr: '5*', fresh: false }, '1+2')).toEqual({ expr: '5*(1+2)', fresh: false })
+  })
+
+  it('does not bracket a lone number, which has no precedence of its own', () => {
+    expect(insertExpressionAt({ expr: '1+', fresh: false }, '42')).toEqual({ expr: '1+42', fresh: false })
+    expect(insertExpressionAt({ expr: '1+', fresh: false }, '3.5')).toEqual({ expr: '1+3.5', fresh: false })
+  })
+
+  it('replaces when nothing has been typed', () => {
+    expect(insertExpressionAt({ expr: '', fresh: false }, '9*9')).toEqual({ expr: '9*9', fresh: false })
+  })
+
+  it('replaces a finished answer, because the next thing typed starts over', () => {
+    expect(insertExpressionAt({ expr: '81', fresh: true }, '9*9')).toEqual({ expr: '9*9', fresh: false })
+  })
+
+  it('ignores an empty expression', () => {
+    const state = { expr: '1+', fresh: false }
+    expect(insertExpressionAt(state, '   ')).toBe(state)
+  })
+
+  it('never grows past the 500-character input limit', () => {
+    const long = { expr: '1'.repeat(495), fresh: false }
+    expect(insertExpressionAt(long, '2*3').expr.length).toBeLessThanOrEqual(500)
   })
 })

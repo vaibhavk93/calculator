@@ -4,6 +4,7 @@ import {
   INITIAL_INPUT,
   applyKey,
   evaluatePreview,
+  insertExpressionAt,
   insertNumber,
   toPlain,
   type InputState,
@@ -297,7 +298,10 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       reuseExpression: (id) => {
         const entry = get().history.find((h) => h.id === id)
         if (!entry) return
-        set({ ...withUndo({ expr: entry.expression, fresh: false }), overlay: 'none', panel: 'none' })
+        // Adds to what is being typed instead of replacing it: picking "9*9" while
+        // "1+2+3+" is on screen gives "1+2+3+(9*9)". Only an empty or just-finished
+        // input is replaced outright.
+        set({ ...withUndo(insertExpressionAt(get().input, entry.expression)), overlay: 'none', panel: 'none' })
       },
 
       reuseResult: (id) => {

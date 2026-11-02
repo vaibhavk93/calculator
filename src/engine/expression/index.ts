@@ -1,7 +1,7 @@
 export { D, toPlain } from '../decimal'
 export type { Dec } from '../decimal'
 export { evaluateExpression, evaluatePreview, closeExpression } from './evaluate'
-export { applyKey, insertNumber, INITIAL_INPUT } from './input'
+export { applyKey, insertNumber, insertExpressionAt, INITIAL_INPUT } from './input'
 export type { InputState, InputResult, Key, Commit } from './input'
 export { ERROR_MESSAGES } from './types'
 export type { AngleMode, EvalOptions, EvalResult, EvalErrorCode } from './types'
