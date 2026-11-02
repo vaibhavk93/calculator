@@ -894,7 +894,149 @@ button:disabled {
   color: var(--alert);
 }
 
+/* ---------------------------------------------------------------- landscape
+ * A phone on its side is about 360px tall: a bottom tab bar, a bar, a display and five key rows
+ * cannot all fit. So the stack becomes two panes. The tab bar turns into a rail on the left, the
+ * display and its utilities take the middle, and the keypad takes the right at full height.
+ * Keyed on height, not width, so a desktop window or a tablet keeps the tall single column.
+ */
+@media (orientation: landscape) and (max-height: 520px) {
+  :root {
+    /* 72px normally; grows with the system font size so "Calculate" is never cut to "Calc…". */
+    --rail-w: max(72px, 3.4rem);
+  }
+
+  .app {
+    max-width: none;
+    flex-direction: row;
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  .app__nav {
+    order: -1;
+    flex: none;
+    display: flex;
+  }
+
+  .tabbar {
+    flex-direction: column;
+    width: var(--rail-w);
+    height: auto;
+    padding-bottom: var(--safe-bottom);
+    border-top: 0;
+    border-right: 1px solid var(--line);
+  }
+
+  .tab {
+    min-height: 44px;
+  }
+
+  .calc {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'bar keys'
+      'display keys'
+      'util keys'
+      'panel keys';
+    column-gap: var(--s-2);
+  }
+
+  .calc__bar {
+    grid-area: bar;
+    height: 44px;
+  }
+
+  .display {
+    grid-area: display;
+    padding-bottom: var(--s-2);
+  }
+
+  .util {
+    grid-area: util;
+    padding-bottom: var(--s-1);
+  }
+
+  .panel {
+    grid-area: panel;
+    gap: var(--s-1);
+    padding-bottom: var(--s-1);
+  }
+
+  /* Five columns of 44px-tall buttons, three rows: room is spent on height, not width. */
+  .calc[data-panel] .panel__btn {
+    height: 44px;
+  }
+
+  .panel--more {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .keypad {
+    grid-area: keys;
+    min-height: 0;
+    grid-template-rows: repeat(5, minmax(44px, 1fr));
+    padding: var(--s-2) var(--s-3) var(--s-2) 0;
+  }
+
+  /* The bottom sheet becomes a side panel: a 78%-high sheet would be 280px of a 360px screen. */
+  .sheet {
+    top: 0;
+    left: auto;
+    width: min(440px, 100%);
+    max-height: none;
+    padding-right: env(safe-area-inset-right, 0px);
+    border-top: 0;
+    border-left: 1px solid var(--line);
+    border-radius: var(--r-lg) 0 0 var(--r-lg);
+    animation: slide-left 240ms var(--ease-out);
+  }
+
+  .sheet__grab {
+    display: none;
+  }
+
+  .sheet__head {
+    padding-top: var(--s-3);
+  }
+
+  /* Undo is offered after a history action, so the bar lines up under the history panel. */
+  .snack {
+    left: auto;
+    right: 0;
+    bottom: var(--safe-bottom);
+    width: min(440px, 100%);
+    padding-right: calc(var(--s-2) + env(safe-area-inset-right, 0px));
+  }
+
+  .screen {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  /* A settings row 700px wide leaves the label and its value a long way apart. */
+  .screen__bar,
+  .screen__body {
+    width: 100%;
+    max-width: 640px;
+    margin-inline: auto;
+  }
+
+  .empty {
+    padding: var(--s-4) var(--s-5);
+  }
+}
+
 /* ------------------------------------------------------------------ motion */
+
+@keyframes slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
 
 @keyframes fade {
   from {

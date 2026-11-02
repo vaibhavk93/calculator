@@ -9,7 +9,7 @@ saved note with a reminder.
 
 No ads. No account. No tracking. Works offline.
 
-**Status:** **P1 (foundation) is built.** A working calculator you can run today. **P1.1 (history power-ups: lock, memo, edit, share) is planned next.** P2 onward is not started.
+**Status:** **P1 (foundation) is built.** A working calculator you can run today. Landscape layout is built. **P1.1 (history power-ups: lock, memo, edit, share) is planned next.** P2 onward is not started.
 
 ```bash
 npm install
@@ -36,6 +36,7 @@ npm run check        # typecheck + 395 unit tests
 | A13 Backup and restore (file) | Done |
 | A14 Formula transparency | Arrives with the calculators that have formulas (P3+) |
 | A15 Vibrate on key press, keep screen on | Done (web APIs; Capacitor plugins in P8) |
+| A21 Landscape layout | Done: rail + two panes + side-panel history, checked at 800×360 and 640×360 |
 
 Tools, Saved and Due are honest empty states until their phases. Tape, Save and Reminders are P6.
 
@@ -49,7 +50,7 @@ that is checked in P8.
 
 | Doc | What's in it |
 |---|---|
-| [`PRD.md`](docs/PRD.md) | Full product requirements — input/output contract for all 91 calculators and features, phased build sequence, risks, definition of done |
+| [`PRD.md`](docs/PRD.md) | Full product requirements — input/output contract for all 99 calculators and features, phased build sequence, risks, definition of done |
 | [`UX-GUIDELINES.md`](docs/UX-GUIDELINES.md) | Design principles, researched good/bad practices from the category, colour and type tokens, keypad spec, accessibility rules, review checklist |
 | [`MEMORY-LAYER.md`](docs/MEMORY-LAYER.md) | The differentiator: notes, reminders, tapes. 30 mapped use cases, data model, privacy position |
 | [`GTM-STRATEGY.md`](docs/GTM-STRATEGY.md) | How this competes for #1 downloads — positioning, ASO, retention mechanics, monetisation, launch sequence, honest counter-argument |
@@ -63,13 +64,13 @@ that is checked in P8.
 
 | Section | Contents | Count |
 |---|---|---|
-| A | Core calculator engine, history, settings, theming | 20 |
+| A | Core calculator engine, history, settings, theming, landscape | 21 |
 | B | Everyday converters and utilities | 15 |
 | C | Loans & EMI | 11 |
 | D | Investments & savings | 13 |
 | E | Tax & salary (India) | 7 |
 | F | Personalisation + product metrics | 13 |
-| G | Memory layer — notes, reminders, tapes | 12 |
+| G | Memory layer — notes, reminders, tapes, spend categories, payment methods, user-managed lists | 19 |
 | H | Platform, freshness & reliability | 14 |
 
 ## Why it's different

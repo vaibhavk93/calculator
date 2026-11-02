@@ -140,7 +140,7 @@ export function App() {
         {tab === 'budget' && <BudgetScreen />}
       </main>
 
-      <div {...behind}>
+      <div className="app__nav" {...behind}>
         <TabBar />
       </div>
 
