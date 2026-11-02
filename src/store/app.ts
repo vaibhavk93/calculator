@@ -11,13 +11,21 @@ import {
 } from '../engine'
 import { sanitizeSettings } from './persistence'
 import {
+  MAX_CARDS,
   MAX_HISTORY,
+  MAX_PINNED,
   MAX_UNDO,
+  TRASH_DAYS,
   type HistoryEntry,
   type PersistedData,
+  type Reminder,
+  type Repeat,
+  type SavedCard,
   type Settings,
   type Tab,
 } from './types'
+import { advance } from '../lib/reminders'
+import { listSummary, repeatLines, tapeTotal } from '../lib/tape'
 
 export type Overlay = 'none' | 'settings' | 'history'
 export type Panel = 'none' | 'more' | 'scientific'
@@ -36,18 +44,48 @@ export interface Removed {
 export interface Snack {
   id: number
   text: string
-  /** When set, the snackbar offers Undo for the last history removal. */
+  /** When set, the snackbar offers Undo for the last removal (history rows, or a card). */
   canUndo: boolean
 }
+
+/** What the user fills in to keep something. Everything but the title can stay empty. */
+export type CardDraft = Pick<SavedCard, 'title' | 'kind' | 'toolId' | 'inputs' | 'summary' | 'amount' | 'lines'> &
+  Partial<Pick<SavedCard, 'note' | 'tags'>>
+
+export interface ReminderDraft {
+  dueAt: number
+  repeat: Repeat
+  leadDays: number
+}
+
+/** Where the user is inside the Tools tab. Lives in the store so the tab bar and the Android back button can pop it. */
+export interface ToolsNav {
+  /** A group id from the Tools list, or null at the top. */
+  category: string | null
+  /** A ToolSpec id, or null when no calculator is open. */
+  tool: string | null
+  /** Whether the scientific calculator is open. */
+  scientific: boolean
+}
+
+export const TOOLS_HOME: ToolsNav = { category: null, tool: null, scientific: false }
 
 export interface AppState {
   input: InputState
   undoStack: InputState[]
   history: HistoryEntry[]
+  cards: SavedCard[]
+  reminders: Reminder[]
   memory: string | null
   settings: Settings
 
   tab: Tab
+  /** Where the user is inside the Tools tab. */
+  nav: ToolsNav
+  /** A card the Notes tab should open as soon as it shows (set after "Add to a list"). The Notes screen clears it. */
+  openCard: string | null
+  /** Goes up by one each time the user taps the tab they are already on, so that tab's screens can return to their start. */
+  tabTap: number
   overlay: Overlay
   panel: Panel
   /** Short-lived notice shown under the result ("Copied", or an error). */
@@ -63,6 +101,8 @@ export interface AppState {
   memoryRecall: () => void
   memoryClear: () => void
   insertPlain: (plain: string) => void
+  /** Puts a pasted calculation into the input. `raw` is already in the engine's form, e.g. "23*36+5". Replaces a finished result, otherwise appends. */
+  insertExpression: (raw: string) => void
 
   reuseExpression: (id: string) => void
   reuseResult: (id: string) => void
@@ -70,8 +110,33 @@ export interface AppState {
   clearHistory: () => void
   undoRemoval: () => void
 
+  /** Keeps a calculation. Returns the new card's id. Over the card limit, returns null and says why. */
+  saveCard: (draft: CardDraft, reminder?: ReminderDraft | null) => string | null
+  /** Changes a card; a reminder draft replaces its reminder (null removes it, undefined leaves it). */
+  updateCard: (id: string, patch: Partial<Omit<SavedCard, 'id'>>, reminder?: ReminderDraft | null) => void
+  /**
+   * Takes a number to a list: `count` equal lines of `value`. With `target.cardId` it adds to that list,
+   * otherwise it starts a new one called `target.title`. A new list from a split gets checkboxes on.
+   * Returns the list's id, or null when the target is gone or the card limit is reached.
+   */
+  addToList: (target: { cardId: string } | { title: string }, value: string, count?: number, label?: string, checklist?: boolean) => string | null
+  /** Ticks or unticks one line of a list. */
+  toggleLine: (cardId: string, lineId: string) => void
+  togglePin: (id: string) => void
+  deleteCard: (id: string) => void
+  restoreCard: (id: string) => void
+  emptyTrash: () => void
+  markPaid: (reminderId: string) => void
+  snooze: (reminderId: string, days: number) => void
+  removeReminder: (reminderId: string) => void
+
   updateSettings: (patch: Partial<Settings>) => void
   setTab: (tab: Tab) => void
+  setNav: (patch: Partial<ToolsNav>) => void
+  /** Goes to the Notes tab with this card open. */
+  showCard: (id: string | null) => void
+  /** Ticks a list on or off as a checklist. */
+  setChecklist: (cardId: string, on: boolean) => void
   setOverlay: (overlay: Overlay) => void
   setPanel: (panel: Panel) => void
   showNotice: (text: string, tone?: Notice['tone']) => void
@@ -98,9 +163,15 @@ const sameInput = (a: InputState, b: InputState) => a.expr === b.expr && a.fresh
 
 export type AppStore = StoreApi<AppState>
 
+const DAY = 86_400_000
+
 export function createAppStore(initial: PersistedData, deps: StoreDeps = defaultDeps): AppStore {
   let counter = 0
   const nextId = () => ++counter
+  // Trash is emptied after TRASH_DAYS; a card's reminders go with it.
+  const keep = initial.cards.filter((c) => c.deletedAt === null || deps.now() - c.deletedAt < TRASH_DAYS * DAY)
+  const keepIds = new Set(keep.map((c) => c.id))
+  let removedCardId: string | null = null
 
   return createStore<AppState>()((set, get) => {
     /** Records the current input so it can be undone, if the next state actually differs. */
@@ -108,6 +179,24 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       const { input, undoStack } = get()
       if (sameInput(input, next)) return { input, undoStack }
       return { input: next, undoStack: [...undoStack, input].slice(-MAX_UNDO) }
+    }
+
+    /** One reminder per card: setting replaces, null removes. */
+    const setReminder = (card: SavedCard, draft: ReminderDraft | null) => {
+      const others = get().reminders.filter((r) => r.cardId !== card.id)
+      if (draft === null) return set({ reminders: others })
+      const existing = get().reminders.find((r) => r.cardId === card.id)
+      const next: Reminder = {
+        id: existing?.id ?? deps.newId(),
+        cardId: card.id,
+        dueAt: draft.dueAt,
+        repeat: draft.repeat,
+        anchorDay: new Date(draft.dueAt).getDate(),
+        leadDays: draft.leadDays,
+        done: false,
+        history: existing?.history ?? [],
+      }
+      set({ reminders: [...others, next] })
     }
 
     const currentValue = () => {
@@ -120,10 +209,16 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       input: initial.input,
       undoStack: [],
       history: initial.history,
+      cards: keep,
+      reminders: initial.reminders.filter((r) => keepIds.has(r.cardId)),
       memory: initial.memory,
       settings: initial.settings,
 
-      tab: initial.settings.startupTab,
+      // A chosen startup calculator opens the Tools tab with that calculator already showing.
+      tab: initial.settings.startupTool ? 'tools' : initial.settings.startupTab,
+      nav: initial.settings.startupTool ? { ...TOOLS_HOME, tool: initial.settings.startupTool } : TOOLS_HOME,
+      tabTap: 0,
+      openCard: null,
       overlay: 'none',
       panel: 'none',
       notice: null,
@@ -177,6 +272,12 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
 
       insertPlain: (plain) => set(withUndo(insertNumber(get().input, plain))),
 
+      insertExpression: (raw) => {
+        const { input } = get()
+        const base = input.fresh ? '' : input.expr
+        set({ ...withUndo({ expr: (base + raw).slice(0, 500), fresh: false }), notice: null })
+      },
+
       reuseExpression: (id) => {
         const entry = get().history.find((h) => h.id === id)
         if (!entry) return
@@ -212,6 +313,12 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       },
 
       undoRemoval: () => {
+        if (removedCardId) {
+          const id = removedCardId
+          removedCardId = null
+          set({ snack: null })
+          return get().restoreCard(id)
+        }
         const { removed, history } = get()
         if (!removed) return
         const restored = [...history]
@@ -222,9 +329,130 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         set({ history: restored.slice(0, MAX_HISTORY), removed: null, snack: null })
       },
 
+      saveCard: (draft, reminder) => {
+        const { cards } = get()
+        if (cards.filter((c) => c.deletedAt === null).length >= MAX_CARDS) {
+          set({ notice: { id: nextId(), text: `You can keep up to ${MAX_CARDS} saved items. Delete some first.`, tone: 'error' } })
+          return null
+        }
+        const now = deps.now()
+        const card: SavedCard = {
+          note: '',
+          tags: [],
+          ...draft,
+          id: deps.newId(),
+          pinned: false,
+          createdAt: now,
+          updatedAt: now,
+          deletedAt: null,
+        }
+        set({ cards: [card, ...cards] })
+        if (reminder) setReminder(card, reminder)
+        return card.id
+      },
+
+      updateCard: (id, patch, reminder) => {
+        const card = get().cards.find((c) => c.id === id)
+        if (!card) return
+        const next = { ...card, ...patch, updatedAt: deps.now() }
+        set({ cards: get().cards.map((c) => (c.id === id ? next : c)) })
+        if (reminder !== undefined) setReminder(next, reminder)
+      },
+
+      addToList: (target, value, count = 1, label = '', checklist = false) => {
+        const { cards, settings } = get()
+        const opts = { system: settings.numberSystem, decimals: settings.decimals }
+        const lines = repeatLines(value, count, label, deps.newId)
+        if ('cardId' in target) {
+          const card = cards.find((c) => c.id === target.cardId && c.deletedAt === null && c.kind === 'tape')
+          if (!card) return null
+          const all = [...card.lines, ...lines]
+          const list = !!card.checklist
+          set({ cards: cards.map((c) => (c.id === card.id ? { ...c, lines: all, amount: toPlain(tapeTotal(all)), summary: listSummary(all, list, opts), updatedAt: deps.now() } : c)) })
+          return card.id
+        }
+        const id = get().saveCard({
+          title: target.title.trim() || 'List',
+          kind: 'tape',
+          toolId: null,
+          inputs: null,
+          summary: listSummary(lines, checklist, opts),
+          amount: toPlain(tapeTotal(lines)),
+          lines,
+          ...(checklist ? { checklist: true } : {}),
+        })
+        return id
+      },
+
+      toggleLine: (cardId, lineId) => {
+        const { cards, settings } = get()
+        const card = cards.find((c) => c.id === cardId && c.deletedAt === null)
+        if (!card) return
+        const lines = card.lines.map((l) => (l.id === lineId ? { ...l, done: !l.done } : l))
+        const opts = { system: settings.numberSystem, decimals: settings.decimals }
+        set({ cards: cards.map((c) => (c.id === cardId ? { ...c, lines, summary: listSummary(lines, !!c.checklist, opts), updatedAt: deps.now() } : c)) })
+      },
+
+      togglePin: (id) => {
+        const { cards } = get()
+        const card = cards.find((c) => c.id === id)
+        if (!card) return
+        if (!card.pinned && cards.filter((c) => c.pinned && c.deletedAt === null).length >= MAX_PINNED) {
+          return set({ notice: { id: nextId(), text: `You can pin up to ${MAX_PINNED}. Unpin one first.`, tone: 'info' } })
+        }
+        set({ cards: cards.map((c) => (c.id === id ? { ...c, pinned: !c.pinned } : c)) })
+      },
+
+      deleteCard: (id) => {
+        const card = get().cards.find((c) => c.id === id && c.deletedAt === null)
+        if (!card) return
+        removedCardId = id
+        set({
+          cards: get().cards.map((c) => (c.id === id ? { ...c, deletedAt: deps.now(), pinned: false } : c)),
+          removed: null,
+          snack: { id: nextId(), text: `Moved "${card.title}" to Trash`, canUndo: true },
+        })
+      },
+
+      restoreCard: (id) => set({ cards: get().cards.map((c) => (c.id === id ? { ...c, deletedAt: null } : c)) }),
+
+      emptyTrash: () => {
+        const cards = get().cards.filter((c) => c.deletedAt === null)
+        const ids = new Set(cards.map((c) => c.id))
+        set({ cards, reminders: get().reminders.filter((r) => ids.has(r.cardId)) })
+      },
+
+      markPaid: (reminderId) => {
+        const r = get().reminders.find((x) => x.id === reminderId)
+        if (!r) return
+        const amount = get().cards.find((c) => c.id === r.cardId)?.amount ?? null
+        const next = advance(r)
+        const paid = { ...r, history: [...r.history, { paidAt: deps.now(), amount }].slice(-200) }
+        set({ reminders: get().reminders.map((x) => (x.id === reminderId ? (next === null ? { ...paid, done: true } : { ...paid, dueAt: next }) : x)) })
+      },
+
+      snooze: (reminderId, days) =>
+        set({ reminders: get().reminders.map((r) => (r.id === reminderId ? { ...r, dueAt: Math.max(r.dueAt, deps.now()) + days * DAY } : r)) }),
+
+      removeReminder: (reminderId) => set({ reminders: get().reminders.filter((r) => r.id !== reminderId) }),
+
       updateSettings: (patch) => set({ settings: sanitizeSettings({ ...get().settings, ...patch }) }),
 
-      setTab: (tab) => set({ tab, overlay: 'none' }),
+      setTab: (tab) => {
+        const { tab: current, tabTap } = get()
+        // Tapping the tab you are already on means "take me back to its start".
+        if (tab === current) return set({ overlay: 'none', tabTap: tabTap + 1, nav: tab === 'tools' ? TOOLS_HOME : get().nav })
+        set({ tab, overlay: 'none' })
+      },
+      setNav: (patch) => set({ nav: { ...get().nav, ...patch } }),
+      showCard: (id) => set(id === null ? { openCard: null } : { openCard: id, tab: 'saved', overlay: 'none' }),
+      setChecklist: (cardId, on) => {
+        const { cards, settings } = get()
+        const card = cards.find((c) => c.id === cardId && c.deletedAt === null && c.kind === 'tape')
+        if (!card) return
+        const opts = { system: settings.numberSystem, decimals: settings.decimals }
+        set({ cards: cards.map((c) => (c.id === cardId ? { ...c, ...(on ? { checklist: true } : { checklist: undefined }), summary: listSummary(c.lines, on, opts), updatedAt: deps.now() } : c)) })
+      },
       setOverlay: (overlay) => set({ overlay }),
       setPanel: (panel) => set({ panel: get().panel === panel ? 'none' : panel }),
 
@@ -241,6 +469,8 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
           input: data.input,
           undoStack: [],
           history: data.history,
+          cards: data.cards,
+          reminders: data.reminders,
           memory: data.memory,
           settings: data.settings,
           removed: null,
@@ -250,8 +480,8 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         }),
 
       snapshot: () => {
-        const { input, history, memory, settings } = get()
-        return { schemaVersion: initial.schemaVersion, input, history, memory, settings }
+        const { input, history, cards, reminders, memory, settings } = get()
+        return { schemaVersion: initial.schemaVersion, input, history, cards, reminders, memory, settings }
       },
     }
   })

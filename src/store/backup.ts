@@ -10,7 +10,7 @@ export function buildBackup(data: PersistedData, now: Date = new Date()): string
       kind: BACKUP_KIND,
       schemaVersion: CURRENT_SCHEMA,
       exportedAt: now.toISOString(),
-      app: 'VK Calc',
+      app: 'Calc',
       data,
     },
     null,
@@ -25,17 +25,17 @@ export function backupFilename(now: Date = new Date()): string {
 export type ParsedBackup = { ok: true; data: PersistedData; exportedAt: string | null } | { ok: false; message: string }
 
 export function parseBackup(text: string): ParsedBackup {
-  if (text.length > MAX_BACKUP_BYTES) return { ok: false, message: 'That file is too large to be a VK Calc backup.' }
+  if (text.length > MAX_BACKUP_BYTES) return { ok: false, message: 'That file is too large to be a Calc backup.' }
 
   let json: unknown
   try {
     json = JSON.parse(text)
   } catch {
-    return { ok: false, message: "That file isn't a VK Calc backup." }
+    return { ok: false, message: "That file isn't a Calc backup." }
   }
 
   if (typeof json !== 'object' || json === null || (json as { kind?: unknown }).kind !== BACKUP_KIND) {
-    return { ok: false, message: "That file isn't a VK Calc backup." }
+    return { ok: false, message: "That file isn't a Calc backup." }
   }
 
   const { data, exportedAt } = json as { data?: unknown; exportedAt?: unknown }

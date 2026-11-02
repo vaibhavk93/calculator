@@ -7,6 +7,8 @@ import {
   defaultPersisted,
   loadPersisted,
   migrate,
+  sanitizeCards,
+  sanitizeReminders,
   sanitizeHistory,
   sanitizeInput,
   sanitizeSettings,
@@ -21,6 +23,8 @@ const sample = (): PersistedData => ({
     { id: 'a', expression: '18450+7200', result: '25650', at: 1_700_000_000_000 },
     { id: 'b', expression: '5*-3', result: '-15', at: 1_700_000_001_000 },
   ],
+  cards: [],
+  reminders: [],
   memory: '42.5',
   input: { expr: '5+3', fresh: false },
 })
@@ -150,7 +154,7 @@ describe('backup and restore', () => {
     for (const text of ['hello', '[]', '{"a":1}', '{"kind":"something-else","data":{}}']) {
       const r = parseBackup(text)
       expect(r.ok).toBe(false)
-      if (!r.ok) expect(r.message).toBe("That file isn't a VK Calc backup.")
+      if (!r.ok) expect(r.message).toBe("That file isn't a Calc backup.")
     }
   })
   it('refuses a backup with no data', () => {
@@ -175,5 +179,66 @@ describe('backup and restore', () => {
   it('rejects an oversized file', () => {
     const r = parseBackup('x'.repeat(6 * 1024 * 1024))
     expect(r.ok).toBe(false)
+  })
+})
+
+describe('schema v1 -> v2 (adds saved cards and reminders)', () => {
+  // A real v1 file: what every existing user has on their phone today.
+  const v1 = {
+    schemaVersion: 1,
+    settings: { ...DEFAULT_SETTINGS, theme: 'light' },
+    history: [{ id: 'a', expression: '2+2', result: '4', at: 5 }],
+    memory: '7',
+    input: { expr: '9', fresh: false },
+  }
+  it('keeps everything the user had and starts with no cards or reminders', () => {
+    const out = migrate(v1)
+    expect(out.schemaVersion).toBe(2)
+    expect(out.settings.theme).toBe('light')
+    expect(out.history).toHaveLength(1)
+    expect(out.memory).toBe('7')
+    expect(out.cards).toEqual([])
+    expect(out.reminders).toEqual([])
+  })
+})
+
+describe('sanitizeCards and sanitizeReminders', () => {
+  const card = (over: object = {}) => ({ id: 'c1', title: 'HDFC', kind: 'tool', toolId: 'emi', inputs: { principal: '1000' }, summary: 's', amount: '5000.5', note: '', tags: ['Loan'], pinned: false, createdAt: 1, updatedAt: 1, deletedAt: null, ...over })
+  it('drops junk, duplicate ids, and tool cards with no tool', () => {
+    expect(sanitizeCards([card(), card(), card({ id: 'c2', toolId: null }), 5, null, { id: '' }])).toHaveLength(1)
+  })
+  it('allows at most 5 pinned cards, and a deleted card cannot stay pinned', () => {
+    const many = Array.from({ length: 7 }, (_, i) => card({ id: `p${i}`, pinned: true }))
+    expect(sanitizeCards(many).filter((c) => c.pinned)).toHaveLength(5)
+    expect(sanitizeCards([card({ pinned: true, deletedAt: 9 })])[0]!.pinned).toBe(false)
+  })
+  it('rejects a non-numeric amount and bad input values', () => {
+    const c = sanitizeCards([card({ amount: 'NaN', inputs: { a: { x: 1 }, b: [['1', 2]] } })])[0]!
+    expect(c.amount).toBeNull()
+    expect(c.inputs).toEqual({ b: [['1', '']] })
+  })
+  it('a reminder with no card is dropped; bad fields fall back', () => {
+    const cards = sanitizeCards([card()])
+    const r = { id: 'r1', cardId: 'c1', dueAt: 1_700_000_000_000, repeat: 'weekly', anchorDay: 99, leadDays: -4, done: false, history: [] }
+    expect(sanitizeReminders([r, { ...r, id: 'r2', cardId: 'gone' }], cards)).toEqual([
+      { ...r, repeat: 'none', anchorDay: new Date(r.dueAt).getDate(), leadDays: 3 },
+    ])
+  })
+})
+
+describe('checklist fields on stored lists', () => {
+  const card = (over: object = {}) => ({ id: 'c1', title: 'Split', kind: 'tape', toolId: null, inputs: null, summary: '', amount: '2000', note: '', tags: [], pinned: false, createdAt: 1, updatedAt: 1, deletedAt: null, ...over })
+  it('keeps the checklist flag and ticked lines, and an old list without them is simply not a checklist', () => {
+    const [c] = sanitizeCards([card({ checklist: true, lines: [{ id: 'a', label: 'Ravi', value: '1000', done: true }, { id: 'b', label: 'Asha', value: '1000' }] })])
+    expect(c!.checklist).toBe(true)
+    expect(c!.lines).toEqual([{ id: 'a', label: 'Ravi', value: '1000', done: true }, { id: 'b', label: 'Asha', value: '1000' }])
+    const [old] = sanitizeCards([card({ lines: [{ id: 'a', label: 'x', value: '5' }] })])
+    expect(old!.checklist).toBeUndefined()
+    expect(old!.lines[0]).not.toHaveProperty('done')
+  })
+  it('ignores junk in those fields', () => {
+    const [c] = sanitizeCards([card({ checklist: 'yes', lines: [{ id: 'a', label: 'x', value: '5', done: 'true' }] })])
+    expect(c!.checklist).toBeUndefined()
+    expect(c!.lines[0]).not.toHaveProperty('done')
   })
 })

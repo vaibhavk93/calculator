@@ -55,7 +55,7 @@ const layerOf = (file: string): Layer | null => {
 }
 const THIRD_PARTY_OK: Record<Layer, string[]> = {
   engine: ['decimal.js'],
-  lib: ['decimal.js'],
+  lib: ['decimal.js', 'loglevel', '@capacitor/core', '@capacitor/preferences', '@capacitor/local-notifications', '@capacitor/clipboard', '@capacitor/app', '@capacitor/status-bar'],
   store: ['zustand', 'zustand/vanilla', 'decimal.js'],
   components: ['react', 'react-dom', 'zustand', 'react/jsx-runtime'],
   features: ['react', 'react-dom', 'zustand', 'react/jsx-runtime'],

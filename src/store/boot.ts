@@ -19,7 +19,8 @@ export async function bootStore(storage: KeyValueStorage): Promise<Booted> {
   const initial = await loadPersisted(storage)
   const store = createAppStore(initial)
 
-  let saved = { input: store.getState().input, history: store.getState().history, memory: store.getState().memory, settings: store.getState().settings }
+  const pick = (s: ReturnType<typeof store.getState>) => [s.input, s.history, s.cards, s.reminders, s.memory, s.settings] as const
+  let saved = pick(store.getState())
   let timer: ReturnType<typeof setTimeout> | undefined
 
   const flush = async () => {
@@ -29,10 +30,9 @@ export async function bootStore(storage: KeyValueStorage): Promise<Booted> {
   }
 
   store.subscribe((s) => {
-    const changed =
-      s.input !== saved.input || s.history !== saved.history || s.memory !== saved.memory || s.settings !== saved.settings
-    if (!changed) return
-    saved = { input: s.input, history: s.history, memory: s.memory, settings: s.settings }
+    const now = pick(s)
+    if (now.every((v, i) => v === saved[i])) return
+    saved = now
     if (timer !== undefined) clearTimeout(timer)
     timer = setTimeout(() => void flush(), SAVE_DELAY_MS)
   })

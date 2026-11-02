@@ -286,7 +286,7 @@ describe('snapshot and restore', () => {
     press('7', '+', '1', '=')
     get().memoryAdd(1)
     const snap = get().snapshot()
-    expect(Object.keys(snap).sort()).toEqual(['history', 'input', 'memory', 'schemaVersion', 'settings'])
+    expect(Object.keys(snap).sort()).toEqual(['cards', 'history', 'input', 'memory', 'reminders', 'schemaVersion', 'settings'])
     expect(snap.history).toHaveLength(1)
   })
   it('restore replaces state and clears transient things', () => {

@@ -1,3 +1,6 @@
+import { Capacitor } from '@capacitor/core'
+import { Preferences } from '@capacitor/preferences'
+
 /**
  * Async on purpose. Browser localStorage is synchronous, but on Android the
  * WebView's copy can be evicted under storage pressure, so the Android build
@@ -67,3 +70,21 @@ export function createLocalStorage(): KeyValueStorage {
     },
   }
 }
+
+/** Capacitor Preferences: Android's own key-value store, which the system does not evict like the WebView's localStorage. */
+export function createNativeStorage(): KeyValueStorage {
+  return {
+    async get(key) {
+      return (await Preferences.get({ key })).value
+    },
+    async set(key, value) {
+      await Preferences.set({ key, value })
+    },
+    async remove(key) {
+      await Preferences.remove({ key })
+    },
+  }
+}
+
+/** The right store for where the app is running. */
+export const createStorage = (): KeyValueStorage => (Capacitor.isNativePlatform() ? createNativeStorage() : createLocalStorage())
