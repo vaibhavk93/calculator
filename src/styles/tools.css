@@ -306,7 +306,7 @@
  */
 .section-head {
   margin: 0;
-  padding: var(--s-4) var(--s-4) var(--s-2);
+  padding: var(--s-3) var(--s-4) var(--s-2);
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--ink-2);
@@ -766,7 +766,7 @@ textarea.field {
   justify-content: space-between;
   gap: var(--s-3);
   width: calc(100% - 2 * var(--s-4));
-  min-height: 56px;
+  min-height: 48px;
   margin: var(--s-2) var(--s-4) var(--s-1);
   padding: 0 var(--s-4);
   border: 1px solid var(--ink-3);
@@ -782,17 +782,20 @@ textarea.field {
 .tiles {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--s-3);
+  gap: var(--s-2);
   padding: 0 var(--s-4);
 }
 
+/* Fits content rather than forcing 96px: the name and footer are each one short line, so the old
+   fixed height and s-4 internal gap left visible slack -- with 8 category tiles this was the
+   difference between the whole list fitting on a 360x640 phone and needing a scroll. */
 .tile {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: var(--s-4);
-  min-height: 96px;
-  padding: var(--s-3) var(--s-4);
+  gap: var(--s-2);
+  min-height: 44px;
+  padding: var(--s-2) var(--s-4);
   background: var(--tint);
   border: 1px solid transparent;
   border-radius: var(--r-md);

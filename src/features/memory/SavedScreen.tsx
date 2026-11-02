@@ -23,7 +23,6 @@ export function SavedScreen() {
   const cards = useApp((s) => s.cards)
   const reminders = useApp((s) => s.reminders)
   const togglePin = useApp((s) => s.togglePin)
-  const setTab = useApp((s) => s.setTab)
   const [view, setView] = useState<View>({ kind: 'list' })
   const [mode, setModeState] = useState(lastMode)
   const setMode = (m: 'notes' | 'todo') => {
@@ -101,12 +100,8 @@ export function SavedScreen() {
       {mode === 'todo' ? (
         <TodoScreen query={query} tag={tag} />
       ) : live.length === 0 ? (
-        <EmptyState
-          title="No notes yet"
-          level="h2"
-          action={<button type="button" className="btn btn--primary" onClick={() => setTab('tools')}>Open calculators</button>}
-        >
-          Press Save on any calculator, or start a list for a running total. Add a reminder and the Due tab will keep track.
+        <EmptyState title="No notes yet" level="h2">
+          Press Save on any calculator, or tap New list above for a running total. Add a reminder and the Due tab will keep track.
         </EmptyState>
       ) : (
         <div className="tools__list sections">

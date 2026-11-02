@@ -95,9 +95,12 @@
   overflow-wrap: anywhere;
 }
 
+/* flex-start, not center: the hint line (date, mode, note) wraps to a second line often enough that
+   centering the delete icon on the WHOLE entry put it visibly below the chevron, which centers on
+   just the first line. Top-aligning both keeps them at the same height regardless of how much wraps. */
 .budget__entry {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--s-1);
   padding-right: var(--s-2);
   border-top: 1px solid var(--line);
