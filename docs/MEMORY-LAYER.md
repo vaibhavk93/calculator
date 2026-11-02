@@ -193,7 +193,7 @@ different product with strong incumbents. The tape already holds labelled line i
 | **Long-term** | Category budgets with "left / over" (G17), recurring spends from reminders, CSV export |
 
 **Why payment mode matters more than it looks.** It is the grouping key for the credit-card
-bill (use case A1): every line with `paymentMode = credit` and `instrument = HDFC` in a statement
+bill (use case A1): every line whose payment mode has `type = credit` and `instrumentId` = HDFC Regalia, in a statement
 month sums to "HDFC card, November", and that total becomes the reminder amount. This is the
 link between spending and the differentiator.
 
@@ -230,6 +230,70 @@ PDF/CSV export is a free feature here but a Pro feature in `GTM-STRATEGY.md`; de
 
 **Dependency:** needs Save and Tape (G1, G2), so it ships inside P6. It must not be built as a
 separate expense table beforehand: that would duplicate `SavedCard` and `TapeLine`.
+
+### 4.6c Add your own, then pick instead of typing (G18, G19)
+
+**Recommendation: one mechanism for every list.** Categories, subcategories, payment modes and
+instruments are all the same two-level `ListItem`, managed by one screen and chosen with one
+picker. Tags (G8) can reuse it later. Building it once is cheaper than building four editors.
+
+**Payment methods are two levels too.** The *mode* is the kind of payment; the *instrument* is
+your specific card or account under it.
+
+| Mode (seeded, or add your own) | Instruments you add, for example |
+|---|---|
+| Cash | none |
+| UPI | GPay · PhonePe · Paytm |
+| Credit card | HDFC Regalia · Amex MRCC |
+| Debit card | SBI debit · ICICI debit |
+| Net banking | HDFC · SBI |
+| Wallet | Paytm wallet · Amazon Pay |
+
+A mode you create (Cheque, Gift card) gets `type = other`. When adding one the app asks one
+question: "Is this a credit card?" Only `credit` modes roll up into a bill total and offer a bill
+reminder. Seeded modes carry their type already.
+
+**The picker** (a bottom sheet in portrait, the right-hand side panel in landscape):
+
+| Behaviour | Why |
+|---|---|
+| Opens on tap of the field. A native dropdown (`<select>`) is not used. | It cannot show recents, filter, nest two levels, or add an item in place |
+| Recents first, then the full list, hidden items excluded | The item you want is usually one of your last few |
+| Typing filters the list. It never becomes the saved value. | Entries store ids, so "Food" and "food" can never become two things |
+| A last row, `Add "xyz"`, creates the item and selects it | Adding must not take you out of the entry |
+| Subcategory is disabled until a category is chosen, then shows only that category's children | Prevents mismatched pairs |
+| Instrument works the same way under the chosen mode | Same reason |
+| Each option is a 44px row; screen readers hear "Eating out, 2 of 5" | Accessibility rules apply to pickers too |
+
+**Manage lists screen** (Settings → Categories & payment methods): hairline rows, tap to rename,
+a toggle to hide, an Add row at the foot of each group. "Restore defaults" brings back seeded
+items you hid and never overwrites or removes anything you added or renamed.
+
+**Rules**
+
+| Rule | Why |
+|---|---|
+| Names are trimmed and compared case-insensitively. Adding an existing name selects it instead. | Stops "Groceries" / "groceries " duplicates at the door |
+| Renaming changes the name everywhere, because lines point at ids | Old reports stay correct |
+| Hiding an item that lines use is allowed; they keep showing its name | Totals must not change under you |
+| Moving lines to another item, and merging two items, are long-term | Needed eventually, but not for a first version |
+| Manual reordering is long-term; recency ordering is the default | Recents already put the right item first |
+| Cards store a nickname and optional last four digits, never a full number | The app holds no payment secrets, so it has none to leak |
+| Both lists are included in backup and restore, with a migration and fixture test | A restored backup must bring its categories with it |
+
+**Build tiers.** *MVP (P6):* manage screen with add / rename / hide, the picker with recents and
+inline add, seeded lists. *Production-ready:* restore defaults, the credit-type question, last four
+digits, instrument-level totals. *Long-term:* merge, move, manual order, per-card statement and due
+day to pre-fill bill reminders.
+
+**Verification:** adding a duplicate selects the existing item; rename shows on old entries; hiding
+an in-use item leaves old lines intact; inline add returns to the entry with the new item selected;
+the picker works by keyboard and at 200% font, portrait and landscape; backup → wipe → restore
+round-trips both lists.
+
+**Risk to watch:** list sprawl. If the average user ends up with 30 categories, picking gets slower
+than typing, which defeats the point. Recents-first and filter-as-you-type are the mitigation; measure
+taps per entry before adding anything more.
 
 ### 4.7 Safety — directly answering the category's worst flaw
 | Action | Behaviour |
@@ -288,18 +352,24 @@ TapeLine
 ├── expression          string          "24000"
 ├── value               decimal
 ├── spentAt             timestamp       the date of the spend, editable
-├── categoryId          uuid? → Category
-├── subcategoryId       uuid? → Category (child of categoryId)
-├── paymentMode         enum?           cash | upi | credit | debit | netbanking | wallet
-├── instrument          string?         "HDFC Regalia": which card or account
+├── categoryId          uuid? → ListItem (kind: category, top level)
+├── subcategoryId       uuid? → ListItem (kind: category, child of categoryId)
+├── paymentModeId       uuid? → ListItem (kind: payment, top level)    "Credit card"
+├── instrumentId        uuid? → ListItem (kind: payment, child of paymentModeId)   "HDFC Regalia"
 └── order               int
 
-Category                                 (seeded from config/categories.json, then yours)
+ListItem                                 (one shape for every user-managed list)
 ├── id                  uuid            stable: renames never break old lines
-├── name                string
+├── kind                enum            category | payment      (tags can join later)
+├── name                string          ≤ 30 chars, trimmed
 ├── parentId            uuid?           null = top level. Two levels maximum.
+├── type                enum?           payment modes only: cash | upi | credit | debit |
+│                                       netbanking | wallet | other. Only "credit" rolls
+│                                       up into a card bill.
+├── lastFour            string?         instruments only, optional, 4 digits. Never a full number.
 ├── hidden              boolean         "delete" = hide, so history stays intact
-├── seeded              boolean
+├── seeded              boolean         came from config/*.json rather than the user
+├── lastUsedAt          timestamp?      drives "recents first" in the picker
 └── order               int
 ```
 

@@ -50,7 +50,7 @@ that is checked in P8.
 
 | Doc | What's in it |
 |---|---|
-| [`PRD.md`](docs/PRD.md) | Full product requirements — input/output contract for all 97 calculators and features, phased build sequence, risks, definition of done |
+| [`PRD.md`](docs/PRD.md) | Full product requirements — input/output contract for all 99 calculators and features, phased build sequence, risks, definition of done |
 | [`UX-GUIDELINES.md`](docs/UX-GUIDELINES.md) | Design principles, researched good/bad practices from the category, colour and type tokens, keypad spec, accessibility rules, review checklist |
 | [`MEMORY-LAYER.md`](docs/MEMORY-LAYER.md) | The differentiator: notes, reminders, tapes. 30 mapped use cases, data model, privacy position |
 | [`GTM-STRATEGY.md`](docs/GTM-STRATEGY.md) | How this competes for #1 downloads — positioning, ASO, retention mechanics, monetisation, launch sequence, honest counter-argument |
@@ -70,7 +70,7 @@ that is checked in P8.
 | D | Investments & savings | 13 |
 | E | Tax & salary (India) | 7 |
 | F | Personalisation + product metrics | 13 |
-| G | Memory layer — notes, reminders, tapes, spend categories, payment modes | 17 |
+| G | Memory layer — notes, reminders, tapes, spend categories, payment methods, user-managed lists | 19 |
 | H | Platform, freshness & reliability | 14 |
 
 ## Why it's different
