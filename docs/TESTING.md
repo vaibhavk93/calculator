@@ -25,7 +25,7 @@ Rules for new tests:
 
 ## 2. By eye: the browser pass (360px, dark and light)
 
-**The audit sweep (use this first).** `e2e/audit-harness.js` opens every calculator (51) and every app page (25) in a 360px
+**The audit sweep (use this first).** `e2e/audit-harness.js` opens every calculator (55) and every app page (25) in a 360px
 iframe and checks each for sideways scrolling, off-screen content, cut-off text, controls under 44px, unnamed controls,
 `NaN` on screen and wrapping money. Run it at normal size **and at 200% font**; the 200% run found most of the bugs. The
 file's header says how. On 2026-11-02 the first sweep found 7 kinds of bug across 30 pages; after fixes it reports none.

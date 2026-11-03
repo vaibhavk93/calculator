@@ -67,6 +67,7 @@ export function MoneyInput({ id, value, onChange, placeholder, describedBy, inva
   onBlur?: () => void
   inputRef?: React.Ref<HTMLInputElement>
 }) {
+  const [minus, setMinus] = useState(false)
   return (
     <div className="field-wrap">
       <span className="field-unit" aria-hidden="true">₹</span>
@@ -80,9 +81,10 @@ export function MoneyInput({ id, value, onChange, placeholder, describedBy, inva
         value={value}
         aria-invalid={invalid ? true : undefined}
         aria-describedby={describedBy}
-        onChange={(e) => onChange(cleanMoney(e.target.value))}
+        onChange={(e) => { setMinus(e.target.value.includes('-')); onChange(cleanMoney(e.target.value)) }}
         onBlur={onBlur}
       />
+      {minus && <p className="ffield__hint" role="status">A minus sign is not used here. Type the amount without it.</p>}
     </div>
   )
 }

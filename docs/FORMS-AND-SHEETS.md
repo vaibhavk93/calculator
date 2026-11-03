@@ -139,7 +139,7 @@ dropped, say so. [S9] Today `cleanLimit` drops a limit typed "0" or "abc" (secti
 | 2 to 4, labels of 10 characters or less | **Segmented** | Wraps 2 by 2 at large font (DS 14.3). Today's rule is 2 to 3; 4 is **unproven** at 360px and 200% font |
 | A set the person builds, up to about 8 | **Chips** that wrap | Multi: `aria-pressed`. Single: one pressed |
 | 5 or more, or a growing list | **Picker row** opening a **picker sheet** | Below |
-| Many and grouped ("Opens on": 51 tools) | Picker sheet **with search** and group headings | |
+| Many and grouped ("Opens on": 55 tools) | Picker sheet **with search** and group headings | |
 | A date | Native `type="date"` | Already a platform picker |
 
 **Why not the phone's `<select>`:** the open list is drawn by the system and **you cannot set its colours or spacing** [S18].

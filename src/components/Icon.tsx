@@ -25,6 +25,7 @@ export type IconName =
   | 'pinFilled'
   | 'edit'
   | 'lock'
+  | 'forward'
 
 const PATHS: Record<IconName, ReactNode> = {
   down: <path d="M6 9.5l6 6 6-6" />,
@@ -116,6 +117,7 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M13 7.5l3.5 3.5" />
     </>
   ),
+  forward: <path d="M5 12h13M13 6.5l5.5 5.5-5.5 5.5" />,
   lock: (
     <>
       <rect x="5" y="11" width="14" height="9" rx="2" />

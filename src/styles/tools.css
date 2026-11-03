@@ -184,6 +184,13 @@
   display: block;
 }
 
+/* The box an error is about: the same marking as FormField (docs/FORMS-AND-SHEETS.md). The words stay the main signal. */
+.tool__form .field-row[data-invalid] .field,
+.tool__form .field-row[data-invalid] .pick,
+.tool__form .rows[data-invalid] .field {
+  border-bottom-color: var(--alert);
+}
+
 .field-words {
   font-family: var(--font-mono);
   font-size: 0.8125rem;
@@ -290,6 +297,25 @@
 
 .rows__row > .rows__cell {
   flex: 1 1 0;
+}
+
+/* Four or more columns do not fit side by side at 360px: two per line, the remove button beside both lines. */
+.rows__row--wrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: var(--s-3);
+}
+
+.rows__row--wrap > .icon-btn {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.rows__row--wrap + .rows__row--wrap {
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--line);
 }
 
 .result {
@@ -989,6 +1015,26 @@ textarea.field {
   margin: var(--s-3) var(--s-4) 0;
   font-size: 0.9375rem;
   color: var(--alert);
+}
+
+/* The one "next step" under a result: a text link and a close, no fill, so it never looks like a result. */
+.suggest {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin: var(--s-1) var(--s-4) 0;
+}
+
+.suggest .link-btn {
+  text-align: left;
+}
+
+/* A sentence under a list of rows ("Row 1 is you...") that must stay visible: the rows have no single box to focus. */
+.rows__hint {
+  margin: 0 0 var(--s-2);
+  font-size: 0.8125rem;
+  color: var(--ink-3);
 }
 
 /* ---------------------------------------------------------------- keep and share */

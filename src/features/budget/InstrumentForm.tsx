@@ -4,7 +4,9 @@ import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { tintStyle } from '../../components/tint'
 import type { Dec } from '../../engine'
+import { cardBillFor } from '../../lib/recurring'
 import { formatCell } from '../../lib/toolFormat'
+import { Row, Toggle } from '../settings/controls'
 import {
   ACCOUNT_TYPES,
   INSTRUMENT_KINDS,
@@ -65,6 +67,8 @@ export function InstrumentForm({ id, initialKind, initialNetwork, onClose, onSav
     upiHandle: cur?.upiHandle ?? '',
     accountType: (cur?.accountType ?? null) as AccountType | null,
     rewardNote: cur?.rewardNote ?? '',
+    /** "Remind me about this card's bill": a monthly reminder in Due on the due day. Credit cards only. */
+    remind: cur ? cardBillFor(budget, cur.id) !== undefined : false,
   }))
   const [f, setF] = useState(start)
   const set = <K extends keyof typeof start>(k: K, v: (typeof start)[K]) => setF((x) => ({ ...x, [k]: v }))
@@ -86,9 +90,16 @@ export function InstrumentForm({ id, initialKind, initialNetwork, onClose, onSav
   const touch = (k: string) => () => setTouched((t) => ({ ...t, [k]: true }))
   const aria = (k: keyof InstrumentErrors, hint = false) => ({ 'aria-invalid': shown(k) ? (true as const) : undefined, 'aria-describedby': shown(k) || hint ? `inst-${k}-msg` : undefined })
 
+  const wantsRemind = kind === 'credit' && f.remind
+  const remindError = wantsRemind && !f.dueDay.trim() ? 'Add the due day above first' : undefined
+
   const save = () => {
     setSubmitted(true)
     const first = ORDER.find((k) => errors[k])
+    if (!first && remindError) {
+      setMoreOpen(true)
+      return void setTimeout(() => focusField('inst-dueDay'), 0)
+    }
     if (first) {
       if (MORE_FIELDS.includes(first)) {
         setMoreOpen(true)
@@ -98,10 +109,14 @@ export function InstrumentForm({ id, initialKind, initialNetwork, onClose, onSav
     }
     const clean = { ...draft, kind: kind!, statementDay: f.statementDay.trim() || null, dueDay: f.dueDay.trim() || null, creditLimit: draft.creditLimit || null, annualFee: f.annualFee.trim() || null }
     if (cur) {
-      if (updateInstrument(cur.id, clean)) return onClose()
+      if (updateInstrument(cur.id, clean)) {
+        if (kind === 'credit' && f.remind !== start.remind) store.getState().setCardBillReminder(cur.id, f.remind)
+        return onClose()
+      }
     } else {
       const newId = addInstrument(clean)
       if (newId !== null) {
+        if (wantsRemind) store.getState().setCardBillReminder(newId, true)
         onSaved?.(newId)
         return onClose()
       }
@@ -202,6 +217,10 @@ export function InstrumentForm({ id, initialKind, initialNetwork, onClose, onSav
                     <FormField label="Due day (optional)" htmlFor="inst-dueDay" error={shown('dueDay')} hint="Day of the month, 1 to 28">
                       <input id="inst-dueDay" className="field field--mono" inputMode="numeric" value={f.dueDay} autoComplete="off" onChange={(e) => set('dueDay', e.target.value.replace(/\D/g, '').slice(0, 2))} onBlur={touch('dueDay')} {...aria('dueDay', true)} />
                     </FormField>
+                    <Row label="Remind me about this card's bill" hint="A reminder in Due on the due day, every month">
+                      <Toggle label="Remind me about this card's bill" checked={f.remind} onChange={(v) => set('remind', v)} />
+                    </Row>
+                    {submitted && remindError && <p className="ffield__error" role="alert">{remindError}</p>}
                     <FormField label="Credit limit in rupees (optional)" htmlFor="inst-creditLimit" error={shown('creditLimit')}>
                       <MoneyInput id="inst-creditLimit" value={f.creditLimit} onChange={(v) => set('creditLimit', v)} invalid={!!shown('creditLimit')} describedBy={shown('creditLimit') ? 'inst-creditLimit-msg' : undefined} onBlur={touch('creditLimit')} />
                     </FormField>

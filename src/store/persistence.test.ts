@@ -479,6 +479,8 @@ describe('sanitizeSettings: reminder and backup fields', () => {
     expect(sanitizeSettings({ reminderTime: '18:30' }).reminderTime).toBe('18:30')
     const s = sanitizeSettings({ lastBackupAt: 'x', backupNudgedAt: -5, backupDismissedAt: 1700000000000 })
     expect([s.lastBackupAt, s.backupNudgedAt, s.backupDismissedAt]).toEqual([null, null, 1700000000000])
+    expect(sanitizeSettings({ dismissedTips: ['emi-monthly', 'emi-monthly', 5, 'BAD ID'] }).dismissedTips).toEqual(['emi-monthly'])
+    expect(sanitizeSettings({}).dismissedTips).toEqual([])
   })
 })
 

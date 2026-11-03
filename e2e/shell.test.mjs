@@ -713,7 +713,7 @@ T('K07', 'POS', 'restore: a valid backup into a fresh app, confirm text, Replace
   const { page } = await open(app, { empty: true }); await openSettings(page); await upload(page, f.name, f.text); await settle(page, 300)
   const c = await page.locator('.confirm').innerText()
   ok(/everything/i.test(c) && /calculations \(8\)/.test(c) && /notes and lists \(3\)/.test(c) && /reminders \(1\)/.test(c) && /budget entries \(2\)/.test(c) && /settings/.test(c), 'confirm text: ' + c.replace(/\n/g, ' '))
-  await page.click('text=Replace everything'); await settle(page, 300)
+  await page.click('.confirm .btn--primary'); await settle(page, 300)
   ok(/Restored 8 calculations, 3 notes and lists, 1 reminders and 2 budget entries/.test(await body(page)), 'done note: ' + (await page.locator('.note[role=status]').innerText().catch(() => 'none')))
   await page.click('[aria-label=Back]'); await tab(page, 'Budget'); ok(/Left this month/.test(await body(page)), 'budget not restored')
 })
@@ -749,7 +749,7 @@ T('K14', 'CORNER', 'restore: older schema (v1) backup is accepted and upgraded',
   const { page } = await open(app, { data: seed() }); await openSettings(page)
   await upload(page, 'old.json', backupOf({ settings: { numberSystem: 'international' }, history: [{ id: 'a', expression: '2+2', result: '4', at: 1 }], memory: null, input: { expr: '', fresh: false } }, { schemaVersion: 1 })); await settle(page, 300)
   ok(/calculations \(1\)/.test(await page.locator('.confirm').innerText()), 'confirm: ' + await page.locator('.confirm').innerText())
-  await page.click('text=Replace everything'); await settle(page, 300)
+  await page.click('.confirm .btn--primary'); await settle(page, 300)
   const s = await stored(page); await settle(page, 400); ok((await stored(page)).schemaVersion === 3, 'schema not upgraded')
 })
 T('K15', 'CORNER', 'restore: a backup from a NEWER schema is accepted without crashing (no warning is shown)', async (app) => {
@@ -760,7 +760,7 @@ T('K15', 'CORNER', 'restore: a backup from a NEWER schema is accepted without cr
 T('K16', 'CORNER', 'restore: partial backup (settings only) resets everything else and says counts of 0', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page); await upload(page, 'p.json', backupOf({ settings: { theme: 'light' } })); await settle(page, 300)
   const c = await page.locator('.confirm').innerText(); ok(/calculations \(0\)/.test(c) && /budget entries \(0\)/.test(c), c)
-  await page.click('text=Replace everything'); await settle(page, 300)
+  await page.click('.confirm .btn--primary'); await settle(page, 300)
   ok(await dataTheme(page) === 'light', 'theme from the file not applied')
   note('a partial backup wipes every other area to empty (documented behaviour of "Replace everything")')
 })
@@ -770,13 +770,13 @@ T('K17', 'ERR', 'restore: data field null gives "damaged" not a crash', async (a
 })
 T('K18', 'POS', 'restore then undo is not possible: no Undo snack and the calculator Undo stack is empty (documented)', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page); await upload(page, 'r.json', backupOf(seed({ history: [] }))); await settle(page, 300)
-  await page.click('text=Replace everything'); await settle(page, 300)
+  await page.click('.confirm .btn--primary'); await settle(page, 300)
   ok(await page.locator('.snack').count() === 0, 'a snack exists after restore')
   note('restore cannot be undone. The only safety net is the "Save a backup of this phone first" button on the confirm. IMPROVE: keep the replaced data for one undo.')
 })
 T('K19', 'NEG', 'restore: the "Replace" confirm is not reachable twice (a second tap does nothing harmful)', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page); await upload(page, 'r.json', backupOf(seed())); await settle(page, 300)
-  await page.click('text=Replace everything'); ok(await page.locator('.confirm').count() === 0, 'confirm still shown after replacing')
+  await page.click('.confirm .btn--primary'); ok(await page.locator('.confirm').count() === 0, 'confirm still shown after replacing')
 })
 T('K20', 'ERR', 'known B-03: a backup the app wrote with 20,000 budget entries can be restored', async (app) => {
   const d = seed(); d.budget.expenses = manyExpenses(20000)
@@ -787,14 +787,14 @@ T('K20', 'ERR', 'known B-03: a backup the app wrote with 20,000 budget entries c
 })
 T('K21', 'ERR', 'known B-16 via restore: backup whose calculator line is "sin(" fresh=true does not blank the app', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page); await upload(page, 'r.json', backupOf(seed({ input: { expr: 'sin(', fresh: true } }))); await settle(page, 300)
-  await page.click('text=Replace everything'); await settle(page, 400); await page.click('[aria-label=Back]').catch(() => {}); await settle(page, 300)
+  await page.click('.confirm .btn--primary'); await settle(page, 400); await page.click('[aria-label=Back]').catch(() => {}); await settle(page, 300)
   ok(await page.locator('.app').count() === 1 && await page.locator('.keypad').count() > 0, KNOWN('B-16', 'the app went blank after restore'))
 })
 T('K22', 'NEG', 'restore: HTML and script text in names is shown as plain text and never runs', async (app) => {
   const evil = '<img src=x onerror="window.__xss=1"><script>window.__xss=2</script>'
   const d = seed(); d.cards[0].title = evil; d.history[0].memo = evil; d.budget.categories[0].name = evil
   const { page } = await open(app, { empty: true }); await openSettings(page); await upload(page, 'e.json', backupOf(d)); await settle(page, 300)
-  await page.click('text=Replace everything'); await settle(page, 300); await page.click('[aria-label=Back]'); await tab(page, 'Notes'); await settle(page, 400)
+  await page.click('.confirm .btn--primary'); await settle(page, 300); await page.click('[aria-label=Back]'); await tab(page, 'Notes'); await settle(page, 400)
   ok(await page.evaluate(() => window.__xss) === undefined, 'script ran'); ok((await body(page)).includes('<img src=x'), 'text not shown literally')
 })
 T('K23', 'CORNER', 'restore: 10,000 history rows in a file are cut to the 200 cap, locked/named kept', async (app) => {
@@ -815,7 +815,7 @@ T('K25', 'UI', 'restore confirm and its three buttons fit 360 px and 200% font, 
 })
 T('K26', 'RUNTIME', 'backup round trip: restore of an export is lossless for every area', async (app) => {
   const d = seed({ memory: '42' }); const src = await open(app, { data: d }); await openSettings(src.page); const f = await download(src.page, 'text=Export a backup')
-  const { page } = await open(app, { empty: true }); await openSettings(page); await upload(page, f.name, f.text); await settle(page, 300); await page.click('text=Replace everything'); await settle(page, 700)
+  const { page } = await open(app, { empty: true }); await openSettings(page); await upload(page, f.name, f.text); await settle(page, 300); await page.click('.confirm .btn--primary'); await settle(page, 700)
   const a = JSON.parse(f.text).data, b = await stored(page)
   for (const k of ['history', 'cards', 'reminders', 'budget', 'memory']) ok(JSON.stringify(a[k]) === JSON.stringify(b[k]), `${k} differs after restore`)
 })

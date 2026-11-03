@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { D } from '../decimal'
-import { cagr, epf, fd, goalSip, lumpsum, ppf, rd, sip, sipFutureValue, swp, xirr } from './invest'
+import { cagr, epf, fd, goalSip, growCorpus, lumpsum, ppf, rd, sip, sipFutureValue, swp, xirr } from './invest'
 
 const r2 = (v: { toFixed(n: number): string }) => v.toFixed(2)
 
@@ -144,5 +144,20 @@ describe('XIRR', () => {
   it('plain errors', () => {
     expect(xirr(f([['2020-01-01', -1]]))).toEqual({ error: 'too-few' })
     expect(xirr(f([['2020-01-01', 1], ['2021-01-01', 2]]))).toEqual({ error: 'no-sign-change' })
+  })
+})
+
+// Not an outside source: 1.01^12 = 1.126825030131969... is a known constant, so 12 months at 12% turns 10,00,000 into 11,26,825.03.
+describe('SWP, saving years at a different rate (growCorpus)', () => {
+  it('12 months at 12% grows 10,00,000 to 11,26,825.03', () => {
+    expect(r2(growCorpus(new D(1000000), new D(12), 12))).toBe('1126825.03')
+  })
+  it('0 months leaves the corpus unchanged, so an old SWP card gives the same answer', () => {
+    expect(growCorpus(new D(1000000), new D(12), 0).toFixed()).toBe('1000000')
+  })
+  it('a higher saving return starts the withdrawals from a bigger corpus, so the money lasts longer', () => {
+    const flat = swp(new D(1000000), new D(10000), new D(8)).months!
+    const grown = swp(growCorpus(new D(1000000), new D(12), 60), new D(10000), new D(8))
+    expect(grown.months === null || grown.months > flat).toBe(true)
   })
 })

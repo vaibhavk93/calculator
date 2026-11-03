@@ -822,3 +822,161 @@ describe('card utilisation and cost', () => {
     expect(cardCostIn({ ...b, expenses: [] }, { id: 'cc', annualFee: '500' }, 2026, money).words).toBe('In 2026 this card has cost you ₹500: ₹500 annual fee.')
   })
 })
+
+// ---------------------------------------------------------------- Phase 2: refunds, statement cycles, search, trips
+import { categoryTotal, cycleRange, entriesIn, searchEntries, signedAmount } from './budget'
+
+const ex = (id: string, date: string, amount: string, o: Partial<BudgetExpense> = {}): BudgetExpense => ({ id, date, amount, categoryId: null, mode: null, instrumentId: null, note: '', deletedAt: null, ...o })
+const cats = [cat('shop'), cat('travel'), cat('goa', null, null, 'travel'), cat('fuel', null, null, 'travel')]
+const insts: PayInstrument[] = [
+  { id: 'cc', name: 'HDFC Regalia', kind: 'credit', network: 'visa', bank: 'HDFC Bank', last4: '4321', rewardNote: '', deletedAt: null, statementDay: 15, dueDay: 5 },
+]
+
+describe('refunds', () => {
+  const b: BudgetData = {
+    overall: '1000', instruments: insts, categories: cats,
+    expenses: [
+      ex('1', '2026-11-02', '1000', { categoryId: 'shop', mode: 'credit', instrumentId: 'cc' }),
+      ex('2', '2026-11-04', '300.50', { categoryId: 'shop', mode: 'credit', instrumentId: 'cc', refund: true }),
+      ex('3', '2026-11-04', '50', { categoryId: 'shop', mode: 'cash' }),
+    ],
+  }
+  it('signedAmount is negative only for a refund', () => {
+    expect(signedAmount(b.expenses[0]!).toFixed(2)).toBe('1000.00')
+    expect(signedAmount(b.expenses[1]!).toFixed(2)).toBe('-300.50')
+  })
+  it('lowers the total, the category, the mode, the card and the limit left', () => {
+    const s = summarise(b, '2026-11')
+    expect(s.spent.toFixed(2)).toBe('749.50')
+    expect(s.lines.find((l) => l.id === 'shop')!.spent.toFixed(2)).toBe('749.50')
+    expect(s.byMode.find((m) => m.id === 'credit')!.spent.toFixed(2)).toBe('699.50')
+    expect(s.byInstrument[0]!.spent.toFixed(2)).toBe('699.50')
+    expect(s.overall!.left.toFixed(2)).toBe('250.50')
+    expect(s.entries).toHaveLength(3) // refunds are listed, and counted as entries
+    expect(s.lines.find((l) => l.id === 'shop')!.count).toBe(3)
+  })
+  it('lowers the daily total, the month sum, the trend and what the card owes', () => {
+    expect(dailyTotals(b, '2026-11').find((d) => d.day === 4)!.spent.toFixed(2)).toBe('-250.50')
+    expect(spentIn(b, '2026-11').toFixed(2)).toBe('749.50')
+    expect(trend(b, '2026-11', 2).map((t) => t.spent.toFixed(2))).toEqual(['0.00', '749.50'])
+    expect(cardOutstanding(b, 'cc').toFixed(2)).toBe('699.50')
+  })
+  it('is not one of the biggest spends', () => {
+    expect(topEntries(b.expenses, 5).map((e) => e.id)).toEqual(['1', '3'])
+  })
+  it('a category with only a refund is still shown (net negative), not hidden', () => {
+    const only: BudgetData = { ...b, expenses: [ex('r', '2026-11-04', '200', { categoryId: 'shop', refund: true })] }
+    const s = summarise(only, '2026-11')
+    expect(s.spent.toFixed(2)).toBe('-200.00')
+    expect(s.lines.map((l) => l.id)).toContain('shop')
+  })
+  it('still refuses a zero or negative amount for any entry', () => {
+    expect(validateAmount('0')).toBe('Enter an amount above zero')
+    expect(validateAmount('-5')).toBe('Enter an amount above zero')
+  })
+  it('a refund is never one of the shares of a total that is not above zero', () => {
+    expect(sharePercent(new D(-5), new D(-5))).toBe(0)
+  })
+  it('compare: a negative earlier month gives no percentage', () => {
+    const neg: BudgetData = { ...b, expenses: [ex('r', '2026-10-04', '200', { categoryId: 'shop', refund: true }), ex('s', '2026-11-04', '100', { categoryId: 'shop' })] }
+    expect(compareLastMonth(neg, '2026-11', new Date(2026, 10, 20))!.pct).toBeNull()
+  })
+})
+
+describe('statement cycle', () => {
+  it('ends on the statement day and starts the day after the previous one', () => {
+    expect(cycleRange(15, '2026-11')).toEqual({ from: '2026-10-16', to: '2026-11-15' })
+    expect(cycleRange(15, '2026-01')).toEqual({ from: '2025-12-16', to: '2026-01-15' })
+    expect(cycleRange(1, '2026-03')).toEqual({ from: '2026-02-02', to: '2026-03-01' })
+  })
+  it('day 28 starts on the 1st after a 28-day February', () => {
+    expect(cycleRange(28, '2026-03')).toEqual({ from: '2026-03-01', to: '2026-03-28' })
+    expect(cycleRange(28, '2026-02')).toEqual({ from: '2026-01-29', to: '2026-02-28' })
+  })
+  const b: BudgetData = {
+    overall: null, instruments: insts, categories: cats,
+    expenses: [
+      ex('a', '2026-10-15', '100', { mode: 'credit', instrumentId: 'cc' }), // last cycle
+      ex('b', '2026-10-16', '200', { mode: 'credit', instrumentId: 'cc' }), // first day of this cycle
+      ex('c', '2026-11-15', '400', { mode: 'credit', instrumentId: 'cc' }), // last day of this cycle
+      ex('d', '2026-11-16', '800', { mode: 'credit', instrumentId: 'cc' }), // next cycle
+      ex('e', '2026-11-01', '1600', { mode: 'cash' }), // not this card
+    ],
+  }
+  it('uses the entry date to decide which cycle an entry is in', () => {
+    expect(entriesIn(b, '2026-11', 15).map((e) => e.id).sort()).toEqual(['b', 'c', 'e'])
+    const s = summarise(b, '2026-11', { instrumentId: 'cc', cycleDay: 15 })
+    expect(s.spent.toFixed(2)).toBe('600.00')
+    expect(summarise(b, '2026-11', { instrumentId: 'cc' }).spent.toFixed(2)).toBe('1200.00') // calendar month: c + d
+  })
+  it('the trend counts one cycle per step and every cycle once', () => {
+    const t = trend(b, '2026-11', 3, { instrumentId: 'cc', cycleDay: 15 })
+    expect(t.map((x) => x.spent.toFixed(2))).toEqual(['0.00', '100.00', '600.00'])
+    expect(spentIn(b, '2026-12', { instrumentId: 'cc', cycleDay: 15 }).toFixed(2)).toBe('800.00')
+  })
+})
+
+describe('search', () => {
+  const b: BudgetData = {
+    overall: null, instruments: insts, categories: cats,
+    expenses: [
+      ex('1', '2026-11-02', '1200', { categoryId: 'goa', mode: 'credit', instrumentId: 'cc', note: 'Beach Shack lunch' }),
+      ex('2', '2026-11-03', '250', { categoryId: 'shop', mode: 'upi', note: 'Chai' }),
+      ex('3', '2026-11-04', '99.5', { categoryId: 'shop', refund: true, note: 'Returned shirt' }),
+      ex('4', '2026-11-05', '5000', { settlement: 'cardBill', instrumentId: 'cc' }),
+    ],
+  }
+  const ids = (q: string) => searchEntries(b, b.expenses, q).map((e) => e.id)
+  it('finds by note, ignoring case', () => expect(ids('BEACH')).toEqual(['1']))
+  it('finds by category and by its parent', () => {
+    expect(ids('goa')).toEqual(['1'])
+    expect(ids('travel')).toEqual(['1'])
+  })
+  it('finds by card name, payment mode and amount (commas and the rupee sign are ignored)', () => {
+    expect(ids('regalia')).toEqual(['1', '4'])
+    expect(ids('upi')).toEqual(['2'])
+    expect(ids('₹1,200')).toEqual(['1'])
+    expect(ids('99.5')).toEqual(['3'])
+  })
+  it('finds a refund by the word, and a bill payment by its kind', () => {
+    expect(ids('refund')).toEqual(['3'])
+    expect(ids('card bill')).toEqual(['4'])
+  })
+  it('every word must match; an empty query matches everything', () => {
+    expect(ids('beach upi')).toEqual([])
+    expect(ids('  ')).toHaveLength(4)
+  })
+})
+
+describe('trip or event as a subcategory', () => {
+  const b: BudgetData = {
+    overall: null, instruments: [], categories: cats,
+    expenses: [
+      ex('1', '2026-11-02', '1000.50', { categoryId: 'goa' }),
+      ex('2', '2026-12-01', '500', { categoryId: 'goa' }),
+      ex('3', '2026-12-02', '100', { categoryId: 'goa', refund: true }),
+      ex('4', '2026-11-03', '80', { categoryId: 'fuel' }),
+      ex('5', '2026-11-03', '9', { categoryId: 'goa', deletedAt: 3 }),
+      ex('6', '2026-11-04', '7', { categoryId: 'shop' }),
+    ],
+  }
+  it('counts every entry across months, minus refunds, skipping deleted ones', () => {
+    const t = categoryTotal(b, 'goa')
+    expect(t.total.toFixed(2)).toBe('1400.50')
+    expect(t.count).toBe(3)
+  })
+  it('a top-level category includes its subcategories', () => {
+    const t = categoryTotal(b, 'travel')
+    expect(t.total.toFixed(2)).toBe('1480.50')
+    expect(t.count).toBe(4)
+  })
+  it('can be narrowed to a period', () => {
+    expect(categoryTotal(b, 'goa', { from: '2026-11-01', to: '2026-11-30' }).total.toFixed(2)).toBe('1000.50')
+  })
+  it('the month summary gives the same counts', () => {
+    const s = summarise(b, '2026-11')
+    const travel = s.lines.find((l) => l.id === 'travel')!
+    expect(travel.count).toBe(2)
+    expect(travel.children.find((c) => c.id === 'goa')!.count).toBe(1)
+  })
+})

@@ -9,14 +9,15 @@ import { GST_PRESETS, GST_RATES_AS_OF } from '../../engine/convert/gstRates'
 import { bitOps, parseBase, toBase, type Base } from '../../engine/convert/numberBase'
 import { percentage, type PercentMode } from '../../engine/convert/percentage'
 import { tip } from '../../engine/convert/tip'
+import { settleUp, splitBill, type SplitMode } from '../../engine/convert/split'
 import { UNIT_CATEGORIES, convertAll, convertUnit } from '../../engine/convert/units'
 import { STANDARD_UNIT, unitPrices, type PriceUnit } from '../../engine/convert/unitPrice'
 import { addDays, addMonths, addYears, daysBetween, formatDate, parseDate, ymd } from '../../engine/everyday/dates'
 import { bodyMetrics, type Activity, type Sex } from '../../engine/everyday/body'
 import { gradeAverage } from '../../engine/everyday/grades'
 import { ovulation } from '../../engine/everyday/ovulation'
-import { CITIES, worldTimes } from '../../engine/everyday/worldTime'
-import { need, parseNum, type Field, type ToolSpec, type Values } from '../../lib/tool'
+import { CITIES, instantAt, todayIn, worldTimes } from '../../engine/everyday/worldTime'
+import { need, parseNum, type Computed, type Field, type ResultTable, type ToolSpec, type Values } from '../../lib/tool'
 
 /** An optional number: blank means `fallback`, junk text is an error (null). */
 function opt(values: Values, id: string, fallback = '0'): Dec | null {
@@ -247,18 +248,84 @@ const gstSpec: ToolSpec = {
 
 // ---- B6 Tip -----------------------------------------------------------------
 
+const SPLIT_ROWS = 6
+const splitModes = [
+  { value: 'equal', label: 'Equal' },
+  { value: 'percent', label: 'By percent' },
+  { value: 'shares', label: 'By shares' },
+  { value: 'exact', label: 'Exact amounts' },
+]
+
+/** The unequal path of Tip and split: names and weights from the rows, one person optionally paid the whole bill. */
+function unequalSplit(v: Values, bill: Dec, pct: Dec, mode: SplitMode): Computed {
+  const rows = (Array.isArray(v.rows) ? v.rows : []) as string[][]
+  const names = rows.map((r, i) => (r[0] ?? '').trim() || (i === 0 ? 'You' : `Person ${i + 1}`))
+  const weights: Dec[] = []
+  for (let i = 0; i < rows.length; i++) {
+    const w = parseNum(rows[i]?.[1])
+    if (w === null) return { error: (rows[i]?.[1] ?? '').trim() === '' ? `Enter a share for ${names[i]}` : `The share for ${names[i]} isn't a number`, field: 'rows' }
+    weights.push(w)
+  }
+  const r = splitBill(bill, pct, mode, weights)
+  if (!r.ok) {
+    if (r.reason === 'percent-sum') return { error: `Percentages add to ${plain(r.sum)}. They must add to 100`, field: 'rows' }
+    if (r.reason === 'exact-sum') return { error: `Amounts add to ₹${plain(r.sum)}, but the bill is ₹${plain(bill)}`, field: 'rows' }
+    return { error: 'Use shares of 0 or more, with at least one above zero, and no negative amounts', field: 'rows' }
+  }
+  const payerText = str(v, 'payer').trim()
+  const payer = payerText === '' ? null : parseNum(payerText)
+  if (payerText !== '' && (payer === null || !payer.isInteger() || payer.lt(1) || payer.gt(rows.length))) return { error: `Who paid is a person number from 1 to ${rows.length}`, field: 'payer' }
+  const owes = payer ? settleUp(r.shares, payer.toNumber() - 1) : null
+  const payerName = payer ? names[payer.toNumber() - 1]! : ''
+  const table: ResultTable = owes
+    ? { title: `Who pays ${payerName}`, columns: ['Person', 'Owes'], fmts: ['text', 'money'], rows: owes.map((o) => [`${names[o.person]} pays ${payerName}`, o.owes]) }
+    : { title: 'Each person pays', columns: ['Person', 'Pays'], fmts: ['text', 'money'], rows: r.shares.map((s, i) => [names[i]!, s]) }
+  return {
+    rows: [
+      { label: 'Your share', value: r.shares[0]!, fmt: 'money', main: true },
+      { label: 'Tip', value: r.tip, fmt: 'money' },
+      { label: 'Total with tip', value: r.total, fmt: 'money' },
+    ],
+    table,
+    note: owes ? `${payerName} paid the whole bill and keeps their own share of ₹${plain(r.shares[payer!.toNumber() - 1]!)}. Everyone else pays them the amounts above.` : 'Shares add up to the total to the paisa.',
+    expense: { amount: r.shares[0]!, note: 'My share of a split bill' },
+    formula: [mode === 'percent' ? 'each pays their % of (bill + tip)' : mode === 'shares' ? 'each pays their shares ÷ all shares of (bill + tip)' : 'each pays their own amount plus the same % tip', 'Rounded to the paisa so the shares add up exactly'],
+  }
+}
+
 const tipSpec: ToolSpec = {
   id: 'tip',
   title: 'Tip and split',
   blurb: 'Tip, total and each person\'s share',
   category: 'everyday',
-  keywords: ['tip', 'split', 'bill', 'restaurant', 'share'],
+  keywords: ['tip', 'split', 'bill', 'restaurant', 'share', 'unequal', 'who owes', 'settle', 'percent', 'shares'],
   fields: [
     { id: 'bill', label: 'Bill amount', kind: 'number', unit: 'rupee', default: '2400' },
     { id: 'pct', label: 'Tip', kind: 'number', unit: 'percent', default: '10' },
-    { id: 'people', label: 'Number of people', kind: 'number', default: '4' },
+    { id: 'mode', label: 'Split', kind: 'select', default: 'equal', options: splitModes },
+    { id: 'people', label: 'Number of people', kind: 'number', default: '4', visibleIf: (v) => !v.mode || v.mode === 'equal' },
+    {
+      id: 'rows',
+      label: 'People',
+      hint: 'Row 1 is you. Percent: each person\'s %, adding to 100. Shares: parts, such as 2 and 1. Exact: each person\'s own amount, before tip.',
+      kind: 'rows',
+      min: 2,
+      max: SPLIT_ROWS,
+      defaultRows: [['You', '1'], ['', '1']],
+      columns: [
+        { id: 'name', label: 'Name', kind: 'text' },
+        { id: 'w', label: 'Share', kind: 'number' },
+      ],
+      visibleIf: (v) => v.mode === 'percent' || v.mode === 'shares' || v.mode === 'exact',
+    },
+    { id: 'payer', label: 'Who paid the bill?', hint: 'Optional. A person number from the list, to see who owes whom.', kind: 'number', unit: 'none', default: '', visibleIf: (v) => v.mode === 'percent' || v.mode === 'shares' || v.mode === 'exact' },
   ],
   compute: (v) => {
+    const mode = str(v, 'mode')
+    if (mode === 'percent' || mode === 'shares' || mode === 'exact') {
+      const r = need(v, [{ id: 'bill', label: 'the bill' }, { id: 'pct', label: 'the tip percent' }])
+      return r.ok ? unequalSplit(v, r.n.bill!, r.n.pct!, mode) : r
+    }
     const r = need(v, [{ id: 'bill', label: 'the bill' }, { id: 'pct', label: 'the tip percent' }, { id: 'people', label: 'the number of people' }])
     if (!r.ok) return r
     const x = tip(r.n.bill!, r.n.pct!, r.n.people!)
@@ -275,6 +342,7 @@ const tipSpec: ToolSpec = {
       note: extra
         ? `₹0.01 extra goes to ${extra === 1 ? 'person 1' : `each of the first ${extra} people`} so the total matches.`
         : undefined,
+      expense: { amount: x.shares[0]!, note: 'My share of a split bill' },
       formula: ['tip = bill × tip% ÷ 100; each = (bill + tip) ÷ people, shared to the paisa', `${plain(r.n.bill!)} × ${plain(r.n.pct!)} ÷ 100; (${plain(r.n.bill!)} + ${plain(x.tip)}) ÷ ${plain(r.n.people!)}`],
     }
   },
@@ -404,18 +472,34 @@ const dateSpec: ToolSpec = {
 const worldTimeSpec: ToolSpec = {
   id: 'world-time',
   title: 'World time',
-  blurb: 'Time now in 20+ cities',
+  blurb: 'Time now, or a time you choose, in 20+ cities',
   category: 'everyday',
   keywords: ['time zone', 'timezone', 'world clock', 'utc', 'ist', 'london', 'new york', 'dubai', 'offset'],
-  fields: [{ id: 'home', label: 'Home city', kind: 'select', default: 'mumbai', options: CITIES.map((c) => ({ value: c.id, label: c.label })) }],
+  fields: [
+    { id: 'home', label: 'Home city', hint: 'A time you choose below is read as this city\'s clock.', kind: 'select', default: 'mumbai', options: CITIES.map((c) => ({ value: c.id, label: c.label })) },
+    { id: 'when', label: 'Show', kind: 'select', default: 'now', options: [{ value: 'now', label: 'Time now' }, { value: 'chosen', label: 'A time I choose' }] },
+    { id: 'at', label: 'Time in home city', kind: 'time', default: '15:00', visibleIf: (v) => v.when === 'chosen' },
+    { id: 'day', label: 'Day in home city', hint: 'Leave blank for today.', kind: 'date', default: '', visibleIf: (v) => v.when === 'chosen' },
+  ],
   compute: (v) => {
-    const times = worldTimes(new Date(), str(v, 'home'))
+    const homeId = str(v, 'home')
+    const chosen = str(v, 'when') === 'chosen'
+    let at = new Date()
+    if (chosen) {
+      if (str(v, 'at') === '') return { error: 'Enter the time in the home city' }
+      const found = instantAt(homeId, str(v, 'day') || (todayIn(homeId, at) ?? ''), str(v, 'at'))
+      if (!found) return { error: str(v, 'day') ? 'Enter a real day and time in the home city' : 'Pick a home city' }
+      at = found
+    }
+    const times = worldTimes(at, homeId)
     if (!times) return { error: 'Pick a home city' }
-    const home = times.find((c) => c.id === v.home)!
+    const home = times.find((c) => c.id === homeId)!
     return {
-      rows: [{ label: `${home.label} now`, value: `${home.time}, ${home.day}`, fmt: 'text', main: true }],
+      rows: [{ label: chosen ? home.label : `${home.label} now`, value: `${home.time}, ${home.day}`, fmt: 'text', main: true }],
       table: { title: 'Cities', columns: ['City', 'Time', 'Day', 'Offset', 'From home'], fmts: ['text', 'text', 'text', 'text', 'text'], rows: times.map((c) => [c.label, c.time, c.day, c.offset, c.fromHome]) },
-      note: 'Shown for the moment you last changed the home city. Daylight saving comes from the device\'s time zone data.',
+      note: chosen
+        ? 'Daylight saving is applied for the day you chose. The offsets are for that day.'
+        : 'Shown for the moment you last changed the home city. Daylight saving comes from the device\'s time zone data.',
     }
   },
 }

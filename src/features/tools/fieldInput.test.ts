@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { Field } from '../../lib/tool'
-import { advancedOpen, caretFor, groupTyped, rawNumber, shouldGroup, significantBefore } from './fieldInput'
+import { advancedOpen, caretFor, groupTyped, migrateLegacyTerm, rawNumber, shouldGroup, significantBefore } from './fieldInput'
+import { ALL_TOOLS } from './registry'
+import { isError } from '../../lib/tool'
 
 describe('typing with grouping', () => {
   it('keeps only digits, one dot and a leading minus', () => {
@@ -53,5 +55,38 @@ describe('advancedOpen', () => {
   it('ignores a changed field that is not shown', () => {
     expect(advancedOpen(fields, { a: '1', b: '2', c: '5' })).toBe(false)
     expect(advancedOpen(fields, { a: '9', b: '2', c: '5' })).toBe(true)
+  })
+})
+
+describe('cards saved with the old years/months pair', () => {
+  const emi = ALL_TOOLS.find((t) => t.id === 'emi')!
+  const compare = ALL_TOOLS.find((t) => t.id === 'loan-compare')!
+  const old = { principal: '5000000', rate: '8.5', tenure: '18', tenureUnit: 'months' }
+
+  it('become one term text, and the old key is gone', () => {
+    const v = migrateLegacyTerm(emi.fields, old)
+    expect(v.tenure).toBe('18 months')
+    expect('tenureUnit' in v).toBe(false)
+    expect(v.principal).toBe('5000000')
+  })
+  it('years stay a bare number (bare means years)', () => {
+    expect(migrateLegacyTerm(emi.fields, { ...old, tenure: '20', tenureUnit: 'years' }).tenure).toBe('20')
+  })
+  it('give the same answer before and after migrating', () => {
+    const before = emi.compute(old)
+    const after = emi.compute(migrateLegacyTerm(emi.fields, old))
+    expect(isError(after)).toBe(false)
+    expect(JSON.stringify(after)).toBe(JSON.stringify(before))
+    const years = { ...old, tenure: '20', tenureUnit: 'years' }
+    expect(JSON.stringify(emi.compute(migrateLegacyTerm(emi.fields, years)))).toBe(JSON.stringify(emi.compute({ ...years, tenure: '20 years', tenureUnit: 'years' })))
+  })
+  it('already-new values pass through untouched', () => {
+    const v = { principal: '1', rate: '2', tenure: '18 months' }
+    expect(migrateLegacyTerm(emi.fields, v)).toBe(v)
+  })
+  it('loan compare: the one switch applies to every offer, as it did before', () => {
+    const v = migrateLegacyTerm(compare.fields, { offers: [['5000000', '8.5', '20', '10000'], ['5000000', '8.35', '20', '25000']], tenureUnit: 'months' })
+    expect(v.offers).toEqual([['5000000', '8.5', '20 months', '10000'], ['5000000', '8.35', '20 months', '25000']])
+    expect('tenureUnit' in v).toBe(false)
   })
 })

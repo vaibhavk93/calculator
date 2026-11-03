@@ -36,7 +36,10 @@ export type Field =
   | (FieldBase & { kind: 'number'; unit?: Unit; default?: string })
   | (FieldBase & { kind: 'select'; options: { value: string; label: string }[]; default: string })
   | (FieldBase & { kind: 'date'; default?: string })
-  | (FieldBase & { kind: 'text'; default?: string })
+  /** A time of day, "HH:MM" (24 hour). Blank is allowed when the spec says what blank means. */
+  | (FieldBase & { kind: 'time'; default?: string })
+  /** `chip` adds a small unit label after the box, worked out from the typed text (the loan term shows "years" for a bare number). */
+  | (FieldBase & { kind: 'text'; default?: string; chip?: (text: string) => string })
   /** A growable list of rows. `columns` are the fields of one row (number, select, date or text). */
   | (FieldBase & { kind: 'rows'; columns: Exclude<Field, { kind: 'rows' }>[]; min: number; max: number; defaultRows: string[][] })
 
@@ -88,9 +91,12 @@ export interface Output {
   formula?: string[]
   /** One plain-language line under the result: a verdict, a caveat, a disclaimer. */
   note?: string
+  /** An amount the screen can offer to keep as a Budget expense ("Save my share to Budget"). Shown only when above zero. */
+  expense?: { amount: Dec; note: string }
 }
 
-export type Computed = Output | { error: string }
+/** An error may name the field id it is about (`field`); the screen then marks exactly that input. Without it the screen works it out. */
+export type Computed = Output | { error: string; field?: string }
 
 export interface ToolSpec {
   id: string
@@ -135,17 +141,17 @@ export function junkOptional(values: Values, fields: { id: string; label: string
 export function need(
   values: Values,
   fields: { id: string; label: string }[],
-): { ok: true; n: Record<string, Dec> } | { ok: false; error: string } {
+): { ok: true; n: Record<string, Dec> } | { ok: false; error: string; field: string } {
   const n: Record<string, Dec> = {}
   for (const f of fields) {
     const v = parseNum(values[f.id])
-    if (v === null) return { ok: false, error: `Enter ${f.label.toLowerCase()}` }
+    if (v === null) return { ok: false, error: `Enter ${f.label.toLowerCase()}`, field: f.id }
     n[f.id] = v
   }
   return { ok: true, n }
 }
 
-export const isError = (c: Computed): c is { error: string } => 'error' in c
+export const isError = (c: Computed): c is { error: string; field?: string } => 'error' in c
 
 /** The starting values of a spec: every field's default. */
 export function defaultValues(spec: ToolSpec): Values {

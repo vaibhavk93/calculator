@@ -90,6 +90,14 @@ export function swp(corpus: Dec, withdrawal: Dec, annualPct: Dec): SwpResult {
   return { months: never ? null : 1200, yearEnd, totalWithdrawn: total }
 }
 
+/**
+ * What the corpus grows to over `months` of saving at `annualPct` (monthly compounding, the same convention
+ * swp() uses while withdrawing). With 0 months it is the corpus unchanged.
+ */
+export function growCorpus(corpus: Dec, annualPct: Dec, months: number): Dec {
+  return corpus.times(ONE.plus(annualPct.div(1200)).pow(months))
+}
+
 /** FD: A = P(1 + r/n)^(n·t), n = compounding periods per year. */
 export function fd(principal: Dec, annualPct: Dec, years: Dec, perYear: number): Dec {
   return principal.times(ONE.plus(pct(annualPct).div(perYear)).pow(years.times(perYear)))

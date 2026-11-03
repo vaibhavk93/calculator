@@ -64,3 +64,12 @@ describe('buildExpensesCsv', () => {
   })
   it('names the file by range and day', () => expect(expensesCsvFilename('year', today)).toBe('calc-expenses-year-2026-11-15.csv'))
 })
+
+describe('refunds in the CSV', () => {
+  it('a refund has a minus sign and the type "refund", so a SUM adds up right', () => {
+    const csv = buildExpensesCsv(budget([e('1', '2026-11-02', '1000', { categoryId: 'food' }), e('2', '2026-11-03', '250.5', { categoryId: 'food', refund: true, note: 'Returned' })]), 'month', today)
+    const rows = csv.replace('﻿', '').trimEnd().split('\r\n')
+    expect(rows[1]).toBe('2026-11-02,1000,Food,,,,spending')
+    expect(rows[2]).toBe('2026-11-03,-250.5,Food,,,Returned,refund')
+  })
+})

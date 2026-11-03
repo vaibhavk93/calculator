@@ -20,7 +20,11 @@ Roadmap = `docs/MASTER-ROADMAP.md` (Phase 0 done, 1 next, 2 soon, 3 later, Ruled
 | Phase 1 reminders (time picker, test reminder, advance-tax pack, backup nudge, stale e2e) | done (helper) |
 | Phase 1 Budget (utilisation, card cost, CSV export, add expense from calculator) | helper running |
 | Phase 1 tools (exact split, rule-of-thumb conditions, checked-against label, budget e2e) | helper running |
-| Phase 2 | not started |
+| Phase 2 backup/restore bugs SH-K16/19/26 | done: not app bugs, test clicked wrong element (fixed in e2e/shell.test.mjs; restore.test.ts added) |
+| Phase 2 calculators part 1 (emergency fund, DTI, savings rate, markup, two inflation rates, SWP split rate; 51->55 tools) | done |
+| Phase 2 loans (runway, multi-loan avalanche/snowball, one loan-term box; 57 tools): done. TODO: e2e/tools1.test.mjs still taps the removed tenureUnit switch | done |
+| Phase 2 Budget: bills and subscriptions, card statement cycle + bill reminder, search, refunds, trip total | done in code + unit tests + 360px browser pass (docs/BUDGET-PLAN.md section J); not on a phone. Tool UI half (use-in/chip/invalid marking/world time/unequal split): other helper |
+| Import screen e2e (e2e/import.test.mjs) + Budget remount bug fixed | done, 10/10 |
 | Statement CSV import (extension of SMS capture) | planned |
 | Owner still to pick from "Ruled out": list shown in final report |  |
 | Not pushed. Owner must say "push". Phone: only Calc QA gets test installs. |  |

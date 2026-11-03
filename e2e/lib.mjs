@@ -17,7 +17,8 @@ const ROOT = new URL('..', import.meta.url).pathname
 export async function startApp({ port = 4200 + Math.floor(Math.random() * 500), build = true } = {}) {
   const out = mkdtempSync(join(tmpdir(), 'calc-e2e-'))
   if (build) execFileSync('npx', ['vite', 'build', '--outDir', out, '--emptyOutDir'], { cwd: ROOT, stdio: 'ignore' })
-  const server = spawn('npx', ['vite', 'preview', '--outDir', out, '--port', String(port), '--host', '127.0.0.1', '--strictPort'], { cwd: ROOT, stdio: 'ignore' })
+  // Run vite directly (not through npx) so server.kill() really stops it and no preview server is left behind.
+  const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--outDir', out, '--port', String(port), '--host', '127.0.0.1', '--strictPort'], { cwd: ROOT, stdio: 'ignore' })
   const url = `http://127.0.0.1:${port}/`
   for (let i = 0; i < 60; i++) {
     try { if ((await fetch(url)).ok) break } catch { /* not up yet */ }

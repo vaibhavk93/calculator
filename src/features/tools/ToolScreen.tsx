@@ -17,6 +17,7 @@ import {
   type Values,
 } from '../../lib/tool'
 import { formatCell } from '../../lib/toolFormat'
+import { invalidFieldIds } from '../../lib/toolInvalid'
 import type { CardDraft } from '../../store/app'
 import type { SavedCard } from '../../store/types'
 import { SaveSheet } from '../memory/SaveSheet'
@@ -25,9 +26,15 @@ import { ScreenHeader } from '../../components/ScreenHeader'
 import { tintStyle } from '../../components/tint'
 import { buildShareText, inputLines } from '../../lib/shareText'
 import { KeepAndShare } from './KeepAndShare'
+import { UseInSheet } from './UseInSheet'
+import { ExpenseSheet } from '../budget/sheets'
+import { EMI_REMINDER_DAY, suggestionFor } from '../../lib/suggest'
+import { nextOnDay } from '../../lib/reminders'
+import { ALL_TOOLS } from './registry'
+import { linkable, linkTargets, linkText } from '../../lib/toolLink'
 import { groupOfTool } from './groups'
 import { Segmented } from '../settings/controls'
-import { advancedOpen, caretFor, groupTyped, rawNumber, shouldGroup, significantBefore, type Leaf } from './fieldInput'
+import { advancedOpen, caretFor, groupTyped, migrateLegacyTerm, rawNumber, shouldGroup, significantBefore, type Leaf } from './fieldInput'
 
 const UNIT_LABEL = { rupee: '₹', percent: '%', years: 'years', months: 'months', days: 'days', none: '' } as const
 
@@ -105,31 +112,42 @@ function Input({ field, value, onChange, describedBy, invalid, words }: {
     return field.options.length <= 3 ? (
       <Segmented label={field.label} value={value} options={field.options} onChange={onChange} />
     ) : (
-      <PickerSelect id={id} label={field.label} value={value} options={field.options} onChange={onChange} describedBy={describedBy} />
+      <PickerSelect id={id} label={field.label} value={value} options={field.options} onChange={onChange} describedBy={describedBy} invalid={invalid} />
     )
   }
-  if (field.kind === 'date') {
-    return <input id={id} className="field field--mono field--date" type="date" aria-describedby={describedBy} value={value} onChange={(e) => onChange(e.target.value)} />
+  if (field.kind === 'date' || field.kind === 'time') {
+    return <input id={id} className="field field--mono field--date" type={field.kind} aria-describedby={describedBy} aria-invalid={invalid || undefined} value={value} onChange={(e) => onChange(e.target.value)} />
   }
   if (field.kind === 'text') {
-    return <input id={id} className="field" type="text" aria-describedby={describedBy} value={value} onChange={(e) => onChange(e.target.value)} />
+    const box = <input id={id} className="field" type="text" aria-describedby={describedBy} aria-invalid={invalid || undefined} value={value} onChange={(e) => onChange(e.target.value)} />
+    const chip = field.chip?.(value)
+    return chip ? (
+      <span className="field-wrap">
+        {box}
+        <span className="field-unit">{chip}</span>
+      </span>
+    ) : box
   }
   return <NumberInput field={field} id={id} value={value} onChange={onChange} describedBy={describedBy} invalid={invalid} words={words} />
 }
 
 type SetValue = (id: string, v: string | string[][]) => void
 
-function FieldRow({ field, values, set, error }: { field: Field; values: Values; set: SetValue; error: string | null }) {
+/** The id of the message under the form: every marked box points at it, so a screen reader reads why. */
+const ERROR_ID = 'tool-error'
+
+function FieldRow({ field, values, set, invalid }: { field: Field; values: Values; set: SetValue; invalid: boolean }) {
   if (field.visibleIf && !field.visibleIf(values)) return null
 
   if (field.kind === 'rows') {
     const rows = (values[field.id] as string[][]) ?? []
     const setCell = (r: number, c: number, v: string) => set(field.id, rows.map((row, i) => (i === r ? row.map((x, j) => (j === c ? v : x)) : row)))
     return (
-      <fieldset className="rows">
+      <fieldset className="rows" data-invalid={invalid || undefined} aria-describedby={invalid ? ERROR_ID : undefined}>
         <legend className="field-label">{field.label}</legend>
+        {field.hint && <p className="rows__hint">{field.hint}</p>}
         {rows.map((row, r) => (
-          <div className="rows__row" key={r}>
+          <div className={field.columns.length > 3 ? 'rows__row rows__row--wrap' : 'rows__row'} key={r}>
             {field.columns.map((col, c) => (
               <label className="rows__cell" key={col.id}>
                 <span className="rows__cap">{col.label}</span>
@@ -153,15 +171,14 @@ function FieldRow({ field, values, set, error }: { field: Field; values: Values;
   }
 
   const value = (values[field.id] as string) ?? ''
-  // The spec's own message names the field ("Enter loan amount"), which is how we know which one to point at.
-  const invalid = error !== null && error.toLowerCase().includes(field.label.toLowerCase())
   const hintId = field.hint ? `h-${field.id}` : undefined
+  const describedBy = [hintId, invalid ? ERROR_ID : undefined].filter(Boolean).join(' ') || undefined
   return (
     <div className="field-row" data-invalid={invalid || undefined}>
       <label className="field-label" htmlFor={`f-${field.id}`}>
         {field.label}
       </label>
-      <Input field={field} value={value} onChange={(v) => set(field.id, v)} describedBy={hintId} invalid={invalid} words />
+      <Input field={field} value={value} onChange={(v) => set(field.id, v)} describedBy={describedBy} invalid={invalid} words />
       {field.hint && (
         <span id={hintId} className="field-hint">
           {field.hint}
@@ -305,8 +322,13 @@ function Result({ out, mainRef, verified }: { out: Output; mainRef: React.RefObj
  */
 const drafts = new Map<string, Values>()
 
+/** Puts one value into one box of a calculator before it opens ("Use in another tool"). Every other box stays as it was. */
+export function prefillDraft(spec: ToolSpec, fieldId: string, value: string) {
+  drafts.set(spec.id, { ...defaultValues(spec), ...drafts.get(spec.id), [fieldId]: value })
+}
+
 export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; onBack: () => void; initial?: Values; card?: SavedCard }) {
-  const [values, setValues] = useState<Values>(() => ({ ...defaultValues(spec), ...(card ? initial : (drafts.get(spec.id) ?? initial)) }))
+  const [values, setValues] = useState<Values>(() => migrateLegacyTerm(spec.fields, { ...defaultValues(spec), ...(card ? initial : (drafts.get(spec.id) ?? initial)) }))
   const set = (id: string, v: string | string[][]) =>
     setValues((cur) => {
       const next = { ...cur, [id]: v }
@@ -316,6 +338,8 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
   const [saving, setSaving] = useState(false)
   const [listing, setListing] = useState(false)
   const [reminding, setReminding] = useState(false)
+  const [using, setUsing] = useState(false)
+  const [expensing, setExpensing] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
   const mainRef = useRef<HTMLDivElement>(null)
   // The floating answer bar shows only once the real answer has scrolled out of sight.
@@ -333,6 +357,12 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
   const deleteCard = useApp((s) => s.deleteCard)
   const saved = useApp((s) => s.cards.find((c) => c.id === savedId && c.deletedAt === null))
   const reminder = useApp((s) => s.reminders.find((r) => r.cardId === savedId))
+  const dismissedTips = useApp((s) => s.settings.dismissedTips)
+  const reminderTime = useApp((s) => s.settings.reminderTime)
+  const updateSettings = useApp((s) => s.updateSettings)
+  const saveCard = useApp((s) => s.saveCard)
+  const updateCard = useApp((s) => s.updateCard)
+  const addAdvanceTaxPack = useApp((s) => s.addAdvanceTaxPack)
 
   // A spec that throws on odd input must not take the app down.
   const computed = useMemo(() => {
@@ -364,12 +394,31 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
   // A list is a list of *amounts*: it totals them and shows "₹3,000 left". Offering it
   // for 300 days apart, or a BMI of 24.5, produced "₹300" and made no sense.
   const listableAmount = draft.amountFmt === 'money' ? draft.amount : null
+  // "Use in another tool" only for a plain number that some other calculator has a box for.
+  const link = ok ? linkable(computed) : null
+  const canUse = link !== null && linkTargets(ALL_TOOLS, spec.id, link.fmt).length > 0
+
+  // One "next step" chip under the result. Used or dismissed once, it never comes back. Not offered when this EMI already has a reminder.
+  const tip = ok && !(reminder && spec.id === 'emi') ? suggestionFor(spec.id, dismissedTips) : null
+  const closeTip = () => tip && updateSettings({ dismissedTips: [...dismissedTips, tip.id] })
+  const takeTip = () => {
+    if (!tip) return
+    if (tip.id === 'advance-tax-pack') addAdvanceTaxPack()
+    else {
+      const rem = { dueAt: nextOnDay(Date.now(), EMI_REMINDER_DAY, reminderTime), repeat: 'monthly' as const, leadDays: 1 }
+      if (saved) updateCard(saved.id, {}, rem)
+      else setSavedId(saveCard(draft, rem))
+      showLinkSnack(`Saved with a reminder every month on the ${EMI_REMINDER_DAY}th`, { label: 'View', run: () => setTab('due') })
+    }
+    closeTip()
+  }
 
   useBackHandler(true, onBack)
 
   const visible = spec.fields.filter((f) => !f.advanced)
   const advanced = spec.fields.filter((f) => f.advanced && (!f.visibleIf || f.visibleIf(values)))
   const error = isError(computed) ? computed.error : null
+  const invalidIds = useMemo(() => invalidFieldIds(spec, values, error), [spec, values, error])
 
   const opts = { system, decimals }
   const shareBody = ok
@@ -420,27 +469,42 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
         </h2>
         <form className="tool__form inputcard" aria-labelledby="inputs-head" onSubmit={(e) => e.preventDefault()}>
           {visible.map((f) => (
-            <FieldRow key={f.id} field={f} values={values} set={set} error={error} />
+            <FieldRow key={f.id} field={f} values={values} set={set} invalid={invalidIds.has(f.id)} />
           ))}
           {advanced.length > 0 && (
             <details className="more" open={moreOpen || advancedOpen(spec.fields, values)} onToggle={(e) => setMoreOpen(e.currentTarget.open)}>
               <summary>More options</summary>
               <div className="more__body">
                 {advanced.map((f) => (
-                  <FieldRow key={f.id} field={f} values={values} set={set} error={error} />
+                  <FieldRow key={f.id} field={f} values={values} set={set} invalid={invalidIds.has(f.id)} />
                 ))}
               </div>
             </details>
           )}
         </form>
         {error && (
-          <p className="tool__error" role="status">
+          <p className="tool__error" id={ERROR_ID} role="status">
             {error}
           </p>
         )}
 
         {/* 2. Result: what it comes to. A plain card, never tinted. */}
         {ok && <Result out={computed} mainRef={mainRef} verified={spec.verified} />}
+
+        {ok && computed.expense && computed.expense.amount.gt(0) && (
+          <div className="suggest">
+            <button type="button" className="link-btn" onClick={() => setExpensing(true)}>Save my share to Budget</button>
+          </div>
+        )}
+
+        {tip && (
+          <div className="suggest">
+            <button type="button" className="link-btn" onClick={takeTip}>{tip.text}</button>
+            <button type="button" className="icon-btn" aria-label={`Dismiss: ${tip.text}`} title="Not now" onClick={closeTip}>
+              <Icon name="close" size={18} />
+            </button>
+          </div>
+        )}
 
         {/* 3. Keep and share: what to do with it. */}
         {ok && (
@@ -450,6 +514,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
             canList={listableAmount !== null}
             onList={() => setListing(true)}
             onRemind={() => setReminding(true)}
+            onUse={canUse && !card ? () => setUsing(true) : undefined}
           />
         )}
 
@@ -464,6 +529,8 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
           )}
         </div>
       </div>
+      {expensing && ok && computed.expense && <ExpenseSheet prefill={{ amount: computed.expense.amount.toDecimalPlaces(2).toFixed(), note: computed.expense.note }} onClose={() => setExpensing(false)} />}
+      {using && link && <UseInSheet fromToolId={spec.id} value={link.value} text={linkText(link.value, link.fmt)} fmt={link.fmt} label={link.label} onClose={() => setUsing(false)} />}
       {listing && listableAmount !== null && <ToListSheet value={listableAmount} onClose={() => setListing(false)} onDone={showCard} />}
       {(saving || reminding) && (
         <SaveSheet

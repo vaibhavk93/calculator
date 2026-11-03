@@ -1,6 +1,6 @@
 import { D, type Dec } from '../../engine/decimal'
 import { formatDecimal } from '../../lib/format'
-import { cagr, epf, fd, goalSip, lumpsum, ppf, rd, sip, swp, xirr, type YearRow } from '../../engine/investments/invest'
+import { cagr, epf, fd, goalSip, growCorpus, lumpsum, ppf, rd, sip, swp, xirr, type YearRow } from '../../engine/investments/invest'
 import { EXAMPLE, PPF } from '../../engine/investments/rates'
 import { junkOptional, need, parseNum, type Field, type Output, type ToolSpec } from '../../lib/tool'
 
@@ -178,40 +178,55 @@ const swpSpec: ToolSpec = {
   blurb: 'How long your money lasts',
   category: 'invest',
   keywords: ['systematic withdrawal', 'retirement income', 'monthly withdrawal', 'depletion'],
-  fields: [num('corpus', 'Starting amount', '1000000', 'rupee'), num('withdraw', 'Monthly withdrawal', '10000', 'rupee'), num('rate', RETURN, '8', 'percent')],
+  fields: [
+    num('corpus', 'Starting amount', '1000000', 'rupee'),
+    num('withdraw', 'Monthly withdrawal', '10000', 'rupee'),
+    num('rate', RETURN, '8', 'percent', 'While you are withdrawing'),
+    num('wait', 'Years of saving first', '0', 'years', 'Years the money keeps growing before the first withdrawal. 0 means start now.', true),
+    num('saveRate', 'Return in the saving years', '', 'percent', 'Leave blank to use the same return as above', true),
+  ],
   compute: (v) => {
     const r = need(v, [{ id: 'corpus', label: 'Corpus' }, { id: 'withdraw', label: 'Monthly withdrawal' }, { id: 'rate', label: 'Expected return' }])
     if (!r.ok) return r
-    if (negative(r.n)) return { error: 'Use positive numbers' }
+    const junk = junkOptional(v, [{ id: 'wait', label: 'Years of saving first' }, { id: 'saveRate', label: 'Return in the saving years' }])
+    if (junk) return junk
+    const wait = parseNum(v.wait) ?? new D(0)
+    const saveRate = parseNum(v.saveRate) ?? r.n.rate!
+    if (negative(r.n) || wait.isNegative() || saveRate.isNegative()) return { error: 'Use positive numbers' }
+    if (!wait.isInteger() || wait.gt(60)) return { error: 'Years of saving must be a whole number, 60 or fewer' }
     if (r.n.withdraw!.isZero()) return { error: 'Enter a withdrawal more than zero' }
-    const out = swp(r.n.corpus!, r.n.withdraw!, r.n.rate!)
+    const start = growCorpus(r.n.corpus!, saveRate, wait.toNumber() * 12)
+    const out = swp(start, r.n.withdraw!, r.n.rate!)
     const chart = {
       title: 'Balance at each year end',
       labels: out.yearEnd.map((_, i) => `Y${i + 1}`),
       series: [{ name: 'Balance', values: out.yearEnd.map((b) => b.toNumber()) }],
     }
-    const formula = ['Each month: balance × (1 + return ÷ 1200) − withdrawal', `Interest in month 1 = ${s(r.n.corpus!.times(r.n.rate!).div(1200))} vs withdrawal ${s(r.n.withdraw!)}`]
+    const formula = ['Each month: balance × (1 + return ÷ 1200) − withdrawal', `Interest in month 1 = ${s(start.times(r.n.rate!).div(1200))} vs withdrawal ${s(r.n.withdraw!)}`]
+    if (wait.gt(0)) formula.unshift(`Saving years first: ${s(r.n.corpus!)} × (1 + ${s(saveRate)} ÷ 1200)^${wait.times(12).toFixed()} = ${s(start)}`)
+    const startRow: Output['rows'] = wait.gt(0) ? [{ label: 'Amount when withdrawals start', value: start, fmt: 'money' }] : []
     if (out.months === null) {
       return {
-        rows: [{ label: 'Lasts', value: 'Never runs out', fmt: 'text', main: true }],
+        rows: [{ label: 'Lasts', value: 'Never runs out', fmt: 'text', main: true }, ...startRow],
         chart: { ...chart, labels: chart.labels.slice(0, 30), series: [{ ...chart.series[0]!, values: chart.series[0]!.values.slice(0, 30) }] },
         formula,
         note: 'The monthly return covers the withdrawal, so the corpus never runs out at this rate.',
       }
     }
-    if (out.months >= 1200) return { rows: [{ label: 'Lasts', value: 'More than 100 years', fmt: 'text', main: true }], formula }
+    if (out.months >= 1200) return { rows: [{ label: 'Lasts', value: 'More than 100 years', fmt: 'text', main: true }, ...startRow], formula }
     const end = new Date()
-    end.setMonth(end.getMonth() + out.months)
+    end.setMonth(end.getMonth() + wait.toNumber() * 12 + out.months)
     return {
       rows: [
         { label: 'Months it lasts', value: new D(out.months), fmt: 'int', main: true },
         { label: 'In years and months', value: `${Math.floor(out.months / 12)} years ${out.months % 12} months`, fmt: 'text' },
         { label: 'Runs out around', value: end.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }), fmt: 'text' },
         { label: 'Total withdrawn', value: out.totalWithdrawn, fmt: 'money' },
+        ...startRow,
       ],
       chart,
       formula,
-      note: 'Withdrawals come at each month’s end, after that month’s return, and the last one is whatever is left. Returns are not guaranteed.',
+      note: 'Withdrawals come at each month’s end, after that month’s return, and the last one is whatever is left. Returns are not guaranteed.' + (wait.gt(0) ? ' Months are counted from the first withdrawal, after the saving years.' : ' Using one return for both saving and withdrawing years is a common error: set the saving-years return under More options if they differ.'),
     }
   },
 }
@@ -430,7 +445,8 @@ const inflationSpec: ToolSpec = {
   keywords: ['real return', 'purchasing power', 'future value', 'present value', 'cost of living'],
   fields: [
     num('amount', 'Amount', '100000', 'rupee'),
-    num('infl', 'Yearly inflation', '6', 'percent', EX),
+    num('infl', 'General inflation', '6', 'percent', EX),
+    num('medical', 'Medical inflation', '10', 'percent', 'Usually higher than general. Example rate, enter your own; blank hides the medical lines'),
     num('years', 'Number of years', '10', 'years'),
     num('ret', 'Your yearly return', '', 'percent', 'To see the return after inflation', true),
   ],
@@ -438,20 +454,27 @@ const inflationSpec: ToolSpec = {
     const r = need(v, [{ id: 'amount', label: 'Amount' }, { id: 'infl', label: 'Inflation' }, { id: 'years', label: 'Years' }])
     if (!r.ok) return r
     if (negative(r.n)) return { error: 'Use positive numbers' }
-    const junk = junkOptional(v, [{ id: 'ret', label: 'Your yearly return' }])
+    const junk = junkOptional(v, [{ id: 'ret', label: 'Your yearly return' }, { id: 'medical', label: 'Medical inflation' }])
     if (junk) return junk
     const f = new D(1).plus(r.n.infl!.div(100)).pow(r.n.years!)
     const ret = parseNum(v.ret)
+    const med = parseNum(v.medical)
+    if (med?.isNegative()) return { error: 'Use positive numbers' }
     const rows: Output['rows'] = [
       { label: 'Future cost of the same thing', value: r.n.amount!.times(f), fmt: 'money', main: true },
       { label: 'Future amount, in today’s money', value: r.n.amount!.div(f), fmt: 'money' },
     ]
     const formula = ['Future cost = A × (1 + inflation)^years; today’s value = A ÷ (1 + inflation)^years', `${s(r.n.amount!)} × ${s(f, 6)}`]
+    if (med) {
+      const fm = new D(1).plus(med.div(100)).pow(r.n.years!)
+      rows.splice(2, 0, { label: 'Future cost if it is medical', value: r.n.amount!.times(fm), fmt: 'money' })
+      formula.push(`Medical: ${s(r.n.amount!)} × (1 + ${s(med)} ÷ 100)^${s(r.n.years!)} = ${s(r.n.amount!.times(fm))}`)
+    }
     if (ret) {
       rows.push({ label: 'Return after inflation, a year', value: new D(1).plus(ret.div(100)).div(new D(1).plus(r.n.infl!.div(100))).minus(1).times(100), fmt: 'percent' })
       formula.push('Real return = (1 + return) ÷ (1 + inflation) − 1')
     }
-    return { rows, formula }
+    return { rows, formula, note: med ? 'General and medical inflation are separate rates: use the medical line for hospital and insurance costs, the first line for everything else.' : undefined }
   },
 }
 

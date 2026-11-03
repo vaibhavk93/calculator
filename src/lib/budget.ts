@@ -489,11 +489,49 @@ export interface BudgetExpense {
    * but listed. A 'cardBill' has `instrumentId` = the credit card that was paid off, and no category.
    */
   settlement?: Settlement | null
+  /** Money coming back (a returned item, a cancelled order). The amount stays positive; every total subtracts it. Never together with `settlement`. */
+  refund?: boolean
+  /** The recurring bill (RecurringItem.id) this entry was paid for. Set by "Repeats" and by marking a bill paid in Due. */
+  recurringId?: string
 }
 
 export type Settlement = 'cardBill' | 'transfer'
 export const isSettlement = (v: unknown): v is Settlement => v === 'cardBill' || v === 'transfer'
 export const SETTLEMENT_LABEL: Record<Settlement, string> = { cardBill: 'Card bill payment', transfer: 'Transfer between own accounts' }
+
+export const BILL_REPEATS = [
+  { id: 'monthly', label: 'Monthly', months: 1 },
+  { id: 'quarterly', label: 'Quarterly', months: 3 },
+  { id: 'yearly', label: 'Yearly', months: 12 },
+] as const
+export type BillRepeat = (typeof BILL_REPEATS)[number]['id']
+export const isBillRepeat = (v: unknown): v is BillRepeat => BILL_REPEATS.some((r) => r.id === v)
+export const MAX_RECURRING = 100
+
+/**
+ * One bill or subscription that repeats. It owns BOTH the Due reminder (a task card and its reminder, found by `cardId`;
+ * the next due date lives ONLY on that reminder) and the Budget entries (made when the reminder is marked paid; each carries
+ * `recurringId`). 'cardBill' is a credit card's monthly bill reminder: it has no amount and never adds an entry.
+ */
+export interface RecurringItem {
+  id: string
+  kind: 'bill' | 'cardBill'
+  title: string
+  /** Plain decimal string. Null for a card bill. */
+  amount: string | null
+  repeat: BillRepeat
+  categoryId: string | null
+  mode: PaymentModeId | null
+  /** What each entry is paid with. For a card bill: the credit card the reminder is about. */
+  instrumentId: string | null
+  /** The task card in Notes and Due that carries the reminder. */
+  cardId: string | null
+  /** True while paused: no reminder, no entries. */
+  paused?: boolean
+  /** Only while paused: when it was next due (ms), so Resume carries on from there. */
+  pausedDue?: number
+  deletedAt: number | null
+}
 
 export interface BudgetData {
   /** One limit for all spending in a month, or null. */
@@ -505,6 +543,8 @@ export interface BudgetData {
   expenses: BudgetExpense[]
   /** Fingerprints of bank messages already added or skipped (see smsParse.fingerprint). Not the text. Newest first. */
   smsSeen?: string[]
+  /** Bills and subscriptions that repeat (see RecurringItem). Absent in older backups: none. */
+  recurring?: RecurringItem[]
 }
 
 /** What the add/edit sheet sends. Mode and instrument must go together (see paymentError). */
@@ -517,6 +557,8 @@ export interface ExpenseDraft {
   note: string
   /** A card bill payment (instrumentId is the card) or an own-account transfer. Not spending. */
   settlement?: Settlement | null
+  /** A refund: reduces spending. Ignored with a settlement. */
+  refund?: boolean
 }
 
 export const MAX_EXPENSES = 20000
@@ -570,6 +612,8 @@ export interface CategoryLine {
   pct: number | null
   /** Live subcategories (empty for a subcategory line). */
   children: CategoryLine[]
+  /** Entries in the month for this line (a top-level line counts its subcategories' too). Refunds count as entries. */
+  count: number
   /** Whether `limit` is for this month only, or the every-month one. */
   limitScope: 'month' | 'always'
   /** "only for Nov 2026" when the category is not active in the month but entries were recorded on it. Else null. */
@@ -584,6 +628,11 @@ export interface Filter {
   network?: NetworkId
   /** A top-level id matches it and all its subcategories; a subcategory id matches only itself. */
   categoryId?: string
+  /**
+   * A credit card's statement day (1 to 28). When set, "the month" means the statement cycle that ENDS on that day of the month:
+   * the day after the previous statement day, through this month's statement day. Entries are placed by their own date.
+   */
+  cycleDay?: number
 }
 
 export interface MonthSummary {
@@ -623,9 +672,24 @@ const parse = (s: string | null): Dec | null => {
 
 const pctOf = (spent: Dec, limit: Dec): number => (limit.isZero() ? (spent.isZero() ? 0 : 100) : Math.round(spent.div(limit).times(100).toNumber()))
 
-/** Live entries in a month, newest first. */
-export function entriesIn(budget: BudgetData, month: string): BudgetExpense[] {
-  return budget.expenses.filter((e) => e.deletedAt === null && e.date.startsWith(month)).sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? 1 : -1))
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/**
+ * The statement cycle that ends on `statementDay` of `month`: from the day after the previous month's statement day, to this
+ * month's statement day, both included. For day 15 and 2026-11 that is 2026-10-16 to 2026-11-15. Days 1 to 28 exist in every month.
+ */
+export function cycleRange(statementDay: number, month: string): { from: string; to: string } {
+  const prev = shiftMonth(month, -1)
+  const startDay = statementDay + 1
+  // Day 28 ends on the 28th, so the next cycle starts on the 29th, which may not exist: it starts on the 1st of the month instead.
+  const from = startDay > daysInMonth(prev) ? `${month}-01` : `${prev}-${pad2(startDay)}`
+  return { from, to: `${month}-${pad2(statementDay)}` }
+}
+
+/** Live entries in a month (or, with `cycleDay`, in that card's statement cycle), newest first. */
+export function entriesIn(budget: BudgetData, month: string, cycleDay?: number): BudgetExpense[] {
+  const range = cycleDay === undefined ? null : cycleRange(cycleDay, month)
+  return budget.expenses.filter((e) => e.deletedAt === null && (range ? e.date >= range.from && e.date <= range.to : e.date.startsWith(month))).sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? 1 : -1))
 }
 
 /** "Food" or "Food › Swiggy"; "Uncategorised" for none or a deleted one. */
@@ -637,6 +701,8 @@ export function categoryName(budget: Pick<BudgetData, 'categories'>, id: string 
 }
 
 const ZERO = () => new D(0)
+/** What an entry adds to spending: its amount, or minus its amount for a refund. */
+export const signedAmount = (e: Pick<BudgetExpense, 'amount' | 'refund'>): Dec => (e.refund ? (parse(e.amount) ?? ZERO()).neg() : (parse(e.amount) ?? ZERO()))
 const bySpentDesc = (a: { spent: Dec }, b: { spent: Dec }) => b.spent.comparedTo(a.spent)
 
 /** True when a live entry passes the filter. One rule for the summary, the trend and the entries list. */
@@ -652,7 +718,7 @@ export function entryMatches(budget: Pick<BudgetData, 'instruments' | 'categorie
 
 export function summarise(budget: BudgetData, month: string, filter: Filter = {}): MonthSummary {
   const instById = new Map(budget.instruments.map((i) => [i.id, i]))
-  const entries = entriesIn(budget, month).filter((e) => entryMatches(budget, e, filter))
+  const entries = entriesIn(budget, month, filter.cycleDay).filter((e) => entryMatches(budget, e, filter))
   const tops = budget.categories.filter((c) => c.deletedAt === null && c.parentId === null)
   const topIds = new Set(tops.map((c) => c.id))
   // A subcategory counts only while its parent is live; otherwise its entries show as uncategorised.
@@ -660,6 +726,7 @@ export function summarise(budget: BudgetData, month: string, filter: Filter = {}
   const liveIds = new Set([...topIds, ...subs.map((c) => c.id)])
 
   const spentBy = new Map<string, Dec>()
+  const countBy = new Map<string, number>()
   let uncategorised = ZERO()
   let spent = ZERO()
   let noMode = ZERO()
@@ -670,8 +737,9 @@ export function summarise(budget: BudgetData, month: string, filter: Filter = {}
   const netSpent = new Map<NetworkId, { spent: Dec; count: number }>()
   for (const e of entries) {
     if (e.settlement) continue // a bill payment or own-account transfer is not spending
-    const amount = parse(e.amount) ?? ZERO()
+    const amount = signedAmount(e)
     spent = spent.plus(amount)
+    if (e.categoryId !== null && liveIds.has(e.categoryId)) countBy.set(e.categoryId, (countBy.get(e.categoryId) ?? 0) + 1)
     if (e.mode === null) noMode = noMode.plus(amount)
     else modeSpent.set(e.mode, (modeSpent.get(e.mode) ?? ZERO()).plus(amount))
     if (e.categoryId !== null && liveIds.has(e.categoryId)) spentBy.set(e.categoryId, (spentBy.get(e.categoryId) ?? ZERO()).plus(amount))
@@ -695,11 +763,12 @@ export function summarise(budget: BudgetData, month: string, filter: Filter = {}
   }
 
   const line = (c: BudgetCategory, own: Dec, total: Dec, children: CategoryLine[]): CategoryLine => {
+    const count = (countBy.get(c.id) ?? 0) + children.reduce((t, k) => t + k.count, 0)
     const raw = effectiveLimit(c, month)
     const limit = parse(raw)
     const months = categoryMonths(budget, c)
     return {
-      id: c.id, name: c.name, parentId: c.parentId, spent: total, direct: own, limit, left: limit ? limit.minus(total) : null, pct: limit ? pctOf(total, limit) : null, children,
+      id: c.id, name: c.name, parentId: c.parentId, spent: total, direct: own, limit, left: limit ? limit.minus(total) : null, pct: limit ? pctOf(total, limit) : null, children, count,
       limitScope: hasMonthLimit(c, month) ? 'month' : 'always',
       note: months && !months.includes(month) ? onlyForLabel(months) : null,
     }
@@ -710,11 +779,11 @@ export function summarise(budget: BudgetData, month: string, filter: Filter = {}
       const children = subs
         .filter((s) => s.parentId === c.id)
         .map((s) => line(s, ZERO(), spentBy.get(s.id) ?? ZERO(), []))
-        .filter((k) => categoryActiveIn(budget, k.id, month) || k.spent.gt(0))
+        .filter((k) => categoryActiveIn(budget, k.id, month) || !k.spent.isZero())
       const own = spentBy.get(c.id) ?? ZERO()
       return line(c, own, children.reduce((t, k) => t.plus(k.spent), own), children)
     })
-    .filter((l) => categoryActiveIn(budget, l.id, month) || l.spent.gt(0))
+    .filter((l) => categoryActiveIn(budget, l.id, month) || !l.spent.isZero())
 
   const overallLimit = parse(effectiveOverall(budget, month))
   return {
@@ -723,7 +792,7 @@ export function summarise(budget: BudgetData, month: string, filter: Filter = {}
     overall: overallLimit ? { limit: overallLimit, left: overallLimit.minus(spent), pct: pctOf(spent, overallLimit), scope: hasMonthLimit({ overallByMonth: budget.overallByMonth }, month) ? 'month' : 'always' } : null,
     lines,
     uncategorised,
-    byMode: PAYMENT_MODES.filter((m) => modeSpent.get(m.id)?.gt(0)).map((m) => ({ id: m.id, label: m.label, spent: modeSpent.get(m.id)! })),
+    byMode: PAYMENT_MODES.filter((m) => modeSpent.has(m.id) && !modeSpent.get(m.id)!.isZero()).map((m) => ({ id: m.id, label: m.label, spent: modeSpent.get(m.id)! })),
     noMode,
     byInstrument: budget.instruments.filter((i) => instSpent.has(i.id)).map((i) => ({ instrument: i, ...instSpent.get(i.id)! })).sort(bySpentDesc),
     byNetwork: NETWORKS.filter((n) => netSpent.has(n.id)).map((n) => ({ id: n.id, label: n.label, ...netSpent.get(n.id)! })).sort(bySpentDesc),
@@ -741,9 +810,9 @@ export function cardOutstanding(budget: Pick<BudgetData, 'expenses'>, instrument
   let owed = ZERO()
   for (const e of budget.expenses) {
     if (e.deletedAt !== null || e.instrumentId !== instrumentId) continue
-    const amount = parse(e.amount) ?? ZERO()
+    const amount = signedAmount(e)
     if (e.settlement === 'cardBill') owed = owed.minus(amount)
-    else if (!e.settlement && (e.mode === 'credit' || e.mode === 'upi')) owed = owed.plus(amount)
+    else if (!e.settlement && (e.mode === 'credit' || e.mode === 'upi')) owed = owed.plus(amount) // a refund is negative, so it lowers what is owed
   }
   return owed
 }
@@ -789,8 +858,9 @@ export function daysInMonth(month: string): number {
 /** Sum of the live entries in a month that match the filter, optionally only up to and including `throughDay`. */
 export function spentIn(budget: BudgetData, month: string, filter: Filter = {}, throughDay = 31): Dec {
   let total = ZERO()
-  for (const e of entriesIn(budget, month)) {
-    if (!e.settlement && parseDay(e.date) <= throughDay && entryMatches(budget, e, filter)) total = total.plus(parse(e.amount) ?? ZERO())
+  // With a statement cycle, `throughDay` (a day of the calendar month) does not apply: the whole cycle is summed.
+  for (const e of entriesIn(budget, month, filter.cycleDay)) {
+    if (!e.settlement && (filter.cycleDay !== undefined || parseDay(e.date) <= throughDay) && entryMatches(budget, e, filter)) total = total.plus(signedAmount(e))
   }
   return total
 }
@@ -842,13 +912,13 @@ export function compareLastMonth(budget: BudgetData, month: string, today: Date,
   const current = spentIn(budget, month, filter, c === 0 ? today.getDate() : 31)
   const previous = spentIn(budget, prevMonth, filter, throughDay ?? 31)
   const diff = current.minus(previous)
-  return { prevMonth, throughDay, current, previous, diff, pct: previous.isZero() ? null : Math.round(diff.div(previous).times(100).toNumber()) }
+  return { prevMonth, throughDay, current, previous, diff, pct: previous.lte(0) ? null : Math.round(diff.div(previous).times(100).toNumber()) }
 }
 
 /** The biggest `n` entries by amount. Ties: newest date first, then stored order. */
 export function topEntries(entries: BudgetExpense[], n: number): BudgetExpense[] {
   return entries
-    .filter((e) => !e.settlement)
+    .filter((e) => !e.settlement && !e.refund)
     .map((e, i) => ({ e, i, a: parse(e.amount) ?? ZERO() }))
     .sort((x, y) => y.a.comparedTo(x.a) || (x.e.date === y.e.date ? x.i - y.i : x.e.date < y.e.date ? 1 : -1))
     .slice(0, n)
@@ -856,7 +926,7 @@ export function topEntries(entries: BudgetExpense[], n: number): BudgetExpense[]
 }
 
 /** Whole percent of `part` in `total`; 0 when the total is zero. Callers show "under 1%" when part is above zero and this is 0. */
-export const sharePercent = (part: Dec, total: Dec): number => (total.isZero() ? 0 : Math.round(part.div(total).times(100).toNumber()))
+export const sharePercent = (part: Dec, total: Dec): number => (total.lte(0) || part.lte(0) ? 0 : Math.round(part.div(total).times(100).toNumber()))
 
 /** Where spending stands against a limit. The 80% line is a guess (unproven): keep it in this one constant. */
 export const CLOSE_AT = 0.8
@@ -966,7 +1036,7 @@ export function dailyTotals(budget: BudgetData, month: string, filter: Filter = 
     if (e.settlement || !entryMatches(budget, e, filter)) continue
     const day = parseDay(e.date)
     const cur = spent.get(day) ?? { total: ZERO(), count: 0 }
-    spent.set(day, { total: cur.total.plus(parse(e.amount) ?? ZERO()), count: cur.count + 1 })
+    spent.set(day, { total: cur.total.plus(signedAmount(e)), count: cur.count + 1 })
   }
   const biggest = [...spent.values()].reduce((m, x) => (x.total.gt(m) ? x.total : m), ZERO())
   return Array.from({ length: daysInMonth(month) }, (_, i) => {
@@ -1020,10 +1090,52 @@ export function cardCostIn(
   let charges = ZERO()
   for (const e of budget.expenses) {
     if (e.deletedAt !== null || e.settlement || e.instrumentId !== card.id || !e.date.startsWith(`${year}-`)) continue
-    if (isCostCategory(budget, e.categoryId)) charges = charges.plus(parse(e.amount) ?? ZERO())
+    if (isCostCategory(budget, e.categoryId)) charges = charges.plus(signedAmount(e))
   }
   const total = fee.plus(charges)
   const parts = [fee.gt(0) ? `${money(fee)} annual fee` : '', charges.gt(0) ? `${money(charges)} in interest and fees you recorded` : ''].filter(Boolean)
   const words = parts.length === 0 ? `No annual fee, interest or fees recorded for this card in ${year}.` : `In ${year} this card has cost you ${money(total)}: ${parts.join(' and ')}.`
   return { fee, charges, total, words }
+}
+
+// ---------------------------------------------------------------- search, and a category's all-time total
+
+/**
+ * Entries whose note, category (with its parent), payment mode, card or account name, amount or kind (refund, card bill, transfer)
+ * contain every word typed. Case does not matter. Commas, spaces and the rupee sign in the query are ignored for amounts, so "1,200" finds 1200.
+ * An empty query returns the entries unchanged.
+ */
+export function searchEntries(budget: BudgetData, entries: BudgetExpense[], query: string): BudgetExpense[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return entries
+  const instById = new Map(budget.instruments.map((i) => [i.id, i]))
+  return entries.filter((e) => {
+    const inst = e.instrumentId === null ? undefined : instById.get(e.instrumentId)
+    const text = [
+      e.note,
+      e.settlement ? SETTLEMENT_LABEL[e.settlement] : categoryName(budget, e.categoryId),
+      e.mode ? modeLabel(e.mode) : '',
+      inst ? instrumentLabel(inst) : '',
+      e.refund ? 'refund' : '',
+      e.amount,
+    ].join(' ').toLowerCase()
+    return words.every((w) => text.includes(w) || text.includes(w.replace(/[,₹]/g, '')))
+  })
+}
+
+/**
+ * Everything ever recorded on a category (a top-level one includes its subcategories): the net amount (refunds subtracted) and how many
+ * entries. Settlements are not spending. Use it for a trip or event kept as a subcategory ("Travel > Goa trip").
+ * `from` and `to` ("YYYY-MM-DD") narrow it to a period, both included.
+ */
+export function categoryTotal(budget: BudgetData, categoryId: string, range?: { from: string; to: string }): { total: Dec; count: number } {
+  let total = ZERO()
+  let count = 0
+  for (const e of budget.expenses) {
+    if (e.deletedAt !== null || e.settlement || (range && (e.date < range.from || e.date > range.to))) continue
+    if (!entryMatches(budget, e, { categoryId })) continue
+    total = total.plus(signedAmount(e))
+    count += 1
+  }
+  return { total, count }
 }

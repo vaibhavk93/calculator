@@ -247,7 +247,7 @@ Four tabs. Never more.
 | Tab | Contains | Why it's a tab |
 |---|---|---|
 | **Calculate** | The basic calculator + history sheet (Scientific lives at the top of Tools) | Opens here. 70% of sessions never leave it. |
-| **Tools** | All 51 calculators in 9 groups, searchable | Breadth without burying the basics |
+| **Tools** | All 55 calculators in 8 groups, searchable | Breadth without burying the basics |
 | **Notes** | Notes, lists with checkboxes, calculator cards | The memory layer — the differentiator |
 | **Due** | Upcoming and overdue money events | The reason to re-open the app when you weren't calculating |
 

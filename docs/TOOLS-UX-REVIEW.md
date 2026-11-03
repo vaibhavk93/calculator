@@ -82,7 +82,7 @@ All: age is now under More options everywhere (default "Below 60" is right for m
 2. **Percentage and date labels cannot change with the mode.** "X" and "Y" mean different things per mode, so they stay "Number X/Y" and the result sentence explains. A `label` that can be a function of the values would fix it.
 3. **No time picker.** World time only shows "now". Converting a chosen time between cities needs a `time` field kind.
 4. **No `km`, `cm`, `kg` or `litre` unit.** Those words stay in the label ("Distance (km)", "Height (cm)"). Extra `Unit` values would let the screen show them like the rupee sign.
-5. **Loan term is a number plus a years/months switch.** On long forms the switch is tucked away, so a hint says "In years. Switch to months under More options." A single "term" field that accepts "18 months" or "20 years" would remove the trap.
+5. **(Done 2026-11-03: one "Loan term" box, `src/engine/loans/term.ts`.) Loan term is a number plus a years/months switch.** On long forms the switch is tucked away, so a hint says "In years. Switch to months under More options." A single "term" field that accepts "18 months" or "20 years" would remove the trap.
 6. **Advanced fields hide example numbers.** NPS annuity share and rate, EPF wage ceiling and the FD slab hold example values the user should check. The notes say so, but a small "using example values" badge on the More options line would be safer.
 7. **Preset GST labels come from the engine** ("5% (merit)", "40% (special)"). Left as they are; shorten them in `gstRates.ts` if wanted.
 8. **Tax terms are mixed.** Income tax says "80C", home loan tax says "section 123" (the 2025 Act number). Both are correct; pick one style across the app.

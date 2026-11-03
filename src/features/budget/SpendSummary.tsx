@@ -8,7 +8,13 @@ import { D, type Dec } from '../../engine'
 import {
   SETTLEMENT_LABEL,
   categoryName,
+  categoryTotal,
   compareLastMonth,
+  cycleRange,
+  dayKey,
+  entryMatches,
+  searchEntries,
+  signedAmount,
   dailyAverage,
   dayLongLabel,
   instrumentLabel,
@@ -26,6 +32,7 @@ import {
   type CategoryLine,
   type LimitState,
 } from '../../lib/budget'
+import { cardBillFor } from '../../lib/recurring'
 import { formatCell } from '../../lib/toolFormat'
 import { Segmented } from '../settings/controls'
 import { FilterSheet, scopeKey, scopeLabel, type Scope } from './FilterSheet'
@@ -94,15 +101,16 @@ export function EntryRow({ e, onEdit }: { e: BudgetExpense; onEdit: (id: string)
   const remove = useApp((s) => s.deleteExpense)
   const money = useMoney()
   const amount = new D(e.amount)
+  const refund = e.refund === true
   const name = e.settlement ? SETTLEMENT_LABEL[e.settlement] : categoryName(budget, e.categoryId)
   const inst = e.instrumentId === null ? undefined : budget.instruments.find((i) => i.id === e.instrumentId)
   const how = [e.mode ? modeLabel(e.mode) : '', inst ? instrumentLabel(inst) : ''].filter(Boolean).join(' · ')
-  const hint = [shortDate(e.date), how, e.settlement ? 'Not counted as spending' : '', e.note].filter(Boolean).join(' · ')
-  const spoken = `${money(amount)} ${name}${e.settlement ? ', not counted as spending' : ''}`
+  const hint = [refund ? 'Refund' : '', shortDate(e.date), how, e.settlement ? 'Not counted as spending' : '', e.note].filter(Boolean).join(' · ')
+  const spoken = `${refund ? 'refund of ' : ''}${money(amount)} ${name}${e.settlement ? ', not counted as spending' : ''}`
   return (
     <div className="budget__entry">
       <button type="button" className="budget__main tap-row" aria-label={`Edit ${spoken}`} onClick={() => onEdit(e.id)}>
-        <span className="budget__amt spend__amt">{money(amount)}</span>
+        <span className="budget__amt spend__amt">{money(refund ? amount.neg() : amount)}</span>
         <span className="row__label">{name}</span>
         <Icon name="chevron" size={18} className="tap-row__chev" />
         <span className="row__hint">{hint}</span>
@@ -156,15 +164,34 @@ export function SpendSummary({
   const [picking, setPicking] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [cycleOn, setCycleOn] = useState(false)
   useBackHandler(editing !== null, () => setEditing(null))
 
   const today = new Date()
   const everything = scopeKey(scope) === 'all'
-  const s = summarise(budget, month, scope)
-  const byCat = cat ? summarise(budget, month, { ...scope, categoryId: cat }).entries : s.entries
+  // A credit card with a statement day can be viewed by its statement cycle instead of the calendar month.
+  const card = scope.instrumentId === undefined ? undefined : budget.instruments.find((i) => i.id === scope.instrumentId)
+  const cardDay = card?.kind === 'credit' && card.statementDay ? card.statementDay : null
+  const cycle = cycleOn && cardDay !== null
+  const eff: Scope = cycle ? { ...scope, cycleDay: cardDay! } : scope
+  const range = cycle ? cycleRange(cardDay!, month) : null
+  const periodWord = range ? `the cycle ending ${shortDate(range.to)}` : monthName(month, 'long')
+  const billOn = card && cardBillFor(budget, card.id)
+  const setBill = useApp((st) => st.setCardBillReminder)
+  const s = summarise(budget, month, eff)
+  const byCat = cat ? summarise(budget, month, { ...eff, categoryId: cat }).entries : s.entries
   const entries = day ? byCat.filter((e) => e.date === day) : byCat
   const catLabel = cat ? categoryName(budget, cat) : ''
-  const monthWord = monthName(month, 'long')
+  const monthWord = range ? periodWord : monthName(month, 'long')
+
+  // Search looks through every month (it respects the card or account chosen), so a month's own filters do not apply to it.
+  const needle = query.trim()
+  const found = tab === 'entries' && needle
+    ? searchEntries(budget, budget.expenses.filter((e) => e.deletedAt === null && entryMatches(budget, e, scope)).sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? 1 : -1)), needle)
+    : null
+  const foundTotal = found ? found.filter((e) => !e.settlement).reduce((t, e) => t.plus(signedAmount(e)), new D(0)) : null
+  const SEARCH_SHOWN = 200
 
   const showAll = () => { setScope({}); setCat(null); setDay(null) }
   const drill = (id: string) => { setCat(id); setTab('entries') }
@@ -188,7 +215,34 @@ export function SpendSummary({
           options={[{ value: 'summary', label: 'Summary' }, { value: 'entries', label: 'Entries' }]}
         />
       </div>
-      {tab === 'entries' && (cat || day) && (
+      {cardDay !== null && (
+        <div className="spend__cycle">
+          <span className="ffield__label" id="spend-cycle-label">Show this card by</span>
+          <Segmented<'calendar' | 'cycle'>
+            label="Show this card by"
+            value={cycle ? 'cycle' : 'calendar'}
+            onChange={(v) => { setCycleOn(v === 'cycle'); setDay(null) }}
+            options={[{ value: 'calendar', label: 'Calendar month' }, { value: 'cycle', label: 'Statement cycle' }]}
+          />
+          {range && (
+            <>
+              <p className="budget__note">Statement cycle: {shortDate(range.from)} to {shortDate(range.to)} {range.to.slice(0, 4)}</p>
+              <p className="budget__note">Each entry has one date in Calc, so that date decides the cycle, not the day your bank posted the charge. A purchase just before the statement date may land on your next bill.</p>
+            </>
+          )}
+          {card && (
+            <button type="button" className="link-btn" onClick={() => setBill(card.id, !billOn)}>
+              {billOn ? "Stop reminding me about this card's bill" : "Remind me about this card's bill"}
+            </button>
+          )}
+        </div>
+      )}
+      {tab === 'entries' && (
+        <div className="spend__search">
+          <input className="field" type="search" placeholder="Search note, category, card or amount" aria-label="Search entries in all months" value={query} onChange={(e) => setQuery(e.target.value)} autoComplete="off" spellCheck={false} />
+        </div>
+      )}
+      {tab === 'entries' && !needle && (cat || day) && (
         <div className="spend__tools spend__tools--chips">
           {cat && (
             <button type="button" className="chip spend__scope" aria-label={`Remove the ${catLabel} filter`} title={`Remove the ${catLabel} filter`} onClick={() => setCat(null)}>
@@ -219,26 +273,27 @@ export function SpendSummary({
     ) : null
 
   // ---- cards
-  const cmp = compareLastMonth(budget, month, today, scope)
-  const avg = dailyAverage(s.spent, month, today)
-  const range = cmp ? (cmp.throughDay ? `1 to ${cmp.throughDay} ${monthName(cmp.prevMonth, 'short')}` : monthName(cmp.prevMonth, 'long')) : ''
+  const cmp = cycle ? null : compareLastMonth(budget, month, today, scope)
+  const avg = cycle ? null : dailyAverage(s.spent, month, today)
+  const cmpRange = cmp ? (cmp.throughDay ? `1 to ${cmp.throughDay} ${monthName(cmp.prevMonth, 'short')}` : monthName(cmp.prevMonth, 'long')) : ''
   const cmpText = !cmp
     ? ''
     : cmp.previous.isZero()
-      ? `Nothing to compare: no spending in ${range}`
+      ? `Nothing to compare: no spending in ${cmpRange}`
       : cmp.diff.isZero()
-        ? `Same as ${range}`
-        : `${money(cmp.diff.abs())} ${cmp.diff.gt(0) ? 'more' : 'less'} than ${range}${cmp.pct === null ? '' : ` (${cmp.pct > 0 ? '+' : cmp.pct < 0 ? '-' : ''}${Math.abs(cmp.pct)}%)`}`
+        ? `Same as ${cmpRange}`
+        : `${money(cmp.diff.abs())} ${cmp.diff.gt(0) ? 'more' : 'less'} than ${cmpRange}${cmp.pct === null ? '' : ` (${cmp.pct > 0 ? '+' : cmp.pct < 0 ? '-' : ''}${Math.abs(cmp.pct)}%)`}`
 
-  const months = trend(budget, month, 6, scope)
+  const months = trend(budget, month, 6, eff)
   const newestFirst = [...months].reverse()
   const peak = months.reduce((m, t) => (t.spent.gt(m) ? t.spent : m), new D(0))
   const thisMonth = monthKey(today)
 
-  const ranked = [...s.lines].filter((l) => l.spent.gt(0)).sort((a, b) => b.spent.comparedTo(a.spent))
+  // A category that only has refunds in the month is shown too (its total is below zero).
+  const ranked = [...s.lines].filter((l) => !l.spent.isZero()).sort((a, b) => b.spent.comparedTo(a.spent))
   const share = (v: Dec) => {
     const p = sharePercent(v, s.spent)
-    return { pct: p, text: p === 0 && v.gt(0) ? 'under 1%' : `${p}%` }
+    return { pct: p, text: v.lte(0) ? '' : p === 0 ? 'under 1%' : `${p}%` }
   }
   const catRow = (c: CategoryLine, sub: boolean) => {
     const sh = share(c.spent)
@@ -249,13 +304,14 @@ export function SpendSummary({
         key={c.id}
         type="button"
         className={sub ? 'budget__row tap-row spend__sub' : 'budget__row tap-row'}
-        aria-label={`${c.name}, ${money(c.spent)}, ${sh.text.replace('%', ' percent')}${words ? `, ${words}` : ''}. Show its entries`}
+        aria-label={`${c.name}, ${money(c.spent)}${sh.text ? `, ${sh.text.replace('%', ' percent')}` : ''}, ${entriesWord(c.count)}${words ? `, ${words}` : ''}. Show its entries`}
         onClick={() => drill(c.id)}
       >
         <span className="row__label">{c.name}</span>
-        <span className="budget__amt spend__amt">{money(c.spent)} <span className="spend__pct">{sh.text}</span></span>
+        <span className="budget__amt spend__amt">{money(c.spent)} {sh.text && <span className="spend__pct">{sh.text}</span>}</span>
         <Icon name="chevron" size={18} className="tap-row__chev" />
         {!sub && <Bar pct={sh.pct} />}
+        <span className="budget__note">{entriesWord(c.count)}</span>
         {words && <span className={state === 'over' ? 'budget__note budget__note--over' : 'budget__note'}>{words}</span>}
       </button>
     )
@@ -270,6 +326,7 @@ export function SpendSummary({
       <section className="sect" style={tintStyle(3)} aria-label="Total">
         <div className="budget__sum">
           <span className="result__label">Spent in {monthWord}</span>
+          {s.spent.isNegative() && <span className="budget__note">Refunds are more than what you spent</span>}
           <span className="budget__hero">{money(s.spent)}</span>
           <span className="budget__note">
             {avg ? `${money(avg.perDay)} a day (${avg.days} ${avg.days === 1 ? 'day' : 'days'}) · ` : ''}
@@ -279,15 +336,17 @@ export function SpendSummary({
         </div>
       </section>
 
-      <Card tint={5} title="Day by day">
-        <Heatmap budget={budget} month={month} filter={scope} selected={day} onPick={pickDay} money={money} today={today} />
-      </Card>
+      {!cycle && (
+        <Card tint={5} title="Day by day">
+          <Heatmap budget={budget} month={month} filter={scope} selected={day} onPick={pickDay} money={money} today={today} />
+        </Card>
+      )}
 
-      <Card tint={4} title="Last 6 months">
+      <Card tint={4} title={cycle ? 'Last 6 cycles' : 'Last 6 months'}>
         {newestFirst.map((t) => (
           <div className="budget__row budget__row--plain" key={t.month} aria-current={t.month === month ? 'true' : undefined}>
-            <span className={t.month === month ? 'row__label spend__cur' : 'row__label'}>{monthName(t.month, 'strip')}</span>
-            <span className="budget__amt spend__amt">{money(t.spent)}{t.month === thisMonth ? ' so far' : ''}</span>
+            <span className={t.month === month ? 'row__label spend__cur' : 'row__label'}>{cycle ? `Ends ${monthName(t.month, 'strip')}` : monthName(t.month, 'strip')}</span>
+            <span className="budget__amt spend__amt">{money(t.spent)}{(cycle ? cycleRange(cardDay!, t.month).to >= dayKey(today) : t.month === thisMonth) ? ' so far' : ''}</span>
             <Bar pct={peak.isZero() ? 0 : t.spent.div(peak).times(100).toNumber()} />
           </div>
         ))}
@@ -295,12 +354,12 @@ export function SpendSummary({
 
       <Card tint={5} title="By category">
         {ranked.map((c) => {
-          const kids = c.children.filter((k) => k.spent.gt(0)).sort((a, b) => b.spent.comparedTo(a.spent))
+          const kids = c.children.filter((k) => !k.spent.isZero()).sort((a, b) => b.spent.comparedTo(a.spent))
           return (
             <div key={c.id}>
               {catRow(c, false)}
               {kids.map((k) => catRow(k, true))}
-              {kids.length > 0 && c.direct.gt(0) && (
+              {kids.length > 0 && !c.direct.isZero() && (
                 <div className="budget__row budget__row--plain spend__sub">
                   <span className="row__label">No subcategory</span>
                   <span className="budget__amt spend__amt">{money(c.direct)}</span>
@@ -309,10 +368,10 @@ export function SpendSummary({
             </div>
           )
         })}
-        {s.uncategorised.gt(0) && (
+        {!s.uncategorised.isZero() && (
           <div className="budget__row budget__row--plain">
             <span className="row__label">Uncategorised</span>
-            <span className="budget__amt spend__amt">{money(s.uncategorised)} <span className="spend__pct">{share(s.uncategorised).text}</span></span>
+            <span className="budget__amt spend__amt">{money(s.uncategorised)} {share(s.uncategorised).text && <span className="spend__pct">{share(s.uncategorised).text}</span>}</span>
           </div>
         )}
         {ranked.length === 0 && <p className="budget__none">Pick a category when you add an expense, and it shows up here.</p>}
@@ -329,7 +388,7 @@ export function SpendSummary({
             <span className="budget__amt spend__amt">{money(m.spent)}</span>
           </div>
         ))}
-        {s.noMode.gt(0) && (
+        {!s.noMode.isZero() && (
           <div className="budget__row budget__row--plain">
             <span className="row__label">No mode</span>
             <span className="budget__amt spend__amt">{money(s.noMode)}</span>
@@ -373,12 +432,32 @@ export function SpendSummary({
           )
         })}
         {!all.overall && limitRows.length === 0 && <p className="budget__none">No limits set.</p>}
-        {!everything && <p className="budget__none">Limits count spending from all accounts.</p>}
+        {!everything && <p className="budget__none">Limits count spending from all accounts{cycle ? ' and whole calendar months, not statement cycles' : ''}.</p>}
         <button type="button" className="link-btn spend__link" onClick={onManage}>{!all.overall && limitRows.length === 0 ? 'Set a limit' : 'Change limits'}</button>
       </Card>
     </>
   )
 
+  // A category's own totals: this month, and everything ever. For a trip kept as a subcategory ("Travel > Goa trip") the second is the trip's total.
+  const detail = cat && !day
+    ? { month: categoryTotal(budget, cat, range ?? { from: `${month}-01`, to: `${month}-31` }), all: categoryTotal(budget, cat) }
+    : null
+  const searchResults = found && (
+    <section className="sect" style={tintStyle(5)} aria-label="Search results">
+      <h2 className="sect__head">
+        <span>Search results</span>
+        <span className="sect__count">{found.length}</span>
+      </h2>
+      <div className="sect__body">
+        <p className="budget__none" role="status">
+          {found.length === 0 ? `Nothing matches "${needle}" in any month.` : `${entriesWord(found.length)} match "${needle}" in all months${foundTotal && !foundTotal.isZero() ? `, ${money(foundTotal)} in total` : ''}.`}
+        </p>
+        {found.slice(0, SEARCH_SHOWN).map((e) => <EntryRow key={e.id} e={e} onEdit={setEditing} />)}
+        {found.length > SEARCH_SHOWN && <p className="budget__none">Showing the first {SEARCH_SHOWN}. Type more to narrow it down.</p>}
+        <button type="button" className="link-btn spend__link" onClick={() => setQuery('')}>Clear search</button>
+      </div>
+    </section>
+  )
   const entryList = (
     <section className="sect" style={tintStyle(5)} aria-label="Entries">
       <h2 className="sect__head">
@@ -386,6 +465,12 @@ export function SpendSummary({
         <span className="sect__count">{entries.length}</span>
       </h2>
       <div className="sect__body">
+        {detail && (
+          <>
+            <p className="budget__note" role="status">{catLabel} · {money(detail.month.total)} across {entriesWord(detail.month.count)} {range ? 'in this cycle' : `in ${monthWord}`}</p>
+            <p className="budget__note">{catLabel} · {money(detail.all.total)} across {entriesWord(detail.all.count)} in all months</p>
+          </>
+        )}
         {entries.map((e) => <EntryRow key={e.id} e={e} onEdit={setEditing} />)}
       </div>
     </section>
@@ -397,7 +482,7 @@ export function SpendSummary({
       <div className="screen__body">
         {header}
         <div className="sections">
-          {empty ?? (tab === 'summary' ? summaryCards : entryList)}
+          {found ? searchResults : (empty ?? (tab === 'summary' ? summaryCards : entryList))}
         </div>
         <button type="button" className="link-btn" onClick={() => setExporting(true)}>Export expenses as a spreadsheet</button>
       </div>

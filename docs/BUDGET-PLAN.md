@@ -365,7 +365,7 @@ that changes a screen also needs the browser pass with screenshots. **`e2e/smoke
 | A card reward rate database | Section E |
 | Push alerts for limits | Reminder delivery unproven on real phones |
 | Rollover, per-month limits, 50/30/20, shared wallets | Already left out in ROADMAP; no evidence they are needed |
-| Refunds as negative entries | MEMORY-LAYER 4.6b allows them; today's check needs an amount above zero. Add when asked (open question 2) |
+| ~~Refunds as negative entries~~ | **Built 2026-11-03** as an explicit `refund` flag (see section J) |
 | Linking a debit card to a bank account | Not asked; a debit card is its own instrument |
 
 ---
@@ -398,3 +398,25 @@ that changes a screen also needs the browser pass with screenshots. **`e2e/smoke
 3. **Is "delete becomes hide and keep the name" right?** Today deleting a category makes its entries "Uncategorised" and moves old totals. The plan keeps old totals and offers "Move entries" as a choice.
 
 *No critic pass was run: the owner asked for these features; risky parts (P5, P6, deletion) are labelled and gated.*
+
+---
+
+## J. Phase 2 build (2026-11-03): bills, statement cycle, search, refunds, trips
+
+Built in code with unit tests and a 360px / 200% font browser pass. **Not yet run on a phone.** Schema stays 3; every new field is optional, so old backups load.
+
+**Bills and subscriptions** (`src/lib/recurring.ts`, `BillsScreen.tsx`, store actions `updateBill`, `pauseBill`, `resumeBill`, `stopBill`)
+- One record, `budget.recurring[]`: `kind` ('bill' or 'cardBill'), `title`, `amount`, `repeat`, category, mode, instrument, `cardId`, `paused`, `pausedDue`, `deletedAt`. It owns a **task card plus its Reminder** (the Due row) and the **entries** (`recurringId` on each). The next due date exists only on the Reminder (while paused it is parked in `pausedDue`, and the Reminder is removed), so nothing is stored twice.
+- Marking it paid in Due (or ticking its note in To-do) **adds the entry automatically, with Undo**. We chose auto-add over "offer" because tapping Mark paid already says "I paid"; a second prompt is an extra tap on every bill, and Undo covers a mistake. One entry per bill per date, so a double tap does not double it. Entry date: the due day, or today if paid early.
+- Pause removes the reminder and stops entries. Resume carries on from the saved date, moved forward past dates that went by. Stop removes the reminder and its helper card (Undo restores both); past entries stay. Removing the reminder in Due is the same as Stop.
+- First due date: one period after the entry's date, moved on in whole periods if that is already past (an old entry never shows overdue). A bill on the 31st keeps aiming at the 31st.
+- Known limit: the helper card shows in Notes and To-do as a task with the bill's name. A paused bill keeps it, with no date.
+
+**Statement cycle** (`cycleRange`, `Filter.cycleDay`, `entriesIn(budget, month, cycleDay)`)
+- Cycle = day after the previous month's statement day through this month's statement day. Statement day is 1 to 28, so every month has it.
+- The entry's own date decides the cycle. A bank posts a charge a day or two after it happens, so Calc's cycle can differ from the bill. Stated on screen.
+- "Remind me about this card's bill" is a `cardBill` recurring record: monthly, due day, no amount, never adds an entry.
+
+**Refunds**: `refund?: true`, amount stays positive. `signedAmount()` is the one place that subtracts; every total path uses it (summary, categories, modes, cards, networks, uncategorised, month sum, trend, daily totals, card outstanding, card cost). Biggest spends and the "share of total" ignore refunds. A category with only refunds still shows (net below zero). Known: typing "-500" in the amount box is still silently saved as +500 (B-23); use the Refund choice.
+
+**Search** (`searchEntries`) and **trip total** (`categoryTotal`) are pure filters over existing data.

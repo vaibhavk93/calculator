@@ -1,3 +1,4 @@
+import { legacyTermText } from '../../engine/loans/term'
 import { groupInteger, type NumberSystem } from '../../lib/format'
 import type { Field, Values } from '../../lib/tool'
 
@@ -50,4 +51,24 @@ const sameAsDefault = (f: Field, v: Values): boolean => {
 /** "More options" opens by itself when a hidden-by-default field has been changed, so a saved card never hides what it used. */
 export function advancedOpen(fields: Field[], v: Values): boolean {
   return fields.some((f) => f.advanced && (!f.visibleIf || f.visibleIf(v)) && !sameAsDefault(f, v))
+}
+
+/**
+ * Loan cards saved before the single "Loan term" box kept a number (`tenure`) and a years/months pick
+ * (`tenureUnit`). Folds the pair into the one text the box holds ("18 months") and drops the old key.
+ * Handles the box as a field and as a column of a rows field (loan compare). Values already in the new shape pass through.
+ */
+export function migrateLegacyTerm(fields: Field[], v: Values): Values {
+  const unit = v.tenureUnit
+  if (unit === undefined) return v
+  const { tenureUnit: _gone, ...rest } = v
+  for (const f of fields) {
+    if (f.kind === 'text' && f.id === 'tenure' && typeof rest.tenure === 'string') rest.tenure = legacyTermText(rest.tenure, unit)
+    if (f.kind === 'rows') {
+      const at = f.columns.findIndex((c) => c.id === 'tenure')
+      const rows = rest[f.id]
+      if (at >= 0 && Array.isArray(rows)) rest[f.id] = rows.map((row) => row.map((cell, i) => (i === at ? legacyTermText(cell, unit) : cell)))
+    }
+  }
+  return rest
 }

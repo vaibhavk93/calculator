@@ -54,6 +54,7 @@ export const GROUPS: ToolGroup[] = [
   group('loans', 'Loans and EMI', 5, [
     { title: 'Plan a loan', tools: ['emi', 'amortisation', 'reverse-emi'] },
     { title: 'Change a loan', tools: ['prepayment', 'rate-change', 'balance-transfer', 'loan-compare'] },
+    { title: 'Several loans', tools: ['multi-loan', 'runway'] },
     { title: 'Special cases', tools: ['card-emi', 'home-loan-tax', 'simple-compound', 'loan-presets'] },
   ]),
   group('savings', 'Savings and investing', 6, [
@@ -61,6 +62,7 @@ export const GROUPS: ToolGroup[] = [
     { title: 'Fixed returns', tools: ['fd', 'rd', 'ppf'] },
     { title: 'Retirement', tools: ['nps', 'epf', 'swp'] },
     { title: 'Measure growth', tools: ['inflation', 'cagr-xirr'] },
+    { title: 'Check your finances', tools: ['emergency-fund', 'debt-to-income', 'savings-rate'] },
   ]),
   group('tax', 'Tax and salary', 7, [
     { title: 'Your tax', tools: ['income-tax', 'advance-tax', 'capital-gains', 'presumptive-44ada'] },
@@ -70,6 +72,7 @@ export const GROUPS: ToolGroup[] = [
     { title: 'Customers', tools: ['cac-ltv', 'cac-payback', 'retention'] },
     { title: 'Growth', tools: ['funnel', 'arr-mrr', 'rule-of-40'] },
     { title: 'Experiments', tools: ['ab-sample-size'] },
+    { title: 'Pricing', tools: ['markup'] },
   ]),
 ]
 

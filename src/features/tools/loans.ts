@@ -18,6 +18,8 @@ import {
   type RateChangeMode,
   type Row,
 } from '../../engine/loans/loan'
+import { legacyTermText, parseTerm, termChip } from '../../engine/loans/term'
+import { asScheduled, neverEnds, partPay, partPayTarget, payoffPlan, runway, type Debt } from '../../engine/loans/payoff'
 import { CARD_GST_PCT, HOME_LOAN_TAX, LOAN_RULES_AS_OF, PRESETS, type LoanType } from '../../engine/loans/rules'
 import { junkOptional, need, parseNum, type Computed, type Field, type Output, type ResultTable, type ToolSpec, type Values } from '../../lib/tool'
 
@@ -34,36 +36,23 @@ const rateField = (d = '8.5', id = 'rate', label = 'Yearly interest rate'): Fiel
   default: d,
   hint: 'Example rate. Enter your own.',
 })
-/** Loan term as a number plus a years/months switch. `tuck` hides the switch under "More options" when the form is long. */
-const tenureFields = (tuck = false): Field[] => [
-  { id: 'tenure', label: 'Loan term', kind: 'number', default: '20', hint: tuck ? 'In years. Switch to months under More options.' : undefined },
-  {
-    id: 'tenureUnit',
-    label: 'Years or months',
-    kind: 'select',
-    default: 'years',
-    advanced: tuck || undefined,
-    options: [
-      { value: 'years', label: 'Years' },
-      { value: 'months', label: 'Months' },
-    ],
-  },
-]
+/** One loan-term box: "18 months", "20 years", "1.5 years", "18m". A bare number means years, and the chip says so. */
+const termField: Field = {
+  id: 'tenure',
+  label: 'Loan term',
+  kind: 'text',
+  default: '20',
+  hint: 'Type 20 years or 18 months. A plain number means years.',
+  chip: termChip,
+}
+
+/** Term text to whole months. Inputs saved before the single box may still carry a years/months pick; it is honoured. */
+const termOf = (text: unknown, legacyUnit?: unknown) => parseTerm(legacyTermText(typeof text === 'string' ? text : '', legacyUnit))
 
 const LOAN_NEEDS = [
   { id: 'principal', label: 'Loan amount' },
   { id: 'rate', label: 'Interest rate' },
-  { id: 'tenure', label: 'Loan term' },
 ]
-
-/** Tenure in whole months, from a number and a years/months select. */
-function toMonths(t: Dec, unit: unknown): number | { error: string } {
-  const m = unit === 'years' ? t.times(12) : t
-  if (m.lte(0)) return { error: 'Loan term must be more than zero' }
-  if (!m.isInteger()) return { error: 'Loan term must come to a whole number of months' }
-  if (m.gt(600)) return { error: 'Loan term can be at most 50 years' }
-  return m.toNumber()
-}
 
 interface Loan {
   p: Dec
@@ -75,11 +64,11 @@ interface Loan {
 function readLoan(v: Values): Loan | { error: string } {
   const r = need(v, LOAN_NEEDS)
   if (!r.ok) return r
-  const { principal: p, rate, tenure } = r.n as Record<string, Dec>
+  const { principal: p, rate } = r.n as Record<string, Dec>
   if (p!.lte(0)) return { error: 'Loan amount must be more than zero' }
   if (rate!.lt(0)) return { error: "Interest rate can't be negative" }
   if (rate!.gt(100)) return { error: 'Interest rate looks too high. Enter a yearly rate in percent' }
-  const n = toMonths(tenure!, v.tenureUnit)
+  const n = termOf(v.tenure, v.tenureUnit)
   if (typeof n !== 'number') return n
   return { p: p!, rate: rate!, n }
 }
@@ -115,7 +104,7 @@ const emiSpec: ToolSpec = {
   category: 'loans',
   verified: { source: 'Bajaj Finserv tables and Excel PMT' },
   keywords: ['emi', 'loan', 'instalment', 'installment', 'home loan', 'car loan', 'interest'],
-  fields: [principalField(), rateField(), ...tenureFields()],
+  fields: [principalField(), rateField(), termField],
   compute: (v) => {
     const l = readLoan(v)
     if ('error' in l) return l
@@ -155,7 +144,7 @@ const scheduleSpec: ToolSpec = {
   fields: [
     principalField(),
     rateField(),
-    ...tenureFields(),
+    termField,
     {
       id: 'view',
       label: 'Show',
@@ -196,7 +185,7 @@ const prepaySpec: ToolSpec = {
   fields: [
     principalField(),
     rateField(),
-    ...tenureFields(true),
+    termField,
     { id: 'amount', label: 'Prepayment amount', kind: 'number', unit: 'rupee', default: '500000' },
     { id: 'after', label: 'Prepay after EMI number', kind: 'number', unit: 'months', default: '24' },
     {
@@ -259,18 +248,17 @@ const reverseSpec: ToolSpec = {
   blurb: 'Biggest loan your EMI can repay',
   category: 'loans',
   keywords: ['affordability', 'eligibility', 'reverse emi', 'how much loan', 'max loan'],
-  fields: [{ id: 'emi', label: 'EMI you can pay', kind: 'number', unit: 'rupee', default: '40000' }, rateField(), ...tenureFields()],
+  fields: [{ id: 'emi', label: 'EMI you can pay', kind: 'number', unit: 'rupee', default: '40000' }, rateField(), termField],
   compute: (v) => {
     const r = need(v, [
       { id: 'emi', label: 'EMI' },
       { id: 'rate', label: 'Interest rate' },
-      { id: 'tenure', label: 'Loan term' },
     ])
     if (!r.ok) return r
-    const { emi: pay, rate, tenure } = r.n as Record<string, Dec>
+    const { emi: pay, rate } = r.n as Record<string, Dec>
     if (pay!.lte(0)) return { error: 'EMI must be more than zero' }
     if (rate!.lt(0) || rate!.gt(100)) return { error: 'Enter a yearly rate from 0 to 100%' }
-    const n = toMonths(tenure!, v.tenureUnit)
+    const n = termOf(v.tenure, v.tenureUnit)
     if (typeof n !== 'number') return n
     const p = maxLoan(pay!, rate!, n)
     const total = pay!.times(n)
@@ -300,7 +288,7 @@ const rateChangeSpec: ToolSpec = {
   fields: [
     principalField(),
     rateField('8.5', 'rate', 'Current yearly rate'),
-    ...tenureFields(true),
+    termField,
     { id: 'delta', label: 'Change in rate', kind: 'number', unit: 'percent', default: '0.5', hint: '0.25 for a rise, -0.25 for a cut' },
     { id: 'from', label: 'Change applies from EMI', kind: 'number', unit: 'months', default: '13' },
     {
@@ -373,7 +361,7 @@ const compareSpec: ToolSpec = {
       columns: [
         { id: 'principal', label: 'Loan amount', kind: 'number', unit: 'rupee' },
         { id: 'rate', label: 'Yearly rate', kind: 'number', unit: 'percent' },
-        { id: 'tenure', label: 'Term', kind: 'number' },
+        { id: 'tenure', label: 'Term', kind: 'text', chip: termChip },
         { id: 'fee', label: 'Fee', kind: 'number', unit: 'rupee' },
       ],
       defaultRows: [
@@ -381,17 +369,16 @@ const compareSpec: ToolSpec = {
         ['5000000', '8.35', '20', '25000'],
       ],
     },
-    tenureFields()[1]!,
   ],
   compute: (v): Computed => {
     const offers = Array.isArray(v.offers) ? v.offers : []
     const results: { p: Dec; e: Dec; interest: Dec; fee: Dec; total: Dec; eff: Dec }[] = []
     for (const [i, row] of offers.entries()) {
-      const [p, rate, tenure, fee] = row.map((c) => parseNum(c))
-      if (!p || !rate || !tenure) return { error: `Fill in the loan amount, rate and tenure of offer ${i + 1}` }
+      const [p, rate, , fee] = row.map((c) => parseNum(c))
+      if (!p || !rate || !(row[2] ?? '').trim()) return { error: `Fill in the loan amount, rate and tenure of offer ${i + 1}` }
       if (p.lte(0)) return { error: `Offer ${i + 1}: loan amount must be more than zero` }
       if (rate.lt(0) || rate.gt(100)) return { error: `Offer ${i + 1}: enter a yearly rate from 0 to 100%` }
-      const n = toMonths(tenure, v.tenureUnit)
+      const n = termOf(row[2], v.tenureUnit)
       if (typeof n !== 'number') return { error: `Offer ${i + 1}: ${n.error.toLowerCase()}` }
       const f = fee ?? new D(0)
       if (f.lt(0)) return { error: `Offer ${i + 1}: fee can't be negative` }
@@ -440,7 +427,7 @@ const homeTaxSpec: ToolSpec = {
   fields: [
     principalField(),
     rateField(),
-    ...tenureFields(true),
+    termField,
     { id: 'slab', label: 'Your tax slab', kind: 'number', unit: 'percent', default: '30', hint: 'Optional: add 4% cess, so 30% becomes 31.2%' },
     {
       id: 'regime',
@@ -756,6 +743,183 @@ const presetSpec: ToolSpec = {
   },
 }
 
+// ---- C12 Runway and C13 several loans ---------------------------------------------------------------
+
+/** One loan per row: what it is called, what is left, the yearly rate, the monthly EMI. */
+const debtColumns: Extract<Field, { kind: 'rows' }>['columns'] = [
+  { id: 'name', label: 'Name', kind: 'text' },
+  { id: 'balance', label: 'Balance left', kind: 'number', unit: 'rupee' },
+  { id: 'rate', label: 'Yearly rate', kind: 'number', unit: 'percent' },
+  { id: 'emi', label: 'Monthly EMI', kind: 'number', unit: 'rupee' },
+]
+
+/** Reads loan rows. A row left entirely empty is skipped. Errors name the loan, in plain words. */
+function readDebts(rows: unknown, min: number): Debt[] | { error: string } {
+  const out: Debt[] = []
+  for (const [i, row] of (Array.isArray(rows) ? (rows as string[][]) : []).entries()) {
+    const [name = '', bal = '', rate = '', emi = ''] = row
+    if ([name, bal, rate, emi].every((c) => c.trim() === '')) continue
+    const label = name.trim() || `Loan ${i + 1}`
+    const balance = parseNum(bal)
+    const ratePct = parseNum(rate)
+    const e = parseNum(emi)
+    if (!balance || !ratePct || !e) return { error: `Fill in the balance, rate and EMI of ${label}` }
+    if (balance.lte(0)) return { error: `${label}: balance must be more than zero` }
+    if (ratePct.lt(0) || ratePct.gt(100)) return { error: `${label}: enter a yearly rate from 0 to 100%` }
+    if (e.lte(0)) return { error: `${label}: EMI must be more than zero` }
+    out.push({ name: label, balance, ratePct, emi: e })
+  }
+  if (out.length < min) return { error: min === 1 ? 'Enter a loan' : `Enter at least ${min} loans` }
+  const stuck = neverEnds(out)
+  if (stuck) return { error: `EMI is lower than the monthly interest on ${stuck.name}` }
+  return out
+}
+
+/** "Mar 2031": the month the last EMI falls in, taking the first EMI as next month. */
+const monthYear = (monthsFromNow: number) => new Date(new Date().getFullYear(), new Date().getMonth() + monthsFromNow, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })
+const clears = (m: number) => `${yearsMonths(m)} (${monthYear(m)})`
+
+const multiLoanSpec: ToolSpec = {
+  id: 'multi-loan',
+  title: 'Pay off several loans',
+  blurb: 'Debt-free date, avalanche vs snowball',
+  category: 'loans',
+  keywords: ['multiple loans', 'debt free', 'avalanche', 'snowball', 'payoff', 'portfolio', 'debt', 'clear loans', 'which loan first'],
+  fields: [
+    {
+      id: 'loans',
+      label: 'Your loans',
+      kind: 'rows',
+      min: 2,
+      max: 6,
+      columns: debtColumns,
+      defaultRows: [
+        ['Home loan', '3000000', '8.5', '30000'],
+        ['Personal loan', '400000', '14', '12000'],
+        ['Car loan', '250000', '9.5', '8000'],
+      ],
+    },
+    { id: 'extra', label: 'Extra you can pay each month', kind: 'number', unit: 'rupee', default: '5000', hint: 'Optional. Leave blank or 0 for none.' },
+  ],
+  compute: (v) => {
+    const junk = junkOptional(v, [{ id: 'extra', label: 'Extra amount' }])
+    if (junk) return junk
+    const extra = parseNum(v.extra) ?? new D(0)
+    if (extra.lt(0)) return { error: "Extra amount can't be negative" }
+    const debts = readDebts(v.loans, 2)
+    if (!Array.isArray(debts)) return debts
+    const now = asScheduled(debts)
+    const av = payoffPlan(debts, extra, 'avalanche')
+    const sn = payoffPlan(debts, extra, 'snowball')
+    if (!now || !av || !sn) return { error: 'These loans would take more than 100 years at these EMIs' }
+    const totalEmi = debts.reduce((s, x) => s.plus(x.emi), new D(0))
+    const diff = sn.interest.minus(av.interest)
+    const step = (name: string, p: typeof av) => p.order.map((o, i) => [`${name} ${i + 1}`, o.name, yearsMonths(o.month)])
+    return {
+      rows: [
+        { label: 'Debt-free (avalanche)', value: clears(av.months), fmt: 'text', main: true },
+        { label: 'Total EMI each month', value: totalEmi, fmt: 'money' },
+        { label: 'Interest left, loans as they run now', value: now.interest, fmt: 'money' },
+        { label: 'Debt-free, loans as they run now', value: clears(now.months), fmt: 'text' },
+        { label: 'Interest with avalanche', value: av.interest, fmt: 'money' },
+        { label: 'Interest with snowball', value: sn.interest, fmt: 'money' },
+        diff.gt(0)
+          ? { label: 'Avalanche saves over snowball', value: diff, fmt: 'money', tone: 'positive' }
+          : { label: 'Avalanche vs snowball', value: 'No difference here', fmt: 'text' },
+      ],
+      table: { title: 'Order each loan is cleared', columns: ['Plan', 'Loan', 'Cleared after'], fmts: ['text', 'text', 'text'], rows: [...step('Avalanche', av), ...step('Snowball', sn)] },
+      formula: [
+        'Each month every loan gets its EMI and the extra amount goes to the first loan still open. When a loan is cleared, its EMI moves to the next one.',
+        'Avalanche: highest yearly rate first. Snowball: smallest balance first.',
+        'Interest each month = balance × yearly rate ÷ 12 ÷ 100.',
+      ],
+      note: 'Rolling each cleared loan\'s EMI into the next is the standard method. The first EMI is taken as next month, and each loan\'s last instalment is only what is left of it. Check your lender\'s prepayment charges first.',
+    }
+  },
+}
+
+const runwaySpec: ToolSpec = {
+  id: 'runway',
+  title: 'Money runway',
+  blurb: 'How many months your money lasts',
+  category: 'loans',
+  keywords: ['runway', 'layoff', 'severance', 'payout', 'notice period', 'savings last', 'job loss', 'how long money lasts', 'burn rate', 'part pay'],
+  fields: [
+    { id: 'payout', label: 'Net payout, after tax', kind: 'number', unit: 'rupee', default: '400000' },
+    { id: 'savings', label: 'Liquid savings', kind: 'number', unit: 'rupee', default: '300000', hint: 'Cash and bank money you can reach in days' },
+    { id: 'cost', label: 'Monthly living cost, without EMIs', kind: 'number', unit: 'rupee', default: '60000' },
+    { id: 'income', label: 'New monthly income', kind: 'number', unit: 'rupee', default: '0', hint: 'Optional: salary, freelance, rent', advanced: true },
+    {
+      id: 'loans',
+      label: 'Your loans (optional)',
+      kind: 'rows',
+      min: 0,
+      max: 6,
+      columns: debtColumns,
+      defaultRows: [['Home loan', '2000000', '8.5', '25000']],
+    },
+    { id: 'partpay', label: 'Part-pay a loan with', kind: 'number', unit: 'rupee', default: '100000', hint: 'Optional: how much of the money you would put into the loan' },
+  ],
+  compute: (v) => {
+    const r = need(v, [
+      { id: 'payout', label: 'Net payout' },
+      { id: 'savings', label: 'Liquid savings' },
+      { id: 'cost', label: 'Monthly living cost' },
+    ])
+    if (!r.ok) return r
+    const { payout, savings, cost } = r.n as Record<string, Dec>
+    const junk = junkOptional(v, [
+      { id: 'income', label: 'New monthly income' },
+      { id: 'partpay', label: 'Part-pay amount' },
+    ])
+    if (junk) return junk
+    const income = parseNum(v.income) ?? new D(0)
+    const pay = parseNum(v.partpay) ?? new D(0)
+    if (payout!.lt(0) || savings!.lt(0)) return { error: "Payout and savings can't be negative" }
+    if (cost!.lte(0)) return { error: 'Monthly living cost must be more than zero' }
+    if (income.lt(0) || pay.lt(0)) return { error: "Amounts can't be negative" }
+    const debts = readDebts(v.loans, 0)
+    if (!Array.isArray(debts)) return debts
+    const cash = payout!.plus(savings!)
+    if (pay.gt(cash)) return { error: 'The part-payment is more than your payout and savings together' }
+    const emis = debts.reduce((s, x) => s.plus(x.emi), new D(0))
+    const spend = cost!.plus(emis)
+    const base = runway(cash, spend, income)
+    const lasts = (x: typeof base) =>
+      x.months === null ? 'Never runs out: income covers your spending' : x.months === 0 && x.days === 0 ? 'Less than a day' : [x.months ? `${x.months} month${x.months === 1 ? '' : 's'}` : '', x.days ? `${x.days} day${x.days === 1 ? '' : 's'}` : ''].filter(Boolean).join(' ')
+    const rows: Output['rows'] = [
+      { label: 'Your money lasts', value: lasts(base), fmt: 'text', main: true },
+      base.burn.gt(0) ? { label: 'Net money out each month', value: base.burn, fmt: 'money' } : { label: 'Money left each month', value: base.burn.neg(), fmt: 'money' },
+      { label: 'Cash you have', value: cash, fmt: 'money' },
+    ]
+    if (emis.gt(0)) {
+      rows.push({ label: 'EMIs each month', value: emis, fmt: 'money' }, { label: 'Cash covers the EMIs alone for', value: lasts(runway(cash, emis, new D(0))), fmt: 'text' })
+    }
+    const target = partPayTarget(debts)
+    if (target) {
+      rows.push({ label: 'Part-pay this loan first', value: `${target.name} (${pct(target.ratePct)} a year)`, fmt: 'text' })
+      if (pay.gt(0)) {
+        const used = D.min(pay, target.balance)
+        const out = partPay(target, used)!
+        const after = runway(cash.minus(used), out.clears ? spend.minus(target.emi) : spend, income)
+        rows.push(
+          { label: `Interest saved by paying ${money(used)}`, value: out.interestSaved, fmt: 'money', tone: 'positive' },
+          { label: out.clears ? 'That clears the loan, so your money would last' : 'Your money would then last', value: lasts(after), fmt: 'text' },
+        )
+      }
+    }
+    return {
+      rows,
+      formula: [
+        'Monthly burn = living cost + EMIs − new income',
+        `Months = cash ÷ burn, rounded down. ${cash.toFixed(2)} ÷ ${base.burn.toFixed(2)}${base.months === null ? ' is not positive, so the money never runs out' : ` = ${base.months} months, and the rest is ${base.days} days on a 30-day month`}`,
+        'Interest saved = the loan\'s remaining interest with its EMI unchanged, less the same with the part-payment taken off the balance',
+      ],
+      note: 'Assumes spending, EMIs and income stay the same every month, and ignores interest on savings and price rises. Part-paying a loan lowers your cash, so check the new figure before you decide. Highest rate first is a rule of thumb, not advice.',
+    }
+  },
+}
+
 export const TOOLS: ToolSpec[] = [
   emiSpec,
   scheduleSpec,
@@ -768,4 +932,6 @@ export const TOOLS: ToolSpec[] = [
   interestSpec,
   cardSpec,
   presetSpec,
+  multiLoanSpec,
+  runwaySpec,
 ]

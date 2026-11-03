@@ -1,0 +1,202 @@
+import { useState } from 'react'
+import { FormField, RequiredNote } from '../../components/FormField'
+import { Icon } from '../../components/Icon'
+import { ScreenHeader } from '../../components/ScreenHeader'
+import { Sheet } from '../../components/Sheet'
+import { useApp, useAppStore } from '../../components/StoreProvider'
+import { tintStyle } from '../../components/tint'
+import { D } from '../../engine'
+import { BILL_REPEATS, type BillRepeat, type RecurringItem } from '../../lib/budget'
+import { billTotals, billWords, liveBills, validateBill } from '../../lib/recurring'
+import { dueLabel } from '../../lib/reminders'
+import { dayText, shortDate } from '../../lib/tasks'
+import { Segmented } from '../settings/controls'
+import { GuardedFooter, MoneyInput, focusField, useDiscardGuard } from './formKit'
+import { ExpenseSheet } from './sheets'
+import { useMoney } from './SpendSummary'
+
+type SheetState = null | { kind: 'add' } | { kind: 'edit'; id: string }
+
+/**
+ * Bills and subscriptions: everything that repeats, what it costs a month and a year, when each is next due, and Pause and Stop.
+ * Each item is ONE record that owns the Due reminder and the budget entries (docs/BUDGET-PLAN.md, Bills). The next due date is read
+ * from the reminder, never kept twice. Reached from the Budget home; Back is handled by BudgetScreen.
+ */
+export function BillsScreen({ onBack }: { onBack: () => void }) {
+  const budget = useApp((s) => s.budget)
+  const reminders = useApp((s) => s.reminders)
+  const pause = useApp((s) => s.pauseBill)
+  const resume = useApp((s) => s.resumeBill)
+  const stop = useApp((s) => s.stopBill)
+  const money = useMoney()
+  const [sheet, setSheet] = useState<SheetState>(null)
+
+  const items = liveBills(budget)
+  const bills = items.filter((i) => i.kind === 'bill')
+  const cardBills = items.filter((i) => i.kind === 'cardBill')
+  const totals = billTotals(items)
+  const now = Date.now()
+  const nextOf = (i: RecurringItem) => reminders.find((r) => r.cardId === i.cardId)?.dueAt
+
+  const dueText = (i: RecurringItem) => {
+    const at = nextOf(i)
+    if (i.paused) return 'Paused: no reminder and no new entries'
+    return at === undefined ? 'No reminder is set. Tap Resume to turn it on' : `Next due ${shortDate(at)} · ${dueLabel(at, now)}`
+  }
+  const actions = (i: RecurringItem) => (
+    <div className="due__actions bills__actions">
+      {i.paused || nextOf(i) === undefined ? (
+        <button type="button" className="link-btn" aria-label={`Resume ${i.title}`} onClick={() => resume(i.id)}>Resume</button>
+      ) : (
+        <button type="button" className="link-btn" aria-label={`Pause ${i.title}`} onClick={() => pause(i.id)}>Pause</button>
+      )}
+      <button type="button" className="link-btn link-btn--danger" aria-label={`Stop ${i.title}`} onClick={() => stop(i.id)}>Stop</button>
+    </div>
+  )
+
+  return (
+    <div className="screen" role="dialog" aria-modal="true" aria-label="Bills and subscriptions">
+      <ScreenHeader title="Bills and subscriptions" onBack={onBack} />
+      <div className="screen__body">
+        <div className="sections">
+          {totals.count > 0 && (
+            <section className="sect" style={tintStyle(3)} aria-label="What your bills cost">
+              <div className="budget__sum">
+                <span className="result__label">Per year, all running bills</span>
+                <span className="budget__hero">{money(totals.perYear)}</span>
+                <span className="budget__note">About {money(totals.perMonth)} a month · {totals.count} {totals.count === 1 ? 'bill' : 'bills'}</span>
+              </div>
+            </section>
+          )}
+
+          <section className="sect" style={tintStyle(5)} aria-label="Bills">
+            <h2 className="sect__head">
+              <span>Bills</span>
+              <span className="sect__count">{bills.length}</span>
+            </h2>
+            <div className="sect__body">
+              {bills.length === 0 && <p className="budget__none">No bills yet. Add one below, or choose Repeats when you add an expense.</p>}
+              {bills.map((i) => (
+                <div key={i.id} className="bills__item">
+                  <button type="button" className="budget__row tap-row" aria-label={`Edit ${i.title}. ${billWords(i, money)}`} onClick={() => setSheet({ kind: 'edit', id: i.id })}>
+                    <span className="row__label">{i.title}{i.paused ? ' (paused)' : ''}</span>
+                    <span className="budget__amt spend__amt">{money(new D(i.amount!))}</span>
+                    <Icon name="chevron" size={18} className="tap-row__chev" />
+                    <span className="budget__note">{billWords(i, money)}</span>
+                    <span className="budget__note">{dueText(i)}</span>
+                  </button>
+                  {actions(i)}
+                </div>
+              ))}
+            </div>
+            <div className="manage__actions">
+              <button type="button" className="btn btn--primary" onClick={() => setSheet({ kind: 'add' })}>Add a bill</button>
+            </div>
+          </section>
+
+          {cardBills.length > 0 && (
+            <section className="sect" style={tintStyle(4)} aria-label="Card bill reminders">
+              <h2 className="sect__head">
+                <span>Card bill reminders</span>
+                <span className="sect__count">{cardBills.length}</span>
+              </h2>
+              <div className="sect__body">
+                {cardBills.map((i) => {
+                  const day = budget.instruments.find((c) => c.id === i.instrumentId)?.dueDay
+                  return (
+                    <div key={i.id} className="bills__item">
+                      <div className="budget__row budget__row--plain">
+                        <span className="row__label">{i.title}{i.paused ? ' (paused)' : ''}</span>
+                        <span className="budget__note">{day ? `Due on day ${day} of every month. ` : ''}Change the day in Categories and cards.</span>
+                        <span className="budget__note">{dueText(i)}</span>
+                      </div>
+                      {actions(i)}
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )}
+          <p className="budget__none">Marking a bill paid in Due adds that payment to your budget. Past entries stay if you stop a bill.</p>
+        </div>
+      </div>
+      {sheet?.kind === 'add' && <ExpenseSheet title="Add a bill" startRepeat="monthly" onClose={() => setSheet(null)} />}
+      {sheet?.kind === 'edit' && <BillSheet id={sheet.id} onClose={() => setSheet(null)} />}
+    </div>
+  )
+}
+
+/** Change a bill's name, amount, how often it repeats and (while it is running) when it is next due. */
+function BillSheet({ id, onClose }: { id: string; onClose: () => void }) {
+  const budget = useApp((s) => s.budget)
+  const reminders = useApp((s) => s.reminders)
+  const store = useAppStore()
+  const money = useMoney()
+  const item = liveBills(budget).find((i) => i.id === id)
+  const rem = item ? reminders.find((r) => r.cardId === item.cardId) : undefined
+  const showDate = !!item && !item.paused && rem !== undefined
+  const [start] = useState(() => ({ title: item?.title ?? '', amount: item?.amount ?? '', repeat: (item?.repeat ?? 'monthly') as BillRepeat, date: rem ? dayText(rem.dueAt) : '' }))
+  const [title, setTitle] = useState(start.title)
+  const [amount, setAmount] = useState(start.amount)
+  const [repeat, setRepeat] = useState(start.repeat)
+  const [date, setDate] = useState(start.date)
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const [submitted, setSubmitted] = useState(false)
+  const [storeError, setStoreError] = useState<string | null>(null)
+  const guard = useDiscardGuard(title !== start.title || amount !== start.amount || repeat !== start.repeat || date !== start.date, onClose)
+  if (!item) return null
+
+  const errors = validateBill({ title, amount, date: showDate ? date : null })
+  const shown = (f: 'title' | 'amount' | 'date') => (submitted || touched[f] ? errors[f] : undefined)
+  const touch = (f: string) => () => setTouched((t) => ({ ...t, [f]: true }))
+  const aria = (f: 'title' | 'amount' | 'date') => ({ 'aria-invalid': shown(f) ? (true as const) : undefined, 'aria-describedby': shown(f) ? `bill-${f}-msg` : undefined })
+
+  const save = () => {
+    setSubmitted(true)
+    const first = (['title', 'amount', 'date'] as const).find((f) => errors[f])
+    if (first) return focusField(`bill-${first}`)
+    if (store.getState().updateBill(id, { title, amount, repeat, ...(showDate ? { date } : {}) })) return onClose()
+    setStoreError(store.getState().notice?.text ?? 'Could not save this bill')
+  }
+
+  return (
+    <Sheet
+      title="Edit bill"
+      onClose={guard.requestClose}
+      footer={
+        <GuardedFooter guard={guard} question="Discard your changes?">
+          <button type="button" className="btn btn--primary" onClick={save}>Save changes</button>
+        </GuardedFooter>
+      }
+    >
+      <div className="save">
+        <RequiredNote />
+        {storeError && <p className="ffield__error" role="alert">{storeError}</p>}
+        <div className="save__card" style={tintStyle(7)}>
+          <FormField label="Name" htmlFor="bill-title" required error={shown('title')}>
+            <input id="bill-title" className="field" value={title} maxLength={120} autoComplete="off" aria-required="true" onChange={(e) => setTitle(e.target.value)} onBlur={touch('title')} {...aria('title')} />
+          </FormField>
+          <FormField label="Amount in rupees" htmlFor="bill-amount" required error={shown('amount')} hint={!errors.amount ? billWords({ amount, repeat }, money) : undefined}>
+            <MoneyInput id="bill-amount" value={amount} onChange={setAmount} onBlur={touch('amount')} invalid={!!shown('amount')} describedBy={shown('amount') ? 'bill-amount-msg' : undefined} />
+          </FormField>
+          <div className="ffield">
+            <span className="ffield__label" id="bill-repeat-label">Repeats</span>
+            <Segmented<BillRepeat>
+              label="Repeats"
+              value={repeat}
+              onChange={setRepeat}
+              options={BILL_REPEATS.map((r) => ({ value: r.id, label: r.label }))}
+            />
+          </div>
+          {showDate ? (
+            <FormField label="Next due" htmlFor="bill-date" required error={shown('date')} hint="When it shows up in Due">
+              <input id="bill-date" className="field field--mono field--date" type="date" aria-required="true" value={date} onChange={(e) => setDate(e.target.value)} onBlur={touch('date')} {...aria('date')} />
+            </FormField>
+          ) : (
+            <p className="ffield__hint">{item.paused ? 'Resume the bill to pick its next due date.' : 'There is no reminder for this bill. Resume it to turn the reminder on.'}</p>
+          )}
+        </div>
+      </div>
+    </Sheet>
+  )
+}

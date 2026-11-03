@@ -95,6 +95,14 @@ export function timeLabel(time: string): string {
   return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`
 }
 
+/** The next time it is `day` of a month at `time`: this month if that is still ahead of `now`, else next month (clamped to a short month). */
+export function nextOnDay(now: number, day: number, time: string): number {
+  const [h, min] = parseTime(time) ?? [9, 0]
+  const d = new Date(now)
+  const thisMonth = addMonths(new Date(d.getFullYear(), d.getMonth(), 1, h, min).getTime(), 0, day)
+  return thisMonth > now ? thisMonth : addMonths(thisMonth, 1, day)
+}
+
 // ------------------------------------------------------------------ advance-tax pack
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']

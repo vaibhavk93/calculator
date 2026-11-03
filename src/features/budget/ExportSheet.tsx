@@ -66,7 +66,7 @@ export function ExportSheet({ onClose }: { onClose: () => void }) {
       footer={<button type="button" className="btn btn--primary" onClick={() => void exportNow()}>Export</button>}
     >
       <div className="save">
-        <p className="save__sum">One spreadsheet file (CSV) with a row for each entry: date, amount, category, how you paid, note. Card bill payments and transfers are included and marked.</p>
+        <p className="save__sum">One spreadsheet file (CSV) with a row for each entry: date, amount, category, how you paid, note. Card bill payments and transfers are included and marked. A refund has a minus sign and the type "refund".</p>
         {error && <p className="ffield__error" role="alert">{error}</p>}
         <div className="save__card" style={tintStyle(7)}>
           <div className="ffield">

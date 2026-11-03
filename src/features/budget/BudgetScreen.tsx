@@ -5,12 +5,14 @@ import { useApp } from '../../components/StoreProvider'
 import { tintStyle } from '../../components/tint'
 import { useBackHandler } from '../../components/useBackHandler'
 import { limitState, monthKey, monthLabel, monthShortLabel, needsAttention, paceLeft, summarise } from '../../lib/budget'
+import { billTotals, liveBills } from '../../lib/recurring'
+import { BillsScreen } from './BillsScreen'
 import { ImportScreen } from './ImportScreen'
 import { ManageScreen } from './ManageScreen'
 import { ExpenseSheet } from './sheets'
 import { Bar, EntryRow, MonthNav, SpendSummary, limitWords, useMoney, type SummaryTab } from './SpendSummary'
 
-type Page = 'home' | 'summary' | 'manage' | 'import'
+type Page = 'home' | 'summary' | 'manage' | 'import' | 'bills'
 type SheetState = null | { id: string | null }
 
 const entriesWord = (n: number) => `${n} ${n === 1 ? 'entry' : 'entries'}`
@@ -39,6 +41,7 @@ export function BudgetScreen() {
   useBackHandler(sheet !== null, () => setSheet(null))
 
   const s = summarise(budget, month)
+  const bills = billTotals(liveBills(budget))
   const never = budget.expenses.every((e) => e.deletedAt !== null)
   const goSummary = (tab: SummaryTab, categoryId: string | null = null) => {
     setOpen({ tab, categoryId })
@@ -51,6 +54,7 @@ export function BudgetScreen() {
       {page === 'summary' && <SpendSummary month={month} onMonth={setMonth} onBack={() => setPage('home')} onManage={() => setPage('manage')} initialTab={open.tab} initialCategory={open.categoryId} />}
       {page === 'manage' && <ManageScreen onBack={() => setPage('home')} month={month} />}
       {page === 'import' && <ImportScreen onBack={() => setPage('home')} />}
+      {page === 'bills' && <BillsScreen onBack={() => setPage('home')} />}
     </>
   )
 
@@ -63,6 +67,7 @@ export function BudgetScreen() {
             <>
               <button type="button" className="btn btn--primary" onClick={() => setSheet({ id: null })}>Add expense</button>
               <button type="button" className="link-btn" onClick={() => setPage('import')}>Add from bank messages</button>
+              <button type="button" className="link-btn" onClick={() => setPage('bills')}>Bills and subscriptions</button>
               <button type="button" className="link-btn" onClick={() => setPage('manage')}>Set a monthly limit</button>
               <button type="button" className="link-btn" onClick={() => setPage('manage')}>Categories and cards</button>
             </>
@@ -85,6 +90,7 @@ export function BudgetScreen() {
   const recent = s.entries.slice(0, 5)
 
   return (
+    <>
     <div className="tools">
       {/* Summary and Manage stack on top via {pages} below without unmounting this -- so their own
           h1 (from ScreenHeader) must be the only one while either is open, not two at once. */}
@@ -155,6 +161,18 @@ export function BudgetScreen() {
           </div>
         </section>
 
+        <section className="sect" style={tintStyle(7)} aria-label="Bills and subscriptions">
+          <button type="button" className="budget__row tap-row" onClick={() => setPage('bills')}>
+            <span className="row__label">Bills and subscriptions</span>
+            <Icon name="chevron" size={18} className="tap-row__chev" />
+            <span className="budget__note">
+              {bills.count > 0
+                ? `${bills.count} running · about ${money(bills.perMonth)} a month = ${money(bills.perYear)} a year`
+                : 'Rent, Netflix, insurance. See what they cost a year and get reminded.'}
+            </span>
+          </button>
+        </section>
+
         <section className="sect" style={tintStyle(7)} aria-label="Add from messages">
           <button type="button" className="budget__row tap-row" onClick={() => setPage('import')}>
             <span className="row__label">Add from bank messages</span>
@@ -171,8 +189,11 @@ export function BudgetScreen() {
           </button>
         </section>
       </div>
-      {sheets}
-      {pages}
     </div>
+    {/* sheets and pages sit at the same place in the tree as in the empty-state return above, so adding the first
+        entry from inside one of them does not unmount it (that used to reset the Add from messages screen). */}
+    {sheets}
+    {pages}
+    </>
   )
 }

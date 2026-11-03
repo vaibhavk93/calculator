@@ -2,7 +2,7 @@ import { INITIAL_INPUT, type InputState } from '../engine'
 import { ACCENT_NAMES, type AccentName, type ThemePreference } from '../lib/theme'
 import type { KeyValueStorage } from '../lib/storage'
 import { parseTime } from '../lib/reminders'
-import { isAccountType, isMonthKey, isSettlement } from '../lib/budget'
+import { MAX_RECURRING, isAccountType, isBillRepeat, isMonthKey, isSettlement, type RecurringItem } from '../lib/budget'
 import {
   DEFAULT_SETTINGS,
   MAX_HISTORY,
@@ -86,6 +86,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     lastBackupAt: stamp(r.lastBackupAt),
     backupNudgedAt: stamp(r.backupNudgedAt),
     backupDismissedAt: stamp(r.backupDismissedAt),
+    dismissedTips: Array.isArray(r.dismissedTips) ? [...new Set(r.dismissedTips.filter((t): t is string => typeof t === 'string' && /^[a-z0-9-]{1,40}$/.test(t)))].slice(0, 20) : [],
   }
 }
 
@@ -346,10 +347,49 @@ export function sanitizeBudget(raw: unknown): BudgetData {
       note: str(e.note, 200),
       deletedAt: num(e.deletedAt),
       ...(settlement ? { settlement } : {}),
+      // A refund is spending turned round; a settlement is never one.
+      ...(e.refund === true && !settlement ? { refund: true as const } : {}),
+      ...(goodId(e.recurringId) ? { recurringId: e.recurringId } : {}),
     })
     if (expenses.length >= MAX_EXPENSES) break
   }
-  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, ...ifSet({ overallByMonth: limitMap(raw.overallByMonth) }), categories: cats, instruments, expenses, ...ifSet({ smsSeen: seenList(raw.smsSeen) }) }
+  const recurring = sanitizeRecurring(raw.recurring, catIds, instById)
+  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, ...ifSet({ overallByMonth: limitMap(raw.overallByMonth) }), categories: cats, instruments, expenses, ...ifSet({ smsSeen: seenList(raw.smsSeen) }), ...(recurring.length > 0 ? { recurring } : {}) }
+}
+
+/** Bills and subscriptions. A bill needs a real amount; a card bill needs a card that exists and is a credit card. Anything else is dropped. */
+function sanitizeRecurring(raw: unknown, catIds: Set<string>, instById: Map<string, PayInstrument>): RecurringItem[] {
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+  const out: RecurringItem[] = []
+  const seenIds = new Set<string>()
+  for (const r of Array.isArray(raw) ? raw : []) {
+    if (!isObject(r) || !goodId(r.id) || seenIds.has(r.id) || !isBillRepeat(r.repeat)) continue
+    const kind = r.kind === 'cardBill' ? 'cardBill' : r.kind === 'bill' ? 'bill' : null
+    const title = str(r.title, 120).trim()
+    if (!kind || !title) continue
+    const inst = typeof r.instrumentId === 'string' ? instById.get(r.instrumentId) : undefined
+    if (kind === 'bill' && !(isPlainNumber(r.amount) && !r.amount.startsWith('-') && Number(r.amount) > 0)) continue
+    if (kind === 'cardBill' && !(inst && inst.kind === 'credit')) continue
+    const mode = isPaymentMode(r.mode) ? r.mode : null
+    seenIds.add(r.id)
+    out.push({
+      id: r.id,
+      kind,
+      title,
+      amount: kind === 'bill' ? (r.amount as string) : null,
+      repeat: r.repeat,
+      categoryId: typeof r.categoryId === 'string' && catIds.has(r.categoryId) ? r.categoryId : null,
+      mode: kind === 'bill' ? mode : null,
+      // An instrument that is gone, or that the mode does not accept, is dropped; the bill is kept.
+      instrumentId: kind === 'cardBill' ? inst!.id : inst && inst.deletedAt === null && mode !== null && instrumentFitsMode(mode, inst) ? inst.id : null,
+      cardId: goodId(r.cardId) ? r.cardId : null,
+      ...(r.paused === true ? { paused: true as const } : {}),
+      ...(r.paused === true && typeof r.pausedDue === 'number' && Number.isFinite(r.pausedDue) ? { pausedDue: r.pausedDue } : {}),
+      deletedAt: num(r.deletedAt),
+    })
+    if (out.length >= MAX_RECURRING) break
+  }
+  return out
 }
 
 type Migration = (data: Record<string, unknown>) => Record<string, unknown>

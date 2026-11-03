@@ -39,7 +39,7 @@ export function inputLines(fields: Field[], values: Values, opts: FormatOptions)
       const text =
         f.unit === 'rupee' ? RUPEE + grouped : f.unit === 'percent' ? `${grouped}%` : f.unit && f.unit !== 'none' ? `${grouped} ${f.unit}` : grouped
       out.push({ label: f.label, text })
-    } else if (f.kind === 'date' || f.kind === 'text') {
+    } else if (f.kind === 'date' || f.kind === 'time' || f.kind === 'text') {
       out.push({ label: f.label, text: raw })
     }
   }

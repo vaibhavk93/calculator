@@ -51,3 +51,30 @@ export function worldTimes(now: Date, homeId: string): CityTime[] | null {
     return { id: c.id, label: c.label, time: `${p('hour')}:${p('minute')}`, day: `${p('weekday')} ${p('day')} ${p('month')}`, offset: offsetText(off), fromHome: diffText(off - homeOff) }
   })
 }
+
+/** Today's date in a city, "YYYY-MM-DD". Null for an unknown city. */
+export function todayIn(homeId: string, now: Date): string | null {
+  const home = CITIES.find((c) => c.id === homeId)
+  if (!home) return null
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: home.zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now)
+  const p = (t: string) => parts.find((x) => x.type === t)?.value ?? ''
+  return `${p('year')}-${p('month')}-${p('day')}`
+}
+
+/**
+ * The moment the clock in a city reads `day` ("YYYY-MM-DD") at `time` ("HH:MM", 24 hour), or null if the city, the day
+ * or the time is not valid. The city's offset is looked up for THAT day, so daylight saving is right. A clock time that
+ * does not exist (the hour skipped when clocks go forward) is read with the offset from before the change.
+ */
+export function instantAt(homeId: string, day: string, time: string): Date | null {
+  const home = CITIES.find((c) => c.id === homeId)
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day)
+  const t = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time)
+  if (!home || !d || !t) return null
+  const [y, mo, da] = [Number(d[1]), Number(d[2]), Number(d[3])]
+  const wall = Date.UTC(y, mo - 1, da, Number(t[1]), Number(t[2]))
+  if (new Date(wall).getUTCDate() !== da || new Date(wall).getUTCMonth() !== mo - 1) return null // 31 Feb and the like
+  const first = wall - offsetMinutes(new Date(wall), home.zone) * 60_000
+  const second = wall - offsetMinutes(new Date(first), home.zone) * 60_000
+  return new Date(second)
+}

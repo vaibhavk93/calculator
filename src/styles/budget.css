@@ -464,3 +464,32 @@ button.heat__cell:active {
   border-top: 1px solid var(--line);
   overflow-wrap: anywhere;
 }
+
+/* Search box and the card-view choice on the Spending summary; the Bills page. */
+.spend__search {
+  padding: 0 var(--s-4) var(--s-2);
+}
+
+.spend__cycle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: 0 var(--s-4) var(--s-2);
+}
+
+.spend__cycle .budget__note {
+  margin: 0;
+}
+
+.bills__item {
+  border-top: 1px solid var(--line);
+}
+
+.bills__item:first-child {
+  border-top: 0;
+}
+
+.bills__actions {
+  padding: 0 var(--s-4) var(--s-2);
+}

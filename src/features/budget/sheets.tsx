@@ -6,7 +6,9 @@ import { Sheet } from '../../components/Sheet'
 import { tintStyle } from '../../components/tint'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import {
+  type BillRepeat,
   type ExpenseDraft,
+  BILL_REPEATS,
   PAYMENT_MODES,
   UPI_DEFAULT_LABEL,
   activeCategories,
@@ -31,6 +33,8 @@ import {
   type PaymentModeId,
   type Settlement,
 } from '../../lib/budget'
+import { firstDue, repeatWord } from '../../lib/recurring'
+import { shortDate } from '../../lib/tasks'
 import { Segmented } from '../settings/controls'
 import { GuardedFooter, MoneyInput, focusField, useDiscardGuard } from './formKit'
 import { InstrumentForm } from './InstrumentForm'
@@ -69,13 +73,14 @@ type View = { v: 'form' } | { v: 'category' } | { v: 'inst' } | { v: 'newInst'; 
  * the button is never disabled. The store checks again before it saves. A list of choices or the card form takes the
  * place of this form inside the same sheet (docs/FORMS-AND-SHEETS.md: never stack a sheet on a sheet), then returns here.
  */
-export function ExpenseSheet({ expense, prefill, onSaved, onClose }: { expense?: BudgetExpense; /** A new entry that starts with these values (a calculator result, or a bank message being reviewed). */ prefill?: Partial<ExpenseDraft> & { amount: string; note: string }; /** Called after a NEW entry is saved. */ onSaved?: () => void; onClose: () => void }) {
+export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, onClose }: { expense?: BudgetExpense; /** A new entry that starts with these values (a calculator result, or a bank message being reviewed). */ prefill?: Partial<ExpenseDraft> & { amount: string; note: string }; /** Replaces "Add expense" as the sheet's title. */ title?: string; /** "Repeats" starts on this (the Bills page opens the sheet on Monthly). */ startRepeat?: BillRepeat; /** Called after a NEW entry is saved. */ onSaved?: () => void; onClose: () => void }) {
   const budget = useApp((s) => s.budget)
   const add = useApp((s) => s.addExpense)
   const update = useApp((s) => s.updateExpense)
   const remove = useApp((s) => s.deleteExpense)
   const addCategory = useApp((s) => s.addCategory)
   const store = useAppStore()
+  const reminderTime = useApp((s) => s.settings.reminderTime)
 
   // A category or card that was deleted since this entry was saved starts as "none", so editing never trips over it.
   // The category stays even when it is not used in the entry's month: an old entry keeps what it was.
@@ -90,6 +95,8 @@ export function ExpenseSheet({ expense, prefill, onSaved, onClose }: { expense?:
       instrumentId: expense?.settlement === 'cardBill' ? (card?.id ?? null) : expense ? (paymentError(budget, expense.mode, expense.instrumentId) === null ? expense.instrumentId : null) : (prefill?.instrumentId ?? null),
       note: expense?.note ?? prefill?.note ?? '',
       settlement: (expense?.settlement ?? prefill?.settlement ?? null) as Settlement | null,
+      refund: expense?.refund ?? prefill?.refund ?? false,
+      repeat: (startRepeat ?? 'none') as BillRepeat | 'none',
     }
   })
   const [amount, setAmount] = useState(start.amount)
@@ -99,6 +106,8 @@ export function ExpenseSheet({ expense, prefill, onSaved, onClose }: { expense?:
   const [instrumentId, setInstrumentId] = useState<string | null>(start.instrumentId)
   const [note, setNote] = useState(start.note)
   const [settlement, setSettlement] = useState<Settlement | null>(start.settlement)
+  const [refund, setRefund] = useState(start.refund)
+  const [repeat, setRepeat] = useState<BillRepeat | 'none'>(start.repeat)
   const [view, setView] = useState<View>({ v: 'form' })
   // Category and mode pre-fill from an earlier entry with the same note, until the user picks one themselves.
   const [picked, setPicked] = useState(expense !== undefined)
@@ -111,7 +120,7 @@ export function ExpenseSheet({ expense, prefill, onSaved, onClose }: { expense?:
     if (!expense) amountRef.current?.focus()
   }, [expense])
 
-  const dirty = amount !== start.amount || date !== start.date || categoryId !== start.categoryId || mode !== start.mode || instrumentId !== start.instrumentId || note !== start.note || settlement !== start.settlement
+  const dirty = amount !== start.amount || date !== start.date || categoryId !== start.categoryId || mode !== start.mode || instrumentId !== start.instrumentId || note !== start.note || settlement !== start.settlement || refund !== start.refund || repeat !== start.repeat
   const guard = useDiscardGuard(dirty, onClose)
 
   const month = /^\d{4}-\d{2}/.test(date) ? date.slice(0, 7) : monthKey(new Date())
@@ -127,8 +136,9 @@ export function ExpenseSheet({ expense, prefill, onSaved, onClose }: { expense?:
     setSubmitted(true)
     const first = (['amount', 'date', 'category', 'paidWith'] as Field[]).find((f) => errors[f])
     if (first) return focusField(first === 'paidWith' && mode === null && settlement === null ? 'exp-mode' : FIELD_ID[first])
-    const draft = { amount, categoryId, mode, instrumentId, date, note: note.trim(), settlement }
-    if (expense ? update(expense.id, draft) : add(draft)) { if (!expense) onSaved?.(); return onClose() }
+    const draft = { amount, categoryId, mode, instrumentId, date, note: note.trim(), settlement, refund: settlement === null && refund }
+    const rep = settlement === null && !refund && repeat !== 'none' ? repeat : null
+    if (expense ? update(expense.id, draft, rep) : add(draft, rep)) { if (!expense) onSaved?.(); return onClose() }
     setStoreError(store.getState().notice?.text ?? 'Could not save this entry')
   }
 
@@ -160,6 +170,14 @@ export function ExpenseSheet({ expense, prefill, onSaved, onClose }: { expense?:
       setMode(null)
     }
     setPicked(true)
+  }
+  /** Spending, a refund (spending turned round), a card bill payment or an own-account transfer. Only spending repeats. */
+  const chooseKind = (v: 'spend' | 'refund' | Settlement) => {
+    setRefund(v === 'refund')
+    if (v === 'spend' || v === 'refund') {
+      if (settlement !== null) chooseSettlement(null)
+    } else chooseSettlement(v)
+    if (v !== 'spend') setRepeat('none')
   }
 
   // ---- category: the five most recent as pills, the rest behind "More"
@@ -247,14 +265,16 @@ export function ExpenseSheet({ expense, prefill, onSaved, onClose }: { expense?:
 
   const catError = shown('category')
   const instError = shown('paidWith')
+  const linked = expense?.recurringId ? (budget.recurring ?? []).find((r) => r.id === expense.recurringId && r.deletedAt === null) : undefined
+  const nextDue = repeat !== 'none' && !errors.date ? firstDue(date, repeat, Date.now(), reminderTime).dueAt : null
 
   return (
     <Sheet
-      title={expense ? 'Edit expense' : 'Add expense'}
+      title={expense ? (expense.refund ? 'Edit refund' : 'Edit expense') : (title ?? (refund ? 'Add refund' : 'Add expense'))}
       onClose={guard.requestClose}
       footer={
         <GuardedFooter guard={guard} question="Discard this expense?">
-          <button type="button" className="btn btn--primary" onClick={submit}>{expense ? 'Save changes' : 'Add expense'}</button>
+          <button type="button" className="btn btn--primary" onClick={submit}>{expense ? 'Save changes' : refund ? 'Add refund' : 'Add expense'}</button>
         </GuardedFooter>
       }
     >
@@ -270,16 +290,40 @@ export function ExpenseSheet({ expense, prefill, onSaved, onClose }: { expense?:
           </FormField>
           <div className="ffield">
             <span className="ffield__label" id="exp-kind-label">What is this</span>
-            <Segmented<'spend' | Settlement>
+            <Segmented<'spend' | 'refund' | Settlement>
               label="What is this"
-              value={settlement ?? 'spend'}
-              onChange={(v) => chooseSettlement(v === 'spend' ? null : v)}
-              options={[{ value: 'spend', label: 'Spending' }, { value: 'cardBill', label: 'Card bill' }, { value: 'transfer', label: 'Transfer' }]}
+              value={settlement ?? (refund ? 'refund' : 'spend')}
+              onChange={chooseKind}
+              options={[{ value: 'spend', label: 'Spending' }, { value: 'refund', label: 'Refund' }, { value: 'cardBill', label: 'Card bill' }, { value: 'transfer', label: 'Transfer' }]}
             />
+            {refund && settlement === null && <p className="ffield__hint">Money that came back, such as a returned item. It lowers your spending.</p>}
             {settlement === 'cardBill' && <p className="ffield__hint">Paying off a credit card. Not counted as spending.</p>}
             {settlement === 'transfer' && <p className="ffield__hint">Moving money between your own accounts. Not counted as spending.</p>}
           </div>
         </div>
+
+        {settlement === null && !refund && (
+          <div className="save__card" style={tintStyle(7)}>
+            {linked ? (
+              <p className="ffield__hint">This entry is part of a bill that repeats {repeatWord(linked.repeat)}. Change or stop it in Bills.</p>
+            ) : (
+              <div className="ffield">
+                <span className="ffield__label" id="exp-repeat-label">Repeats</span>
+                <Segmented<BillRepeat | 'none'>
+                  label="Repeats"
+                  value={repeat}
+                  onChange={setRepeat}
+                  options={[{ value: 'none', label: 'Never' }, ...BILL_REPEATS.map((r) => ({ value: r.id, label: r.label }))]}
+                />
+                <p className="ffield__hint" role="status">
+                  {repeat === 'none' || nextDue === null
+                    ? 'For a bill or subscription, such as rent or Netflix.'
+                    : `This entry counts as the first payment. Next due ${shortDate(nextDue)}: it shows in Due, and marking it paid adds the entry.`}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {settlement === null && (
           <div className="save__card" style={tintStyle(7)}>

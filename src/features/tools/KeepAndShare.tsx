@@ -15,6 +15,7 @@ export function KeepAndShare({
   canList,
   onList,
   onRemind,
+  onUse,
 }: {
   title: string
   text: string
@@ -22,6 +23,8 @@ export function KeepAndShare({
   canList: boolean
   onList: () => void
   onRemind: () => void
+  /** Set when the headline answer is a plain number another calculator could take. */
+  onUse?: () => void
 }) {
   const [msg, setMsg] = useState('')
   const timer = useRef<ReturnType<typeof setTimeout>>()
@@ -44,6 +47,7 @@ export function KeepAndShare({
     { icon: 'share', label: 'Share', run: () => void share() },
     ...(canList ? [{ icon: 'list' as const, label: 'Add to a list', run: onList }] : []),
     { icon: 'due', label: 'Remind me', run: onRemind },
+    ...(onUse ? [{ icon: 'forward' as const, label: 'Use in another tool', run: onUse }] : []),
   ]
 
   return (

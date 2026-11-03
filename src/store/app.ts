@@ -14,12 +14,20 @@ import {
 } from '../engine'
 import { parseNum } from '../lib/tool'
 import {
+  MAX_RECURRING,
   MAX_SUBCATEGORIES,
+  categoryName,
   categoryUsable,
   cleanInstrument,
+  dayKey,
   dropInapplicable,
   instrumentFitsMode,
+  instrumentLabel,
   isMonthKey,
+  paymentError,
+  type BillRepeat,
+  type PaymentModeId,
+  type RecurringItem,
   validateCategoryMonths,
   validateExpense,
   validateLimit,
@@ -51,8 +59,9 @@ import {
   type Tab,
   type BudgetData,
 } from './types'
-import { advance, advanceTaxPack } from '../lib/reminders'
-import { isTaskDone, nextOccurrence, shortDate, taskSummary } from '../lib/tasks'
+import { advance, advanceTaxPack, atTime } from '../lib/reminders'
+import { billForCard, cardBillDue, cardBillFor, firstDue, liveBills, rollForward, validateBill } from '../lib/recurring'
+import { isTaskDone, nextOccurrence, parseDay, shortDate, taskSummary } from '../lib/tasks'
 import { listSummary, repeatLines, tapeTotal } from '../lib/tape'
 
 export type Overlay = 'none' | 'settings' | 'history'
@@ -143,10 +152,23 @@ export interface AppState {
 
   press: (key: Key) => void
 
-  /** Records something spent. Returns false (and says why) when the amount is not a positive number. */
-  addExpense: (draft: ExpenseDraft) => boolean
-  /** Changes an entry. Same rules as addExpense. */
-  updateExpense: (id: string, draft: ExpenseDraft) => boolean
+  /**
+   * Records something spent (or, with `draft.refund`, money coming back). Returns false (and says why) when the amount is not a positive number.
+   * With `repeat` the entry is also the first payment of a new recurring bill: one record that owns the Due reminder and the later entries.
+   */
+  addExpense: (draft: ExpenseDraft, repeat?: BillRepeat | null) => boolean
+  /** Changes an entry. Same rules as addExpense. `repeat` turns an entry that is not yet a bill into one. */
+  updateExpense: (id: string, draft: ExpenseDraft, repeat?: BillRepeat | null) => boolean
+  /** Changes a bill's name, amount, repeat or (when running) next due date ("YYYY-MM-DD"). Returns false (and says why) when refused. */
+  updateBill: (id: string, patch: { title?: string; amount?: string; repeat?: BillRepeat; date?: string }) => boolean
+  /** No reminder and no new entries until resumed. Past entries stay. */
+  pauseBill: (id: string) => void
+  /** Carries on from where it was paused (the next due date on or after today). */
+  resumeBill: (id: string) => void
+  /** Ends a bill: its reminder goes, past entries stay. The snackbar offers Undo. */
+  stopBill: (id: string) => void
+  /** Turns the monthly reminder for a credit card's bill on or off (it needs the card's due day). Returns false (and says why) when refused. */
+  setCardBillReminder: (instrumentId: string, on: boolean) => boolean
   /** Removes an entry; the snackbar offers Undo. */
   deleteExpense: (id: string) => void
   /** Remembers bank messages that were added or skipped, so a later scan does not offer them again. */
@@ -323,7 +345,97 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       const bad = validateExpense({ amount: d.amount, date: d.date, categoryId, mode, instrumentId, settlement }, budget, new Date(), keepCategoryId)
       const first = bad.amount ?? bad.date ?? bad.category ?? bad.paidWith
       if (first) return first
-      return { amount: toPlain(parseNum(d.amount)!), categoryId, mode, instrumentId, date: d.date, note: d.note.trim().slice(0, 200), settlement }
+      // A refund is spending turned round, so it only exists for ordinary spending.
+      const refund = !settlement && d.refund === true
+      return { amount: toPlain(parseNum(d.amount)!), categoryId, mode, instrumentId, date: d.date, note: d.note.trim().slice(0, 200), settlement, refund }
+    }
+
+    /** A snackbar whose Undo runs `run`. Only valid while that snackbar is showing. */
+    const undoable = (text: string, run: () => void) => {
+      const snackId = nextId()
+      taskUndo = { snackId, run }
+      set({ snack: { id: snackId, text, canUndo: true } })
+    }
+
+    const patchBill = (id: string, change: (i: RecurringItem) => RecurringItem) => {
+      const { budget } = get()
+      set({ budget: { ...budget, recurring: (budget.recurring ?? []).map((i) => (i.id === id ? change(i) : i)) } })
+    }
+
+    /**
+     * Puts a bill's task card and reminder in place for `dueAt`, restoring or making the card as needed.
+     * `anchorDay` is the day of the month it keeps aiming for (a bill on the 31st stays on the 31st). Returns the card's id, or null.
+     */
+    const armBill = (item: RecurringItem, dueAt: number, anchorDay: number): string | null => {
+      const rem = { dueAt, repeat: item.repeat, leadDays: 1 }
+      const existing = item.cardId ? get().cards.find((c) => c.id === item.cardId) : undefined
+      let cardId: string | null
+      if (existing) {
+        get().restoreCard(existing.id)
+        get().updateCard(existing.id, { title: item.title, amount: item.amount, summary: taskSummary(dueAt, item.repeat) }, rem)
+        cardId = existing.id
+      } else {
+        cardId = get().saveCard({ title: item.title, kind: 'task', toolId: null, inputs: null, summary: taskSummary(dueAt, item.repeat), amount: item.amount, lines: [], note: '', tags: [] }, rem)
+      }
+      if (cardId) set({ reminders: get().reminders.map((r) => (r.cardId === cardId ? { ...r, anchorDay } : r)) })
+      return cardId
+    }
+
+    /** Makes the record together with its Due card and reminder. Returns the record's id, or null (and says why). */
+    const makeBill = (d: Omit<RecurringItem, 'id' | 'cardId' | 'deletedAt'> & { dueAt: number; anchorDay: number }): string | null => {
+      if (liveBills(get().budget).length >= MAX_RECURRING) return (fail(`You can keep up to ${MAX_RECURRING} bills.`), null)
+      const { dueAt, anchorDay, ...fields } = d
+      const id = deps.newId()
+      const item: RecurringItem = { id, ...fields, cardId: null, deletedAt: null }
+      const cardId = armBill(item, dueAt, anchorDay)
+      if (cardId === null) return null
+      const { budget } = get()
+      set({ budget: { ...budget, recurring: [{ ...item, cardId }, ...(budget.recurring ?? [])] } })
+      return id
+    }
+
+    /**
+     * A bill's Due reminder was paid: adds the entry for that period (once; dated the due day, or today if it is not due yet).
+     * Returns the new entry's id, or null when nothing was added (not a bill, paused, or already recorded).
+     */
+    const settleBill = (r: Reminder): string | null => {
+      const { budget } = get()
+      const item = billForCard(budget, r.cardId)
+      if (!item || item.kind !== 'bill' || item.paused || !item.amount || budget.expenses.length >= MAX_EXPENSES) return null
+      const due = dayKey(new Date(r.dueAt))
+      const today = dayKey(new Date(deps.now()))
+      const date = due <= today ? due : today
+      if (budget.expenses.some((e) => e.deletedAt === null && e.recurringId === item.id && e.date === date)) return null
+      const id = deps.newId()
+      const fits = paymentError(budget, item.mode, item.instrumentId) === null
+      const entry = { id, date, amount: item.amount, categoryId: item.categoryId !== null && categoryUsable(budget, item.categoryId) ? item.categoryId : null, mode: item.mode, instrumentId: fits ? item.instrumentId : null, note: item.title, deletedAt: null, recurringId: item.id }
+      set({ budget: { ...budget, expenses: [entry, ...budget.expenses] } })
+      return id
+    }
+
+    const dropExpense = (id: string) => set({ budget: { ...get().budget, expenses: get().budget.expenses.filter((e) => e.id !== id) } })
+
+    /** After a card is edited: keeps its bill reminder's name and day in step, or ends it when the due day is gone. */
+    const syncCardBill = (instrumentId: string) => {
+      const { budget, settings, reminders } = get()
+      const item = cardBillFor(budget, instrumentId)
+      if (!item) return
+      const card = budget.instruments.find((i) => i.id === instrumentId && i.deletedAt === null)
+      if (!card || card.dueDay == null) return get().stopBill(item.id)
+      const title = `${instrumentLabel(card)} bill`
+      patchBill(item.id, (i) => ({ ...i, title }))
+      if (item.cardId) get().updateCard(item.cardId, { title })
+      const rem = reminders.find((r) => r.cardId === item.cardId)
+      // Only a changed due day moves the date: editing something else on the card must not undo a snooze.
+      if (!item.paused && (!rem || rem.anchorDay !== card.dueDay)) armBill({ ...item, title }, cardBillDue(card.dueDay, deps.now(), settings.reminderTime), card.dueDay)
+    }
+
+    /** Starts a recurring bill from an entry that was just checked: this entry is its first payment. Returns the record's id, or null (and says why). */
+    const startBill = (e: { amount: string; categoryId: string | null; mode: PaymentModeId | null; instrumentId: string | null; date: string; note: string }, repeat: BillRepeat): string | null => {
+      const { budget, settings } = get()
+      const { dueAt, anchorDay } = firstDue(e.date, repeat, deps.now(), settings.reminderTime)
+      const title = (e.note || (e.categoryId ? categoryName(budget, e.categoryId) : 'Recurring bill')).slice(0, 120)
+      return makeBill({ kind: 'bill', title, amount: e.amount, repeat, categoryId: e.categoryId, mode: e.mode, instrumentId: e.instrumentId, dueAt, anchorDay })
     }
 
     /** A limit as a clean string, null for "none", or undefined (and a notice) when it is not acceptable. */
@@ -531,23 +643,104 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         })
       },
 
-      addExpense: (draft) => {
+      addExpense: (draft, repeat = null) => {
         const e = checkedExpense(draft)
         if (typeof e === 'string') return fail(e)
+        if (get().budget.expenses.length >= MAX_EXPENSES) return fail(`You can keep up to ${MAX_EXPENSES} entries.`)
+        const { settlement, refund, ...rest } = e
+        const recurringId = repeat && !settlement && !refund ? startBill(e, repeat) : undefined
+        if (recurringId === null) return false
         const { budget } = get()
-        if (budget.expenses.length >= MAX_EXPENSES) return fail(`You can keep up to ${MAX_EXPENSES} entries.`)
-        const { settlement, ...rest } = e
-        set({ budget: { ...budget, expenses: [{ id: deps.newId(), ...rest, deletedAt: null, ...(settlement ? { settlement } : {}) }, ...budget.expenses] }, notice: null })
+        set({ budget: { ...budget, expenses: [{ id: deps.newId(), ...rest, deletedAt: null, ...(settlement ? { settlement } : {}), ...(refund ? { refund: true } : {}), ...(recurringId ? { recurringId } : {}) }, ...budget.expenses] }, notice: null })
         return true
       },
 
-      updateExpense: (id, draft) => {
-        const { budget } = get()
-        const e = checkedExpense(draft, budget.expenses.find((x) => x.id === id)?.categoryId ?? null)
+      updateExpense: (id, draft, repeat = null) => {
+        const old = get().budget.expenses.find((x) => x.id === id)
+        const e = checkedExpense(draft, old?.categoryId ?? null)
         if (typeof e === 'string') return fail(e)
-        const { settlement, ...rest } = e
-        set({ budget: { ...budget, expenses: budget.expenses.map((x) => { if (x.id !== id) return x; const { settlement: _old, ...keep } = x; return { ...keep, ...rest, ...(settlement ? { settlement } : {}) } }) } })
+        const { settlement, refund, ...rest } = e
+        const recurringId = repeat && old && !old.recurringId && !settlement && !refund ? startBill(e, repeat) : undefined
+        if (recurringId === null) return false
+        const { budget } = get()
+        set({ budget: { ...budget, expenses: budget.expenses.map((x) => { if (x.id !== id) return x; const { settlement: _s, refund: _r, ...keep } = x; return { ...keep, ...rest, ...(settlement ? { settlement } : {}), ...(refund ? { refund: true } : {}), ...(recurringId ? { recurringId } : {}) } }) } })
         return true
+      },
+
+      updateBill: (id, patch) => {
+        const { budget, settings } = get()
+        const item = liveBills(budget).find((i) => i.id === id)
+        if (!item || item.kind !== 'bill') return false
+        const title = (patch.title ?? item.title).trim()
+        const amountText = patch.amount ?? item.amount ?? ''
+        const bad = validateBill({ title, amount: amountText, date: patch.date ?? null })
+        const first = bad.title ?? bad.amount ?? bad.date
+        if (first) return fail(first)
+        const amount = toPlain(parseNum(amountText)!)
+        const repeat = patch.repeat ?? item.repeat
+        const rem = get().reminders.find((r) => r.cardId === item.cardId)
+        const dueAt = patch.date !== undefined ? atTime(parseDay(patch.date)!, settings.reminderTime) : (rem?.dueAt ?? item.pausedDue)
+        const next: RecurringItem = { ...item, title, amount, repeat, ...(item.paused && dueAt !== undefined ? { pausedDue: dueAt } : {}) }
+        patchBill(id, () => next)
+        if (!item.paused && dueAt !== undefined) armBill(next, dueAt, patch.date !== undefined ? new Date(dueAt).getDate() : (rem?.anchorDay ?? new Date(dueAt).getDate()))
+        else if (item.cardId) get().updateCard(item.cardId, { title, amount, summary: 'Paused' })
+        return true
+      },
+
+      pauseBill: (id) => {
+        const item = liveBills(get().budget).find((i) => i.id === id)
+        if (!item || item.paused) return
+        const rem = get().reminders.find((r) => r.cardId === item.cardId)
+        set({ reminders: get().reminders.filter((r) => r.cardId !== item.cardId) })
+        patchBill(id, (i) => ({ ...i, paused: true, ...(rem ? { pausedDue: rem.dueAt } : {}) }))
+        if (item.cardId) get().updateCard(item.cardId, { summary: 'Paused' })
+        get().toast(`Paused "${item.title}". Resume it in Bills`)
+      },
+
+      resumeBill: (id) => {
+        const { budget, settings } = get()
+        const item = liveBills(budget).find((i) => i.id === id)
+        if (!item) return
+        const now = deps.now()
+        const card = item.kind === 'cardBill' ? budget.instruments.find((i) => i.id === item.instrumentId && i.deletedAt === null) : undefined
+        if (item.kind === 'cardBill' && (!card || card.dueDay == null)) return void fail("Add this card's due day first")
+        const base = item.pausedDue ?? now
+        const anchor = card?.dueDay ?? new Date(base).getDate()
+        const dueAt = card?.dueDay != null ? cardBillDue(card.dueDay, now, settings.reminderTime) : rollForward(base, item.repeat, anchor, now)
+        const cardId = armBill(item, dueAt, anchor)
+        if (cardId === null) return
+        patchBill(id, ({ paused: _p, pausedDue: _d, ...i }) => ({ ...i, cardId }))
+      },
+
+      stopBill: (id) => {
+        const { cards, reminders } = get()
+        const item = liveBills(get().budget).find((i) => i.id === id)
+        if (!item) return
+        const card = cards.find((c) => c.id === item.cardId)
+        const rem = reminders.find((r) => r.cardId === item.cardId)
+        patchBill(id, (i) => ({ ...i, deletedAt: deps.now() }))
+        // Its helper card goes with it (nothing else is on it), and comes back with Undo.
+        set({ cards: cards.filter((c) => c.id !== item.cardId), reminders: reminders.filter((r) => r.cardId !== item.cardId) })
+        undoable(`Stopped "${item.title}"`, () => {
+          patchBill(id, (i) => ({ ...i, deletedAt: null }))
+          set({ cards: card ? [card, ...get().cards.filter((c) => c.id !== card.id)] : get().cards, reminders: rem ? [...get().reminders.filter((r) => r.cardId !== item.cardId), rem] : get().reminders })
+        })
+      },
+
+      setCardBillReminder: (instrumentId, on) => {
+        const { budget, settings } = get()
+        const existing = cardBillFor(budget, instrumentId)
+        if (!on) {
+          if (existing) get().stopBill(existing.id)
+          return true
+        }
+        if (existing) return true
+        const card = budget.instruments.find((i) => i.id === instrumentId && i.deletedAt === null && i.kind === 'credit')
+        if (!card) return fail('Pick a credit card first')
+        if (card.dueDay == null) return fail("Add this card's due day first")
+        const id = makeBill({ kind: 'cardBill', title: `${instrumentLabel(card)} bill`, amount: null, repeat: 'monthly', categoryId: null, mode: null, instrumentId, dueAt: cardBillDue(card.dueDay, deps.now(), settings.reminderTime), anchorDay: card.dueDay })
+        if (id) get().toast(`Reminder on for day ${card.dueDay} of every month`)
+        return id !== null
       },
 
       markSmsSeen: (ids) => {
@@ -707,11 +900,14 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
           },
           notice: null,
         })
+        syncCardBill(id)
         return true
       },
 
       deleteInstrument: (id) => {
-        const { budget } = get()
+        const bill = cardBillFor(get().budget, id)
+        if (bill) get().stopBill(bill.id)
+        const { budget } = get() // read after stopBill, which changed it
         const at = deps.now()
         set({
           budget: {
@@ -855,13 +1051,27 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const amount = get().cards.find((c) => c.id === r.cardId)?.amount ?? null
         const next = advance(r)
         const paid = { ...r, history: [...r.history, { paidAt: deps.now(), amount }].slice(-200) }
+        // A bill that repeats also puts this period's payment in the budget (once), and Undo takes both back.
+        const added = settleBill(r)
         set({ reminders: get().reminders.map((x) => (x.id === reminderId ? (next === null ? { ...paid, done: true } : { ...paid, dueAt: next }) : x)) })
+        if (added) {
+          undoable('Paid. Added to your budget', () => {
+            dropExpense(added)
+            set({ reminders: get().reminders.map((x) => (x.id === reminderId ? r : x)) })
+          })
+        }
       },
 
       snooze: (reminderId, days) =>
         set({ reminders: get().reminders.map((r) => (r.id === reminderId ? { ...r, dueAt: Math.max(r.dueAt, deps.now()) + days * DAY } : r)) }),
 
-      removeReminder: (reminderId) => set({ reminders: get().reminders.filter((r) => r.id !== reminderId) }),
+      removeReminder: (reminderId) => {
+        const r = get().reminders.find((x) => x.id === reminderId)
+        // Removing a bill's reminder ends the bill (a bill without its reminder would be half alive); Undo brings it back.
+        const bill = r ? billForCard(get().budget, r.cardId) : undefined
+        if (bill) return get().stopBill(bill.id)
+        set({ reminders: get().reminders.filter((x) => x.id !== reminderId) })
+      },
 
       setTaskDone: (id, done) => {
         const { cards, reminders } = get()
@@ -879,10 +1089,12 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         }
         const next = rem && !rem.done ? nextOccurrence(rem, now) : null
         let text: string
+        let addedEntry: string | null = null
         if (rem && next !== null) {
           // A repeating task is never "done": it moves on, and the tick is logged.
           setRem({ ...rem, dueAt: next, history: [...rem.history, { paidAt: now, amount: null }].slice(-200) })
-          text = `Done. Next on ${shortDate(next)}`
+          addedEntry = settleBill(rem)
+          text = `Done. Next on ${shortDate(next)}${addedEntry ? '. Added to your budget' : ''}`
         } else {
           setCard({ ...card, done: true, doneAt: now, updatedAt: now })
           if (rem) setRem({ ...rem, done: true })
@@ -894,6 +1106,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
           run: () => {
             set({ cards: get().cards.map((c) => (c.id === id ? card : c)) })
             setRem(rem)
+            if (addedEntry) dropExpense(addedEntry)
           },
         }
         set({ snack: { id: snackId, text, canUndo: true } })

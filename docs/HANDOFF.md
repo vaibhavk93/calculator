@@ -4,7 +4,7 @@
 It says what exists, what was verified and how, what is not done, and how to get going. Everything here was checked
 against the code on this date. Where something was not checked, it says so.
 
-**One-line state:** a working React + Capacitor calculator app with 51 calculators, notes and lists, reminders, a
+**One-line state:** a working React + Capacitor calculator app with 55 calculators, notes and lists, reminders, a
 **Budget tab** and a revamped UI. 1086 unit tests pass (49 files). The **phone has an older build**. The revamp has been seen in a
 browser at 360px but **not yet on the phone**. Version 0.5.0 (commit `bb17c50`, on top of `3910de7`) added cursor editing,
 the Copy setting, the Budget tab and a round of page tidying. See `CHANGELOG.md`.
@@ -24,7 +24,7 @@ analytics, nothing leaves the device except (later) currency rates. Visible name
 |---|---|---|
 | Calculator: brackets, live preview, history (shown only from the History sheet), Paste and Copy, bordered keys | Built, tested, seen in browser | `src/features/calculator/`, `src/engine/expression/` |
 | Scientific calculator (separate screen, memory keys) | Built, seen in browser | `ScientificScreen.tsx`, opened from the top of Tools |
-| 51 calculators in 9 groups, one shared screen | Built, all open and show a result | `src/features/tools/`, `src/engine/{convert,everyday,loans,investments,tax,metrics}` |
+| 55 calculators in 8 groups, one shared screen | Built, all open and show a result | `src/features/tools/`, `src/engine/{convert,everyday,loans,investments,tax,metrics}` |
 | Tools UI: groups, search, sticky answer bar, grouped digits, "More options", tap-the-tab-to-go-back | Built, seen in browser | `ToolsScreen.tsx`, `ToolScreen.tsx`, `groups.ts` |
 | Notes tab (was "Saved"): cards, tags, pin, search, Trash 7 days with Undo | Built | `src/features/memory/` |
 | Lists with checkboxes ("2 of 5 done, ₹3,000 left"), To list, Remind me | Built, seen in browser | `TapeScreen.tsx`, `ToListSheet.tsx`, `ResultActions.tsx` |
@@ -36,14 +36,14 @@ analytics, nothing leaves the device except (later) currency rates. Visible name
 | **Budget tab** (5th tab): limit per category plus an optional overall limit, expenses by date, month switcher, Uncategorised shown, soft delete with Undo, 10 starter categories | Built 0.5.0, **unproven** | `src/features/budget/`, `src/lib/budget.ts`, `PersistedData.budget` |
 | Settings: theme, accent, number system, decimals, copying numbers, "Opens on" any calculator, reminders status, backup and restore. Sections are tinted cards | Built | `src/features/settings/` |
 
-Counts: **1086 tests in 49 files**, **51 calculators**, 9 Tools groups, 5 tabs, stored data schema **v3** (the budget was added without a bump: old data gets the starter categories).
+Counts: **1086 tests in 49 files**, **55 calculators**, 8 Tools groups, 5 tabs, stored data schema **v3** (the budget was added without a bump: old data gets the starter categories).
 
 ## 3. What was verified, and how
 
 | Claim | Evidence |
 |---|---|
 | All tests pass, build succeeds | `npm run check` and `npm run build` on 2026-11-02 |
-| All 51 calculators open and show a result, no `NaN`, no console errors | Scripted sweep in a real browser (before the UI revamp) and `registry.test.ts` (after) |
+| All 55 calculators open and show a result, no `NaN`, no console errors | Scripted sweep in a real browser (before the UI revamp) and `registry.test.ts` (after) |
 | The revamped calculator, "=" behaviour, chips, split-to-list with checkboxes, Tools home, Loan EMI, Scientific, tap-the-tab-to-go-back | Looked at in a 360px browser frame after the revamp |
 | Formulas | See `docs/VERIFICATION.md`: each calculator is marked A (outside source), B (recalled source + recomputed), C (recomputed only) or D (hand-worked) |
 | App builds and installs on a OnePlus (Android 16) | Debug build installed and launched with no crash. **That was the build before the UI revamp** |

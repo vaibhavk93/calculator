@@ -53,7 +53,7 @@ think of more — see **Future ideas** at the bottom.
 | Weighted grade average / GPA | ✅ | PRD B14 → `grade-average` |
 | Ovulation / fertile window estimate | ✅ | PRD B15 → `ovulation` |
 
-## Loans & EMI (11 calculators)
+## Loans & EMI (13 calculators)
 
 | Use case | | Maps to |
 |---|---|---|

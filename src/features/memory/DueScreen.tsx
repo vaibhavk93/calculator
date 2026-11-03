@@ -5,6 +5,7 @@ import { useApp } from '../../components/StoreProvider'
 import { tintStyle } from '../../components/tint'
 import { formatCell } from '../../lib/toolFormat'
 import { D } from '../../engine'
+import { billForCard } from '../../lib/recurring'
 import { dueLabel, dueSoonTotal, groupReminders } from '../../lib/reminders'
 import type { Reminder } from '../../store/types'
 import { CardView } from './CardView'
@@ -17,6 +18,7 @@ const WHEN = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short'
 export function DueScreen() {
   const cards = useApp((s) => s.cards)
   const all = useApp((s) => s.reminders)
+  const budget = useApp((s) => s.budget)
   const system = useApp((s) => s.settings.numberSystem)
   const decimals = useApp((s) => s.settings.decimals)
   const markPaid = useApp((s) => s.markPaid)
@@ -65,6 +67,8 @@ export function DueScreen() {
         <div className="sect__body">
           {items.map((r) => {
             const card = cards.find((c) => c.id === r.cardId)!
+            // A bill or card-bill reminder belongs to a record in Budget: paying it adds the entry, and Remove ends the bill.
+            const bill = billForCard(budget, r.cardId)
             return (
               <div className="due" key={r.id}>
                 <button type="button" className="due__main tap-row" onClick={() => setOpenId(card.id)}>
@@ -81,15 +85,15 @@ export function DueScreen() {
                 <div className="due__actions">
                   {askId === r.id ? (
                     <>
-                      <span className="due__ask" role="alert">Remove this reminder? The note stays.</span>
+                      <span className="due__ask" role="alert">{bill ? 'Stop this bill? Past entries stay in your budget.' : 'Remove this reminder? The note stays.'}</span>
                       <button type="button" className="link-btn" onClick={() => setAskId(null)}>Keep it</button>
-                      <button type="button" className="link-btn link-btn--danger" onClick={() => { remove(r.id); setAskId(null) }}>Yes, remove</button>
+                      <button type="button" className="link-btn link-btn--danger" onClick={() => { remove(r.id); setAskId(null) }}>{bill ? 'Yes, stop it' : 'Yes, remove'}</button>
                     </>
                   ) : (
                     <>
-                      <button type="button" className="link-btn" onClick={() => markPaid(r.id)}>{card.kind === 'task' ? 'Done' : 'Mark paid'}</button>
+                      <button type="button" className="link-btn" onClick={() => markPaid(r.id)}>{card.kind === 'task' && !bill ? 'Done' : 'Mark paid'}</button>
                       <button type="button" className="link-btn" onClick={() => snooze(r.id, 1)}>Snooze 1 day</button>
-                      <button type="button" className="link-btn link-btn--danger" onClick={() => setAskId(r.id)}>Remove</button>
+                      <button type="button" className="link-btn link-btn--danger" onClick={() => setAskId(r.id)}>{bill ? 'Stop' : 'Remove'}</button>
                     </>
                   )}
                 </div>

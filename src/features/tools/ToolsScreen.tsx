@@ -131,7 +131,7 @@ export function ToolsScreen() {
         )}
       </div>
       {group && <GroupPage group={group} onBack={() => setNav({ category: null })} onOpen={(id) => setNav({ tool: id })} />}
-      {spec && <ToolScreen spec={spec} onBack={() => setNav({ tool: null })} />}
+      {spec && <ToolScreen key={spec.id} spec={spec} onBack={() => setNav({ tool: null })} />}
       {nav.scientific && <ScientificScreen onBack={() => setNav({ scientific: false })} />}
     </div>
   )

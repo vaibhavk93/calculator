@@ -41,12 +41,12 @@ export function buildExpensesCsv(budget: BudgetData, range: ExportRange, today: 
     lines.push(
       [
         e.date,
-        e.amount, // a validated plain decimal, never text, so it is not escaped
+        e.refund ? `-${e.amount}` : e.amount, // a validated plain decimal, never text, so it is not escaped. A refund is negative so a SUM adds up right.
         csvCell(e.settlement ? '' : categoryName(budget, e.categoryId).replace(' › ', ' > ')),
         csvCell(e.mode ? modeLabel(e.mode) : ''),
         csvCell(inst ? instrumentLabel(inst) : ''),
         csvCell(e.note),
-        e.settlement ? TYPE[e.settlement] ?? 'spending' : 'spending',
+        e.settlement ? TYPE[e.settlement] ?? 'spending' : e.refund ? 'refund' : 'spending',
       ].join(','),
     )
   }

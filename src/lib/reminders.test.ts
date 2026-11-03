@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advance, addMonths, advanceTaxPack, atTime, dueLabel, dueSoonTotal, groupReminders, parseTime, timeLabel } from './reminders'
+import { advance, addMonths, advanceTaxPack, atTime, nextOnDay, dueLabel, dueSoonTotal, groupReminders, parseTime, timeLabel } from './reminders'
 import type { Reminder, SavedCard } from './memory'
 
 const at = (y: number, m: number, d: number, h = 9) => new Date(y, m - 1, d, h).getTime()
@@ -82,6 +82,18 @@ describe('reminder time of day', () => {
     expect(timeLabel('00:05')).toBe('12:05 am')
     expect(timeLabel('12:00')).toBe('12:00 pm')
     expect(timeLabel('18:30')).toBe('6:30 pm')
+  })
+})
+
+describe('nextOnDay', () => {
+  const day = (ts: number) => { const d = new Date(ts); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}` }
+  it('is this month while the time is still ahead, otherwise next month', () => {
+    expect(day(nextOnDay(at(2026, 11, 3), 5, '09:00'))).toBe('2026-11-5 9:0')
+    expect(day(nextOnDay(at(2026, 11, 5, 10), 5, '09:00'))).toBe('2026-12-5 9:0')
+    expect(day(nextOnDay(at(2026, 12, 20), 5, '18:30'))).toBe('2027-1-5 18:30')
+  })
+  it('clamps a day a short month does not have', () => {
+    expect(day(nextOnDay(at(2027, 2, 10), 31, '09:00'))).toBe('2027-2-28 9:0')
   })
 })
 

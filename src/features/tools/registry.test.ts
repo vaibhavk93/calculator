@@ -5,8 +5,12 @@ import { ALL_TOOLS } from './registry'
 /** Every optional number field, by tool id, that reads with `?? 0` -- junk here must error, not vanish into 0. */
 const OPTIONAL_NUMBER_FIELDS: Record<string, string[]> = {
   'goal-sip': ['existing'],
+  'multi-loan': ['extra'],
+  runway: ['income', 'partpay'],
   fd: ['slab'],
-  inflation: ['ret'],
+  inflation: ['ret', 'medical'],
+  swp: ['wait', 'saveRate'],
+  'emergency-fund': ['savings'],
   'home-loan-tax': ['used123'],
   'balance-transfer': ['fees'],
   'card-emi': ['fee'],

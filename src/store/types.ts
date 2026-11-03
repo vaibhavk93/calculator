@@ -30,6 +30,8 @@ export interface Settings {
   backupNudgedAt: number | null
   /** When the backup line at the top of Settings was last dismissed, in ms. */
   backupDismissedAt: number | null
+  /** Ids of the "next step" chips under a result that were dismissed or used. A chip is never offered again. */
+  dismissedTips: string[]
 }
 
 export type CopyFormat = 'ask' | 'with' | 'without'
@@ -50,6 +52,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lastBackupAt: null,
   backupNudgedAt: null,
   backupDismissedAt: null,
+  dismissedTips: [],
 }
 
 export interface HistoryEntry {
