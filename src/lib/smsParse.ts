@@ -1,5 +1,6 @@
-import { dayKey, instrumentFitsMode, MAX_AMOUNT, type BudgetData, type PayInstrument, type PaymentModeId } from './budget'
+import { dayKey, instrumentFitsMode, MAX_AMOUNT, type BudgetData, type InstrumentKind, type PayInstrument, type PaymentModeId } from './budget'
 import { D } from '../engine/decimal'
+import { maskText, shapeOf } from './maskText'
 
 /**
  * Reads ONE bank text message into a possible expense. Everything here runs on the phone; nothing is sent anywhere
@@ -21,6 +22,8 @@ export interface ParsedSms {
   last4: string | null
   merchant: string
   mode: PaymentModeId | null
+  /** What the named last digits belong to: a credit card, a debit card or a bank account. Null when the text does not say. */
+  source: InstrumentKind | null
   bank: string | null
   ref: string | null
 }
@@ -43,9 +46,13 @@ const REFUNDISH = /\b(refund(?:ed)?|reversed|reversal|cashback)\b/i
 const OTP = /\b(otp|one[- ]?time password|verification code|cvv|pin)\b/i
 const STRONG_DEBIT = /\b(debited|spent|withdrawn|sent|paid)\b/i
 /** "Payment of Rs 500 received on your credit card": a payment INTO the card, so not spending. */
-const RECEIPT = /\b(?:payment|amount)\b.{0,40}?\breceived\b/i
-const PROMO = /\b(offer|apply now|pre-?approved|click|congratulations|limited time|win |reward points|download)\b|https?:\/\//i
-const CARD_BILL = /\b(credit card (?:bill|payment|outstanding)|cc (?:bill|payment)|card bill|towards (?:your )?(?:credit )?card|billdesk.*card|cred club)\b/i
+const RECEIPT = /\b(?:payment|amount)\b.{0,40}?\breceived\b|\breceived (?:your |a )?payment\b|\bcredited to your (?:credit )?(?:card|account|a\/c)\b/i
+const PROMO = /\b(offer|apply now|pre-?approved|click|congratulations|limited time|win |reward points|download|convert|flexi emi|into easy|t&cs?|about to|expir\w*|bonus cash|redeem)\b|https?:\/\//i
+/** Not a payment that already happened: reminders, scheduled debits, failed or declined payments, money requests. */
+const NOT_DONE = /\b(will be (?:debited|deducted|charged|auto)|to be (?:debited|deducted)|is due|are due|due (?:on|by|date)|scheduled|upcoming|reminder|failed|declined|unsuccessful|not successful|could not be|cancell?ed|requested? (?:money|payment)|collect request|has requested|pending|minimum (?:amount )?due|total (?:amount )?due)\b/i
+/** The part of a message after these words is advice or a helpline, never the payee. */
+const TAIL = /\b(not you|if not|if this was not|to block|sms block|to report|to dispute|to stop|call \d|call us|for any|click|avl\b|available (?:bal|limit)|bal(?:ance)?:)/i
+const CARD_BILL = /\b(for (?:your |an? )?(?:[\w]+ ){0,4}credit card|credit card (?:bill|payment|outstanding)|cc (?:bill|payment)|card bill|towards (?:your )?(?:credit )?card|billdesk.*card|cred club)\b/i
 
 /** "Rs.1,250.00", "INR 450", "₹99". Amounts after "avail/bal/limit" are balances, not the payment. */
 const MONEY = /(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d{1,2})?)/gi
@@ -73,7 +80,13 @@ function clean(raw: string): string | null {
 }
 
 const LAST4 = [
-  /(?:a\/c|acct?|account|card)[^\d\n]{0,25}?[x*•]+\s?(\d{3,4})\b/i,
+  // hidden digits then a long number: the last four are the card/account tail ("XXXXX948086" -> 8086)
+  /(?:a\/c|acct?|account|card)[^\d\n]{0,25}?[x*•]+\s?\d*?(\d{4})\b/i,
+  /(?:a\/c|acct?|account|card)[^\d\n]{0,25}?[x*•]+\s?(\d{3})\b/i,
+  // "credit card (2655)"
+  /(?:card|a\/c|acct?|account)\s*\((\d{4})\)/i,
+  // "from HDFC Bank A/c 7261": digits straight after the word, no x marks
+  /(?:a\/c|acct?|account|card)\s*(?:no\.?|number)?\s*:?\s*(\d{4})\b(?!\d)/i,
   /(?:ending|ending with|ending in|no\.?)\s*(?:[x*•]+\s?)?(\d{4})\b/i,
   /\b[x*•]{2,}\s?(\d{3,4})\b/i,
 ]
@@ -87,15 +100,27 @@ const pretty = (s: string): string => {
 
 const NOT_A_MERCHANT = /^(a\/c|acct|account|your|you|card|vpa|bank|ref|upi|self|the|a\b)/i
 
-function merchantOf(text: string): string {
+function merchantOf(full: string): string {
+  // look for the payee only in the transaction part, with links and phone numbers taken out
+  const p2m = /UPI\/P2[MP]\/\d+\/((?:[A-Za-z0-9 &'\-]|\.(?=\w)){2,40})/i.exec(full)
+  if (p2m) return pretty(p2m[1]!)
+  const ist = /\bIST\s+([A-Za-z_][A-Za-z0-9_ *&'.\-]{1,38}?)(?=\s+(?:avl|available|not)\b|[.;,]\s|\s*$)/i.exec(full)
+  if (ist) return pretty(ist[1]!.replace(/^[_*]+|[_*]+$/g, ''))
+  const cut = TAIL.exec(full)
+  const text = (cut ? full.slice(0, cut.index) : full).replace(/https?:\/\/\S+|www\.\S+/gi, ' ').replace(/\b\d{10,}\b/g, ' ')
+  const found = merchantFrom(text)
+  return /[A-Za-z]{2}/.test(found) ? found : ''
+}
+
+function merchantFrom(text: string): string {
   const vpa = /\b(?:to|towards)\s+(?:vpa\s+)?([\w.\-]{2,}@[\w.]+)/i.exec(text)
   if (vpa) return pretty((vpa[1] ?? '').split('@')[0]!.replace(/[._\-]?\d{6,}$/g, '').replace(/[._]+/g, ' '))
   const p2m = /UPI\/P2[MP]\/\d+\/((?:[A-Za-z0-9 &'\-]|\.(?=\w)){2,40})/i.exec(text)
   if (p2m) return pretty(p2m[1]!)
   const payee = /;\s*([A-Za-z0-9 .&'\-*]{2,30}?)\s+credited/i.exec(text)
   if (payee && !NOT_A_MERCHANT.test(payee[1]!)) return pretty(payee[1]!)
-  const at = /\b(?:at|trf to|to|towards)\s+([A-Za-z0-9](?:[A-Za-z0-9 &'\-*]|\.(?=\w)){1,34}?)(?=\s+(?:on|ref\w*|upi|avl|avail|not|if|call|via|dated|using|from|for|ending)\b|[.;,(]|\s*$)/i.exec(text)
-  if (at && !NOT_A_MERCHANT.test(at[1]!)) return pretty(at[1]!.replace(/\s+(ltd|pvt|limited)\.?$/i, ''))
+  const at = /\b(?:at|trf to|to|towards)\s+([A-Za-z_](?:[A-Za-z0-9 &'\-*_]|\.(?=\w)){1,34}?)(?=\s+(?:on|ref\w*|upi|avl|avail|not|if|call|via|dated|using|from|for|ending)\b|\s+\d|[.;,(]|\s*$)/i.exec(text)
+  if (at && !NOT_A_MERCHANT.test(at[1]!)) return pretty(at[1]!.replace(/^_+/, '').replace(/\s+(ltd|pvt|limited)\.?$/i, ''))
   return ''
 }
 
@@ -104,6 +129,13 @@ function modeOf(text: string): PaymentModeId | null {
   if (/credit card|\bcc\b/i.test(text)) return 'credit'
   if (/debit card|\batm\b/i.test(text)) return 'debit'
   if (/net ?banking|\bneft\b|\bimps\b|\brtgs\b/i.test(text)) return 'netbanking'
+  return null
+}
+
+function sourceOf(text: string): InstrumentKind | null {
+  if (/credit card|\bcc\b/i.test(text)) return 'credit'
+  if (/debit card/i.test(text)) return 'debit'
+  if (/\ba\/c|\bacct?\b|\baccount\b/i.test(text)) return 'bank'
   return null
 }
 
@@ -121,7 +153,9 @@ export function parseSms(body: string, address: string): ParsedSms | SkippedSms 
   const d = DEBIT.exec(text)
   const c = CREDIT.exec(text)
   if (!d && !c) return { ok: false, reason: 'not-a-payment' }
-  if (!d && PROMO.test(text)) return { ok: false, reason: 'not-a-payment' }
+  if (!STRONG_DEBIT.test(text) && PROMO.test(text)) return { ok: false, reason: 'not-a-payment' }
+  if (!STRONG_DEBIT.test(text) && c) return { ok: false, reason: 'credit' }
+  if (NOT_DONE.test(text)) return { ok: false, reason: 'not-a-payment' }
   if (REFUNDISH.test(text) || RECEIPT.test(text)) return { ok: false, reason: 'credit' }
   if (!d) return { ok: false, reason: 'credit' }
   // Both words present ("debited ... ; ZOMATO credited"): money went out only when the debit comes first.
@@ -144,6 +178,7 @@ export function parseSms(body: string, address: string): ParsedSms | SkippedSms 
     last4,
     merchant: merchantOf(text),
     mode: modeOf(text),
+    source: sourceOf(text),
     bank: bankFromSender(address, text),
     ref,
   }
@@ -172,6 +207,8 @@ export interface Candidate {
   instrumentId: string | null
   bank: string | null
   last4: string | null
+  /** What the last digits belong to (see ParsedSms.source). */
+  source: InstrumentKind | null
   /** Pre-filled from an earlier entry with the same merchant name, or null. */
   categoryId: string | null
   /** An entry with the same amount, on the same or the next day, from the same card or merchant already exists. */
@@ -240,6 +277,7 @@ export function buildCandidates(
   messages: InboxMessage[],
   budget: BudgetData & { smsSeen?: string[] },
   suggest: (note: string) => { categoryId: string | null } | null,
+  salt = 'unsalted',
 ): ScanResult {
   const seen = new Set(budget.smsSeen ?? [])
   const found: Candidate[] = []
@@ -249,7 +287,7 @@ export function buildCandidates(
   let alreadySeen = 0
   for (const m of messages) {
     const p = parseSms(m.body, m.address)
-    const note = logEntryFor(m, p, Date.now())
+    const note = logEntryFor(m, p, Date.now(), salt)
     if (note) log.push(note)
     if (!p.ok) {
       if (p.reason !== 'not-a-payment' && p.reason !== 'otp') skipped[p.reason] = (skipped[p.reason] ?? 0) + 1
@@ -272,7 +310,8 @@ export function buildCandidates(
       instrumentId: inst?.id ?? null,
       bank: p.bank,
       last4: p.last4,
-      categoryId: p.kind === 'spend' && p.merchant ? (suggest(p.merchant)?.categoryId ?? null) : null,
+      source: p.source,
+      categoryId: p.kind === 'spend' ? ((p.merchant ? suggest(p.merchant)?.categoryId : null) ?? guessCategory(budget, `${p.merchant} ${m.body}`)) : null,
       duplicateOfExisting: false,
     }
     cand.duplicateOfExisting = alreadyAdded(budget, cand)
@@ -290,37 +329,24 @@ export interface ParseLogEntry {
   sender: string
   /** 'read' (but a part was missing) or why it was skipped. */
   outcome: SkipReason | 'partial'
-  /** The message with digits, handles, links and the names after "to / at / from / by" blanked out. */
+  /** The message with every number, date and name swapped for fake ones of the same shape (see maskText.ts). */
   template: string
-  /** What was understood, so a wrong guess can be seen next to the template. */
+  /** What was understood, as shapes only ("4 digits, 2 decimals"), never the values. */
   got?: { amount?: string; merchant?: string; mode?: string | null; last4?: boolean; ref?: boolean }
   /** Same template seen again. */
   count: number
-}
-
-/** Blanks everything personal: digits become #, handles and links become <vpa>/<link>, payee names become <name>. */
-export function redact(body: string): string {
-  return body
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/https?:\/\/\S+|www\.\S+/gi, '<link>')
-    .replace(/[\w.\-]+@[\w.]+/g, '<vpa>')
-    .replace(/\b(to|at|from|by|trf to|towards)\s+(?!<)([A-Za-z][\w&'*.\-]*(?:\s+[A-Za-z][\w&'*.\-]*){0,2}?)(?=\s+(?:on|ref\w*|upi|avl|avail|not|if|call|via|dated|using|for|ending|credited|debited)\b|[.;,(]|\s*$)/gi, '$1 <name>')
-    .replace(/;\s*[A-Za-z][\w &'*.\-]{1,30}?\s+credited/gi, '; <name> credited')
-    .replace(/\d+/g, '#')
-    .slice(0, 300)
 }
 
 /**
  * What to keep about one message for the parser log: skipped messages that looked like payments (not credits, OTPs or
  * chat: those are the normal case) and messages that were read but lack a merchant or card digits. Null = nothing to log.
  */
-export function logEntryFor(m: InboxMessage, p: ParsedSms | SkippedSms, now: number): ParseLogEntry | null {
+export function logEntryFor(m: InboxMessage, p: ParsedSms | SkippedSms, now: number, salt: string): ParseLogEntry | null {
   if (p.ok) {
     if (p.merchant && p.last4) return null
-    return { at: now, sender: m.address, outcome: 'partial', template: redact(m.body), got: { amount: p.amount, merchant: p.merchant, mode: p.mode, last4: !!p.last4, ref: !!p.ref }, count: 1 }
+    return { at: now, sender: m.address, outcome: 'partial', template: maskText(m.body, salt), got: { amount: shapeOf(p.amount), merchant: p.merchant ? shapeOf(p.merchant) : undefined, mode: p.mode, last4: !!p.last4, ref: !!p.ref }, count: 1 }
   }
-  if (p.reason === 'no-amount' || p.reason === 'unsure') return { at: now, sender: m.address, outcome: p.reason, template: redact(m.body), count: 1 }
+  if (p.reason === 'no-amount' || p.reason === 'unsure') return { at: now, sender: m.address, outcome: p.reason, template: maskText(m.body, salt), count: 1 }
   return null
 }
 
@@ -342,4 +368,57 @@ export function logAsText(log: ParseLogEntry[]): string {
   return log
     .map((e) => `[${e.outcome}${e.count > 1 ? ` x${e.count}` : ''}] ${e.sender}: ${e.template}${e.got ? `  => ${JSON.stringify(e.got)}` : ''}`)
     .join('\n')
+}
+
+
+// ---------------------------------------------------------------- categories and cards found in messages
+
+/** Words in a payee or message -> the name of a starter category. Used only when the user has no earlier entry with that payee. */
+const CATEGORY_WORDS: [RegExp, string][] = [
+  [/swiggy|zomato|eatsure|dominos|pizza|mcdonald|kfc|burger|starbucks|cafe|restaurant|dhaba|bakery|food/i, 'Food'],
+  [/bigbasket|blinkit|zepto|instamart|dmart|grofers|jiomart|grocer|kirana|supermarket|more retail|reliance fresh/i, 'Groceries'],
+  [/uber|ola\b|rapido|redbus|irctc|metro|fastag|petrol|fuel|indian oil|hpcl|bpcl|shell|parking|toll/i, 'Transport'],
+  [/airtel|jio|vodafone|vi\b|bsnl|electricity|bescom|tata power|adani electricity|gas|water bill|broadband|act fibernet|netflix|prime|hotstar|spotify|youtube|google play|apple|subscription|mandate|dth|tatasky/i, 'Bills'],
+  [/pharm|apollo|medplus|1mg|netmeds|hospital|clinic|diagnos|lab\b|doctor|practo|health|insurance|premium|lic\b/i, 'Health'],
+  [/amazon|flipkart|myntra|ajio|nykaa|meesho|croma|reliance digital|decathlon|lifestyle|shoppers|zara|h&m/i, 'Shopping'],
+  [/makemytrip|goibibo|cleartrip|yatra|airline|indigo|air india|vistara|oyo|airbnb|booking|hotel|resort|trip/i, 'Travel'],
+  [/\bemi\b|loan|finance|bajaj fin|hdfc ltd|home credit|tata capital|nbfc/i, 'Loan EMI'],
+  [/\bsip\b|\bfund\b|folio|\bfd\b|fixed deposit|mutual fund|zerodha|groww|upstox|kuvera|smallcase|coin|ppf|nps|rd\b|investment|betterinvest|better invest/i, 'Savings'],
+  [/\brent\b|landlord|nobroker|housing/i, 'Rent'],
+]
+
+/** A live top-level category whose name matches the guess, or null. Never creates a category. */
+export function guessCategory(budget: Pick<BudgetData, 'categories'>, text: string): string | null {
+  for (const [re, name] of CATEGORY_WORDS) {
+    if (!re.test(text)) continue
+    const c = budget.categories.find((x) => x.deletedAt === null && x.parentId === null && x.name.toLowerCase() === name.toLowerCase())
+    if (c) return c.id
+  }
+  return null
+}
+
+export interface NewInstrument {
+  bank: string
+  last4: string
+  kind: InstrumentKind
+  /** Payments in this list that name it. */
+  uses: number
+}
+
+/** Cards and accounts the messages name that the user has not added yet (needs bank, digits and what it is). */
+export function newInstruments(cands: Candidate[]): NewInstrument[] {
+  const out = new Map<string, NewInstrument>()
+  for (const c of cands) {
+    if (c.instrumentId !== null || !c.bank || !c.last4 || !c.source || c.last4.length < 4) continue
+    const key = `${c.bank}|${c.last4}|${c.source}`
+    const cur = out.get(key)
+    if (cur) cur.uses++
+    else out.set(key, { bank: c.bank, last4: c.last4, kind: c.source, uses: 1 })
+  }
+  return [...out.values()].sort((a, b) => b.uses - a.uses)
+}
+
+/** After the user adds a card or account: points every payment that named it at it, and sets how it was paid. */
+export function attachInstrument(cands: Candidate[], inst: PayInstrument, bank: string, last4: string): Candidate[] {
+  return cands.map((c) => (c.instrumentId === null && c.bank === bank && c.last4 === last4 && c.source === inst.kind ? { ...c, instrumentId: inst.id, mode: modeFor({ mode: c.mode }, inst) } : c))
 }

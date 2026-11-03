@@ -31,8 +31,9 @@ import java.util.regex.Pattern;
 )
 public class SmsInboxPlugin extends Plugin {
     private static final int MAX = 1500;
-    // A sender header: letters/digits, at least one letter, optionally prefixed "XX-". Phone numbers are digits and "+" only.
-    private static final Pattern HEADER = Pattern.compile("^(?:[A-Za-z0-9]{2}-)?[A-Za-z0-9]{3,11}$");
+    // A sender header: letters/digits, at least one letter, optionally prefixed "XX-" and suffixed "-S" / "-T" / "-P" / "-G"
+    // (JX-HDFCBK-S is how Indian banks appear). Phone numbers are digits and "+" only.
+    private static final Pattern HEADER = Pattern.compile("^(?:[A-Za-z0-9]{2}-)?[A-Za-z0-9]{3,11}(?:-[A-Za-z0-9]{1,2})?$");
     private static final Pattern HAS_LETTER = Pattern.compile(".*[A-Za-z].*");
 
     @PluginMethod

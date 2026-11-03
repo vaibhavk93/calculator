@@ -7,11 +7,11 @@ import { useApp, useAppStore } from '../../components/StoreProvider'
 import { tintStyle } from '../../components/tint'
 import { useBackHandler } from '../../components/useBackHandler'
 import { D } from '../../engine'
-import { categoryName, instrumentLabel, modeLabel, suggestFor } from '../../lib/budget'
+import { INSTRUMENT_KINDS, categoryName, instrumentLabel, modeLabel, suggestFor } from '../../lib/budget'
 import { buildStatementCandidates } from '../../lib/statementParse'
 import { copyText } from '../../lib/device'
-import { addToParseLog, clearParseLog, loadParseLog, readBankMessages, smsSupported } from '../../lib/sms'
-import { buildCandidates, logAsText, type Candidate, type ParseLogEntry, type ScanResult } from '../../lib/smsParse'
+import { addToParseLog, clearParseLog, loadParseLog, logSalt, readBankMessages, smsSupported } from '../../lib/sms'
+import { attachInstrument, buildCandidates, logAsText, newInstruments, type Candidate, type ParseLogEntry, type ScanResult } from '../../lib/smsParse'
 import { Segmented } from '../settings/controls'
 import { ExpenseSheet } from './sheets'
 import { shortDate, useMoney } from './SpendSummary'
@@ -50,6 +50,15 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
 
   useEffect(() => { void loadParseLog().then((l) => setLogCount(l.length)) }, [logOpen])
 
+  const CONSENT_KEY = 'vkcalc.smsConsent'
+  const [consent, setConsent] = useState(false)
+  const wantScan = () => {
+    let known = false
+    try { known = localStorage.getItem(CONSENT_KEY) === '1' } catch { /* ask again */ }
+    if (known || !smsSupported()) void scan()
+    else setConsent(true)
+  }
+
   const scan = async () => {
     setBusy(true)
     setMessage(null)
@@ -65,7 +74,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
       return
     }
     const s = store.getState()
-    const res = buildCandidates(r.messages, s.budget, (note) => suggestFor(s.budget, note))
+    const res = buildCandidates(r.messages, s.budget, (note) => suggestFor(s.budget, note), await logSalt())
     setResult(res)
     void addToParseLog(res.log).then((l) => setLogCount(l.length))
     setBusy(false)
@@ -80,6 +89,15 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
     const r = buildStatementCandidates(await file.text(), s.budget, stmtFor || null, (note) => suggestFor(s.budget, note))
     if (!r.ok) { setResult(null); return setMessage(r.message) }
     setResult(r.result)
+  }
+
+  const addInstrument = useApp((s) => s.addInstrument)
+  const addCard = (n: { bank: string; last4: string; kind: 'credit' | 'debit' | 'bank' | 'wallet' }) => {
+    const id = addInstrument({ name: n.bank, kind: n.kind, bank: n.bank, last4: n.last4 })
+    const inst = id ? store.getState().budget.instruments.find((i) => i.id === id) : undefined
+    if (!inst) return
+    setResult((r) => (r ? { ...r, found: attachInstrument(r.found, inst, n.bank, n.last4) } : r))
+    toast(`Added ${instrumentLabel(inst)}`)
   }
 
   const drop = (id: string) => setResult((r) => (r ? { ...r, found: r.found.filter((c) => c.id !== id) } : r))
@@ -141,7 +159,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
           <div className="sect__body import__intro">
             <p>Calc reads only messages from banks and payment apps, only when you tap Scan, only on this phone. Nothing is sent anywhere. The message text is not saved. You choose what to add.</p>
             <Segmented label="How far back" value={days} options={DAYS} onChange={setDays} />
-            <button type="button" className="btn btn--primary" onClick={() => void scan()}>{busy ? 'Reading…' : smsSupported() ? 'Scan messages' : 'Scan messages (Android only)'}</button>
+            <button type="button" className="btn btn--primary" onClick={wantScan}>{busy ? 'Reading…' : smsSupported() ? 'Scan messages' : 'Scan messages (Android only)'}</button>
             {message && <p className="import__msg" role="status">{message}</p>}
           </div>
         </section>
@@ -167,6 +185,15 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
           <section className="sect" style={tintStyle(4)} aria-label="Found">
             <h2 className="sect__head"><span>Found</span><span className="sect__count">{fresh.length}</span></h2>
             <div className="sect__body">
+              {newInstruments(fresh).map((n) => (
+                <div key={`${n.bank}${n.last4}${n.kind}`} className="budget__entry import__row">
+                  <span className="budget__main">
+                    <span className="row__label">{n.bank} ••{n.last4}</span>
+                    <span className="row__hint">{INSTRUMENT_KINDS.find((k) => k.id === n.kind)?.label ?? 'Account'} found in {plural(n.uses, 'message', 'messages')}, not in your cards yet</span>
+                  </span>
+                  <div className="import__acts"><button type="button" className="btn" onClick={() => addCard(n)}>Add to my cards</button></div>
+                </div>
+              ))}
               {fresh.length === 0 && <p className="budget__none">Nothing new to add. {result.alreadySeen > 0 ? `${plural(result.alreadySeen, 'payment was', 'payments were')} handled before.` : 'No bank payments in this period.'}</p>}
               {fresh.map((c) => row(c))}
             </div>
@@ -186,7 +213,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
           <button type="button" className="navrow tap-row" onClick={() => setLogOpen(true)}>
             <span className="row__text">
               <span className="row__label">Reader log</span>
-              <span className="row__hint">{logCount === 0 ? 'Messages Calc could not fully read will be listed here' : `${plural(logCount, 'message', 'messages')} Calc could not fully read, with numbers and names blanked`}</span>
+              <span className="row__hint">{logCount === 0 ? 'Messages Calc could not fully read will be listed here' : `${plural(logCount, 'message', 'messages')} Calc could not fully read, with every number and name swapped for a fake one`}</span>
             </span>
             <Icon name="chevron" size={18} className="navrow__chev" />
           </button>
@@ -199,6 +226,21 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
           onSaved={() => { markSeen([edit.id]); drop(edit.id) }}
           onClose={() => setEdit(null)}
         />
+      )}
+      {consent && (
+        <Sheet
+          title="Read bank messages?"
+          onClose={() => setConsent(false)}
+          footer={<button type="button" className="btn btn--primary" onClick={() => { try { localStorage.setItem(CONSENT_KEY, '1') } catch { /* asked again next time */ } setConsent(false); void scan() }}>Continue</button>}
+        >
+          <ul className="import__why">
+            <li>Calc will ask Android for permission to read your text messages.</li>
+            <li>It looks only at messages from banks and payment apps (sender names like HDFCBK), never at messages from people.</li>
+            <li>It reads them once, when you tap Scan. It does not run in the background.</li>
+            <li>Everything stays on this phone. Nothing is uploaded or shared. The message text is not saved.</li>
+            <li>You decide what to add. You can take the permission back any time in Android Settings.</li>
+          </ul>
+        </Sheet>
       )}
       {logOpen && <LogSheet onClose={() => setLogOpen(false)} />}
     </div>
@@ -217,14 +259,14 @@ function LogSheet({ onClose }: { onClose: () => void }) {
       action={log && log.length > 0 ? <button type="button" className="link-btn" onClick={() => { void clearParseLog(); setLog([]) }}>Clear</button> : undefined}
       footer={<button type="button" className="btn btn--primary" onClick={() => void copy()}>Copy log</button>}
     >
-      <p className="manage__help">Each line is a bank message the reader skipped or only partly understood. Digits, UPI IDs, links and the names after "to", "at" or "from" are blanked before it is kept. It stays on this phone and is not part of backups. Copy it to show whoever improves the reader.</p>
+      <p className="manage__help">Each line is a bank message the reader skipped or only partly understood. Before a line is kept, every number, date, UPI ID and name in it is swapped for a fake one of the same shape (a 5-digit amount stays a 5-digit amount), so the real values never reach the log, and the key for the swap stays on this phone. It stays on this phone and is not part of backups. Copy it to show whoever improves the reader.</p>
       {log === null ? null : log.length === 0 ? <p className="budget__none">Nothing logged yet. Scan messages first.</p> : (
         <ul className="import__log">
           {log.map((e, i) => (
             <li key={i}>
               <span className="row__label">{e.outcome === 'partial' ? 'Read, but something was missing' : e.outcome === 'unsure' ? 'Could not tell if money went out' : 'No amount found'}{e.count > 1 ? ` · seen ${e.count} times` : ''}</span>
               <span className="row__hint">{e.sender}: {e.template}</span>
-              {e.got && <span className="row__hint">Understood: {[e.got.amount && `amount ${e.got.amount}`, e.got.merchant ? `to ${e.got.merchant}` : 'no name', e.got.last4 ? 'card digits' : 'no card digits'].filter(Boolean).join(', ')}</span>}
+              {e.got && <span className="row__hint">Understood: {[e.got.amount && `amount (${e.got.amount})`, e.got.merchant ? `name (${e.got.merchant})` : 'no name', e.got.last4 ? 'card digits' : 'no card digits'].filter(Boolean).join(', ')}</span>}
             </li>
           ))}
         </ul>

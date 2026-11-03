@@ -1,6 +1,6 @@
 import { instrumentFitsMode, MAX_AMOUNT, type BudgetData } from './budget'
 import { D } from '../engine/decimal'
-import { alreadyAdded, fingerprint, modeFor, type Candidate, type ParsedSms, type ScanResult } from './smsParse'
+import { alreadyAdded, fingerprint, guessCategory, modeFor, type Candidate, type ParsedSms, type ScanResult } from './smsParse'
 
 /**
  * Reads a bank or card statement saved as CSV (picked with the file chooser: no permission needed) into the same review
@@ -141,7 +141,7 @@ export function buildStatementCandidates(
     if (!isDebit) { skipped.credit = (skipped.credit ?? 0) + 1; continue }
     const merchant = merchantFromNarration(narration)
     const ref = cols.ref >= 0 ? (r[cols.ref] ?? '').replace(/\D/g, '') : ''
-    const p: ParsedSms = { ok: true, kind: /credit card|cc payment|card bill|billdesk|autopay/i.test(narration) ? 'cardBill' : 'spend', amount, last4: null, merchant, mode: /^upi/i.test(narration) ? 'upi' : null, bank: null, ref: ref.length >= 9 ? ref : null }
+    const p: ParsedSms = { ok: true, source: null, kind: /credit card|cc payment|card bill|billdesk|autopay/i.test(narration) ? 'cardBill' : 'spend', amount, last4: null, merchant, mode: /^upi/i.test(narration) ? 'upi' : null, bank: null, ref: ref.length >= 9 ? ref : null }
     const id = fingerprint(p, date)
     if (seen.has(id)) { alreadySeen++; continue }
     if (inList.has(id)) continue
@@ -150,8 +150,8 @@ export function buildStatementCandidates(
       id, date, amount, merchant, kind: p.kind,
       mode: inst ? modeFor(p, inst) : p.mode === 'credit' || p.mode === 'debit' ? null : p.mode,
       instrumentId: inst && (p.mode === null || p.mode === 'upi' ? true : instrumentFitsMode(p.mode, inst)) ? inst.id : null,
-      bank: null, last4: null,
-      categoryId: p.kind === 'spend' && merchant ? (suggest(merchant)?.categoryId ?? null) : null,
+      bank: null, last4: null, source: null,
+      categoryId: p.kind === 'spend' ? ((merchant ? suggest(merchant)?.categoryId : null) ?? guessCategory(budget, `${merchant} ${narration}`)) : null,
       duplicateOfExisting: false,
     }
     cand.duplicateOfExisting = alreadyAdded(budget, cand)
