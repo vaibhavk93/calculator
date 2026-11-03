@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
-import { atTime, dueLabel } from './reminders'
+import { atTime, dueLabel, leadsOf } from './reminders'
 import type { Reminder, SavedCard } from './memory'
 
 const DAY = 86_400_000
@@ -30,28 +30,35 @@ const daysBefore = (ts: number, n: number) => {
 }
 
 /**
- * Which notifications should exist right now: one per open reminder, `leadDays` before it is due
- * (or at the due time, if that heads-up moment has already passed). Overdue ones are left to the
+ * Which notifications should exist right now: one per heads-up time (`leadDays`, or the `leads` list) of each open
+ * reminder (or one at the due time, if every heads-up moment has already passed). Overdue ones are left to the
  * Due tab: re-notifying forever is how apps get muted. With `time` ("HH:MM"), every notification
  * comes at that time of day instead of the 9:00 a reminder is stored with, worked out in the phone's
  * current time zone, so a time-zone change is fixed by planning again.
  */
-export function planNotifications(reminders: Reminder[], cards: SavedCard[], now: number, money: (plain: string) => string, time?: string): Planned[] {
+export function planNotifications(reminders: Reminder[], cards: SavedCard[], now: number, money: (plain: string, fmt?: SavedCard['amountFmt']) => string, time?: string): Planned[] {
   const out: Planned[] = []
   const when = (ts: number) => (time ? atTime(ts, time) : ts)
   for (const r of reminders) {
     const card = cards.find((c) => c.id === r.cardId && c.deletedAt === null)
     const dueAt = when(r.dueAt)
     if (r.done || !card || dueAt <= now) continue
-    const heads = time ? atTime(daysBefore(r.dueAt, r.leadDays), time) : r.dueAt - r.leadDays * DAY
-    const at = heads > now ? heads : dueAt
-    out.push({
-      id: numericId(r.id),
-      at,
-      title: card.title,
-      body: [card.amount !== null ? money(card.amount) : '', `due ${dueLabel(dueAt, at).toLowerCase()}`].filter(Boolean).join(' · '),
-      reminderId: r.id,
+    // One notification per heads-up time that is still ahead; if none is (all passed), one at the due time.
+    const times = new Map<number, number>()
+    leadsOf(r).forEach((lead, i) => {
+      const heads = time ? atTime(daysBefore(r.dueAt, lead), time) : r.dueAt - lead * DAY
+      if (heads > now && !times.has(heads)) times.set(heads, i)
     })
+    if (times.size === 0) times.set(dueAt, 0)
+    for (const [at, i] of [...times].sort((x, y) => x[0] - y[0])) {
+      out.push({
+        id: i === 0 ? numericId(r.id) : numericId(`${r.id}:${i}`),
+        at,
+        title: card.title,
+        body: [card.amount !== null ? money(card.amount, card.amountFmt) : '', `due ${dueLabel(dueAt, at).toLowerCase()}`].filter(Boolean).join(' · '),
+        reminderId: r.id,
+      })
+    }
   }
   return out
 }
@@ -139,6 +146,16 @@ export async function onNotificationAction(cb: (reminderId: string, action: 'pai
     cb(reminderId, e.actionId === 'paid' ? 'paid' : e.actionId === 'snooze' ? 'snooze' : 'open')
   })
   return () => void handle.remove()
+}
+
+/** The numbers of notifications still showing in the notification shade. Empty on the web or if the phone will not say. */
+export async function deliveredIds(): Promise<Set<number>> {
+  if (!notificationsSupported()) return new Set()
+  try {
+    return new Set((await LocalNotifications.getDeliveredNotifications()).notifications.map((n) => n.id))
+  } catch {
+    return new Set()
+  }
 }
 
 export type TestResult = { ok: true; at: number; exact: boolean } | { ok: false; reason: 'web' | 'denied' | 'failed' }

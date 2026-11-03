@@ -1,12 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { PickerSelect } from '../../components/PickerSelect'
-import { useApp } from '../../components/StoreProvider'
+import { useApp, useAppStore } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
 import { magnitudeWords, type NumberSystem } from '../../lib/format'
 import {
   defaultValues,
+  exampleFieldsInUse,
   isError,
+  labelOf,
   parseNum,
   type Field,
   type Fmt,
@@ -17,8 +19,9 @@ import {
   type Values,
 } from '../../lib/tool'
 import { formatCell } from '../../lib/toolFormat'
+import { ratesLine } from '../../lib/ratesFresh'
 import { invalidFieldIds } from '../../lib/toolInvalid'
-import type { CardDraft } from '../../store/app'
+import type { AppStore, CardDraft } from '../../store/app'
 import type { SavedCard } from '../../store/types'
 import { SaveSheet } from '../memory/SaveSheet'
 import { ToListSheet } from '../memory/ToListSheet'
@@ -34,12 +37,13 @@ import { ALL_TOOLS } from './registry'
 import { linkable, linkTargets, linkText } from '../../lib/toolLink'
 import { groupOfTool } from './groups'
 import { Segmented } from '../settings/controls'
-import { advancedOpen, caretFor, groupTyped, migrateLegacyTerm, rawNumber, shouldGroup, significantBefore, type Leaf } from './fieldInput'
+import { bumpUse, togglePinned } from '../../lib/toolUse'
+import { addAmount, advancedOpen, caretFor, chipSteps, groupTyped, migrateLegacyTerm, rawNumber, shouldGroup, significantBefore, type Leaf } from './fieldInput'
 
 const UNIT_LABEL = { rupee: '₹', percent: '%', years: 'years', months: 'months', days: 'days', none: '' } as const
 
 /** A number box. Money and counts show grouping as you type (50,00,000); the stored text stays plain digits. */
-function NumberInput({ field, id, value, onChange, describedBy, invalid, words }: {
+function NumberInput({ field, id, value, onChange, describedBy, invalid, words, chips }: {
   field: Extract<Leaf, { kind: 'number' }>
   id: string
   value: string
@@ -47,6 +51,8 @@ function NumberInput({ field, id, value, onChange, describedBy, invalid, words }
   describedBy?: string
   invalid?: boolean
   words?: boolean
+  /** Quick-add chips (+1K, +10K, +1L) under the box. Loan and investment money fields. */
+  chips?: boolean
 }) {
   const system = useApp((s) => s.settings.numberSystem)
   const group = shouldGroup(field)
@@ -89,6 +95,26 @@ function NumberInput({ field, id, value, onChange, describedBy, invalid, words }
         {field.unit && field.unit !== 'rupee' && unit && <span className="field-unit">{unit}</span>}
       </span>
       {echo && <span className="field-words">{echo}</span>}
+      {chips && (
+        <span className="chips" role="group" aria-label={`Add to ${field.label}`}>
+          {chipSteps(system).map((c) => (
+            <button
+              key={c.step}
+              type="button"
+              className="chip"
+              aria-label={`Add ${c.spoken}`}
+              // Keep the caret in the box: the chip adds to what is typed, it does not take over the keyboard.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                const next = addAmount(value, c.step)
+                if (next !== null) onChange(next)
+              }}
+            >
+              {c.label}
+            </button>
+          ))}
+        </span>
+      )}
     </>
   )
 }
@@ -99,13 +125,14 @@ const wordsFor = (value: string, system: NumberSystem) => {
 }
 
 /** One input. `value` is the typed text; the screen never parses it, the spec does. */
-function Input({ field, value, onChange, describedBy, invalid, words }: {
+function Input({ field, value, onChange, describedBy, invalid, words, chips }: {
   field: Leaf
   value: string
   onChange: (v: string) => void
   describedBy?: string
   invalid?: boolean
   words?: boolean
+  chips?: boolean
 }) {
   const id = `f-${field.id}`
   if (field.kind === 'select') {
@@ -128,7 +155,7 @@ function Input({ field, value, onChange, describedBy, invalid, words }: {
       </span>
     ) : box
   }
-  return <NumberInput field={field} id={id} value={value} onChange={onChange} describedBy={describedBy} invalid={invalid} words={words} />
+  return <NumberInput field={field} id={id} value={value} onChange={onChange} describedBy={describedBy} invalid={invalid} words={words} chips={chips} />
 }
 
 type SetValue = (id: string, v: string | string[][]) => void
@@ -136,8 +163,9 @@ type SetValue = (id: string, v: string | string[][]) => void
 /** The id of the message under the form: every marked box points at it, so a screen reader reads why. */
 const ERROR_ID = 'tool-error'
 
-function FieldRow({ field, values, set, invalid }: { field: Field; values: Values; set: SetValue; invalid: boolean }) {
-  if (field.visibleIf && !field.visibleIf(values)) return null
+function FieldRow({ field: base, values, set, invalid, chips }: { field: Field; values: Values; set: SetValue; invalid: boolean; chips?: boolean }) {
+  if (base.visibleIf && !base.visibleIf(values)) return null
+  const field = base.labelFor ? { ...base, label: labelOf(base, values) } : base
 
   if (field.kind === 'rows') {
     const rows = (values[field.id] as string[][]) ?? []
@@ -178,7 +206,7 @@ function FieldRow({ field, values, set, invalid }: { field: Field; values: Value
       <label className="field-label" htmlFor={`f-${field.id}`}>
         {field.label}
       </label>
-      <Input field={field} value={value} onChange={(v) => set(field.id, v)} describedBy={describedBy} invalid={invalid} words />
+      <Input field={field} value={value} onChange={(v) => set(field.id, v)} describedBy={describedBy} invalid={invalid} words chips={chips && field.kind === 'number' && field.unit === 'rupee'} />
       {field.hint && (
         <span id={hintId} className="field-hint">
           {field.hint}
@@ -186,6 +214,33 @@ function FieldRow({ field, values, set, invalid }: { field: Field; values: Value
       )}
     </div>
   )
+}
+
+/** The fields of one list. Neighbours sharing a `cluster` heading are drawn as one compact block (advance tax: the four payments). */
+function FieldList({ fields, values, set, invalidIds, chips }: { fields: Field[]; values: Values; set: SetValue; invalidIds: Set<string>; chips: boolean }) {
+  const out: React.ReactNode[] = []
+  for (let i = 0; i < fields.length; ) {
+    const f = fields[i]!
+    if (!f.cluster) {
+      out.push(<FieldRow key={f.id} field={f} values={values} set={set} invalid={invalidIds.has(f.id)} chips={chips && !f.advanced} />)
+      i++
+      continue
+    }
+    let j = i
+    while (j < fields.length && fields[j]!.cluster === f.cluster) j++
+    out.push(
+      <fieldset className="cluster" key={f.id}>
+        <legend className="field-label">{f.cluster}</legend>
+        <div className="cluster__grid">
+          {fields.slice(i, j).map((g) => (
+            <FieldRow key={g.id} field={g} values={values} set={set} invalid={invalidIds.has(g.id)} chips={chips && !g.advanced} />
+          ))}
+        </div>
+      </fieldset>,
+    )
+    i = j
+  }
+  return <>{out}</>
 }
 
 /**
@@ -280,7 +335,7 @@ function Chart({ chart }: { chart: ResultChart }) {
   )
 }
 
-function Result({ out, mainRef, verified }: { out: Output; mainRef: React.RefObject<HTMLDivElement>; verified?: ToolSpec['verified'] }) {
+function Result({ out, mainRef, verified, rates, examples }: { out: Output; mainRef: React.RefObject<HTMLDivElement>; verified?: ToolSpec['verified']; rates?: ToolSpec['rates']; examples: string[] }) {
   const system = useApp((s) => s.settings.numberSystem)
   const decimals = useApp((s) => s.settings.decimals)
   const fmt = (c: Parameters<typeof formatCell>[0], f?: Fmt) => formatCell(c, f, { system, decimals })
@@ -301,7 +356,19 @@ function Result({ out, mainRef, verified }: { out: Output; mainRef: React.RefObj
         </div>
       ))}
       {out.note && <p className="result__note">{out.note}</p>}
+      {out.span && (
+        // Says nothing the rows above do not: hidden from a screen reader so it is not read twice.
+        <div className="span" aria-hidden="true">
+          <span className="span__end">{out.span.start}</span>
+          <span className="span__end span__end--to">{out.span.end}</span>
+          <span className="span__bar">
+            <span className="span__count">{out.span.between}</span>
+          </span>
+        </div>
+      )}
       {verified && <p className="result__checked">Checked against {verified.source}</p>}
+      {rates && <p className="result__checked">{ratesLine(rates, Date.now())}</p>}
+      {examples.length > 0 && <p className="result__checked">Uses example values for {examples.join(', ').toLowerCase()}. Check them under More options.</p>}
       {out.chart && <Chart chart={out.chart} />}
       {out.table && <Table table={out.table} fmt={fmt} />}
       {out.formula && (
@@ -317,24 +384,27 @@ function Result({ out, mainRef, verified }: { out: Output; mainRef: React.RefObj
 }
 
 /**
- * What the user last typed into each calculator this session, so leaving for another tab and coming back
- * does not throw the numbers away. Not kept for a saved card, which has its own stored inputs.
+ * What the user last typed into each calculator lives in the store (`drafts`, saved with the rest), so leaving for another tab,
+ * or closing the app, does not throw the numbers away. Reset clears it. Not kept for a saved card, which has its own stored inputs.
  */
-const drafts = new Map<string, Values>()
 
 /** Puts one value into one box of a calculator before it opens ("Use in another tool"). Every other box stays as it was. */
-export function prefillDraft(spec: ToolSpec, fieldId: string, value: string) {
-  drafts.set(spec.id, { ...defaultValues(spec), ...drafts.get(spec.id), [fieldId]: value })
+export function prefillDraft(store: AppStore, spec: ToolSpec, fieldId: string, value: string) {
+  store.getState().setDraft(spec.id, { ...defaultValues(spec), ...store.getState().drafts[spec.id], [fieldId]: value })
 }
 
 export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; onBack: () => void; initial?: Values; card?: SavedCard }) {
-  const [values, setValues] = useState<Values>(() => migrateLegacyTerm(spec.fields, { ...defaultValues(spec), ...(card ? initial : (drafts.get(spec.id) ?? initial)) }))
-  const set = (id: string, v: string | string[][]) =>
-    setValues((cur) => {
-      const next = { ...cur, [id]: v }
-      if (!card) drafts.set(spec.id, next)
-      return next
-    })
+  const store = useAppStore()
+  const [values, setValues] = useState<Values>(() => migrateLegacyTerm(spec.fields, { ...defaultValues(spec), ...(card ? initial : (store.getState().drafts[spec.id] ?? initial)) }))
+  const set = (id: string, v: string | string[][]) => setValues((cur) => ({ ...cur, [id]: v }))
+  // Keep the draft in step with what is typed. Back at the starting values (Reset) means no draft at all.
+  useEffect(() => {
+    if (card) return
+    const same = JSON.stringify(values) === JSON.stringify(defaultValues(spec))
+    const stored = store.getState().drafts[spec.id]
+    if (same ? stored !== undefined : JSON.stringify(stored) !== JSON.stringify(values)) store.getState().setDraft(spec.id, same ? null : values)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values])
   const [saving, setSaving] = useState(false)
   const [listing, setListing] = useState(false)
   const [reminding, setReminding] = useState(false)
@@ -360,6 +430,8 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
   const dismissedTips = useApp((s) => s.settings.dismissedTips)
   const reminderTime = useApp((s) => s.settings.reminderTime)
   const updateSettings = useApp((s) => s.updateSettings)
+  const toolUse = useApp((s) => s.settings.toolUse)
+  const pinnedTools = useApp((s) => s.settings.pinnedTools)
   const saveCard = useApp((s) => s.saveCard)
   const updateCard = useApp((s) => s.updateCard)
   const addAdvanceTaxPack = useApp((s) => s.addAdvanceTaxPack)
@@ -415,6 +487,33 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
 
   useBackHandler(true, onBack)
 
+  // One more use for this calculator: "Your tools" on Tools floats the most used ones up. Counted once the screen has
+  // stayed open for 1.5 seconds (a stray tap is not a use), and not while the screen is still sliding in.
+  useEffect(() => {
+    const t = setTimeout(() => updateSettings({ toolUse: bumpUse(toolUse, spec.id) }), 1500)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spec.id])
+  const pinned = pinnedTools.includes(spec.id)
+  const togglePin = () => {
+    const next = togglePinned(pinnedTools, spec.id)
+    if (next === null) return toast('You can pin up to 3 tools. Unpin one first.')
+    updateSettings({ pinnedTools: next })
+    toast(pinned ? 'Unpinned from Your tools' : 'Pinned to Your tools')
+  }
+
+  // Back to the starting values. Undo puts back exactly what was typed. A saved card is not touched until "Update".
+  const replaceAll = (next: Values) => setValues(next)
+  const reset = () => {
+    const before = values
+    const fresh = defaultValues(spec)
+    if (JSON.stringify(before) === JSON.stringify(fresh)) return toast('Already at the starting values')
+    replaceAll(fresh)
+    showLinkSnack('Inputs reset', { label: 'Undo', run: () => replaceAll(before) })
+  }
+
+  // Quick-add chips only where the amounts are big: loans and investments.
+  const chips = spec.category === 'loans' || spec.category === 'invest'
   const visible = spec.fields.filter((f) => !f.advanced)
   const advanced = spec.fields.filter((f) => f.advanced && (!f.visibleIf || f.visibleIf(values)))
   const error = isError(computed) ? computed.error : null
@@ -446,11 +545,16 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
         title={saved?.title ?? spec.title}
         onBack={onBack}
         icons={
-          saved && (
-            <button type="button" className="icon-btn" aria-label={`Delete ${saved.title}`} title={`Delete ${saved.title}`} onClick={() => { deleteCard(saved.id); onBack() }}>
-              <Icon name="trash" size={20} />
+          <>
+            <button type="button" className="icon-btn" aria-pressed={pinned} aria-label={pinned ? `Unpin ${spec.title} from Your tools` : `Pin ${spec.title} to Your tools`} title={pinned ? 'Unpin from Your tools' : 'Pin to Your tools'} onClick={togglePin}>
+              <Icon name={pinned ? 'pinFilled' : 'pin'} size={20} />
             </button>
-          )
+            {saved && (
+              <button type="button" className="icon-btn" aria-label={`Delete ${saved.title}`} title={`Delete ${saved.title}`} onClick={() => { deleteCard(saved.id); onBack() }}>
+                <Icon name="trash" size={20} />
+              </button>
+            )}
+          </>
         }
         action={
           <button
@@ -468,16 +572,12 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
           What you are working out
         </h2>
         <form className="tool__form inputcard" aria-labelledby="inputs-head" onSubmit={(e) => e.preventDefault()}>
-          {visible.map((f) => (
-            <FieldRow key={f.id} field={f} values={values} set={set} invalid={invalidIds.has(f.id)} />
-          ))}
+          <FieldList fields={visible} values={values} set={set} invalidIds={invalidIds} chips={chips} />
           {advanced.length > 0 && (
             <details className="more" open={moreOpen || advancedOpen(spec.fields, values)} onToggle={(e) => setMoreOpen(e.currentTarget.open)}>
               <summary>More options</summary>
               <div className="more__body">
-                {advanced.map((f) => (
-                  <FieldRow key={f.id} field={f} values={values} set={set} invalid={invalidIds.has(f.id)} />
-                ))}
+                <FieldList fields={advanced} values={values} set={set} invalidIds={invalidIds} chips={false} />
               </div>
             </details>
           )}
@@ -489,7 +589,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
         )}
 
         {/* 2. Result: what it comes to. A plain card, never tinted. */}
-        {ok && <Result out={computed} mainRef={mainRef} verified={spec.verified} />}
+        {ok && <Result out={computed} mainRef={mainRef} verified={spec.verified} rates={spec.rates} examples={exampleFieldsInUse(spec, values)} />}
 
         {ok && computed.expense && computed.expense.amount.gt(0) && (
           <div className="suggest">
@@ -515,6 +615,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
             onList={() => setListing(true)}
             onRemind={() => setReminding(true)}
             onUse={canUse && !card ? () => setUsing(true) : undefined}
+            onReset={reset}
           />
         )}
 

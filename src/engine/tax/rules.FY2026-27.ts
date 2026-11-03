@@ -55,6 +55,13 @@
  * (G.S.R. 198(E), 20 Mar 2026; reports say the 50% list grew to eight cities), and the EPF wage ceiling.
  */
 
+/**
+ * When this pack was last checked (`asOf`) and the first day it may be out of date (`until`: the next tax year
+ * starts 1 Apr 2027; a Budget on 1 Feb can change rates earlier). The screen shows "Rates as of ..." and, from
+ * `until`, "may have changed". Change both with the values above.
+ */
+export const RATES_AS_OF = { asOf: '2026-11-02', until: '2027-04-01' } as const
+
 export interface Slab {
   /** Upper bound of this band, or null for "and above". */
   upTo: string | null

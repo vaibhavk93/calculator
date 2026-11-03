@@ -13,6 +13,7 @@ import { CardView } from './CardView'
 import { Segmented } from '../settings/controls'
 import { TapeScreen } from './TapeScreen'
 import { TodoScreen } from './TodoScreen'
+import { useTour } from '../onboarding/useTour'
 
 /** Which side of the Notes tab was last open. Kept while the app runs, forgotten on restart. */
 let lastMode: 'notes' | 'todo' = 'notes'
@@ -35,6 +36,12 @@ export function SavedScreen() {
   const tabTap = useApp((s) => s.tabTap)
   const openCard = useApp((s) => s.openCard)
   const showCard = useApp((s) => s.showCard)
+  const setTab = useApp((s) => s.setTab)
+  const tour = useTour('notes', (a) => {
+    if (a === 'tools') setTab('tools')
+    else if (a === 'new-list') (setMode('notes'), setView({ kind: 'newTape' }))
+    else if (a === 'todo') setMode('todo')
+  })
 
   // Tapping the Saved tab while on it closes whatever is open and clears the search.
   useEffect(() => {
@@ -65,6 +72,7 @@ export function SavedScreen() {
 
   return (
     <div className="tools">
+      {view.kind === 'list' && tour.row}
       <div className="saved__head">
         {/* The Notes/To-do switch below is this screen's own visible title; this just gives it a
             real heading for anyone navigating by headings, without a second, redundant title above it.
@@ -98,9 +106,9 @@ export function SavedScreen() {
       </div>
 
       {mode === 'todo' ? (
-        <TodoScreen query={query} tag={tag} />
+        <TodoScreen query={query} tag={tag} tourLink={tour.link} />
       ) : live.length === 0 ? (
-        <EmptyState title="No notes yet" level="h2">
+        <EmptyState title="No notes yet" level="h2" action={tour.link}>
           Press Save on any calculator, or tap New list above for a running total. Add a reminder and the Due tab will keep track.
         </EmptyState>
       ) : (
@@ -132,6 +140,7 @@ export function SavedScreen() {
       {open && <CardView card={open} onBack={back} />}
       {view.kind === 'newTape' && <TapeScreen onBack={back} />}
       {view.kind === 'trash' && <TrashScreen onBack={back} />}
+      {tour.sheet}
     </div>
   )
 }

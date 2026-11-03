@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react'
+import { setMissed, missedText } from '../../lib/delivery'
+import { useMissedReminder } from '../../components/useMissedReminder'
+import { ReliableRemindersSheet } from '../settings/ReliableRemindersSheet'
 import { Icon } from '../../components/Icon'
 import { EmptyState } from '../../components/EmptyState'
 import { useApp } from '../../components/StoreProvider'
@@ -6,9 +9,10 @@ import { tintStyle } from '../../components/tint'
 import { formatCell } from '../../lib/toolFormat'
 import { D } from '../../engine'
 import { billForCard } from '../../lib/recurring'
-import { dueLabel, dueSoonTotal, groupReminders } from '../../lib/reminders'
+import { afterDaysLabel, dueLabel, dueSoonTotal, groupReminders } from '../../lib/reminders'
 import type { Reminder } from '../../store/types'
 import { CardView } from './CardView'
+import { useTour } from '../onboarding/useTour'
 
 /** Overdue is the one section that earns a hue by meaning: its heading takes the alert colour on a plain card. */
 const OVERDUE = { '--tint': 'var(--surface)', '--tint-ink': 'var(--alert)' } as React.CSSProperties
@@ -30,6 +34,10 @@ export function DueScreen() {
   // A reminder cannot be brought back once removed, so Remove asks first (the store has no undo for reminders).
   const [askId, setAskId] = useState<string | null>(null)
   const tabTap = useApp((s) => s.tabTap)
+  // "A reminder may not have shown": found when the app was opened (lib/delivery.ts). Calm, and never certain.
+  const missed = useMissedReminder()
+  const [fixing, setFixing] = useState(false)
+  const tour = useTour('due', (a) => a === 'reliable' && setFixing(true))
 
   // Tapping the Due tab while on it closes an open card.
   useEffect(() => setOpenId(null), [tabTap])
@@ -43,17 +51,23 @@ export function DueScreen() {
 
   if (g.overdue.length + g.week.length + g.later.length === 0) {
     return (
+      <>
+      {tour.row}
       <EmptyState
         title="No reminders yet"
         action={
           <>
             <button type="button" className="btn btn--primary" onClick={() => setTab('saved')}>Open notes</button>
             <button type="button" className="btn" onClick={addPack}>Add advance tax reminders</button>
+            {tour.link}
           </>
         }
       >
         Save a calculation, such as a card total or an EMI, and add a reminder. It will show up here and tell you when it is due. No account, no internet.
       </EmptyState>
+      {tour.sheet}
+      {fixing && <ReliableRemindersSheet onClose={() => setFixing(false)} />}
+      </>
     )
   }
 
@@ -76,7 +90,7 @@ export function DueScreen() {
                     <span className="row__label">{card.title}</span>
                     <span className={overdue ? 'row__hint due__alert' : 'row__hint'}>
                       {dueLabel(r.dueAt, now)} · {WHEN.format(r.dueAt)}
-                      {r.repeat !== 'none' ? ` · ${r.repeat}` : ''}
+                      {r.afterDays ? ` · repeats ${afterDaysLabel(r.afterDays)}` : r.repeat !== 'none' ? ` · ${r.repeat}` : ''}
                     </span>
                   </span>
                   <Icon name="chevron" size={18} className="tap-row__chev" />
@@ -113,6 +127,16 @@ export function DueScreen() {
           <h1 className="screen__title">Due</h1>
         </header>
       )}
+      {!open && tour.row}
+      {missed && !open && (
+        <div className="due__missed" role="status">
+          <p>{missedText(missed)}</p>
+          <div className="due__missed-acts">
+            <button type="button" className="link-btn" onClick={() => setFixing(true)}>Fix reminders</button>
+            <button type="button" className="link-btn" onClick={() => setMissed(null)}>Dismiss</button>
+          </div>
+        </div>
+      )}
       {!total.isZero() && (
         <div className="due__total">
           <span className="result__label">Amounts due in the next 30 days</span>
@@ -129,6 +153,8 @@ export function DueScreen() {
         <button type="button" className="btn" onClick={addPack}>Add a pack: advance tax</button>
       </div>
       {open && <CardView card={open} onBack={() => setOpenId(null)} />}
+      {fixing && <ReliableRemindersSheet onClose={() => setFixing(false)} />}
+      {tour.sheet}
     </div>
   )
 }

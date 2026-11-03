@@ -1,6 +1,7 @@
+import { D } from '../../engine/decimal'
 import { legacyTermText } from '../../engine/loans/term'
 import { groupInteger, type NumberSystem } from '../../lib/format'
-import type { Field, Values } from '../../lib/tool'
+import { parseNum, type Field, type Values } from '../../lib/tool'
 
 /** A field that is one input (not a list of rows). */
 export type Leaf = Exclude<Field, { kind: 'rows' }>
@@ -71,4 +72,19 @@ export function migrateLegacyTerm(fields: Field[], v: Values): Values {
     }
   }
   return rest
+}
+
+/** The quick-add chips under a money box: +1K, +10K and a lakh (+1L) or, in the international system, +100K. */
+export function chipSteps(system: NumberSystem): { step: string; label: string; spoken: string }[] {
+  return [
+    { step: '1000', label: '+1K', spoken: '1,000' },
+    { step: '10000', label: '+10K', spoken: '10,000' },
+    system === 'indian' ? { step: '100000', label: '+1L', spoken: '1 lakh' } : { step: '100000', label: '+100K', spoken: '100,000' },
+  ]
+}
+
+/** What the box holds after a chip adds `step` to it: blank counts as 0. Null when the text is not a number, so a chip never wipes what was typed. */
+export function addAmount(raw: string, step: string): string | null {
+  const now = raw.trim() === '' ? new D(0) : parseNum(raw)
+  return now === null ? null : now.plus(step).toFixed()
 }

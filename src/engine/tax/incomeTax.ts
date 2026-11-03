@@ -130,12 +130,12 @@ export function incomeTax(input: TaxInput, r: TaxRules = RULES_FY2026_27): TaxRe
 
   if (regime === 'old') {
     add('Home-loan interest, self-occupied', min(z(input.homeLoanInterest), new D(o.homeLoanInterestCap)))
-    add('PF, PPF, ELSS, life cover etc. (s.123, old 80C)', min(z(input.sec123), new D(o.sec123Cap)))
-    add('Own NPS (s.124(3), old 80CCD(1B))', min(z(input.ownNps), new D(o.ownNpsCap)))
+    add('Section 80C (old regime): PF, PPF, ELSS, life cover etc.', min(z(input.sec123), new D(o.sec123Cap)))
+    add('Section 80CCD(1B) (old regime): your own NPS', min(z(input.ownNps), new D(o.ownNpsCap)))
     const selfCap = new D(age === 'below60' ? o.healthSelfCap : o.healthSeniorCap)
     const parentCap = new D(input.parentsSenior ? o.healthSeniorCap : o.healthParentsCap)
-    add('Health insurance, self and family (s.126, old 80D)', min(z(input.healthSelf), selfCap))
-    add('Health insurance, parents (s.126)', min(z(input.healthParents), parentCap))
+    add('Section 80D (old regime): health insurance, self and family', min(z(input.healthSelf), selfCap))
+    add('Section 80D (old regime): health insurance, parents', min(z(input.healthParents), parentCap))
   }
 
   const totalIncome = round10(pos(gross.minus(deductions.reduce((a, d) => a.plus(d.amount), Z))), r)

@@ -1,15 +1,15 @@
 import { D, type Dec } from '../../engine/decimal'
 import { formatDecimal } from '../../lib/format'
 import { cagr, epf, fd, goalSip, growCorpus, lumpsum, ppf, rd, sip, swp, xirr, type YearRow } from '../../engine/investments/invest'
-import { EXAMPLE, PPF } from '../../engine/investments/rates'
+import { EXAMPLE, PPF, RATES_AS_OF } from '../../engine/investments/rates'
 import { junkOptional, need, parseNum, type Field, type Output, type ToolSpec } from '../../lib/tool'
 
 /** Grouped the Indian way for the worked-out lines (1,50,000 and not 150000). */
 const s = (v: Dec, dp = 2) => formatDecimal(v.toDecimalPlaces(dp), { system: 'indian', decimals: 'auto' })
 const EX = 'Example rate, enter your own'
 
-const num = (id: string, label: string, def: string, unit: Extract<Field, { kind: 'number' }>['unit'] = 'none', hint?: string, advanced?: boolean): Field => ({
-  id, label, kind: 'number', unit, default: def, hint, advanced,
+const num = (id: string, label: string, def: string, unit: Extract<Field, { kind: 'number' }>['unit'] = 'none', hint?: string, advanced?: boolean, example?: boolean): Field => ({
+  id, label, kind: 'number', unit, default: def, hint, advanced, example,
 })
 const RETURN = 'Expected yearly return'
 const WHOLE = 'Whole years only'
@@ -247,7 +247,7 @@ const fdSpec: ToolSpec = {
       id: 'comp', label: 'Compounded', kind: 'select', default: 'quarterly', advanced: true,
       options: Object.keys(PERIODS).map((k) => ({ value: k, label: k[0]!.toUpperCase() + k.slice(1) })),
     },
-    num('slab', 'Your tax slab', '30', 'percent', 'Your highest tax rate, e.g. 30', true),
+    num('slab', 'Your tax slab', '30', 'percent', 'Your highest tax rate, e.g. 30', true, true),
   ],
   compute: (v) => {
     const r = need(v, [{ id: 'principal', label: 'Amount' }, { id: 'rate', label: 'Interest rate' }, { id: 'years', label: 'Years' }])
@@ -309,6 +309,7 @@ const rdSpec: ToolSpec = {
 
 const ppfSpec: ToolSpec = {
   id: 'ppf',
+  rates: RATES_AS_OF,
   title: 'Public Provident Fund',
   blurb: 'PPF maturity, tax-free',
   category: 'invest',
@@ -349,6 +350,7 @@ const ppfSpec: ToolSpec = {
 
 const npsSpec: ToolSpec = {
   id: 'nps',
+  rates: RATES_AS_OF,
   title: 'NPS pension',
   blurb: 'Retirement fund and monthly pension',
   category: 'invest',
@@ -358,8 +360,8 @@ const npsSpec: ToolSpec = {
     num('rate', RETURN, '10', 'percent'),
     num('age', 'Your age now', '30', 'years'),
     num('retire', 'Retirement age', '60', 'years'),
-    num('annuity', 'Share put into annuity', EXAMPLE.npsAnnuityShare, 'percent', 'Example share. Check the current PFRDA rule.', true),
-    num('annuityRate', 'Yearly annuity rate', EXAMPLE.npsAnnuityRate, 'percent', EX, true),
+    num('annuity', 'Share put into annuity', EXAMPLE.npsAnnuityShare, 'percent', 'Example share. Check the current PFRDA rule.', true, true),
+    num('annuityRate', 'Yearly annuity rate', EXAMPLE.npsAnnuityRate, 'percent', EX, true, true),
   ],
   compute: (v) => {
     const r = need(v, [
@@ -393,6 +395,7 @@ const npsSpec: ToolSpec = {
 
 const epfSpec: ToolSpec = {
   id: 'epf',
+  rates: RATES_AS_OF,
   title: 'Provident fund (EPF)',
   blurb: 'EPF balance at retirement',
   category: 'invest',
@@ -404,7 +407,7 @@ const epfSpec: ToolSpec = {
     num('rate', 'Yearly EPF interest rate', EXAMPLE.epfRate, 'percent', EX),
     num('emp', 'Your share (% of basic)', '12', 'percent', undefined, true),
     num('er', 'Employer share (% of basic)', '12', 'percent', 'Part of this goes to pension (EPS), not EPF', true),
-    num('ceiling', 'Pension wage ceiling', EXAMPLE.epsWageCeiling, 'rupee', 'Was ₹15,000, reportedly ₹25,000 from Sep 2026. Check payslip.', true),
+    num('ceiling', 'Pension wage ceiling', EXAMPLE.epsWageCeiling, 'rupee', 'Was ₹15,000, reportedly ₹25,000 from Sep 2026. Check payslip.', true, true),
   ],
   compute: (v) => {
     const r = need(v, [

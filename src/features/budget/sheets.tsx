@@ -15,6 +15,7 @@ import {
   categoryMonths,
   categoryName,
   dayKey,
+  editWords,
   eligibleInstruments,
   instrumentLabel,
   monthKey,
@@ -33,7 +34,9 @@ import {
   type PaymentModeId,
   type Settlement,
 } from '../../lib/budget'
-import { firstDue, repeatWord } from '../../lib/recurring'
+import { D } from '../../engine'
+import { firstDue, looksMonthly, repeatWord } from '../../lib/recurring'
+import { formatCell } from '../../lib/toolFormat'
 import { shortDate } from '../../lib/tasks'
 import { Segmented } from '../settings/controls'
 import { GuardedFooter, MoneyInput, focusField, useDiscardGuard } from './formKit'
@@ -65,6 +68,11 @@ function addChoices(pay: PaymentModeId): AddChoice[] {
 const UPI_GROUP: Record<InstrumentKind, string> = { bank: 'Bank accounts', debit: 'Debit cards', wallet: 'Wallets', credit: 'RuPay credit cards' }
 
 const hintOf = (i: PayInstrument) => [i.network ? networkLabel(i.network) : '', i.bank].filter(Boolean).join(' · ') || undefined
+
+/** Notes the person said "Not now" to for the monthly-bill guess, for as long as the app stays open. */
+const dismissedHints = new Set<string>()
+/** How many past changes the edit sheet lists (newest first); the rest are summed up in one line. */
+const TRAIL_SHOWN = 3
 
 type View = { v: 'form' } | { v: 'category' } | { v: 'inst' } | { v: 'newInst'; add: AddChoice }
 
@@ -114,6 +122,9 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
   const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({})
   const [submitted, setSubmitted] = useState(false)
   const [storeError, setStoreError] = useState<string | null>(null)
+  const [hintGone, setHintGone] = useState(false)
+  const system = useApp((s) => s.settings.numberSystem)
+  const decimals = useApp((s) => s.settings.decimals)
 
   const amountRef = useRef<HTMLInputElement>(null)
   useEffect(() => {
@@ -267,6 +278,11 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
   const instError = shown('paidWith')
   const linked = expense?.recurringId ? (budget.recurring ?? []).find((r) => r.id === expense.recurringId && r.deletedAt === null) : undefined
   const nextDue = repeat !== 'none' && !errors.date ? firstDue(date, repeat, Date.now(), reminderTime).dueAt : null
+  // A quiet guess from the person's own repeats. Never automatic: it only offers, and "Not now" is remembered for this note.
+  const hintKey = note.trim().toLowerCase()
+  const guess = !linked && !expense?.recurringId && settlement === null && !refund && repeat === 'none' && !hintGone && hintKey !== '' && !dismissedHints.has(hintKey) ? looksMonthly(budget, { note, amount, date }, expense?.id ?? null) : null
+  const trail = expense?.edits ?? []
+  const trailMoney = (plain: string) => formatCell(new D(plain), 'money', { system, decimals })
 
   return (
     <Sheet
@@ -320,6 +336,15 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
                     ? 'For a bill or subscription, such as rent or Netflix.'
                     : `This entry counts as the first payment. Next due ${shortDate(nextDue)}: it shows in Due, and marking it paid adds the entry.`}
                 </p>
+                {guess && (
+                  <>
+                    <p className="ffield__hint" role="status">Looks like a monthly bill. Make it a bill?</p>
+                    <div className="expense__guess">
+                      <button type="button" className="link-btn" onClick={() => setRepeat('monthly')}>Make it a bill</button>
+                      <button type="button" className="link-btn" onClick={() => { dismissedHints.add(hintKey); setHintGone(true) }}>Not now</button>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -395,6 +420,13 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
             <input id="exp-note" className="field" value={note} maxLength={200} autoComplete="off" onChange={(e) => changeNote(e.target.value)} />
           </FormField>
         </div>
+
+        {trail.length > 0 && (
+          <div className="expense__trail" role="group" aria-label="Changes to this entry">
+            {trail.slice(-TRAIL_SHOWN).reverse().map((t, i) => <p key={i} className="ffield__hint">{editWords(t, trailMoney, (id) => (id === null ? 'Uncategorised' : categoryName(budget, id)))}</p>)}
+            {trail.length > TRAIL_SHOWN && <p className="ffield__hint">and {trail.length - TRAIL_SHOWN} earlier {trail.length - TRAIL_SHOWN === 1 ? 'change' : 'changes'}</p>}
+          </div>
+        )}
 
         {expense && (
           <button type="button" className="link-btn link-btn--danger expense__delete" aria-label="Delete this expense" onClick={() => { remove(expense.id); onClose() }}>

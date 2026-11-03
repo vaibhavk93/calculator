@@ -199,7 +199,7 @@ describe('backup and restore', () => {
     }
   })
   it('rejects an oversized file', () => {
-    const r = parseBackup('x'.repeat(6 * 1024 * 1024))
+    const r = parseBackup('x'.repeat(26 * 1024 * 1024))
     expect(r.ok).toBe(false)
   })
 })
@@ -484,9 +484,50 @@ describe('sanitizeSettings: reminder and backup fields', () => {
   })
 })
 
+describe('sanitizeSettings: tours', () => {
+  it('defaults to none seen, so old backups show the tip rows', () => {
+    expect(sanitizeSettings({}).tours).toEqual({})
+    expect(sanitizeSettings({ theme: 'light' }).tours).toEqual({})
+  })
+  it('keeps done and skipped for the three tours and drops everything else', () => {
+    expect(sanitizeSettings({ tours: { budget: 'done', notes: 'skipped', due: 'nope', calc: 'done' } }).tours).toEqual({ budget: 'done', notes: 'skipped' })
+    expect(sanitizeSettings({ tours: 'x' }).tours).toEqual({})
+    expect(sanitizeSettings({ tours: ['budget'] }).tours).toEqual({})
+  })
+})
+
 describe('smsSeen (bank messages already handled)', () => {
   it('keeps valid fingerprints, drops junk, and is absent when empty', () => {
     expect(sanitizeBudget({ ...starterBudget(), smsSeen: ['abc123', 5, '<script>', 'zz99a'] }).smsSeen).toEqual(['abc123', 'zz99a'])
     expect(sanitizeBudget({ ...starterBudget(), smsSeen: 'nope' }).smsSeen).toBeUndefined()
+  })
+})
+
+describe('several lead times and repeat-after-done on stored reminders', () => {
+  const cards = sanitizeCards([{ id: 'c1', title: 'x', kind: 'task', toolId: null, inputs: null, summary: '', amount: null, lines: [], note: '', tags: [], pinned: false, createdAt: 1, updatedAt: 1, deletedAt: null }])
+  const r = { id: 'r1', cardId: 'c1', dueAt: 1_700_000_000_000, repeat: 'none', anchorDay: 1, leadDays: 3, done: false, history: [] }
+  it('an old reminder (a number) is valid and gets no new fields', () => {
+    const [out] = sanitizeReminders([r], cards)
+    expect(out).toEqual(r)
+    expect(out).not.toHaveProperty('leads')
+    expect(out).not.toHaveProperty('afterDays')
+  })
+  it('keeps a list of lead times biggest first, with leadDays as the biggest', () => {
+    const [out] = sanitizeReminders([{ ...r, leadDays: 1, leads: [1, 7, 0, 7] }], cards)
+    expect(out).toMatchObject({ leadDays: 7, leads: [7, 1, 0] })
+  })
+  it('drops junk from the list; a list that ends up with one entry is just leadDays', () => {
+    const [out] = sanitizeReminders([{ ...r, leads: [2, -1, 'x', 99, 1.5] }], cards)
+    expect(out).toMatchObject({ leadDays: 3 })
+    expect(out).not.toHaveProperty('leads')
+  })
+  it('keeps afterDays only as a whole number from 1 to 365', () => {
+    expect(sanitizeReminders([{ ...r, afterDays: 30 }], cards)[0]!.afterDays).toBe(30)
+    for (const bad of [0, 400, 2.5, '30', null]) expect(sanitizeReminders([{ ...r, afterDays: bad }], cards)[0]).not.toHaveProperty('afterDays')
+  })
+  it('a skipped line is kept, and never together with done', () => {
+    const lines = [{ id: 'a', label: 'x', value: '1', skip: true }, { id: 'b', label: 'y', value: '1', done: true, skip: true }, { id: 'c', label: 'z', value: '1' }]
+    const [c] = sanitizeCards([{ id: 'c9', title: 't', kind: 'tape', toolId: null, inputs: null, summary: '', amount: '3', checklist: true, lines, note: '', tags: [], pinned: false, createdAt: 1, updatedAt: 1, deletedAt: null }])
+    expect(c!.lines).toEqual([{ id: 'a', label: 'x', value: '1', skip: true }, { id: 'b', label: 'y', value: '1', done: true }, { id: 'c', label: 'z', value: '1' }])
   })
 })

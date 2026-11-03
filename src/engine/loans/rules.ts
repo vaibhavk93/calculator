@@ -34,6 +34,9 @@
 
 export const LOAN_RULES_AS_OF = '2 Nov 2026'
 
+/** Market loan rates change on any bank's say-so, so this pack is stale from the next quarter. Home loan TAX rules use the tax pack's stamp. */
+export const RATES_AS_OF = { asOf: '2026-11-02', until: '2027-01-01' } as const
+
 export const HOME_LOAN_TAX = {
   taxYear: '2026-27',
   selfOccupiedInterestCap: '200000',

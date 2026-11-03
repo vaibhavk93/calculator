@@ -1,5 +1,5 @@
 import { MAX_TASK_TAGS, MAX_TASK_TITLE, type Reminder, type Repeat, type SavedCard } from './memory'
-import { advance, startOfDay } from './reminders'
+import { advance, afterDaysLabel, cleanAfterDays, startOfDay } from './reminders'
 
 /**
  * To-do, as plain data. A task is a SavedCard of kind 'task'; its date is an ordinary Reminder on that card,
@@ -41,6 +41,8 @@ export interface TaskInput {
   /** "YYYY-MM-DD", or "" for no date. */
   date: string
   repeat: Repeat
+  /** "Repeat N days after I tick it": the days as typed, or null / absent when that is off. */
+  afterDays?: string | null
   tags: string[]
 }
 
@@ -48,6 +50,7 @@ export interface TaskErrors {
   title?: string
   date?: string
   repeat?: string
+  afterDays?: string
   tags?: string
 }
 
@@ -56,6 +59,8 @@ export interface TaskChecked {
   title: string
   /** Null when the task has no date. */
   dueAt: number | null
+  /** Days after it is ticked off, or null for a calendar repeat or none. */
+  afterDays: number | null
 }
 
 /** Checks a task before it is saved. Every message is in words and says what to do. */
@@ -75,18 +80,24 @@ export function validateTask(input: TaskInput, now: number): TaskChecked {
       const limit = new Date(n.getFullYear() + MAX_YEARS_AHEAD, n.getMonth(), n.getDate() + 1).getTime()
       if (dueAt >= limit) errors.date = `Pick a date within the next ${MAX_YEARS_AHEAD} years`
     }
-  } else if (input.repeat !== 'none') errors.repeat = 'Pick a date first, so we know when it repeats'
+  } else if (input.repeat !== 'none' || input.afterDays != null) errors.repeat = 'Pick a date first, so we know when it repeats'
+
+  let afterDays: number | null = null
+  if (input.afterDays != null) {
+    afterDays = cleanAfterDays(input.afterDays)
+    if (afterDays === null) errors.afterDays = 'Enter a number of days from 1 to 365'
+  }
 
   if (new Set(input.tags.map((t) => t.trim().toLowerCase())).size > MAX_TASK_TAGS) errors.tags = `${MAX_TASK_TAGS} tags is the most`
-  return { errors, title, dueAt: errors.date ? null : dueAt }
+  return { errors, title, dueAt: errors.date ? null : dueAt, afterDays }
 }
 
 export const hasErrors = (e: TaskErrors) => Object.keys(e).length > 0
 
 /** The one line a task shows in Trash and in search. */
-export function taskSummary(dueAt: number | null, repeat: Repeat): string {
+export function taskSummary(dueAt: number | null, repeat: Repeat, afterDays?: number | null): string {
   if (dueAt === null) return 'No date'
-  return `Due ${shortDate(dueAt)}${repeat === 'none' ? '' : ` · ${repeat}`}`
+  return `Due ${shortDate(dueAt)}${afterDays ? ` · ${afterDaysLabel(afterDays)}` : repeat === 'none' ? '' : ` · ${repeat}`}`
 }
 
 // ------------------------------------------------------------------ grouping
@@ -156,7 +167,9 @@ export const todayCount = (g: TaskGroups) => g.overdue.length + g.today.length
  * (a monthly task left for three months jumps to the next future month, not to last month).
  * Returns null for a one-time task: it is finished.
  */
-export function nextOccurrence(r: Pick<Reminder, 'dueAt' | 'repeat' | 'anchorDay'>, now: number): number | null {
+export function nextOccurrence(r: Pick<Reminder, 'dueAt' | 'repeat' | 'anchorDay'> & { afterDays?: number }, now: number): number | null {
+  // "N days after I tick it" counts from today, so it is never in the past.
+  if (r.afterDays) return advance(r, now)
   let next = advance(r)
   const today = startOfDay(now)
   for (let i = 0; next !== null && next < today && i < 1000; i++) next = advance({ ...r, dueAt: next })

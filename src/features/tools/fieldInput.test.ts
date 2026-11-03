@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Field } from '../../lib/tool'
-import { advancedOpen, caretFor, groupTyped, migrateLegacyTerm, rawNumber, shouldGroup, significantBefore } from './fieldInput'
+import { addAmount, advancedOpen, chipSteps, caretFor, groupTyped, migrateLegacyTerm, rawNumber, shouldGroup, significantBefore } from './fieldInput'
 import { ALL_TOOLS } from './registry'
 import { isError } from '../../lib/tool'
 
@@ -88,5 +88,23 @@ describe('cards saved with the old years/months pair', () => {
     const v = migrateLegacyTerm(compare.fields, { offers: [['5000000', '8.5', '20', '10000'], ['5000000', '8.35', '20', '25000']], tenureUnit: 'months' })
     expect(v.offers).toEqual([['5000000', '8.5', '20 months', '10000'], ['5000000', '8.35', '20 months', '25000']])
     expect('tenureUnit' in v).toBe(false)
+  })
+})
+
+describe('quick-add chips', () => {
+  it('adds to what is typed, blank counts as zero, decimals stay exact', () => {
+    expect(addAmount('', '1000')).toBe('1000')
+    expect(addAmount('250000', '100000')).toBe('350000')
+    expect(addAmount('0.1', '1000')).toBe('1000.1')
+    expect(addAmount('-500', '1000')).toBe('500')
+  })
+  it('never wipes text it cannot read', () => {
+    expect(addAmount('12abc', '1000')).toBeNull()
+    expect(addAmount('-', '1000')).toBeNull()
+  })
+  it('labels the lakh step the Indian way and the same amount in thousands elsewhere', () => {
+    expect(chipSteps('indian').map((c) => c.label)).toEqual(['+1K', '+10K', '+1L'])
+    expect(chipSteps('international').map((c) => c.label)).toEqual(['+1K', '+10K', '+100K'])
+    expect(chipSteps('indian').map((c) => c.step)).toEqual(chipSteps('international').map((c) => c.step))
   })
 })

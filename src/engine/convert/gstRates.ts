@@ -12,6 +12,9 @@
  */
 export const GST_RATES_AS_OF = '2 Nov 2026'
 
+/** The GST Council changes slabs on no schedule; 31 Mar 2027 (year end, pre-Budget meetings) is the point to say "check". */
+export const RATES_AS_OF = { asOf: '2026-11-02', until: '2027-03-31' } as const
+
 export const GST_PRESETS: { value: string; label: string }[] = [
   { value: '0', label: '0% (nil)' },
   { value: '5', label: '5% (merit)' },

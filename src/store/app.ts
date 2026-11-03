@@ -17,8 +17,12 @@ import {
   MAX_RECURRING,
   MAX_SUBCATEGORIES,
   categoryName,
+  categoryActiveIn,
   categoryUsable,
   cleanInstrument,
+  expenseChanges,
+  withEdits,
+  type BudgetExpense,
   dayKey,
   dropInapplicable,
   instrumentFitsMode,
@@ -35,6 +39,7 @@ import {
   type ExpenseDraft,
 } from '../lib/budget'
 import { capHistory, isRawExpression, sanitizeSettings } from './persistence'
+import type { Values } from '../lib/tool'
 import {
   MAX_CATEGORIES,
   MAX_EXPENSES,
@@ -43,6 +48,7 @@ import {
   type InstrumentDraft,
   type PayInstrument,
   MAX_CARDS,
+  MAX_DRAFTS,
   MAX_HISTORY,
   MAX_LOCKED,
   MAX_MEMO,
@@ -62,7 +68,7 @@ import {
 import { advance, advanceTaxPack, atTime } from '../lib/reminders'
 import { billForCard, cardBillDue, cardBillFor, firstDue, liveBills, rollForward, validateBill } from '../lib/recurring'
 import { isTaskDone, nextOccurrence, parseDay, shortDate, taskSummary } from '../lib/tasks'
-import { listSummary, repeatLines, tapeTotal } from '../lib/tape'
+import { lineState, listSummary, nextLineState, repeatLines, tapeTotal, withLineState } from '../lib/tape'
 
 export type Overlay = 'none' | 'settings' | 'history'
 export type Panel = 'none' | 'more' | 'scientific'
@@ -95,6 +101,10 @@ export interface ReminderDraft {
   dueAt: number
   repeat: Repeat
   leadDays: number
+  /** Several heads-up times in days before, biggest first (see `leadFields`). Absent: just `leadDays`. */
+  leads?: number[]
+  /** Repeat this many days after it is ticked off, instead of on the calendar. */
+  afterDays?: number
 }
 
 /** Where the user is inside the Tools tab. Lives in the store so the tab bar and the Android back button can pop it. */
@@ -133,6 +143,8 @@ export interface AppState {
   memory: string | null
   settings: Settings
   budget: BudgetData
+  /** Unsaved calculator inputs by tool id. Saved with the app, so a half-filled calculator survives a restart. */
+  drafts: Record<string, Values>
 
   tab: Tab
   /** Where the user is inside the Tools tab. */
@@ -148,7 +160,6 @@ export interface AppState {
   /** The expression "=" just evaluated, for the line above the result. Null when nothing was computed. */
   lastExpression: string | null
   snack: Snack | null
-  removed: Removed[] | null
 
   press: (key: Key) => void
 
@@ -171,6 +182,13 @@ export interface AppState {
   setCardBillReminder: (instrumentId: string, on: boolean) => boolean
   /** Removes an entry; the snackbar offers Undo. */
   deleteExpense: (id: string) => void
+  /** Remembers what is typed into a calculator (null forgets it). Keeps the newest MAX_DRAFTS. */
+  setDraft: (toolId: string, values: Values | null) => void
+  /**
+   * Moves several entries to one category (null: Uncategorised) in one step, with one Undo. Card bills and transfers have no
+   * category and are skipped, as are entries from months the category is not used in. Returns how many were changed.
+   */
+  recategorise: (ids: string[], categoryId: string | null) => number
   /** Remembers bank messages that were added or skipped, so a later scan does not offer them again. */
   markSmsSeen: (ids: string[]) => void
   /** A monthly limit for one category, or null to remove it. */
@@ -297,9 +315,10 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
   // Trash is emptied after TRASH_DAYS; a card's reminders go with it.
   const keep = initial.cards.filter((c) => c.deletedAt === null || deps.now() - c.deletedAt < TRASH_DAYS * DAY)
   const keepIds = new Set(keep.map((c) => c.id))
-  let removedCardId: string | null = null
-  let removedExpenseId: string | null = null
-  /** A task tick or "Clear done" that the snackbar's Undo can reverse; only valid while its own snackbar is showing. */
+  /**
+   * The ONE thing the snackbar's Undo can reverse (a delete, a task tick, a bill payment). Every removal replaces it, and it
+   * is only valid while its own snackbar is showing, so Undo can never bring back an older, different item (B-05).
+   */
   let taskUndo: { snackId: number; run: () => void } | null = null
 
   return createStore<AppState>()((set, get) => {
@@ -322,6 +341,8 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         repeat: draft.repeat,
         anchorDay: new Date(draft.dueAt).getDate(),
         leadDays: draft.leadDays,
+        ...(draft.leads && draft.leads.length > 1 ? { leads: draft.leads } : {}),
+        ...(draft.afterDays ? { afterDays: draft.afterDays } : {}),
         done: false,
         history: existing?.history ?? [],
       }
@@ -413,6 +434,13 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       return id
     }
 
+    /** Puts removed history rows back at their old positions (ascending, so the indexes line up again). */
+    const restoreHistory = (removed: { entry: HistoryEntry; index: number }[]) => {
+      const restored = [...get().history]
+      for (const { entry, index } of [...removed].sort((a, b) => a.index - b.index)) restored.splice(Math.min(index, restored.length), 0, entry)
+      set({ history: capHistory(restored, MAX_HISTORY) })
+    }
+
     const dropExpense = (id: string) => set({ budget: { ...get().budget, expenses: get().budget.expenses.filter((e) => e.id !== id) } })
 
     /** After a card is edited: keeps its bill reminder's name and day in step, or ends it when the due day is gone. */
@@ -443,7 +471,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       if (limit === null || limit.trim() === '') return null
       const bad = validateLimit(limit)
       if (bad) return void fail(bad)
-      return toPlain(parseNum(limit.replace(/[,₹\s]/g, ''))!)
+      return toPlain(parseNum(limit)!)
     }
 
     /** Applies a limit to the every-month field or to one month's override. Returns the new pair, or null when refused. */
@@ -475,7 +503,9 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       reminders: initial.reminders.filter((r) => keepIds.has(r.cardId)),
       memory: initial.memory,
       settings: initial.settings,
-      budget: initial.budget,
+      // Entries deleted more than 30 days ago are gone for good, so deleting can free room under the 20,000 cap (B-27).
+      drafts: initial.drafts ?? {},
+      budget: { ...initial.budget, expenses: initial.budget.expenses.filter((e) => e.deletedAt === null || deps.now() - e.deletedAt < TRASH_DAYS * DAY) },
 
       // A chosen startup calculator opens the Tools tab with that calculator already showing.
       tab: initial.settings.startupTool ? 'tools' : initial.settings.startupTab,
@@ -487,7 +517,6 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       notice: null,
       lastExpression: null,
       snack: null,
-      removed: null,
 
       press: (key) => {
         const { input, settings, history, selection } = get()
@@ -624,11 +653,8 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const entry = history[index]
         if (index === -1 || !entry) return
         if (entry.locked) return set({ notice: { id: nextId(), text: 'Unlock it first to delete it.', tone: 'info' } })
-        set({
-          history: history.filter((h) => h.id !== id),
-          removed: [{ entry, index }],
-          snack: { id: nextId(), text: 'Removed from history', canUndo: true },
-        })
+        set({ history: history.filter((h) => h.id !== id) })
+        undoable('Removed from history', () => restoreHistory([{ entry, index }]))
       },
 
       clearHistory: () => {
@@ -636,11 +662,8 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         // Named and locked rows are kept: clearing is for the clutter, not for what you bothered to keep.
         const toRemove = history.map((entry, index) => ({ entry, index })).filter((r) => !isKept(r.entry))
         if (toRemove.length === 0) return
-        set({
-          history: history.filter(isKept),
-          removed: toRemove,
-          snack: { id: nextId(), text: `Cleared ${toRemove.length} calculations`, canUndo: true },
-        })
+        set({ history: history.filter(isKept) })
+        undoable(`Cleared ${toRemove.length} calculations`, () => restoreHistory(toRemove))
       },
 
       addExpense: (draft, repeat = null) => {
@@ -663,7 +686,14 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const recurringId = repeat && old && !old.recurringId && !settlement && !refund ? startBill(e, repeat) : undefined
         if (recurringId === null) return false
         const { budget } = get()
-        set({ budget: { ...budget, expenses: budget.expenses.map((x) => { if (x.id !== id) return x; const { settlement: _s, refund: _r, ...keep } = x; return { ...keep, ...rest, ...(settlement ? { settlement } : {}), ...(refund ? { refund: true } : {}), ...(recurringId ? { recurringId } : {}) } }) } })
+        const at = deps.now()
+        set({ budget: { ...budget, expenses: budget.expenses.map((x) => {
+          if (x.id !== id) return x
+          const { settlement: _s, refund: _r, edits: _e, ...keep } = x
+          // A trail of what changed (amount, date, category). It is only a note: it can never stop the save.
+          const edits = withEdits(x.edits, expenseChanges(x, rest, at))
+          return { ...keep, ...rest, ...(settlement ? { settlement } : {}), ...(refund ? { refund: true } : {}), ...(recurringId ? { recurringId } : {}), ...(edits ? { edits } : {}) }
+        }) } })
         return true
       },
 
@@ -753,12 +783,45 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const { budget } = get()
         const target = budget.expenses.find((x) => x.id === id && x.deletedAt === null)
         if (!target) return
-        removedExpenseId = id
-        removedCardId = null
-        set({
-          budget: { ...budget, expenses: budget.expenses.map((x) => (x.id === id ? { ...x, deletedAt: deps.now() } : x)) },
-          snack: { id: nextId(), text: 'Removed from your budget', canUndo: true },
+        set({ budget: { ...budget, expenses: budget.expenses.map((x) => (x.id === id ? { ...x, deletedAt: deps.now() } : x)) } })
+        undoable('Removed from your budget', () => {
+          const b = get().budget
+          set({ budget: { ...b, expenses: b.expenses.map((x) => (x.id === id ? { ...x, deletedAt: null } : x)) } })
         })
+      },
+
+      setDraft: (toolId, values) => {
+        const { [toolId]: _old, ...rest } = get().drafts
+        // Re-added last, so the oldest ones are the ones dropped at the limit.
+        const next = values === null ? rest : { ...rest, [toolId]: values }
+        set({ drafts: Object.fromEntries(Object.entries(next).slice(-MAX_DRAFTS)) })
+      },
+
+      recategorise: (ids, categoryId) => {
+        const { budget } = get()
+        if (categoryId !== null && !categoryUsable(budget, categoryId)) return (fail('Pick a category from the list'), 0)
+        const want = new Set(ids)
+        const at = deps.now()
+        const before = new Map<string, BudgetExpense>()
+        let wrongMonth = 0
+        const expenses = budget.expenses.map((x) => {
+          if (!want.has(x.id) || x.deletedAt !== null || x.settlement || x.categoryId === categoryId) return x
+          if (categoryId !== null && !categoryActiveIn(budget, categoryId, x.date.slice(0, 7))) return (wrongMonth++, x)
+          before.set(x.id, x)
+          const edits = withEdits(x.edits, expenseChanges(x, { ...x, categoryId }, at))
+          return { ...x, categoryId, ...(edits ? { edits } : {}) }
+        })
+        if (before.size === 0) {
+          if (wrongMonth > 0 && categoryId !== null) fail(`${categoryName(budget, categoryId)} is not used in ${wrongMonth === 1 ? 'that entry\'s month' : 'those entries\' months'}`)
+          return 0
+        }
+        set({ budget: { ...budget, expenses }, notice: null })
+        const name = categoryId === null ? 'Uncategorised' : categoryName(budget, categoryId)
+        undoable(`${before.size} ${before.size === 1 ? 'entry' : 'entries'} moved to ${name}${wrongMonth > 0 ? `. ${wrongMonth} skipped: not used in their month` : ''}`, () => {
+          const b = get().budget
+          set({ budget: { ...b, expenses: b.expenses.map((x) => before.get(x.id) ?? x) } })
+        })
+        return before.size
       },
 
       setCategoryLimit: (id, limit, scope = { kind: 'always' }) => {
@@ -925,26 +988,6 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
           set({ snack: null })
           return t.run()
         }
-        if (removedExpenseId) {
-          const id = removedExpenseId
-          removedExpenseId = null
-          const { budget } = get()
-          return set({ snack: null, budget: { ...budget, expenses: budget.expenses.map((x) => (x.id === id ? { ...x, deletedAt: null } : x)) } })
-        }
-        if (removedCardId) {
-          const id = removedCardId
-          removedCardId = null
-          set({ snack: null })
-          return get().restoreCard(id)
-        }
-        const { removed, history } = get()
-        if (!removed) return
-        const restored = [...history]
-        // Re-insert in ascending original position so indexes line up again.
-        for (const { entry, index } of [...removed].sort((a, b) => a.index - b.index)) {
-          restored.splice(Math.min(index, restored.length), 0, entry)
-        }
-        set({ history: capHistory(restored, MAX_HISTORY), removed: null, snack: null })
       },
 
       saveCard: (draft, reminder) => {
@@ -1008,7 +1051,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const { cards, settings } = get()
         const card = cards.find((c) => c.id === cardId && c.deletedAt === null)
         if (!card) return
-        const lines = card.lines.map((l) => (l.id === lineId ? { ...l, done: !l.done } : l))
+        const lines = card.lines.map((l) => (l.id === lineId ? withLineState(l, nextLineState(lineState(l))) : l))
         const opts = { system: settings.numberSystem, decimals: settings.decimals }
         set({ cards: cards.map((c) => (c.id === cardId ? { ...c, lines, summary: listSummary(lines, !!c.checklist, opts), updatedAt: deps.now() } : c)) })
       },
@@ -1029,12 +1072,8 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       deleteCard: (id) => {
         const card = get().cards.find((c) => c.id === id && c.deletedAt === null)
         if (!card) return
-        removedCardId = id
-        set({
-          cards: get().cards.map((c) => (c.id === id ? { ...c, deletedAt: deps.now(), pinned: false } : c)),
-          removed: null,
-          snack: { id: nextId(), text: `Moved "${card.title}" to Trash`, canUndo: true },
-        })
+        set({ cards: get().cards.map((c) => (c.id === id ? { ...c, deletedAt: deps.now(), pinned: false } : c)) })
+        undoable(`Moved "${card.title}" to Trash`, () => get().restoreCard(id))
       },
 
       restoreCard: (id) => set({ cards: get().cards.map((c) => (c.id === id ? { ...c, deletedAt: null } : c)) }),
@@ -1049,7 +1088,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const r = get().reminders.find((x) => x.id === reminderId)
         if (!r) return
         const amount = get().cards.find((c) => c.id === r.cardId)?.amount ?? null
-        const next = advance(r)
+        const next = advance(r, deps.now())
         const paid = { ...r, history: [...r.history, { paidAt: deps.now(), amount }].slice(-200) }
         // A bill that repeats also puts this period's payment in the budget (once), and Undo takes both back.
         const added = settleBill(r)
@@ -1123,7 +1162,6 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         taskUndo = { snackId, run: () => set({ cards: get().cards.map((c) => before.get(c.id) ?? c) }) }
         set({
           cards: cards.map((c) => (doneIds.has(c.id) ? { ...c, deletedAt: at, pinned: false } : c)),
-          removed: null,
           snack: { id: snackId, text: `Moved ${doneIds.size} done ${doneIds.size === 1 ? 'task' : 'tasks'} to Trash`, canUndo: true },
         })
         return doneIds.size
@@ -1174,7 +1212,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       showLinkSnack: (text, link) => set({ snack: { id: nextId(), text, canUndo: false, link } }),
 
       dismissSnack: (id) => {
-        if (get().snack?.id === id) set({ snack: null, removed: null })
+        if (get().snack?.id === id) set({ snack: null })
       },
 
       restore: (data) =>
@@ -1188,15 +1226,15 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
           memory: data.memory,
           settings: data.settings,
           budget: data.budget,
-          removed: null,
+          drafts: data.drafts ?? {},
           snack: null,
           notice: null,
           lastExpression: null,
         }),
 
       snapshot: () => {
-        const { input, history, cards, reminders, memory, settings, budget } = get()
-        return { schemaVersion: initial.schemaVersion, input, history, cards, reminders, memory, settings, budget }
+        const { input, history, cards, reminders, memory, settings, budget, drafts } = get()
+        return { schemaVersion: initial.schemaVersion, input, history, cards, reminders, memory, settings, budget, ...(Object.keys(drafts).length > 0 ? { drafts } : {}) }
       },
     }
   })

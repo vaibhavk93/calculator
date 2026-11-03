@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { EmptyState } from '../../components/EmptyState'
 import { Icon } from '../../components/Icon'
 import { useApp, useAppStore } from '../../components/StoreProvider'
@@ -21,7 +21,7 @@ let lastView: View = 'today'
  * To-do, inside the Notes tab. Today (due today and overdue), Upcoming (dated, later), All (with an undated Inbox).
  * Tick a task to finish it; tap its text to open it. `query` and `tag` come from the Notes search box.
  */
-export function TodoScreen({ query, tag }: { query: string; tag: string | null }) {
+export function TodoScreen({ query, tag, tourLink }: { query: string; tag: string | null; tourLink?: ReactNode }) {
   const cards = useApp((s) => s.cards)
   const reminders = useApp((s) => s.reminders)
   const tabTap = useApp((s) => s.tabTap)
@@ -130,7 +130,7 @@ export function TodoScreen({ query, tag }: { query: string; tag: string | null }
 
       <div className="tools__list sections">
         {total === 0 ? (
-          <EmptyState title="No tasks yet" level="h2">Write what needs doing in the box above. Give a task a date and it shows in Today and in the Due tab.</EmptyState>
+          <EmptyState title="No tasks yet" level="h2" action={tourLink}>Write what needs doing in the box above. Give a task a date and it shows in Today and in the Due tab.</EmptyState>
         ) : (
           <>
             {body}

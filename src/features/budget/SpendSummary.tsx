@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import type { PickOption } from '../../components/PickerSelect'
 import { Icon } from '../../components/Icon'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useApp } from '../../components/StoreProvider'
@@ -9,6 +10,8 @@ import {
   SETTLEMENT_LABEL,
   categoryName,
   categoryTotal,
+  categoryUsable,
+  validateCategoryName,
   compareLastMonth,
   cycleRange,
   dayKey,
@@ -36,9 +39,11 @@ import { cardBillFor } from '../../lib/recurring'
 import { formatCell } from '../../lib/toolFormat'
 import { Segmented } from '../settings/controls'
 import { FilterSheet, scopeKey, scopeLabel, type Scope } from './FilterSheet'
+import { PaidWithTree } from './PaidWithTree'
 import { Heatmap } from './Heatmap'
 import { ExportSheet } from './ExportSheet'
 import { ExpenseSheet } from './sheets'
+import { PickView } from './pick'
 
 export type SummaryTab = 'summary' | 'entries'
 
@@ -96,7 +101,7 @@ export function limitWords(state: LimitState, left: Dec, limit: Dec, money: (v: 
 }
 
 /** One entry: tap the row to edit it, the trash to remove it (the snack bar offers Undo). A bill payment or transfer says it is not spending. */
-export function EntryRow({ e, onEdit }: { e: BudgetExpense; onEdit: (id: string) => void }) {
+export function EntryRow({ e, onEdit, select }: { e: BudgetExpense; onEdit: (id: string) => void; /** Set while picking several entries: the row becomes a tick box (a card bill or transfer has no category, so it cannot be ticked). */ select?: { checked: boolean; onToggle: () => void } }) {
   const budget = useApp((s) => s.budget)
   const remove = useApp((s) => s.deleteExpense)
   const money = useMoney()
@@ -107,6 +112,29 @@ export function EntryRow({ e, onEdit }: { e: BudgetExpense; onEdit: (id: string)
   const how = [e.mode ? modeLabel(e.mode) : '', inst ? instrumentLabel(inst) : ''].filter(Boolean).join(' · ')
   const hint = [refund ? 'Refund' : '', shortDate(e.date), how, e.settlement ? 'Not counted as spending' : '', e.note].filter(Boolean).join(' · ')
   const spoken = `${refund ? 'refund of ' : ''}${money(amount)} ${name}${e.settlement ? ', not counted as spending' : ''}`
+  if (select && e.settlement) {
+    return (
+      <div className="budget__entry budget__entry--off">
+        <div className="budget__main budget__main--pick">
+          <span className="budget__amt spend__amt">{money(amount)}</span>
+          <span className="row__label">{name}</span>
+          <span className="row__hint">{hint}. Has no category</span>
+        </div>
+      </div>
+    )
+  }
+  if (select) {
+    return (
+      <div className="budget__entry">
+        <button type="button" role="checkbox" aria-checked={select.checked} className="budget__main budget__main--pick tap-row" aria-label={`Select ${spoken}`} onClick={select.onToggle}>
+          <span className="budget__tick" aria-hidden="true">{select.checked && <Icon name="check" size={18} />}</span>
+          <span className="budget__amt spend__amt">{money(refund ? amount.neg() : amount)}</span>
+          <span className="row__label">{name}</span>
+          <span className="row__hint">{hint}</span>
+        </button>
+      </div>
+    )
+  }
   return (
     <div className="budget__entry">
       <button type="button" className="budget__main tap-row" aria-label={`Edit ${spoken}`} onClick={() => onEdit(e.id)}>
@@ -166,7 +194,16 @@ export function SpendSummary({
   const [editing, setEditing] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [cycleOn, setCycleOn] = useState(false)
+  // Picking several entries to give them one category. `sel` holds ids; only the ones in the list on screen are used.
+  const [selecting, setSelecting] = useState(false)
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  const [recat, setRecat] = useState(false)
+  const [selNote, setSelNote] = useState<string | null>(null)
+  const recategorise = useApp((st) => st.recategorise)
+  const addCategory = useApp((st) => st.addCategory)
+  const stopSelecting = () => { setSelecting(false); setSel(new Set()); setSelNote(null) }
   useBackHandler(editing !== null, () => setEditing(null))
+  useBackHandler(selecting && !recat && editing === null, stopSelecting)
 
   const today = new Date()
   const everything = scopeKey(scope) === 'all'
@@ -192,6 +229,27 @@ export function SpendSummary({
     : null
   const foundTotal = found ? found.filter((e) => !e.settlement).reduce((t, e) => t.plus(signedAmount(e)), new D(0)) : null
   const SEARCH_SHOWN = 200
+
+  const listed = found ?? entries
+  const chosen = listed.filter((e) => sel.has(e.id) && !e.settlement)
+  const tickable = listed.filter((e) => !e.settlement)
+  const rowSelect = (e: BudgetExpense) => (selecting ? { checked: sel.has(e.id), onToggle: () => { setSelNote(null); setSel((s) => { const n = new Set(s); if (n.has(e.id)) n.delete(e.id); else n.add(e.id); return n }) } } : undefined)
+  const categoryChoices = useMemo<PickOption[]>(() => {
+    const usable = budget.categories.filter((c) => c.deletedAt === null && categoryUsable(budget, c.id))
+    const out: PickOption[] = [{ value: '', label: 'Uncategorised' }]
+    for (const top of usable.filter((c) => c.parentId === null)) {
+      out.push({ value: top.id, label: top.name })
+      for (const sub of usable.filter((c) => c.parentId === top.id)) out.push({ value: sub.id, label: categoryName(budget, sub.id) })
+    }
+    return out
+  }, [budget])
+  const pickCategory = (v: string) => {
+    const moved = recategorise(chosen.map((e) => e.id), v === '' ? null : v)
+    setRecat(false)
+    if (moved > 0) stopSelecting()
+    else setSelNote('Nothing was moved. Check the message above')
+  }
+  const startRecat = () => (chosen.length === 0 ? setSelNote('Tick at least one entry first') : setRecat(true))
 
   const showAll = () => { setScope({}); setCat(null); setDay(null) }
   const drill = (id: string) => { setCat(id); setTab('entries') }
@@ -382,18 +440,7 @@ export function SpendSummary({
       </Card>
 
       <Card tint={4} title="Paid with">
-        {s.byMode.map((m) => (
-          <div className="budget__row budget__row--plain" key={m.id}>
-            <span className="row__label">{m.label}</span>
-            <span className="budget__amt spend__amt">{money(m.spent)}</span>
-          </div>
-        ))}
-        {!s.noMode.isZero() && (
-          <div className="budget__row budget__row--plain">
-            <span className="row__label">No mode</span>
-            <span className="budget__amt spend__amt">{money(s.noMode)}</span>
-          </div>
-        )}
+        <PaidWithTree budget={budget} month={month} scope={eff} onPick={({ cycleDay: _cycle, ...f }) => { setScope(f); setCat(null); setDay(null); setTab('entries') }} />
       </Card>
 
       {scope.instrumentId === undefined && s.byInstrument.length > 0 && (
@@ -452,7 +499,7 @@ export function SpendSummary({
         <p className="budget__none" role="status">
           {found.length === 0 ? `Nothing matches "${needle}" in any month.` : `${entriesWord(found.length)} match "${needle}" in all months${foundTotal && !foundTotal.isZero() ? `, ${money(foundTotal)} in total` : ''}.`}
         </p>
-        {found.slice(0, SEARCH_SHOWN).map((e) => <EntryRow key={e.id} e={e} onEdit={setEditing} />)}
+        {found.slice(0, SEARCH_SHOWN).map((e) => <EntryRow key={e.id} e={e} onEdit={setEditing} select={rowSelect(e)} />)}
         {found.length > SEARCH_SHOWN && <p className="budget__none">Showing the first {SEARCH_SHOWN}. Type more to narrow it down.</p>}
         <button type="button" className="link-btn spend__link" onClick={() => setQuery('')}>Clear search</button>
       </div>
@@ -471,7 +518,8 @@ export function SpendSummary({
             <p className="budget__note">{catLabel} · {money(detail.all.total)} across {entriesWord(detail.all.count)} in all months</p>
           </>
         )}
-        {entries.map((e) => <EntryRow key={e.id} e={e} onEdit={setEditing} />)}
+        {entries.length > 1 && !selecting && <button type="button" className="link-btn spend__link" onClick={() => setSelecting(true)}>Select entries to change their category</button>}
+        {entries.map((e) => <EntryRow key={e.id} e={e} onEdit={setEditing} select={rowSelect(e)} />)}
       </div>
     </section>
   )
@@ -486,6 +534,28 @@ export function SpendSummary({
         </div>
         <button type="button" className="link-btn" onClick={() => setExporting(true)}>Export expenses as a spreadsheet</button>
       </div>
+      {selecting && !recat && (
+        <div className="spend__bulk" role="group" aria-label="Change category of the ticked entries">
+          <p className="budget__note" role="status">{selNote ?? `${chosen.length} of ${tickable.length} selected`}</p>
+          <div className="spend__bulkbtns">
+            <button type="button" className="btn" onClick={stopSelecting}>Cancel</button>
+            <button type="button" className="btn" onClick={() => { setSelNote(null); setSel(chosen.length === tickable.length ? new Set() : new Set(tickable.map((e) => e.id))) }}>{chosen.length === tickable.length && tickable.length > 0 ? 'Select none' : 'Select all'}</button>
+            <button type="button" className="btn btn--primary" onClick={startRecat}>Change category</button>
+          </div>
+        </div>
+      )}
+      {recat && (
+        <PickView
+          title={`Category for ${chosen.length} ${chosen.length === 1 ? 'entry' : 'entries'}`}
+          options={categoryChoices}
+          value="__none__"
+          onBack={() => setRecat(false)}
+          onPick={pickCategory}
+          onAddName={(name) => addCategory(name)}
+          validateAdd={(name) => (budget.categories.some((c) => c.deletedAt === null && c.parentId === null && c.name.toLowerCase() === name.toLowerCase()) ? null : validateCategoryName(name, budget, null))}
+          addLabel="Add category"
+        />
+      )}
       {exporting && <ExportSheet onClose={() => setExporting(false)} />}
       {picking && <FilterSheet budget={budget} value={scope} onPick={setScope} onClose={() => setPicking(false)} />}
       {editing !== null && <ExpenseSheet expense={budget.expenses.find((e) => e.id === editing)} onClose={() => setEditing(null)} />}

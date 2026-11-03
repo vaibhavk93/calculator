@@ -1,4 +1,4 @@
-import { useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react'
 import type { Key } from '../../engine'
 import { haptic } from '../../lib/device'
 import { useApp } from '../../components/StoreProvider'
@@ -91,6 +91,8 @@ export function useRepeatingPress(onPress: () => void) {
     clearInterval(timers.current.repeat)
     timers.current = {}
   }
+  // The button can vanish while held (another finger changes the tab): the timer must not outlive it (B-21).
+  useEffect(() => stop, [])
 
   return {
     onPointerDown: (e: ReactPointerEvent) => {

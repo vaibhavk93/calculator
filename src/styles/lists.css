@@ -242,3 +242,164 @@
 .todo__delete {
   align-self: flex-start;
 }
+
+/* ---- three-state lines (pending / paid / skipped): the state is always a word, colour is extra */
+
+.tri {
+  position: relative;
+  flex: none;
+  min-width: 4.75rem;
+  min-height: 32px;
+  margin-left: var(--s-2);
+  padding: 0 var(--s-2);
+  border: 1px solid var(--ink-3);
+  border-radius: var(--r-md);
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+  text-align: center;
+}
+
+/* Looks 32px, hits 44px+. */
+.tri::after {
+  content: '';
+  position: absolute;
+  inset: -8px -2px;
+}
+
+.tri:active {
+  background: var(--key-op-pressed);
+}
+
+.tri[data-state='paid'] {
+  color: var(--accent);
+  border-color: var(--accent-dim);
+}
+
+.tri[data-state='skip'] {
+  color: var(--ink-3);
+  text-decoration: line-through;
+}
+
+.tape__line--skip .tape__label,
+.tape__line--skip .tape__amt {
+  color: var(--ink-3);
+  text-decoration: line-through;
+}
+
+.tape__line--done .tape__name,
+.tape__line--done .tape__amt {
+  color: var(--ink-3);
+}
+
+/* A line's name renames it in place; its amount edits it in the bar below. */
+.tape__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 48px;
+  padding: 0 var(--s-2) 0 var(--s-3);
+  text-align: left;
+}
+
+.tape__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tape__pencil {
+  flex: none;
+  color: var(--accent);
+}
+
+.tape__skipword {
+  flex: none;
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+}
+
+.tape__amt {
+  flex: none;
+  min-height: 48px;
+  padding: 0 var(--s-2);
+  text-align: right;
+}
+
+.tape__rename {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: var(--s-1) var(--s-2) var(--s-1) var(--s-3);
+}
+
+/* Several lines pasted: offer them as checklist items. */
+.tape__offer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin-bottom: var(--s-3);
+  font-size: 0.9375rem;
+}
+
+.tape__offer p {
+  margin: 0;
+}
+
+.tape__offer-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-4);
+}
+
+/* ---- reminders: lead-time pills, "repeat after I tick it", the Due notice, the steps sheet */
+
+.lead,
+.afterdone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin-top: var(--s-3);
+}
+
+.due__missed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9375rem;
+}
+
+.due__missed p {
+  margin: 0;
+}
+
+.due__missed-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-4);
+}
+
+.steps__lead {
+  margin: 0 0 var(--s-3);
+  font-size: 0.9375rem;
+}
+
+.steps__head {
+  margin: 0 0 var(--s-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.steps {
+  margin: 0 0 var(--s-3);
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  font-size: 0.9375rem;
+}

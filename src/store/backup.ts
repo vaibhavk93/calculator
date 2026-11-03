@@ -2,7 +2,8 @@ import { CURRENT_SCHEMA, migrate } from './persistence'
 import type { PersistedData } from './types'
 
 export const BACKUP_KIND = 'vkcalc-backup'
-const MAX_BACKUP_BYTES = 5 * 1024 * 1024
+// 20,000 entries are about 3.6 MB compact; the old limit (5 MB) rejected the app's own pretty-printed backups (B-03).
+const MAX_BACKUP_BYTES = 25 * 1024 * 1024
 
 export function buildBackup(data: PersistedData, now: Date = new Date()): string {
   return JSON.stringify(
@@ -13,8 +14,6 @@ export function buildBackup(data: PersistedData, now: Date = new Date()): string
       app: 'Calc',
       data,
     },
-    null,
-    2,
   )
 }
 

@@ -6,6 +6,7 @@ import { tintStyle } from '../../components/tint'
 import { useBackHandler } from '../../components/useBackHandler'
 import { limitState, monthKey, monthLabel, monthShortLabel, needsAttention, paceLeft, summarise } from '../../lib/budget'
 import { billTotals, liveBills } from '../../lib/recurring'
+import { useTour } from '../onboarding/useTour'
 import { BillsScreen } from './BillsScreen'
 import { ImportScreen } from './ImportScreen'
 import { ManageScreen } from './ManageScreen'
@@ -47,6 +48,11 @@ export function BudgetScreen() {
     setOpen({ tab, categoryId })
     setPage('summary')
   }
+  const tour = useTour('budget', (a) => {
+    if (a === 'add-expense') setSheet({ id: null })
+    else if (a === 'manage' || a === 'import' || a === 'bills') setPage(a)
+    else if (a === 'summary') goSummary('summary')
+  })
 
   const sheets = sheet !== null && <ExpenseSheet expense={budget.expenses.find((e) => e.id === sheet.id)} onClose={() => setSheet(null)} />
   const pages = (
@@ -61,6 +67,7 @@ export function BudgetScreen() {
   if (never && s.entries.length === 0) {
     return (
       <>
+        {tour.row}
         <EmptyState
           title="No spending yet"
           action={
@@ -70,6 +77,7 @@ export function BudgetScreen() {
               <button type="button" className="link-btn" onClick={() => setPage('bills')}>Bills and subscriptions</button>
               <button type="button" className="link-btn" onClick={() => setPage('manage')}>Set a monthly limit</button>
               <button type="button" className="link-btn" onClick={() => setPage('manage')}>Categories and cards</button>
+              {tour.link}
             </>
           }
         >
@@ -77,6 +85,7 @@ export function BudgetScreen() {
         </EmptyState>
         {sheets}
         {pages}
+        {tour.sheet}
       </>
     )
   }
@@ -102,6 +111,7 @@ export function BudgetScreen() {
         </header>
       )}
 
+      {tour.row}
       <div className="tools__list sections">
         <section className="sect" style={tintStyle(3)} aria-label="Summary">
           <div className="budget__sum">
@@ -194,6 +204,7 @@ export function BudgetScreen() {
         entry from inside one of them does not unmount it (that used to reset the Add from messages screen). */}
     {sheets}
     {pages}
+    {tour.sheet}
     </>
   )
 }

@@ -4,7 +4,7 @@ import { advanceTax } from '../../engine/tax/advanceTax'
 import { capitalGains, type Asset } from '../../engine/tax/capitalGains'
 import { gratuity } from '../../engine/tax/gratuity'
 import { compareRegimes, inHandSalary, presumptive, type Regime, type TaxResult } from '../../engine/tax/incomeTax'
-import { RULES_FY2026_27 as R, taxNote, type AgeBand } from '../../engine/tax/rules.FY2026-27'
+import { RATES_AS_OF, RULES_FY2026_27 as R, taxNote, type AgeBand } from '../../engine/tax/rules.FY2026-27'
 import { junkOptional, need, parseNum, type Field, type ResultRow, type ResultTable, type ToolSpec, type Values } from '../../lib/tool'
 
 // ---- shared ---------------------------------------------------------------------
@@ -68,6 +68,7 @@ const taxLine = (t: TaxResult) =>
 
 const incomeTaxSpec: ToolSpec = {
   id: 'income-tax',
+  rates: RATES_AS_OF,
   title: 'Income tax: old vs new',
   blurb: 'Which regime saves you more',
   category: 'tax',
@@ -75,17 +76,17 @@ const incomeTaxSpec: ToolSpec = {
   keywords: ['income tax', 'regime', 'slab', '80C', '80D', 'NPS', 'rebate', '87A', 'surcharge', 'old vs new'],
   fields: [
     money('salary', 'Yearly salary before tax', '1500000', 'Before standard deduction. Include employer NPS.'),
-    money('sec123', 'Section 80C (old regime)', '150000', 'PF, PPF, ELSS, life cover. Max ₹1,50,000.'),
-    money('healthSelf', 'Health insurance 80D (old regime)', '25000', 'Premium for self and family.'),
+    money('sec123', 'Section 80C (old regime)', '150000', 'PF, PPF, ELSS, life cover. Max ₹1,50,000. Section 123 in the 2025 Act.'),
+    money('healthSelf', 'Section 80D (old regime)', '25000', 'Health insurance for self and family.'),
     money('homeLoan', 'Home loan interest (old regime)', '200000', 'Self-occupied house. Max ₹2,00,000.'),
     money('hra', 'HRA exemption (old regime)', '', 'From your Form 16 or payslip.'),
     money('other', 'Other income', '', 'Interest, rent and similar. Not capital gains.', true),
     ageField,
     money('basicDa', 'Yearly basic + DA', '600000', 'Only used to cap the employer NPS deduction.', true),
     money('employerNps', 'Employer NPS contribution', '', 'Both regimes. Max 14% (new) or 10% (old) of basic + DA.', true),
-    money('healthParents', 'Parents health insurance (old regime)', '', 'Premium for your parents (80D).', true),
+    money('healthParents', 'Parents health insurance (old regime)', '', 'Health insurance for your parents (Section 80D).', true),
     yesNo('parentsSenior', 'Parents are 60 or older', 'no', undefined, true),
-    money('ownNps', 'Your own NPS (old regime)', '', 'Extra 80CCD(1B). Max ₹50,000.', true),
+    money('ownNps', 'Section 80CCD(1B) (old regime)', '', 'Your own NPS, extra. Max ₹50,000.', true),
     money('pt', 'Professional tax paid (old regime)', '2400', 'Max ₹2,500.', true),
   ],
   compute: (v) => {
@@ -143,6 +144,7 @@ const incomeTaxSpec: ToolSpec = {
 
 const salarySpec: ToolSpec = {
   id: 'in-hand-salary',
+  rates: RATES_AS_OF,
   title: 'Take-home salary',
   blurb: 'Monthly take-home from yearly CTC',
   category: 'tax',
@@ -206,7 +208,7 @@ const salarySpec: ToolSpec = {
         'Take-home = CTC − employer PF − gratuity − your PF − professional tax − income tax',
         `₹${r0(r.n.ctc!)} − ₹${r0(s.employerPf)} − ₹${r0(s.gratuity)} − ₹${r0(s.employeePf)} − ₹${r0(s.professionalTax)} − ₹${r0(s.incomeTax)} = ₹${r0(s.annualInHand)}`,
         `Gratuity = basic × 15 ÷ 26 ÷ 12 = ₹${r0(s.basic)} × 15 ÷ 26 ÷ 12`,
-        `Tax: new ₹${r0(s.tax.new.total)}, old ₹${r0(s.tax.old.total)} (old uses your PF as 80C)`,
+        `Tax: new ₹${r0(s.tax.new.total)}, old ₹${r0(s.tax.old.total)} (old uses your PF as Section 80C)`,
       ],
       note: `${NOTE} PF is worked on full basic; if your employer caps PF at the statutory wage ceiling, enter your actual % instead.`,
     }
@@ -219,6 +221,7 @@ const slabOptions = ['0', '5', '10', '15', '20', '25', '30'].map((x) => ({ value
 
 const cgSpec: ToolSpec = {
   id: 'capital-gains',
+  rates: RATES_AS_OF,
   title: 'Capital gains tax',
   blurb: 'Tax on selling shares, property or gold',
   category: 'tax',
@@ -308,6 +311,7 @@ const cgSpec: ToolSpec = {
 
 const advanceSpec: ToolSpec = {
   id: 'advance-tax',
+  rates: RATES_AS_OF,
   title: 'Advance tax',
   blurb: 'Instalments, due dates and late interest',
   category: 'tax',
@@ -315,10 +319,13 @@ const advanceSpec: ToolSpec = {
   fields: [
     money('tax', 'Total tax for the year', '200000', 'After rebate, with surcharge and cess. See the income tax tool.'),
     money('tds', 'TDS and TCS already deducted', '50000'),
-    money('p1', 'Paid by 15 Jun', ''),
-    money('p2', 'Paid 16 Jun-15 Sep', ''),
-    money('p3', 'Paid 16 Sep-15 Dec', ''),
-    money('p4', 'Paid 16 Dec-15 Mar', ''),
+    // One block, two boxes a line. Same ids as before, so saved cards still open.
+    ...[
+      ['p1', 'By 15 Jun'],
+      ['p2', '16 Jun to 15 Sep'],
+      ['p3', '16 Sep to 15 Dec'],
+      ['p4', '16 Dec to 15 Mar'],
+    ].map(([id, label]): Field => ({ ...money(id!, label!, ''), cluster: 'Advance tax paid in each period' })),
     yesNo('presumptive', 'Presumptive taxation (44AD/44ADA)', 'no', undefined, true),
     yesNo('senior', 'Age 60+, no business income', 'no', undefined, true),
     { id: 'months', label: 'Months after 31 Mar 2027', kind: 'number', unit: 'months', default: '4', hint: 'Until you pay the rest. Part month counts. 31 July is 4.', advanced: true },
@@ -375,6 +382,7 @@ const advanceSpec: ToolSpec = {
 
 const gratuitySpec: ToolSpec = {
   id: 'gratuity',
+  rates: RATES_AS_OF,
   title: 'Gratuity',
   blurb: 'Gratuity amount and tax-free part',
   category: 'tax',
@@ -439,6 +447,7 @@ const gratuitySpec: ToolSpec = {
 
 const presumptiveSpec: ToolSpec = {
   id: 'presumptive-44ada',
+  rates: RATES_AS_OF,
   title: 'Freelancer tax (44ADA)',
   blurb: 'Presumptive 50% profit vs your actual books',
   category: 'tax',

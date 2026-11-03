@@ -133,3 +133,30 @@ describe('nextOccurrence', () => {
     expect(nextOccurrence(rem('a', NOW), NOW)).toBeNull()
   })
 })
+
+describe('repeat N days after I tick it', () => {
+  const after = (dueAt: number, afterDays: number) => rem('t', dueAt, { afterDays })
+  it('counts from the day it is ticked, at the reminder\'s time of day, not from the calendar', () => {
+    // Due 1 Nov 9:00, ticked late on 10 Nov at 15:00: next is 40 days after the 10th, at 9:00.
+    expect(nextOccurrence(after(at(2026, 11, 1), 30), NOW)).toBe(at(2026, 12, 10))
+  })
+  it('is never in the past, however late it was ticked', () => {
+    const next = nextOccurrence(after(at(2025, 1, 1), 7), NOW)!
+    expect(next).toBeGreaterThan(NOW)
+    expect(next).toBe(at(2026, 11, 17))
+  })
+  it('a calendar repeat is unchanged', () => {
+    expect(nextOccurrence(rem('t', at(2026, 11, 5), { repeat: 'monthly' }), NOW)).toBe(at(2026, 12, 5))
+  })
+  it('validateTask reads the days, and wants a date', () => {
+    expect(validateTask(input({ date: '2026-12-01', afterDays: '30' }), NOW)).toMatchObject({ errors: {}, afterDays: 30 })
+    expect(validateTask(input({ date: '2026-12-01', afterDays: '0' }), NOW).errors.afterDays).toMatch(/1 to 365/)
+    expect(validateTask(input({ date: '2026-12-01', afterDays: '' }), NOW).errors.afterDays).toMatch(/1 to 365/)
+    expect(validateTask(input({ afterDays: '30' }), NOW).errors.repeat).toMatch(/date first/)
+    expect(validateTask(input({ date: '2026-12-01' }), NOW).afterDays).toBeNull()
+  })
+  it('the summary says so in words', () => {
+    expect(taskSummary(at(2026, 12, 1), 'none', 30)).toBe('Due 1 Dec 2026 · 30 days after done')
+    expect(taskSummary(at(2026, 12, 1), 'monthly')).toBe('Due 1 Dec 2026 · monthly')
+  })
+})

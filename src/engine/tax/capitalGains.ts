@@ -77,7 +77,7 @@ export function capitalGains(i: CgInput, r: TaxRules = RULES_FY2026_27): CgResul
   if (!b || !s || isNaN(Date.UTC(b.y, b.m - 1, b.d)) || isNaN(Date.UTC(s.y, s.m - 1, s.d))) return { error: 'Enter both dates' }
   if (i.sellDate < i.buyDate) return { error: 'The sale date is before the purchase date' }
   if (i.sellDate < r.fyStart || i.sellDate > r.fyEnd) return { error: `These rules are for sales from ${r.fyStart} to ${r.fyEnd}` }
-  if (i.buyPrice.isNegative() || i.sellPrice.isNegative() || i.expenses.isNegative()) return { error: 'Amounts cannot be negative' }
+  if (i.buyPrice.isNegative() || i.sellPrice.isNegative() || i.expenses.isNegative() || i.exemptionUsed.isNegative()) return { error: 'Amounts cannot be negative' }
   if (i.asset === 'equity' && i.buyDate < c.equityGrandfatherBefore)
     return { error: 'Not supported yet: shares bought before 1 Feb 2018 need the 31 Jan 2018 price rule' }
   if (i.asset === 'property' && i.buyDate < c.ciiBaseFrom)

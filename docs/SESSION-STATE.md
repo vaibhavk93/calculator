@@ -24,6 +24,7 @@ Roadmap = `docs/MASTER-ROADMAP.md` (Phase 0 done, 1 next, 2 soon, 3 later, Ruled
 | Phase 2 calculators part 1 (emergency fund, DTI, savings rate, markup, two inflation rates, SWP split rate; 51->55 tools) | done |
 | Phase 2 loans (runway, multi-loan avalanche/snowball, one loan-term box; 57 tools): done. TODO: e2e/tools1.test.mjs still taps the removed tenureUnit switch | done |
 | Phase 2 Budget: bills and subscriptions, card statement cycle + bill reminder, search, refunds, trip total | done in code + unit tests + 360px browser pass (docs/BUDGET-PLAN.md section J); not on a phone. Tool UI half (use-in/chip/invalid marking/world time/unequal split): other helper |
+| Phase 3 tool-screen items (freshness line, example-values note, labelFor, advance-tax cluster, amount chips, Reset+Undo, date span, one 80C name, Your tools, tools1 e2e fixed) | built, unit tests; 360px and 200% browser pass `e2e/phase3.test.mjs`; not on a phone |
 | Import screen e2e (e2e/import.test.mjs) + Budget remount bug fixed | done, 10/10 |
 | Statement CSV import (extension of SMS capture) | planned |
 | Owner still to pick from "Ruled out": list shown in final report |  |
@@ -33,6 +34,8 @@ Roadmap = `docs/MASTER-ROADMAP.md` (Phase 0 done, 1 next, 2 soon, 3 later, Ruled
 - "for SMS parser ... add a module which changes the numbers via encoding so LLM does not read the actual data ... check how other apps allow sms reading under google ... SMS auto-logging is not working. test on phone. install ... solve issues and then push. after all these work on phase 3." DONE: sender filter bug (-S suffix) fixed, scan works on phone (117 payments found), allowlist masking module, Play policy checked (budget apps are a listed exception, needs declaration form), pushed 352f643, real Calc updated 07:43.
 - "possible to add categories and payment mode from the SMS?" DONE: mode read from text + matched card, cards/accounts offered via "Add to my cards", category by earlier payee else keyword guess.
 - "help user onboarding step by step for budget, notes and due, tell him what he can do. also add capability to check mode and sub payment mode or type of payment. test all the features you created step by step from 0 to 1 with all type of test cases and evaluate improvements as Experienced Product manager, UX designer, UI designer, developer and QA after building remaining phases."  PLAN: (1) wait for the 3 Phase 3 helpers; (2) onboarding tours for Budget/Notes/Due (+ replay in Settings); (3) payment-mode/sub-mode view (mode -> card/account/UPI source breakdown + filter); (4) QA campaign 0 to 1 across all features + a five-role review (PM, UX, UI, dev, QA) -> docs/ROLE-REVIEW-2026-11-03.md; (5) fix, build, install, report.
+
+**Phase 3 helper status (11:50):** reminders/lists DONE (battery-settings guide per phone brand, may-not-have-shown notice, several lead times, repeat after tick, 3-state checklist lines, paste list, inline rename). Java for BatterySettingsPlugin built in the real APK next. Tools polish and budget/bugs helpers resumed after the 11:20 limit reset. Next: onboarding tours, payment-mode view, QA campaign, five-role review.
 
 ## Working rules the owner set (also in CLAUDE.md)
 1. **Think at app level, always.** A request that names one screen is a sample of a pattern. Find every place with the same pattern and fix them all. Say what else you found.

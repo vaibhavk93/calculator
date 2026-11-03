@@ -33,6 +33,8 @@ It needs no install, unlike `e2e/smoke.mjs`, which is stale.
 
 **Not yet done for 0.5.0:** the Budget tab and the reworked History, Settings, Save sheet and Copy as sheet have not been through the sweep at 200% font or in the light theme. Do that before calling them finished (`docs/BACKLOG.md` items 49 and 50).
 
+`e2e/phase3.test.mjs` (about 1 minute) checks the Phase 3 tool-screen items at 360px, normal and 200% font: rates line, example-values note, mode labels, advance-tax block, amount chips, Reset with Undo, date span, "Your tools". `e2e/tools1.test.mjs` takes `ONLY=<regex>` or words (`node e2e/tools1.test.mjs emi gst`); the full run is 461 cases and takes 20 minutes or more. Its picker-based cases (GST rate, Unit converter, Date unit) time out because the harness click does not open the picker sheet; that is a stale harness step, not an app bug (same on the commit before Phase 3).
+
 `e2e/smoke.mjs` is the scripted browser test (needs Playwright). It is **stale**: it still taps buttons that were removed.
 Update its selectors before relying on it. Until then, do this by hand or with the Chrome tools:
 

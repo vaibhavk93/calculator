@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { Sheet } from '../../components/Sheet'
-import { useApp } from '../../components/StoreProvider'
+import { useApp, useAppStore } from '../../components/StoreProvider'
 import type { Fmt } from '../../lib/tool'
 import { linkTargets } from '../../lib/toolLink'
 import { formatCell } from '../../lib/toolFormat'
@@ -15,6 +15,7 @@ import { prefillDraft } from './ToolScreen'
  * every other box as it was.
  */
 export function UseInSheet({ fromToolId, value, text, fmt, label, onClose }: { fromToolId: string; value: Dec; text: string; fmt: Fmt; label: string; onClose: () => void }) {
+  const store = useAppStore()
   const tab = useApp((s) => s.tab)
   const setTab = useApp((s) => s.setTab)
   const setNav = useApp((s) => s.setNav)
@@ -31,7 +32,7 @@ export function UseInSheet({ fromToolId, value, text, fmt, label, onClose }: { f
   const go = () => {
     const spec = ALL_TOOLS.find((s) => s.id === toolId)
     if (!spec || !fieldId) return setMissing(true)
-    prefillDraft(spec, fieldId, text)
+    prefillDraft(store, spec, fieldId, text)
     onClose()
     showCard(null)
     if (tab !== 'tools') setTab('tools')

@@ -18,6 +18,9 @@
  * - NPS minimum annuity share and annuity rate: PFRDA exit rules have been revised; not checked.
  */
 
+/** Small-savings rates are reset every quarter: this pack is stale from 1 Jan 2027. */
+export const RATES_AS_OF = { asOf: '2026-11-02', until: '2027-01-01' } as const
+
 export const PPF = {
   minYearly: '500',
   maxYearly: '150000',

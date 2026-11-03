@@ -18,6 +18,8 @@ import { ManageScreen } from '../budget/ManageScreen'
 import { ALL_TOOLS } from '../tools/registry'
 import { GROUPS } from '../tools/groups'
 import { OptionRow, Row, Segmented, Toggle } from './controls'
+import { ReliableRemindersSheet } from './ReliableRemindersSheet'
+import { TipsAndTours } from '../onboarding/TipsAndTours'
 
 const TAB_LABEL: Record<Tab, string> = { calculate: 'Calculate', tools: 'Tools', saved: 'Notes', due: 'Due', budget: 'Budget' }
 const DECIMAL_CHOICES = ['auto', ...Array.from({ length: 11 }, (_, i) => String(i))]
@@ -75,6 +77,7 @@ function ReminderSettings() {
   const time = useApp((x) => x.settings.reminderTime)
   const update = useApp((x) => x.updateSettings)
   const toast = useApp((x) => x.toast)
+  const [fixing, setFixing] = useState(false)
 
   const sendTest = async () => {
     const r = await scheduleTestReminder()
@@ -105,7 +108,15 @@ function ReminderSettings() {
         </span>
         <Icon name="chevron" size={18} className="tap-row__chev" />
       </button>
+      <button type="button" className="row row--button tap-row" onClick={() => setFixing(true)}>
+        <span className="row__text">
+          <span className="row__label">Make reminders reliable</span>
+          <span className="row__hint">Steps to stop your phone's battery saver from silencing reminders</span>
+        </span>
+        <Icon name="chevron" size={18} className="tap-row__chev" />
+      </button>
       {notificationsSupported() && <ReminderPermissionRows />}
+      {fixing && <ReliableRemindersSheet onClose={() => setFixing(false)} />}
     </Section>
   )
 }
@@ -322,6 +333,8 @@ export function SettingsScreen() {
             {backup.text}
           </p>
         )}
+
+        <TipsAndTours />
 
         <Section title="About">
           <Row label="Calc" hint="Everything stays on this phone. No account, no ads, no tracking.">

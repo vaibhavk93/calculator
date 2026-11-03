@@ -91,6 +91,8 @@ A result carries a quiet "Checked against <source>" line only for tools rated **
 
 ## Things that go stale
 
+Each rule pack has one `RATES_AS_OF = { asOf, until }` (`src/engine/tax/rules.FY2026-27.ts`, `loans/rules.ts`, `investments/rates.ts`, `convert/gstRates.ts`). The calculators that use it print "Rates as of <month year>" and, from `until`, "These rates may have changed since <date>. Check the official source." **When you re-check a pack against its source, move `asOf` to today and `until` to the next boundary.** `until` is a judgement: 1 Apr 2027 for tax, 1 Jan 2027 for loan market rates and small savings (quarterly), 31 Mar 2027 for GST (no schedule). Tests: `src/lib/ratesFresh.test.ts`, `src/features/tools/rates.test.ts`.
+
 | What | Changes | Check |
 |---|---|---|
 | Tax slabs, deductions, surcharge | Every Budget (Feb) | Before 1 April |

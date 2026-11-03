@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advance, addMonths, advanceTaxPack, atTime, nextOnDay, dueLabel, dueSoonTotal, groupReminders, parseTime, timeLabel } from './reminders'
+import { advance, addDaysAt, afterDaysLabel, cleanAfterDays, leadFields, leadLabel, leadsOf, addMonths, advanceTaxPack, atTime, nextOnDay, dueLabel, dueSoonTotal, groupReminders, parseTime, timeLabel } from './reminders'
 import type { Reminder, SavedCard } from './memory'
 
 const at = (y: number, m: number, d: number, h = 9) => new Date(y, m - 1, d, h).getTime()
@@ -50,6 +50,12 @@ describe('dueSoonTotal and dueLabel', () => {
       now,
     )
     expect(total.toFixed()).toBe('67650.5')
+  })
+  it('adds only money: a percentage or a day count on a reminder is not rupees (B-10)', () => {
+    const now = at(2026, 11, 10)
+    const pct = { id: 'p', amount: '24.5', amountFmt: 'number', deletedAt: null } as SavedCard
+    const total = dueSoonTotal([rem({ cardId: 'a', dueAt: at(2026, 11, 12) }), rem({ cardId: 'p', dueAt: at(2026, 11, 12) })], [card('a', '100'), pct], now)
+    expect(total.toFixed()).toBe('100')
   })
   it('counts a reminder due on day 30 (the list says "In 30 days") but not day 31', () => {
     const now = at(2026, 11, 2, 15)
@@ -113,5 +119,41 @@ describe('advanceTaxPack', () => {
     const pack = advanceTaxPack(new Date(2026, 5, 15, 10).getTime(), '09:00')
     expect(new Date(pack[0]!.dueAt).getFullYear()).toBe(2027)
     expect(new Date(advanceTaxPack(new Date(2026, 5, 15, 8).getTime(), '09:00')[0]!.dueAt).getFullYear()).toBe(2026)
+  })
+})
+
+describe('repeat after completion and several lead times', () => {
+  it('addDaysAt counts calendar days and keeps the time of another timestamp', () => {
+    expect(addDaysAt(at(2026, 11, 10, 15), 30, at(2026, 1, 1, 9))).toBe(at(2026, 12, 10, 9))
+    // across the end of the year
+    expect(addDaysAt(at(2026, 12, 20, 8), 20, at(2026, 1, 1, 18))).toBe(at(2027, 1, 9, 18))
+  })
+  it('advance with afterDays counts from the completion, ignoring repeat and anchor day', () => {
+    const r = { dueAt: at(2026, 11, 5), repeat: 'monthly' as const, anchorDay: 5, afterDays: 30 }
+    expect(advance(r, at(2026, 11, 20, 14))).toBe(at(2026, 12, 20))
+    // without a completion date it falls back to the due date
+    expect(advance(r)).toBe(at(2026, 12, 5))
+    expect(advance({ ...r, afterDays: undefined }, at(2026, 11, 20))).toBe(at(2026, 12, 5))
+  })
+  it('a one-time reminder without afterDays still finishes', () => {
+    expect(advance({ dueAt: 1, repeat: 'none', anchorDay: 1 }, 5)).toBeNull()
+  })
+  it('a number is read as a one-item list, and a list is read biggest first without repeats', () => {
+    expect(leadsOf({ leadDays: 3 })).toEqual([3])
+    expect(leadsOf({ leadDays: 7, leads: [1, 7, 0, 7] })).toEqual([7, 1, 0])
+    expect(leadsOf({ leadDays: 2, leads: [] })).toEqual([2])
+  })
+  it('leadFields keeps leadDays as the biggest and writes the list only when there are several', () => {
+    expect(leadFields([1])).toEqual({ leadDays: 1 })
+    expect(leadFields([0, 7, 1])).toEqual({ leadDays: 7, leads: [7, 1, 0] })
+    expect(leadFields([])).toEqual({ leadDays: 0 })
+  })
+  it('labels in words', () => {
+    expect([0, 1, 7].map(leadLabel)).toEqual(['On the day', '1 day before', '7 days before'])
+    expect(afterDaysLabel(1)).toBe('1 day after done')
+  })
+  it('cleanAfterDays wants a whole number of days from 1 to 365', () => {
+    expect(['30', ' 7 ', '365', '1'].map(cleanAfterDays)).toEqual([30, 7, 365, 1])
+    expect(['0', '366', '', 'abc', '1.5', '-3', '1000'].map(cleanAfterDays)).toEqual([null, null, null, null, null, null, null])
   })
 })

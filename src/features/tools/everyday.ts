@@ -5,7 +5,7 @@ import { getCurrencyRates, primeCurrencyRates } from '../../lib/currencyRates'
 import { discount } from '../../engine/convert/discount'
 import { fuelCost, fuelEfficiency, type EfficiencyUnit } from '../../engine/convert/fuel'
 import { gst } from '../../engine/convert/gst'
-import { GST_PRESETS, GST_RATES_AS_OF } from '../../engine/convert/gstRates'
+import { GST_PRESETS, GST_RATES_AS_OF, RATES_AS_OF } from '../../engine/convert/gstRates'
 import { bitOps, parseBase, toBase, type Base } from '../../engine/convert/numberBase'
 import { percentage, type PercentMode } from '../../engine/convert/percentage'
 import { tip } from '../../engine/convert/tip'
@@ -31,6 +31,13 @@ const today = (): Date => {
   return new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()))
 }
 
+/** What the two boxes mean in each mode. The ids stay x and y. */
+const PERCENT_LABELS: Record<PercentMode, [string, string]> = {
+  of: ['Percent', 'Of this number'],
+  whatPercent: ['Part', 'Whole'],
+  change: ['Old value', 'New value'],
+}
+
 const percentSpec: ToolSpec = {
   id: 'percentage',
   title: 'Percentage',
@@ -49,19 +56,20 @@ const percentSpec: ToolSpec = {
         { value: 'change', label: '% change' },
       ],
     },
-    { id: 'x', label: 'Number X', kind: 'number', default: '18', hint: 'X% of Y, X out of Y, or X to Y change' },
-    { id: 'y', label: 'Number Y', kind: 'number', default: '45000' },
+    { id: 'x', label: 'Number X', labelFor: (v) => PERCENT_LABELS[v.mode as PercentMode]?.[0] ?? 'Number X', kind: 'number', default: '18' },
+    { id: 'y', label: 'Number Y', labelFor: (v) => PERCENT_LABELS[v.mode as PercentMode]?.[1] ?? 'Number Y', kind: 'number', default: '45000' },
   ],
   compute: (v) => {
-    const r = need(v, [{ id: 'x', label: 'X' }, { id: 'y', label: 'Y' }])
+    const [lx, ly] = PERCENT_LABELS[v.mode as PercentMode] ?? ['Number X', 'Number Y']
+    const r = need(v, [{ id: 'x', label: lx }, { id: 'y', label: ly }])
     if (!r.ok) return r
     const mode = v.mode as PercentMode
     const result = percentage(mode, r.n.x!, r.n.y!)
     if (result === null) return { error: mode === 'change' ? "Can't work out a change from zero" : "Can't divide by zero" }
     const formula = {
-      of: [`X% of Y = X ÷ 100 × Y`, `${r.n.x!.toFixed()} ÷ 100 × ${r.n.y!.toFixed()}`],
-      whatPercent: [`X is what % of Y = X ÷ Y × 100`, `${r.n.x!.toFixed()} ÷ ${r.n.y!.toFixed()} × 100`],
-      change: [`% change = (Y − X) ÷ X × 100`, `(${r.n.y!.toFixed()} − ${r.n.x!.toFixed()}) ÷ ${r.n.x!.toFixed()} × 100`],
+      of: [`Percent of a number = percent ÷ 100 × number`, `${r.n.x!.toFixed()} ÷ 100 × ${r.n.y!.toFixed()}`],
+      whatPercent: [`Part as a percent of the whole = part ÷ whole × 100`, `${r.n.x!.toFixed()} ÷ ${r.n.y!.toFixed()} × 100`],
+      change: [`% change = (new − old) ÷ old × 100`, `(${r.n.y!.toFixed()} − ${r.n.x!.toFixed()}) ÷ ${r.n.x!.toFixed()} × 100`],
     }[mode]
     const label = {
       of: `${plain(r.n.x!)}% of ${plain(r.n.y!)}`,
@@ -101,7 +109,7 @@ const unitSpec: ToolSpec = {
     ...unitFields,
   ],
   compute: (v) => {
-    const r = need(v, [{ id: 'value', label: 'a value' }])
+    const r = need(v, [{ id: 'value', label: 'the amount to convert' }])
     if (!r.ok) return r
     const cat = UNIT_CATEGORIES.find((c) => c.id === v.category)
     const from = cat?.units.find((u) => u.id === v[`from_${cat.id}`])
@@ -145,7 +153,7 @@ const currencySpec: ToolSpec = {
     { id: 'to', label: 'To currency', kind: 'select', options: currencyOptions, default: 'USD' },
   ],
   compute: (v) => {
-    const r = need(v, [{ id: 'amount', label: 'an amount' }])
+    const r = need(v, [{ id: 'amount', label: 'the amount to convert' }])
     if (!r.ok) return r
     const from = str(v, 'from')
     const to = str(v, 'to')
@@ -206,6 +214,7 @@ const discountSpec: ToolSpec = {
 
 const gstSpec: ToolSpec = {
   id: 'gst',
+  rates: RATES_AS_OF,
   title: 'GST',
   blurb: 'Add or remove GST from a price',
   category: 'everyday',
@@ -415,7 +424,7 @@ const dateSpec: ToolSpec = {
     { id: 'from', label: 'Start date', kind: 'date', default: '2026-01-01', visibleIf: (v) => v.mode === 'diff' },
     { id: 'to', label: 'End date', kind: 'date', default: '2026-11-02', visibleIf: (v) => v.mode === 'diff' },
     { id: 'start', label: 'Starting date', kind: 'date', default: '2026-01-31', visibleIf: (v) => v.mode === 'add' },
-    { id: 'n', label: 'How many', hint: 'Use a minus sign to go back', kind: 'number', default: '1', visibleIf: (v) => v.mode === 'add' },
+    { id: 'n', label: 'How many', labelFor: (v) => `How many ${str(v, 'unit') || 'months'}`, hint: 'Use a minus sign to go back', kind: 'number', default: '1', visibleIf: (v) => v.mode === 'add' },
     { id: 'unit', label: 'Unit of time', kind: 'select', default: 'months', visibleIf: (v) => v.mode === 'add', options: [{ value: 'days', label: 'Days' }, { value: 'weeks', label: 'Weeks' }, { value: 'months', label: 'Months' }, { value: 'years', label: 'Years' }] },
     { id: 'dob', label: 'Date of birth', kind: 'date', default: '1990-06-15', visibleIf: (v) => v.mode === 'age' },
   ],
@@ -462,6 +471,7 @@ const dateSpec: ToolSpec = {
         { label: 'Weeks and days', value: `${Math.floor(days / 7)} weeks, ${days % 7} days`, fmt: 'text' },
         { label: 'Years, months, days', value: `${p.years} years, ${p.months} months, ${p.days} days`, fmt: 'text' },
       ],
+      span: { start: formatDate(a), end: formatDate(b), between: `${days} ${days === 1 ? 'day' : 'days'}` },
       formula: [`${formatDate(a)} to ${formatDate(b)}`, 'The start day is not counted, the end day is'],
     }
   },
@@ -524,7 +534,7 @@ const numberBaseSpec: ToolSpec = {
   compute: (v) => {
     const from = Number(str(v, 'from')) as Base
     const to = Number(str(v, 'to')) as Base
-    if (str(v, 'value').trim() === '') return { error: 'Enter a value' }
+    if (str(v, 'value').trim() === '') return { error: 'Enter the number to convert' }
     const a = parseBase(str(v, 'value'), from)
     if (a === null) return { error: `That is not a whole number in base ${from}` }
     const b = str(v, 'other').trim() === '' ? 0n : parseBase(str(v, 'other'), from)
@@ -600,7 +610,7 @@ const fuelEfficiencySpec: ToolSpec = {
     { id: 'unit', label: 'Measured in', kind: 'select', default: 'kmpl', options: [{ value: 'kmpl', label: 'km per litre' }, { value: 'mpgus', label: 'mpg (US)' }, { value: 'mpguk', label: 'mpg (UK)' }, { value: 'l100', label: 'litres per 100 km' }] },
   ],
   compute: (v) => {
-    const r = need(v, [{ id: 'value', label: 'a value' }])
+    const r = need(v, [{ id: 'value', label: 'your mileage figure' }])
     if (!r.ok) return r
     const x = fuelEfficiency(r.n.value!, str(v, 'unit') as EfficiencyUnit)
     if (!x) return { error: 'Enter a value above zero' }

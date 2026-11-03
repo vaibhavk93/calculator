@@ -1,6 +1,6 @@
 import type { KeyValueStorage } from '../lib/storage'
 import { createAppStore, type AppStore } from './app'
-import { loadPersisted, savePersisted } from './persistence'
+import { loadChecked, savePersisted } from './persistence'
 
 export interface Booted {
   store: AppStore
@@ -16,14 +16,19 @@ const SAVE_DELAY_MS = 250
  * opening never touches storage.
  */
 export async function bootStore(storage: KeyValueStorage): Promise<Booted> {
-  const initial = await loadPersisted(storage)
+  const { data: initial, failed } = await loadChecked(storage)
   const store = createAppStore(initial)
 
-  const pick = (s: ReturnType<typeof store.getState>) => [s.input, s.history, s.cards, s.reminders, s.memory, s.settings, s.budget] as const
+  const pick = (s: ReturnType<typeof store.getState>) => [s.input, s.history, s.cards, s.reminders, s.memory, s.settings, s.budget, s.drafts] as const
   let saved = pick(store.getState())
   let timer: ReturnType<typeof setTimeout> | undefined
 
+  // After a failed load the app starts empty. Writing that empty app back would destroy the real data (B-01), so:
+  // storage that could not be read is never written this session; a damaged file (already copied aside) is
+  // replaced only once the person has actually changed something.
+  let changed = false
   const flush = async () => {
+    if (failed === 'unreadable' || (failed === 'damaged' && !changed)) return
     if (timer !== undefined) clearTimeout(timer)
     timer = undefined
     await savePersisted(storage, store.getState().snapshot())
@@ -33,6 +38,7 @@ export async function bootStore(storage: KeyValueStorage): Promise<Booted> {
     const now = pick(s)
     if (now.every((v, i) => v === saved[i])) return
     saved = now
+    changed = true
     if (timer !== undefined) clearTimeout(timer)
     timer = setTimeout(() => void flush(), SAVE_DELAY_MS)
   })

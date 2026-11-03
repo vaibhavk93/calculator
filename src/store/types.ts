@@ -3,6 +3,7 @@ import type { DecimalSetting, NumberSystem } from '../lib/format'
 import type { BudgetData } from '../lib/budget'
 import type { Reminder, SavedCard } from '../lib/memory'
 import type { AccentName, ThemePreference } from '../lib/theme'
+import type { Values } from '../lib/tool'
 
 export type Tab = 'calculate' | 'tools' | 'saved' | 'due' | 'budget'
 export const TABS: readonly Tab[] = ['calculate', 'tools', 'saved', 'due', 'budget']
@@ -32,7 +33,16 @@ export interface Settings {
   backupDismissedAt: number | null
   /** Ids of the "next step" chips under a result that were dismissed or used. A chip is never offered again. */
   dismissedTips: string[]
+  /** How many times each calculator was opened (tool id -> count, capped). Orders "Your tools" on Tools. */
+  toolUse: Record<string, number>
+  /** Calculators pinned by hand. They stay first in "Your tools" whatever the counts say. */
+  pinnedTools: string[]
+  /** First-run tours: a tab's tour is absent until it is finished (`done`) or closed (`skipped`). Absent means "show the tip row". */
+  tours: Partial<Record<TourId, 'done' | 'skipped'>>
 }
+
+export type TourId = 'budget' | 'notes' | 'due'
+export const TOUR_IDS: readonly TourId[] = ['budget', 'notes', 'due']
 
 export type CopyFormat = 'ask' | 'with' | 'without'
 
@@ -53,6 +63,9 @@ export const DEFAULT_SETTINGS: Settings = {
   backupNudgedAt: null,
   backupDismissedAt: null,
   dismissedTips: [],
+  toolUse: {},
+  pinnedTools: [],
+  tours: {},
 }
 
 export interface HistoryEntry {
@@ -111,4 +124,8 @@ export interface PersistedData {
   memory: string | null
   input: InputState
   budget: BudgetData
+  /** What was typed into each calculator and not saved (tool id -> its field values), so reopening one resumes it. Absent: none. At most MAX_DRAFTS. */
+  drafts?: Record<string, Values>
 }
+
+export const MAX_DRAFTS = 40

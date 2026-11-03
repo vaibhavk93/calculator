@@ -1,4 +1,5 @@
 import { D, type Dec } from '../engine'
+import { decimalComma } from './decimalComma'
 
 /**
  * A calculator, described as data. The generic ToolScreen renders the form and the result,
@@ -30,7 +31,16 @@ interface FieldBase {
   visibleIf?: (v: Values) => boolean
   /** Rarely needed: the screen tucks it under a closed "More options" line. Keep the 3 to 5 fields that matter on top. */
   advanced?: boolean
+  /** The label as a function of the current values ("MRP" / "Final price"). The screen, the share text and the answer use it; `label` stays the fixed fallback and the field id never changes. */
+  labelFor?: (v: Values) => string
+  /** Neighbouring fields with the same `cluster` text are drawn as one block under that heading (advance tax: four payments). Ids and values are untouched. */
+  cluster?: string
+  /** Set on an advanced money field whose default is an example the person should check: while it still holds the default, the result says "uses example values". */
+  example?: boolean
 }
+
+/** The label to show for a field right now. */
+export const labelOf = (f: { label: string; labelFor?: (v: Values) => string }, v: Values): string => f.labelFor?.(v) || f.label
 
 export type Field =
   | (FieldBase & { kind: 'number'; unit?: Unit; default?: string })
@@ -93,6 +103,14 @@ export interface Output {
   note?: string
   /** An amount the screen can offer to keep as a Budget expense ("Save my share to Budget"). Shown only when above zero. */
   expense?: { amount: Dec; note: string }
+  /** A start -> end line with the count between (date difference). Plain strings, already formatted. */
+  span?: { start: string; end: string; between: string }
+}
+
+/** When a rule pack's rates were last checked, and the first day they may be out of date (a new tax year, the next quarter). ISO dates. */
+export interface RatesStamp {
+  asOf: string
+  until: string
 }
 
 /** An error may name the field id it is about (`field`); the screen then marks exactly that input. Without it the screen works it out. */
@@ -108,6 +126,8 @@ export interface ToolSpec {
   keywords: string[]
   /** Set ONLY when docs/VERIFICATION.md names an outside source (status A). Shown as a quiet line under the result. Leave unset otherwise: no label beats a weak claim. */
   verified?: { source: string }
+  /** Set when the answer depends on a rate or rule that changes: shows "Rates as of ..." under the result. One stamp per rule pack (`RATES_AS_OF` next to its constants). */
+  rates?: RatesStamp
   fields: Field[]
   compute: (values: Values) => Computed
 }
@@ -117,7 +137,7 @@ export interface ToolSpec {
 /** A finite number from typed text, or null. Accepts "1,50,000", "₹", spaces and a unicode minus. */
 export function parseNum(text: string | string[][] | undefined): Dec | null {
   if (typeof text !== 'string') return null
-  const clean = text.replace(/[,₹\s]/g, '').replace(/−/g, '-')
+  const clean = decimalComma(text).replace(/[,₹\s]/g, '').replace(/−/g, '-')
   if (clean === '' || clean === '-' || clean === '.') return null
   try {
     const v = new D(clean)
@@ -161,4 +181,12 @@ export function defaultValues(spec: ToolSpec): Values {
     else out[f.id] = 'default' in f && f.default !== undefined ? f.default : ''
   }
   return out
+}
+
+/** Labels of the example-value fields that still hold their default, in field order. Empty when the person has changed them all. */
+export function exampleFieldsInUse(spec: ToolSpec, v: Values): string[] {
+  return spec.fields
+    .filter((f): f is Extract<Field, { kind: 'number' }> => f.kind === 'number' && f.example === true && (!f.visibleIf || f.visibleIf(v)))
+    .filter((f) => (typeof v[f.id] === 'string' ? (v[f.id] as string).trim() : '') === (f.default ?? ''))
+    .map((f) => labelOf(f, v))
 }

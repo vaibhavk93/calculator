@@ -91,8 +91,8 @@ describe('old regime', () => {
       homeLoanInterest: d(300000),
       professionalTax: d(3000),
     })
-    const byLabel = Object.fromEntries(r.deductions.map((x) => [x.label.split(/[ ,]/)[0], x.amount.toFixed()]))
-    expect(byLabel).toMatchObject({ Standard: '50000', Professional: '2500', 'Home-loan': '200000', PF: '150000', Own: '50000' })
+    const byLabel = Object.fromEntries(r.deductions.map((x) => [x.label.split(/[ ,:]/).slice(0, 2).join(' '), x.amount.toFixed()]))
+    expect(byLabel).toMatchObject({ 'Standard deduction': '50000', 'Professional tax': '2500', 'Home-loan interest': '200000', 'Section 80C': '150000', 'Section 80CCD(1B)': '50000' })
     // 15,00,000 - 50,000 - 2,500 - 2,00,000 - 1,50,000 - 50,000 - 25,000 - 50,000 = 9,72,500
     expect(r.totalIncome.toFixed()).toBe('972500')
   })

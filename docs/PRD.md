@@ -123,7 +123,7 @@ the engine and UI are built against.
 | A20 | Share entry *(P1.1)* | A history row | Plain text `expression = result` through the system share sheet. No promotional footer. |
 | A21 | **Landscape layout** *(built, P1 shell)* | Phone rotated, height ≤ 520px | Tab bar becomes a left rail; display + utilities in the middle pane; keypad full-height on the right; history opens as a right-hand side panel; Undo bar sits under it. Rotating keeps the expression and result. Tablets and desktop keep the single column. |
 | A22 | **Use result in…** *(P2)* | A result on the keypad | A "Use in…" action lists calculator fields that take an amount; one tap inserts the value at full precision. Works from the keypad into any calculator, so a quick sum never gets retyped. |
-| A23 | **Resume per calculator** *(P2)* | Any calculator form | Reopening a calculator restores its unsaved inputs and the focused field. "Reset" clears it. Drafts are separate from Saved cards (G1). |
+| A23 | **Resume per calculator** *(P2)* | Any calculator form | Reopening a calculator restores its unsaved inputs, also after the app is closed (built 2026-11-03; the focused field is not restored). "Reset" clears it. Drafts are separate from Saved cards (G1). |
 
 **Reference-app review (ClevCalc, 5 screenshots, 2 Nov 2026).** A16–A20 come from its history
 screens. Reviewed and **not** adopted:

@@ -292,3 +292,41 @@ The serious problems are in what surrounds it: saving, loading, undo, backup, an
 | 5 | B-05 undo restores the wrong item | Brings deleted money back by surprise | One `lastRemoval` variable |
 
 Next: B-06, B-14, B-15 (money), B-10 (wrong "₹" on non-money reminders).
+
+---
+
+## Status 2026-11-03
+
+Checked against the current code. "Fixed" bugs each have a regression test. Not run on a phone.
+
+| ID | Status | Evidence |
+|---|---|---|
+| B-01 | **Fixed today** | `loadChecked` copies a damaged file to `vkcalc.data.bad`; `boot.ts` never writes after an unreadable load, and after a damaged one only once something changed. `src/store/dataSafety.test.ts` |
+| B-02 | **Fixed today** | `sanitizeBudget`, `sanitizeCards` count only live items; hard stop at 480 categories, 480 instruments, 2x cards. `dataSafety.test.ts` |
+| B-03 | **Fixed today** | Backup is compact JSON, restore cap is 25 MB; 20,000-entry backup restores. `dataSafety.test.ts` |
+| B-04 | Fixed earlier | `updateInstrument` skips `x.settlement` (comment in `app.ts`) |
+| B-05 | **Fixed today** | One undo slot (`taskUndo`, tied to its snackbar id) used by every delete; the three old variables and `removed` are gone. `src/store/removal.test.ts` |
+| B-06 | **Fixed today (partly)** | New `src/lib/decimalComma.ts` used by the Budget amount box, `validateAmount`, optional money, `parseNum`, list lines. **Not** the calculator number boxes: they show grouped digits while typing, so "1,50" after a deleted digit cannot be told from a decimal comma. `decimalComma.test.ts`, `formKit.test.ts` |
+| B-07 | Still open | A second delete in a row still replaces the first one's Undo. The entry stays hidden until the new 30-day purge (B-27). |
+| B-08 | Still open | `updateInstrument` / `deleteInstrument` still clear the card from entries, with no warning |
+| B-09 | Still open | Category and card delete sheets still say "This can't be undone" |
+| B-10 | **Fixed today** | `dueSoonTotal` adds money cards only; `planNotifications` formats with the card's own format. `reminders.test.ts`, `notifications.test.ts` |
+| B-11 | Still open | `snooze` still moves `dueAt` (reminders are another helper's area) |
+| B-12 | Still open | `planNotifications` still has no done-task check |
+| B-13 | Still open | `planNotifications` still skips `dueAt <= now` |
+| B-14 | **Fixed today** | `parseTapeLine` turns U+2212 and the en dash into minus. `decimalComma.test.ts` |
+| B-15 | **Fixed today** | Negative "exemption already used" returns "Amounts cannot be negative". `other.test.ts` |
+| B-16 | Fixed earlier | `sanitizeInput` sets `fresh` only for a plain number |
+| B-17 | Still open | `savePersisted` still swallows the error |
+| B-18 | Still open | `SaveSheet.tsx:70` still returns silently on an empty date |
+| B-19 | Fixed earlier | `capHistory` reserves the newest row's slot (CALC-254) |
+| B-20 | Still open | `insertExpression` still glues pasted digits |
+| B-21 | **Fixed today** | `useRepeatingPress` stops its timers on unmount |
+| B-22 | Still open | `chooseMode` still clears the card |
+| B-23 | Partly | A typed minus now shows a hint (today). Pasted U+2212 gives no hint; "1e5" and `0x10` still accepted |
+| B-24 | Still open | The engine still says "Too large to show" for an underflow |
+| B-25 | Fixed earlier | `backupFilename` uses local time, with a test |
+| B-26 | Still open | Focus restore, listbox roles and future heatmap days unchanged |
+| B-27 | **Fixed today** | Entries deleted over 30 days ago are dropped when the store starts. `removal.test.ts` |
+
+**Not reproducible:** none. **Still open:** B-07, B-08, B-09, B-11, B-12, B-13, B-17, B-18, B-20, B-22, B-24, B-26 (none loses data silently except B-07, B-17).

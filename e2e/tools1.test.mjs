@@ -1,6 +1,7 @@
 // Test campaign: tools-1 = the first 26 calculators (everyday + loans) and the shared calculator-page chrome.
 // Run:  node e2e/tools1.test.mjs            (all cases)
 //       node e2e/tools1.test.mjs emi gst    (only cases whose id contains one of the words)
+//       ONLY=emi|gst node e2e/tools1.test.mjs   (only cases whose id matches the regex)
 // One line per case:  PASS|FAIL <id> <type> <title> :: <actual if fail>.  Exit code 1 if any FAIL.
 // Types: POS NEG ERR CORNER UI UX RUNTIME.  Each case opens its own fresh page with its own seeded data.
 // A FAIL is either a BUG or a spec mismatch (the report says which).
@@ -245,10 +246,10 @@ def('T1-SEARCH-case', 'CORNER', 'Search ignores case and surrounding spaces', ()
     fail(!names.includes('Loan EMI') ? `got ${names.join(', ')}` : '')
   }),
 )
-def('T1-GROUPS-counts', 'UX', 'Each group tile count matches the rows on its page (Math 2, Money 5, Units 3, Dates 5, Loans 11)', () =>
+def('T1-GROUPS-counts', 'UX', 'Each group tile count matches the rows on its page (Math 2, Money 5, Units 3, Dates 5, Loans 13)', () =>
   withPage({}, async ({ page }) => {
     await tab(page, 'Tools')
-    const want = { 'Math and numbers': 2, 'Money and shopping': 5, 'Units and travel': 3, 'Dates and health': 5, 'Loans and EMI': 11 }
+    const want = { 'Math and numbers': 2, 'Money and shopping': 5, 'Units and travel': 3, 'Dates and health': 5, 'Loans and EMI': 13 }
     const bad = []
     for (const [g, n] of Object.entries(want)) {
       await page.locator('.tile', { hasText: g }).click()
@@ -534,8 +535,7 @@ def('T1-MATH-emi-months', 'POS', 'Loan EMI: 7 lakh at 10.25% for 30 months gives
     const s = await openTool(page, tool('emi'))
     await setField(page, s, 'principal', '700000')
     await setField(page, s, 'rate', '10.25')
-    await setField(page, s, 'tenure', '30')
-    await choose(page, s, 'tenureUnit', 'Months')
+    await setField(page, s, 'tenure', '30 months')
     fail(near(num(await rowVal(s, 'Monthly EMI')), emiOf(700000, 10.25, 30), '0.01', 'EMI'))
   }),
 )
@@ -2005,7 +2005,7 @@ oneShot('T1-SEM-emi-rate-101', 'NEG', 'Loan EMI: rate 101% gives an error', 'emi
 oneShot('T1-SEM-emi-51-years', 'CORNER', 'Loan EMI: 51 years gives "at most 50 years"; 50 years works', 'emi', [['tenure', '51']], wantError(/50 years/i, '51 years'))
 oneShot('T1-SEM-emi-50-years', 'CORNER', 'Loan EMI: exactly 50 years works', 'emi', [['tenure', '50']], wantResult('50 years'))
 oneShot('T1-SEM-emi-frac-year', 'CORNER', 'Loan EMI: 2.5 years (30 months) works; 2.3 years is not a whole number of months and says so', 'emi', [['tenure', '2.3']], wantError(/whole number of months/i, '2.3 years'))
-oneShot('T1-SEM-emi-1-month', 'CORNER', 'Loan EMI: 1 month works', 'emi', [['tenureUnit', 'Years'], ['tenure', '0.0833333333333']], (sn) => (sn.state === 'blank' ? 'blank' : ''))
+oneShot('T1-SEM-emi-1-month', 'CORNER', 'Loan EMI: 1 month works', 'emi', [['tenure', '1 month']], (sn) => (sn.state === 'blank' ? 'blank' : ''))
 oneShot('T1-SEM-emi-tiny-rate', 'CORNER', 'Loan EMI: rate 0.0001% still gives a result', 'emi', [['rate', '0.0001']], wantResult('rate 0.0001'))
 oneShot('T1-SEM-emi-tiny-principal', 'CORNER', 'Loan EMI: loan amount 0.01 gives a result that does not show NaN or a negative EMI', 'emi', [['principal', '0.01']], (sn) => (sn.state === 'result' && /-|NaN/.test(sn.main[1]) ? `main ${sn.main[1]}` : sn.state === 'blank' ? 'blank' : ''))
 oneShot('T1-SEM-prepay-after-last', 'ERR', 'Loan prepayment: "after EMI" equal to the last EMI gives an error with the valid range', 'prepayment', [['after', '240']], wantError(/1 to 239/i, 'after = n'))
@@ -2045,7 +2045,9 @@ oneShot('T1-SEM-compare-zero-rate', 'CORNER', 'Compare loan offers: a 0% offer i
   const sn = await snap(s)
   if (sn.state !== 'result') throw new Error(`0% rate -> ${sn.state} "${sn.err}"`)
 })
-oneShot('T1-SEM-compare-months', 'POS', 'Compare loan offers: switching Years to Months applies to every offer (20 months each)', 'loan-compare', [['mode:tenureUnit', 'Months']], wantResult('months'), async (s) => {
+oneShot('T1-SEM-compare-months', 'POS', 'Compare loan offers: typing "20 months" in an offer\'s term box works (the term is one text box now)', 'loan-compare', [], wantResult('default'), async (s) => {
+  await s.locator('.rows__row').nth(0).locator('input.field').nth(2).fill('20 months')
+  await s.locator('.rows__row').nth(1).locator('input.field').nth(2).fill('20 months')
   const cards = await cardsOf(s)
   const e = emiOf(5000000, 8.5, 20)
   if (D(num(cards[0].cells['EMI'])).minus(e).abs().gt('0.01')) throw new Error(`EMI ${cards[0].cells['EMI']} vs ${e.toFixed(2)}`)
@@ -2098,8 +2100,8 @@ oneShot('T1-SEM-pct-huge', 'CORNER', 'Percentage: 1e30 % of 1e30 does not show N
 oneShot('T1-SEM-pct-neg', 'POS', 'Percentage: negative X works (-10% of 200 = -20)', 'percentage', [['x', '-10'], ['y', '200']], wantResult('-10% of 200'), async (s) => {
   if (!num((await rowsOf(s))[0][1]).eq(-20)) throw new Error(`got ${(await rowsOf(s))[0][1]}`)
 })
-oneShot('T1-SEM-pct-label', 'UX', 'Percentage: empty box error says which number ("Number X")', 'percentage', [['x', '']], wantError(/number x|\bx\b/i, 'x empty'), async (_s, sn) => {
-  if (!/number x/i.test(sn.err)) throw new Error(`error "${sn.err}" calls the box "X" but the box is labelled "Number X"`)
+oneShot('T1-SEM-pct-label', 'UX', 'Percentage: empty box error uses the box\'s mode label ("Percent" in the default mode)', 'percentage', [['x', '']], wantError(/percent/i, 'x empty'), async (_s, sn) => {
+  if (!/enter percent/i.test(sn.err)) throw new Error(`error "${sn.err}" does not name the box "Percent"`)
 })
 oneShot('T1-SEM-fuel-zero-mileage', 'NEG', 'Fuel cost: mileage 0 is an error (no divide by zero)', 'fuel-cost', [['mileage', '0']], wantError(/above zero|mileage/i, 'mileage 0'))
 oneShot('T1-SEM-fuel-zero-price', 'CORNER', 'Fuel cost: price 0 gives cost 0', 'fuel-cost', [['price', '0']], wantResult('price 0'))
@@ -2134,7 +2136,7 @@ oneShot('T1-SEM-grade-max-zero', 'NEG', 'Marks and GPA: "Out of" 0 is an error',
 })
 oneShot('T1-SEM-base-invalid-digit', 'NEG', 'Binary and hex: "12" in binary says "not a whole number in base 2"', 'number-base', [['mode:from', 'Binary (2)'], ['value', '12']], wantError(/base 2/i, '12 in binary'))
 oneShot('T1-SEM-base-negative', 'NEG', 'Binary and hex: a negative number is an error (hint says 0 or more)', 'number-base', [['value', '-5']], wantError(/whole number|base/i, '-5'))
-oneShot('T1-SEM-base-empty', 'ERR', 'Binary and hex: empty value says "Enter a value"', 'number-base', [['value', '']], wantError(/enter a value/i, 'empty'))
+oneShot('T1-SEM-base-empty', 'ERR', 'Binary and hex: empty value says "Enter the number to convert"', 'number-base', [['value', '']], wantError(/enter the number to convert/i, 'empty'))
 oneShot('T1-SEM-base-huge', 'CORNER', 'Binary and hex: a 200-digit decimal converts to hex without hanging or NaN', 'number-base', [['value', '9'.repeat(200)]], wantResult('200 digits'))
 oneShot('T1-SEM-base-shift-big', 'CORNER', 'Binary and hex: shift by 1000000000 gives "Shift is too large", does not hang', 'number-base', [['more:shift', '1000000000']], wantError(/too large/i, 'shift 1e9'))
 oneShot('T1-SEM-base-shift-neg', 'NEG', 'Binary and hex: negative shift is an error', 'number-base', [['more:shift', '-1']], wantError(/shift/i, 'shift -1'))
@@ -2268,7 +2270,9 @@ def('T1-RUNTIME-settings-intl', 'POS', 'International number system shows 1,000,
 // ---------------------------------------------------------------------------------------------------------------------
 async function main() {
   const filters = process.argv.slice(2)
-  const todo = filters.length ? cases.filter((c) => filters.some((f) => c.id.toLowerCase().includes(f.toLowerCase()))) : cases
+  // ONLY=<regex> works too, like tools2.test.mjs. Words on the command line still work.
+  const only = process.env.ONLY ? new RegExp(process.env.ONLY, 'i') : null
+  const todo = cases.filter((c) => (!filters.length || filters.some((f) => c.id.toLowerCase().includes(f.toLowerCase()))) && (!only || only.test(c.id)))
   app = await startApp()
   const q = [...todo]
   const CONC = Number(process.env.CONC ?? 4)

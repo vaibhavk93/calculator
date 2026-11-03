@@ -1,6 +1,7 @@
 import { D, type Dec } from '../engine'
 import { BILL_REPEATS, validateAmount, validateDate, type BillRepeat, type BudgetData, type RecurringItem } from './budget'
 import { MAX_TASK_TITLE } from './memory'
+import { parseNum } from './tool'
 import { addMonths, atTime, startOfDay } from './reminders'
 
 /**
@@ -79,6 +80,44 @@ export const cardBillFor = (b: Pick<BudgetData, 'recurring'>, instrumentId: stri
 
 /** The recurring item that owns a Due card, if any. */
 export const billForCard = (b: Pick<BudgetData, 'recurring'>, cardId: string): RecurringItem | undefined => liveBills(b).find((i) => i.cardId === cardId)
+
+const DAY_MS = 86_400_000
+const dayNumber = (key: string): number => { const [y = 1970, m = 1, d = 1] = dateParts(key); return Math.round(Date.UTC(y, m - 1, d) / DAY_MS) }
+
+/**
+ * Does this note look like a monthly bill? True when at least 3 entries (the saved ones with the same note, plus the one being
+ * typed) are about a month apart (25 to 35 days between each neighbour) and the amounts are within 10% of each other.
+ * Never when the note already names a running bill, or the entries already belong to one. It is only ever a suggestion.
+ * `selfId` is the entry being edited, so it is not counted twice. ponytail: monthly only; a yearly or quarterly guess needs
+ * longer history than most people have.
+ */
+export function looksMonthly(
+  budget: Pick<BudgetData, 'expenses' | 'recurring'>,
+  draft: { note: string; amount: string; date: string },
+  selfId: string | null = null,
+): { count: number } | null {
+  const key = draft.note.trim().toLowerCase()
+  if (!key || liveBills(budget).some((b) => b.title.trim().toLowerCase() === key)) return null
+  const rows: { day: number; amount: Dec }[] = []
+  for (const e of budget.expenses) {
+    if (e.deletedAt !== null || e.id === selfId || e.settlement || e.refund || e.recurringId || e.note.trim().toLowerCase() !== key) continue
+    rows.push({ day: dayNumber(e.date), amount: new D(e.amount) })
+  }
+  const amount = parseNum(draft.amount)
+  if (amount !== null && amount.gt(0) && !validateDate(draft.date)) rows.push({ day: dayNumber(draft.date), amount })
+  if (rows.length < 3) return null
+  rows.sort((a, b) => a.day - b.day)
+  // The latest 4 are enough: an old habit that stopped should not count.
+  const recent = rows.slice(-4)
+  for (let i = 1; i < recent.length; i++) {
+    const gap = recent[i]!.day - recent[i - 1]!.day
+    if (gap < 25 || gap > 35) return null
+  }
+  const lo = recent.reduce((m, r) => (r.amount.lt(m) ? r.amount : m), recent[0]!.amount)
+  const hi = recent.reduce((m, r) => (r.amount.gt(m) ? r.amount : m), recent[0]!.amount)
+  if (lo.lte(0) || hi.gt(lo.times('1.1'))) return null
+  return { count: recent.length }
+}
 
 export interface BillErrors {
   title?: string

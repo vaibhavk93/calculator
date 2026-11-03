@@ -2,14 +2,17 @@ import { INITIAL_INPUT, type InputState } from '../engine'
 import { ACCENT_NAMES, type AccentName, type ThemePreference } from '../lib/theme'
 import type { KeyValueStorage } from '../lib/storage'
 import { parseTime } from '../lib/reminders'
-import { MAX_RECURRING, isAccountType, isBillRepeat, isMonthKey, isSettlement, type RecurringItem } from '../lib/budget'
+import { MAX_COUNTED_TOOLS, MAX_PINNED_TOOLS, MAX_USE_COUNT } from '../lib/toolUse'
+import { MAX_RECURRING, sanitizeEdits, isAccountType, isBillRepeat, isMonthKey, isSettlement, type RecurringItem } from '../lib/budget'
 import {
   DEFAULT_SETTINGS,
   MAX_HISTORY,
   MAX_MEMO,
   isKept,
   TABS,
+  TOUR_IDS,
   MAX_CARDS,
+  MAX_DRAFTS,
   MAX_TASK_TAGS,
   MAX_PINNED,
   REPEATS,
@@ -62,6 +65,27 @@ const bool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fa
 const stamp = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null)
 
 /** Never trusts what is on disk: every field is checked and falls back to its default. */
+const isToolId = (t: unknown): t is string => typeof t === 'string' && /^[a-z0-9-]{1,64}$/.test(t)
+
+/** Tool id -> a whole count from 1 to the cap. Anything else is dropped; the table is trimmed to its size limit. */
+function sanitizeToolUse(raw: unknown): Record<string, number> {
+  if (!isObject(raw)) return {}
+  const out: Record<string, number> = {}
+  for (const [id, n] of Object.entries(raw)) {
+    if (isToolId(id) && typeof n === 'number' && Number.isInteger(n) && n >= 1) out[id] = Math.min(n, MAX_USE_COUNT)
+    if (Object.keys(out).length >= MAX_COUNTED_TOOLS) break
+  }
+  return out
+}
+
+/** Only the three known tours, each `done` or `skipped`. Anything else is dropped, so old backups load as "not seen". */
+function sanitizeTours(raw: unknown): Settings['tours'] {
+  const out: Settings['tours'] = {}
+  if (!isObject(raw)) return out
+  for (const id of TOUR_IDS) if (raw[id] === 'done' || raw[id] === 'skipped') out[id] = raw[id] as 'done' | 'skipped'
+  return out
+}
+
 export function sanitizeSettings(raw: unknown): Settings {
   const r = isObject(raw) ? raw : {}
   const d = DEFAULT_SETTINGS
@@ -87,6 +111,9 @@ export function sanitizeSettings(raw: unknown): Settings {
     backupNudgedAt: stamp(r.backupNudgedAt),
     backupDismissedAt: stamp(r.backupDismissedAt),
     dismissedTips: Array.isArray(r.dismissedTips) ? [...new Set(r.dismissedTips.filter((t): t is string => typeof t === 'string' && /^[a-z0-9-]{1,40}$/.test(t)))].slice(0, 20) : [],
+    toolUse: sanitizeToolUse(r.toolUse),
+    pinnedTools: Array.isArray(r.pinnedTools) ? [...new Set(r.pinnedTools.filter(isToolId))].slice(0, MAX_PINNED_TOOLS) : [],
+    tours: sanitizeTours(r.tours),
   }
 }
 
@@ -156,11 +183,24 @@ function sanitizeValues(raw: unknown): Values | null {
   return out
 }
 
+/** Unsaved calculator inputs by tool id: ids shaped like real ones, values checked like a saved card's, at most MAX_DRAFTS. */
+export function sanitizeDrafts(raw: unknown): Record<string, Values> | undefined {
+  if (!isObject(raw)) return undefined
+  const out: Record<string, Values> = {}
+  for (const [id, v] of Object.entries(raw)) {
+    if (!/^[a-z0-9-]{1,64}$/.test(id)) continue
+    const values = sanitizeValues(v)
+    if (values && Object.keys(values).length > 0) out[id] = values
+    if (Object.keys(out).length >= MAX_DRAFTS) break
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 function sanitizeLines(raw: unknown): TapeLine[] {
   if (!Array.isArray(raw)) return []
   const out: TapeLine[] = []
   for (const l of raw.slice(0, 1000)) {
-    if (isObject(l) && goodId(l.id) && isPlainNumber(l.value)) out.push({ id: l.id, label: str(l.label, 80), value: l.value, ...(l.done === true ? { done: true } : {}) })
+    if (isObject(l) && goodId(l.id) && isPlainNumber(l.value)) out.push({ id: l.id, label: str(l.label, 80), value: l.value, ...(l.done === true ? { done: true } : l.skip === true ? { skip: true } : {}) })
   }
   return out
 }
@@ -202,7 +242,8 @@ export function sanitizeCards(raw: unknown): SavedCard[] {
       updatedAt: ts(c.updatedAt),
       deletedAt: typeof c.deletedAt === 'number' && Number.isFinite(c.deletedAt) ? c.deletedAt : null,
     })
-    if (out.length >= MAX_CARDS) break
+    // Only live cards count toward the limit (the ones in Trash do not), with a hard stop so a damaged file cannot grow without end (B-02).
+    if (out.filter((x) => x.deletedAt === null).length >= MAX_CARDS || out.length >= MAX_CARDS * 2) break
   }
   return out
 }
@@ -219,13 +260,18 @@ export function sanitizeReminders(raw: unknown, cards: SavedCard[]): Reminder[] 
     seen.add(r.id)
     const day = typeof r.anchorDay === 'number' && Number.isInteger(r.anchorDay) && r.anchorDay >= 1 && r.anchorDay <= 31 ? r.anchorDay : new Date(r.dueAt).getDate()
     const lead = typeof r.leadDays === 'number' && Number.isInteger(r.leadDays) && r.leadDays >= 0 && r.leadDays <= 60 ? r.leadDays : 3
+    // Several lead times: a short list of whole days, biggest first. An old reminder has just `leadDays`.
+    const list = Array.isArray(r.leads) ? [...new Set(r.leads.filter((n): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 60))].sort((a, b) => b - a).slice(0, 6) : []
+    const after = typeof r.afterDays === 'number' && Number.isInteger(r.afterDays) && r.afterDays >= 1 && r.afterDays <= 365 ? r.afterDays : undefined
     out.push({
       id: r.id,
       cardId: r.cardId,
       dueAt: r.dueAt,
       repeat: oneOf<Repeat>(r.repeat, REPEATS, 'none'),
       anchorDay: day,
-      leadDays: lead,
+      leadDays: list.length > 1 ? list[0]! : lead,
+      ...(list.length > 1 ? { leads: list } : {}),
+      ...(after ? { afterDays: after } : {}),
       done: r.done === true,
       history: Array.isArray(r.history)
         ? r.history.slice(-200).flatMap((h) => (isObject(h) && typeof h.paidAt === 'number' ? [{ paidAt: h.paidAt, amount: isPlainNumber(h.amount) ? h.amount : null }] : []))
@@ -277,7 +323,8 @@ export function sanitizeBudget(raw: unknown): BudgetData {
       cat: { id: c.id, name, limit: isPlainNumber(c.limit) && !c.limit.startsWith('-') ? c.limit : null, parentId: null, deletedAt: num(c.deletedAt), ...ifSet({ limitByMonth: limitMap(c.limitByMonth), months: monthList(c.months) }) },
       rawParent: c.parentId,
     })
-    if (found.length >= MAX_CATEGORIES) break
+    // A deleted category stays in the list for good, so only live ones count toward the limit (B-02); the hard stop is for damaged files.
+    if (found.filter((f) => f.cat.deletedAt === null).length >= MAX_CATEGORIES || found.length >= MAX_CATEGORIES * 8) break
   }
   // A parent must exist and be top-level itself. Otherwise the category becomes top-level. A child of a deleted parent is deleted too.
   const topIds = new Map(found.filter((f) => typeof f.rawParent !== 'string' || !catIds.has(f.rawParent)).map((f) => [f.cat.id, f.cat]))
@@ -319,7 +366,7 @@ export function sanitizeBudget(raw: unknown): BudgetData {
     }
     instruments.push(inst)
     instById.set(inst.id, inst)
-    if (instruments.length >= MAX_INSTRUMENTS * 5) break
+    if (instruments.filter((x) => x.deletedAt === null).length >= MAX_INSTRUMENTS || instruments.length >= MAX_INSTRUMENTS * 12) break
   }
 
   const expenses: BudgetExpense[] = []
@@ -350,6 +397,7 @@ export function sanitizeBudget(raw: unknown): BudgetData {
       // A refund is spending turned round; a settlement is never one.
       ...(e.refund === true && !settlement ? { refund: true as const } : {}),
       ...(goodId(e.recurringId) ? { recurringId: e.recurringId } : {}),
+      ...ifSet({ edits: sanitizeEdits(e.edits) }),
     })
     if (expenses.length >= MAX_EXPENSES) break
   }
@@ -421,6 +469,7 @@ export function migrate(raw: unknown): PersistedData {
 
   // A newer app wrote this: keep what we understand, and say it is current.
   const cards = sanitizeCards(data.cards)
+  const drafts = sanitizeDrafts(data.drafts)
   return {
     schemaVersion: CURRENT_SCHEMA,
     settings: sanitizeSettings(data.settings),
@@ -431,17 +480,42 @@ export function migrate(raw: unknown): PersistedData {
     input: sanitizeInput(data.input),
     // Absent before the Budget tab existed: a fresh starter set, not an error.
     budget: sanitizeBudget(data.budget),
+    ...(drafts ? { drafts } : {}),
+  }
+}
+
+/** Where the raw text of a saved file that could not be read is kept, so a damaged load never destroys it (B-01). */
+export const BAD_KEY = 'vkcalc.data.bad'
+
+export type Loaded = { data: PersistedData; failed: 'none' | 'damaged' | 'unreadable' }
+
+/**
+ * Like `loadPersisted`, but says whether the load went wrong. `damaged`: the text was there but is not valid; a copy is
+ * kept under BAD_KEY before anything can overwrite it. `unreadable`: storage itself threw, so the real data may be
+ * untouched on disk and the caller must not write over it.
+ */
+export async function loadChecked(storage: KeyValueStorage): Promise<Loaded> {
+  let text: string | null
+  try {
+    text = await storage.get(STORAGE_KEY)
+  } catch {
+    return { data: defaultPersisted(), failed: 'unreadable' }
+  }
+  if (text === null) return { data: defaultPersisted(), failed: 'none' }
+  try {
+    return { data: migrate(JSON.parse(text)), failed: 'none' }
+  } catch {
+    try {
+      await storage.set(BAD_KEY, text)
+    } catch {
+      /* nothing more can be done */
+    }
+    return { data: defaultPersisted(), failed: 'damaged' }
   }
 }
 
 export async function loadPersisted(storage: KeyValueStorage): Promise<PersistedData> {
-  try {
-    const text = await storage.get(STORAGE_KEY)
-    if (text === null) return defaultPersisted()
-    return migrate(JSON.parse(text))
-  } catch {
-    return defaultPersisted()
-  }
+  return (await loadChecked(storage)).data
 }
 
 export async function savePersisted(storage: KeyValueStorage, data: PersistedData): Promise<void> {

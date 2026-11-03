@@ -78,6 +78,8 @@ All: age is now under More options everywhere (default "Below 60" is right for m
 
 ## Needs a ToolScreen or engine change (owner decides)
 
+**Update 2026-11-03:** items 1, 2, 6 and 8 below are done (advance tax `cluster`, `labelFor`, "uses example values" note, one 80C name). Items 3 and 5 were done earlier.
+
 1. **Advance tax has 6 fields on top.** Tax, TDS and the four quarter payments all change the answer, and none is optional in practice. A "rows" layout for the four payments would fit it in five.
 2. **Percentage and date labels cannot change with the mode.** "X" and "Y" mean different things per mode, so they stay "Number X/Y" and the result sentence explains. A `label` that can be a function of the values would fix it.
 3. **No time picker.** World time only shows "now". Converting a chosen time between cities needs a `time` field kind.

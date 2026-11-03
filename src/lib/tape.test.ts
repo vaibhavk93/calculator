@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { parseTapeLine, tapeTotal } from './tape'
+import { LINE_STATE_WORD, lineState, MAX_PASTE_LINES, nextLineState, parsePastedList, parseTapeLine, tapeTotal, withLineState } from './tape'
+import type { TapeLine } from './memory'
 
 const ok = (t: string) => {
   const r = parseTapeLine(t)
@@ -78,5 +79,64 @@ describe('listSummary', () => {
     expect(listSummary(lines, true, IN)).toBe('1 of 3 done, ₹2,000.00 left')
     expect(listSummary(lines.map((l) => ({ ...l, done: true })), true, IN)).toBe('All 3 done, total ₹3,000.00')
     expect(listSummary([L('5')], false, IN)).toBe('1 line, total ₹5.00')
+  })
+})
+
+describe('three-state lines', () => {
+  const mk = (value: string, flags: Partial<TapeLine> = {}, id = 'x'): TapeLine => ({ id, label: id, value, ...flags })
+
+  it('a tap goes pending, paid, skipped, pending', () => {
+    expect(lineState(mk('1'))).toBe('pending')
+    expect(nextLineState('pending')).toBe('paid')
+    expect(nextLineState('paid')).toBe('skip')
+    expect(nextLineState('skip')).toBe('pending')
+    expect(LINE_STATE_WORD).toEqual({ pending: 'Pending', paid: 'Paid', skip: 'Skipped' })
+  })
+  it('withLineState sets one flag at a time and old lines (only done) stay valid', () => {
+    expect(lineState({ done: true })).toBe('paid')
+    expect(withLineState(mk('1', { done: true }), 'skip')).toEqual({ id: 'x', label: 'x', value: '1', skip: true })
+    expect(withLineState(mk('1', { skip: true }), 'pending')).toEqual({ id: 'x', label: 'x', value: '1' })
+    expect(withLineState(mk('1'), 'paid')).toEqual({ id: 'x', label: 'x', value: '1', done: true })
+  })
+  it('totals and progress ignore skipped lines', () => {
+    const lines = [mk('1000', { done: true }, 'a'), mk('500', {}, 'b'), mk('300', { skip: true }, 'c')]
+    expect(tapeTotal(lines).toFixed()).toBe('1500')
+    const p = listProgress(lines)
+    expect([p.done, p.total, p.skipped, p.doneAmount.toFixed(), p.leftAmount.toFixed()]).toEqual([1, 2, 1, '1000', '500'])
+  })
+  it('the summary says how many are skipped, and handles all done or all skipped', () => {
+    const IN = { system: 'indian', decimals: 'auto' } as const
+    const lines = [mk('1000', { done: true }, 'a'), mk('500', {}, 'b'), mk('300', { skip: true }, 'c')]
+    expect(listSummary(lines, true, IN)).toBe('1 of 2 done, ₹500.00 left, 1 skipped')
+    expect(listSummary([lines[0]!, lines[2]!], true, IN)).toBe('All 1 done, total ₹1,000.00, 1 skipped')
+    expect(listSummary([mk('5', { skip: true })], true, IN)).toBe('All 1 skipped')
+  })
+})
+
+describe('parsePastedList', () => {
+  const items = (t: string) => parsePastedList(t)?.items.map((i) => [i.label, i.value, i.done])
+
+  it('needs at least two lines: one line is just typed text', () => {
+    expect(parsePastedList('Flights 24000')).toBeNull()
+    expect(parsePastedList('Flights 24000\n\n  \n')).toBeNull()
+  })
+  it('keeps an amount when a line has one, otherwise the item is worth 0', () => {
+    expect(items('Flights 24000\nHotel 18,500\nMilk')).toEqual([['Flights', '24000', false], ['Hotel', '18500', false], ['Milk', '0', false]])
+  })
+  it('drops bullets, numbers and tick boxes, and notes a ticked one', () => {
+    expect(items('- Eggs\n* Bread\n1. Rice\n2) Salt\n[ ] Tea\n[x] Sugar\n• Oil')).toEqual([
+      ['Eggs', '0', false], ['Bread', '0', false], ['Rice', '0', false], ['Salt', '0', false], ['Tea', '0', false], ['Sugar', '0', true], ['Oil', '0', false],
+    ])
+  })
+  it('reads back what "Copy as text" writes', () => {
+    expect(items('✔ Flights  ₹24,000.00\n☐ Hotel  ₹18,500.00')).toEqual([['Flights', '24000', true], ['Hotel', '18500', false]])
+  })
+  it('works with Windows line breaks, and a quantity-first line is just a label', () => {
+    expect(items('2 eggs\r\n3 apples\r\n')).toEqual([['2 eggs', '0', false], ['3 apples', '0', false]])
+  })
+  it('stops at 200 lines and says how many were left out', () => {
+    const r = parsePastedList(Array.from({ length: 205 }, (_, i) => `Item ${i}`).join('\n'))!
+    expect(r.items).toHaveLength(MAX_PASTE_LINES)
+    expect(r.dropped).toBe(5)
   })
 })

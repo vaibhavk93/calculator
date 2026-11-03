@@ -3,9 +3,10 @@ import { FormField, RequiredNote } from '../../components/FormField'
 import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { MAX_PINNED, MAX_TASK_TAGS, MAX_TASK_TITLE, type Repeat, type SavedCard } from '../../lib/memory'
-import { timeLabel } from '../../lib/reminders'
+import { leadFields, leadsOf, timeLabel } from '../../lib/reminders'
 import { dayText, hasErrors, taskSummary, validateTask } from '../../lib/tasks'
 import { Segmented, Toggle } from '../settings/controls'
+import { AfterDone, LeadPills } from './ReminderOptions'
 
 /**
  * Add a task, or change one. A task is a saved card; its date is an ordinary reminder, so the Due tab and
@@ -24,6 +25,9 @@ export function TaskSheet({ card, onClose }: { card?: SavedCard; onClose: () => 
   const [note, setNote] = useState(card?.note ?? '')
   const [date, setDate] = useState(reminder ? dayText(reminder.dueAt) : '')
   const [repeat, setRepeat] = useState<Repeat>(reminder?.repeat ?? 'none')
+  // "Repeat N days after I tick it": the days as typed, or null when off. Several heads-up times, biggest first.
+  const [after, setAfter] = useState<string | null>(reminder?.afterDays ? String(reminder.afterDays) : null)
+  const [leads, setLeads] = useState<number[]>(reminder ? leadsOf(reminder) : [0])
   const [tags, setTags] = useState<string[]>(card?.tags ?? [])
   const [pinned, setPinned] = useState(card?.pinned ?? false)
   const [custom, setCustom] = useState('')
@@ -32,7 +36,7 @@ export function TaskSheet({ card, onClose }: { card?: SavedCard; onClose: () => 
   const store = useAppStore()
 
   const known = [...new Set([...cards.flatMap((c) => c.tags), ...tags])].sort()
-  const checked = validateTask({ title, date, repeat, tags }, Date.now())
+  const checked = validateTask({ title, date, repeat, afterDays: after, tags }, Date.now())
   const err = submitted ? checked.errors : {}
 
   const toggleTag = (t: string) => setTags((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]))
@@ -49,10 +53,14 @@ export function TaskSheet({ card, onClose }: { card?: SavedCard; onClose: () => 
       return setStoreError(`You can pin up to ${MAX_PINNED}. Unpin one first.`)
     }
     const { dueAt } = checked
-    const summary = taskSummary(dueAt, repeat)
-    // Pass a reminder only when the date or repeat changed, so editing a note never re-opens a finished one.
-    const changed = (dueAt === null) !== (reminder === undefined) || (dueAt !== null && reminder !== undefined && (reminder.dueAt !== dueAt || reminder.repeat !== repeat))
-    const draft = dueAt === null ? null : { dueAt, repeat, leadDays: reminder?.leadDays ?? 0 }
+    const { afterDays } = checked
+    const summary = taskSummary(dueAt, repeat, afterDays)
+    // Pass a reminder only when the date, repeat or heads-up times changed, so editing a note never re-opens a finished one.
+    const sameLeads = reminder !== undefined && leadsOf(reminder).join() === [...leads].sort((a, b) => b - a).join()
+    const changed =
+      (dueAt === null) !== (reminder === undefined) ||
+      (dueAt !== null && reminder !== undefined && (reminder.dueAt !== dueAt || reminder.repeat !== repeat || (reminder.afterDays ?? null) !== afterDays || !sameLeads))
+    const draft = dueAt === null ? null : { dueAt, repeat, ...leadFields(leads), ...(afterDays ? { afterDays } : {}) }
     let id = card?.id ?? null
     if (card) updateCard(card.id, { title: checked.title, note, tags, summary }, changed ? draft : undefined)
     else id = saveCard({ title: checked.title, kind: 'task', toolId: null, inputs: null, summary, amount: null, lines: [], note, tags }, draft)
@@ -98,16 +106,20 @@ export function TaskSheet({ card, onClose }: { card?: SavedCard; onClose: () => 
             />
           </FormField>
           {date && (
-            <button type="button" className="link-btn todo__clear" onClick={() => { setDate(''); setRepeat('none') }}>
+            <button type="button" className="link-btn todo__clear" onClick={() => { setDate(''); setRepeat('none'); setAfter(null) }}>
               Clear date
             </button>
           )}
           <div className="ffield" data-invalid={err.repeat ? '' : undefined}>
             <span className="ffield__label" id="task-repeat-label">Repeat</span>
-            <Segmented
+            <Segmented<Repeat | 'after'>
               label="Repeat"
-              value={repeat}
-              onChange={setRepeat}
+              value={after !== null ? 'after' : repeat}
+              onChange={(v) => {
+                if (v === 'after') return
+                setRepeat(v)
+                setAfter(null)
+              }}
               options={[
                 { value: 'none', label: 'Never' },
                 { value: 'monthly', label: 'Monthly' },
@@ -117,6 +129,8 @@ export function TaskSheet({ card, onClose }: { card?: SavedCard; onClose: () => 
             />
             {err.repeat && <p className="ffield__error" role="alert">{err.repeat}</p>}
           </div>
+          <AfterDone days={after} onChange={(v) => { setAfter(v); if (v !== null) setRepeat('none') }} error={err.afterDays} idPrefix="task" />
+          {date && <LeadPills value={leads} onChange={setLeads} />}
         </div>
 
         <div className="save__card">

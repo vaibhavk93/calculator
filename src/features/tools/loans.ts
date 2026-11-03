@@ -20,7 +20,9 @@ import {
 } from '../../engine/loans/loan'
 import { legacyTermText, parseTerm, termChip } from '../../engine/loans/term'
 import { asScheduled, neverEnds, partPay, partPayTarget, payoffPlan, runway, type Debt } from '../../engine/loans/payoff'
-import { CARD_GST_PCT, HOME_LOAN_TAX, LOAN_RULES_AS_OF, PRESETS, type LoanType } from '../../engine/loans/rules'
+import { CARD_GST_PCT, HOME_LOAN_TAX, LOAN_RULES_AS_OF, PRESETS, RATES_AS_OF as LOAN_RATES, type LoanType } from '../../engine/loans/rules'
+import { RATES_AS_OF as GST_RATES } from '../../engine/convert/gstRates'
+import { RATES_AS_OF as TAX_RATES } from '../../engine/tax/rules.FY2026-27'
 import { junkOptional, need, parseNum, type Computed, type Field, type Output, type ResultTable, type ToolSpec, type Values } from '../../lib/tool'
 
 // ---- shared fields and helpers ------------------------------------------------
@@ -419,11 +421,12 @@ const compareSpec: ToolSpec = {
 
 const homeTaxSpec: ToolSpec = {
   id: 'home-loan-tax',
+  rates: TAX_RATES,
   title: 'Home loan tax benefit',
   blurb: 'Tax saved on your home loan',
   category: 'loans',
   verified: { source: 'Income-tax Act, 2025 gazette sections (the rules, not the results)' },
-  keywords: ['24b', '80c', 'section 22', 'section 123', 'home loan tax', 'deduction', 'housing loan interest'],
+  keywords: ['24b', '80c', 'section 80c', 'section 22', 'section 123', 'home loan tax', 'deduction', 'housing loan interest'],
   fields: [
     principalField(),
     rateField(),
@@ -461,8 +464,8 @@ const homeTaxSpec: ToolSpec = {
     },
     {
       id: 'used123',
-      label: 'Section 123 limit already used',
-      hint: 'PF, insurance, ELSS and similar',
+      label: 'Section 80C limit already used (old regime)',
+      hint: 'PF, insurance, ELSS and similar. Section 123 in the 2025 Act.',
       kind: 'number',
       unit: 'rupee',
       default: '0',
@@ -481,7 +484,7 @@ const homeTaxSpec: ToolSpec = {
     const rent = occupancy === 'letOut' ? parseNum(v.rent) : new D(0)
     if (!rent) return { error: 'Enter the yearly rent' }
     if (regime === 'old') {
-      const junk = junkOptional(v, [{ id: 'used123', label: 'Section 123 limit already used' }])
+      const junk = junkOptional(v, [{ id: 'used123', label: 'Section 80C limit already used' }])
       if (junk) return junk
     }
     const used = regime === 'old' ? (parseNum(v.used123) ?? new D(0)) : new D(0)
@@ -508,16 +511,16 @@ const homeTaxSpec: ToolSpec = {
       formula:
         regime === 'new'
           ? occupancy === 'self'
-            ? ['New regime (s.202): no interest deduction for a house you live in, and no section 123 deduction']
+            ? ['New regime (s.202): no interest deduction for a house you live in, and no Section 80C deduction']
             : [
                 `New regime: interest only down to zero house income: min(interest, 70% × ${rent.toFixed()})`,
-                'No set-off of a house loss against other income, and no section 123',
+                'No set-off of a house loss against other income, and no Section 80C',
               ]
           : [
               occupancy === 'self'
                 ? `Interest deduction = min(interest, ₹2,00,000) (s.22(2)) = min(${y1.interest.toFixed(2)}, 200000)`
                 : `Interest deduction = min(interest, 70% × rent + ₹2,00,000 set-off) = min(${y1.interest.toFixed(2)}, ${rent.times('0.7').plus(HOME_LOAN_TAX.houseLossSetOffCap).toFixed(2)})`,
-              `Principal deduction = min(principal, ₹1,50,000 − ${used.toFixed()} already used) (s.123)`,
+              `Principal deduction = min(principal, ₹1,50,000 − ${used.toFixed()} already used) (Section 80C)`,
               `Tax saved = (interest deduction + principal deduction) × ${slab.toFixed()}%`,
             ],
       note: `Income-tax Act, 2025 rules for tax year ${HOME_LOAN_TAX.taxYear}, as of ${LOAN_RULES_AS_OF}; not tax advice. Assumes a house you live in unless you change it under More options, that the loan buys or builds it and it is finished within 5 years (else the interest cap is ₹30,000), that each loan year is a tax year, that limits stay the same, and that loss carried forward is not counted.`,
@@ -652,6 +655,7 @@ const interestSpec: ToolSpec = {
 
 const cardSpec: ToolSpec = {
   id: 'card-emi',
+  rates: GST_RATES,
   title: 'Credit card EMI cost',
   blurb: 'True cost including GST',
   category: 'loans',
@@ -707,6 +711,7 @@ const cardSpec: ToolSpec = {
 
 const presetSpec: ToolSpec = {
   id: 'loan-presets',
+  rates: LOAN_RATES,
   title: 'Typical loan rates',
   blurb: 'Typical rates by loan type',
   category: 'loans',

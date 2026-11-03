@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useBackHandler } from '../../components/useBackHandler'
+import { decimalComma } from '../../lib/decimalComma'
 
 /** Keep digits and one dot. The store checks the rest and says what to fix. */
-export const cleanMoney = (v: string) => v.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').slice(0, 16)
+export const cleanMoney = (v: string) => decimalComma(v).replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').slice(0, 16)
 
 /** Moves focus to a field by id and scrolls it into view, for the first bad field after a failed press. */
 export function focusField(id: string) {

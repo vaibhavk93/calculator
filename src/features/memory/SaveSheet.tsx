@@ -4,7 +4,9 @@ import { FormField, RequiredNote } from '../../components/FormField'
 import { useApp } from '../../components/StoreProvider'
 import type { CardDraft } from '../../store/app'
 import { DEFAULT_TAGS, type Reminder, type Repeat, type SavedCard } from '../../store/types'
+import { cleanAfterDays, leadFields, leadsOf } from '../../lib/reminders'
 import { Segmented, Toggle } from '../settings/controls'
+import { AfterDone, LeadPills } from './ReminderOptions'
 
 type Remind = 'off' | Repeat
 
@@ -49,7 +51,10 @@ export function SaveSheet({
   const [note, setNote] = useState(card?.note ?? '')
   const [remind, setRemind] = useState<Remind>(reminder ? reminder.repeat : suggest ?? 'off')
   const [date, setDate] = useState(toDateInput(reminder?.dueAt ?? Date.now() + 30 * 86_400_000))
-  const [lead, setLead] = useState(String(reminder?.leadDays ?? 3))
+  // Several heads-up times (a new reminder starts with 3 days), and "repeat N days after I tick it" (days as typed, null = off).
+  const [leads, setLeads] = useState<number[]>(reminder ? leadsOf(reminder) : [3])
+  const [after, setAfter] = useState<string | null>(reminder?.afterDays ? String(reminder.afterDays) : null)
+  const [afterError, setAfterError] = useState<string | null>(null)
   const [custom, setCustom] = useState('')
   const [titleError, setTitleError] = useState<string | null>(null)
 
@@ -62,13 +67,17 @@ export function SaveSheet({
   }
 
   const dueAt = fromDateInput(date)
-  const reminderDraft = remind === 'off' || dueAt === null ? null : { dueAt, repeat: remind, leadDays: Math.max(0, Math.min(60, parseInt(lead, 10) || 0)) }
+  const afterDays = after === null ? null : cleanAfterDays(after)
+  const reminderDraft =
+    remind === 'off' || dueAt === null ? null : { dueAt, repeat: remind, ...leadFields(leads), ...(afterDays ? { afterDays } : {}) }
 
   const done = () => {
     const cleanTitle = title.trim()
     if (!cleanTitle) return setTitleError('Give this a name')
     if (remind !== 'off' && dueAt === null) return
+    if (remind !== 'off' && after !== null && afterDays === null) return setAfterError('Enter a number of days from 1 to 365')
     setTitleError(null)
+    setAfterError(null)
     if (card) {
       updateCard(card.id, { title: cleanTitle, tags, note, inputs: draft.inputs, summary: draft.summary, amount: draft.amount, lines: draft.lines }, reminderDraft)
       onSaved(card.id)
@@ -128,10 +137,14 @@ export function SaveSheet({
           </div>
           {remind !== 'off' && (
             <>
-              <Segmented
+              <Segmented<Remind | 'after'>
                 label="How often"
-                value={remind}
-                onChange={setRemind}
+                value={after !== null ? 'after' : remind}
+                onChange={(v) => {
+                  if (v === 'after') return
+                  setRemind(v)
+                  setAfter(null)
+                }}
                 options={[
                   { value: 'none', label: 'Once' },
                   { value: 'monthly', label: 'Monthly' },
@@ -144,11 +157,9 @@ export function SaveSheet({
                   <span className="field-label">{remind === 'none' ? 'Due on' : 'First due on'}</span>
                   <input className="field field--mono" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
                 </label>
-                <label className="field-row">
-                  <span className="field-label">Days before</span>
-                  <input className="field field--mono" inputMode="numeric" value={lead} onChange={(e) => setLead(e.target.value.replace(/\D/g, '').slice(0, 2))} />
-                </label>
               </div>
+              <AfterDone days={after} onChange={(v) => { setAfter(v); setAfterError(null); if (v !== null) setRemind('none') }} error={afterError} idPrefix="save" />
+              <LeadPills value={leads} onChange={setLeads} />
             </>
           )}
         </div>

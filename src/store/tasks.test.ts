@@ -199,3 +199,38 @@ describe('addAdvanceTaxPack', () => {
     expect(c.get().reminders).toHaveLength(4)
   })
 })
+
+describe('repeat after I tick it, in the store', () => {
+  const afterTask = (c: Ctx, days: number) =>
+    c.store.getState().saveCard(
+      { title: 'Service the car', kind: 'task', toolId: null, inputs: null, summary: '', amount: null, lines: [] },
+      { dueAt: at(2026, 11, 12), repeat: 'none', leadDays: 0, afterDays: days },
+    )!
+
+  it('the reminder keeps afterDays and a list of lead times', () => {
+    const c = setup()
+    const id = c.store.getState().saveCard(
+      { title: 'Rent', kind: 'task', toolId: null, inputs: null, summary: '', amount: null, lines: [] },
+      { dueAt: at(2026, 11, 20), repeat: 'monthly', leadDays: 7, leads: [7, 1, 0], afterDays: 30 },
+    )!
+    expect(c.get().reminders.find((r) => r.cardId === id)).toMatchObject({ leadDays: 7, leads: [7, 1, 0], afterDays: 30 })
+  })
+  it('ticking in To-do moves it to N days from today, and it never finishes', () => {
+    const c = setup()
+    const id = afterTask(c, 180)
+    c.tick(3 * DAY) // ticked 13 Nov
+    expect(c.get().setTaskDone(id, true)).toBe(true)
+    const r = c.get().reminders.find((x) => x.cardId === id)!
+    expect(r.dueAt).toBe(new Date(2027, 4, 12, 9).getTime())
+    expect(r.done).toBe(false)
+    expect(c.get().cards.find((x) => x.id === id)!.done).toBeUndefined()
+    expect(r.history).toHaveLength(1)
+  })
+  it('Mark paid on the Due tab does the same', () => {
+    const c = setup()
+    const id = afterTask(c, 30)
+    c.tick(DAY)
+    c.get().markPaid(c.get().reminders.find((x) => x.cardId === id)!.id)
+    expect(c.get().reminders[0]).toMatchObject({ dueAt: at(2026, 12, 11), done: false })
+  })
+})

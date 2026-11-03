@@ -13,6 +13,8 @@ export interface TapeLine {
   value: string
   /** Ticked off (paid, bought, done). Absent means not ticked. */
   done?: boolean
+  /** Skipped: not paid and not going to be. Left out of the totals. Never set together with `done`. */
+  skip?: boolean
 }
 
 /**
@@ -66,6 +68,10 @@ export interface Reminder {
   /** Day of the month it is meant for, so Jan 31 then Feb 28 then Mar 31 does not drift to the 28th. */
   anchorDay: number
   leadDays: number
+  /** Several heads-up times, in days before (0 = on the day), biggest first. Absent: just `leadDays`. When present, `leadDays` is its biggest. */
+  leads?: number[]
+  /** Repeat this many days after it is ticked off, instead of on the calendar. Absent: use `repeat`. */
+  afterDays?: number
   /** A one-time reminder that has been marked paid. Recurring ones never finish: they advance. */
   done: boolean
   history: Payment[]

@@ -53,6 +53,9 @@ describe('capital gains tax', () => {
     expect((cg({ exemptionUsed: d(100000) }) as { tax: Dec }).tax.toFixed()).toBe('34375') // (3L - 25k) x 12.5%
     expect((cg({ sellPrice: d(625000) }) as { tax: Dec }).tax.toFixed()).toBe('0')
   })
+  it('a negative "exemption already used" is refused, not turned into extra exemption (B-15)', () => {
+    expect(cg({ exemptionUsed: d(-100000) })).toEqual({ error: 'Amounts cannot be negative' })
+  })
   it('property bought before 23 Jul 2024: lower of 12.5% flat and 20% indexed', () => {
     // Bought FY2015-16 (CII 254) for 30L, sold FY2026-27 (CII 384) for 80L.
     // Flat: 50L x 12.5% = 6,25,000. Indexed cost 30L x 384/254 = 45,35,433.07; gain 34,64,566.93 x 20% = 6,92,913.39.

@@ -1,4 +1,5 @@
 import { D, type Dec } from '../engine'
+import { decimalComma } from './decimalComma'
 
 /**
  * A budget bucket. `limit` is a plain decimal string for every month, or null for "no limit".
@@ -196,7 +197,7 @@ export interface InstrumentErrors {
 
 /** What a field check can say. Each message names the fix. Null means the value is fine. */
 const moneyProblem = (text: string, optional: boolean): string | null => {
-  const clean = text.replace(/[,₹\s]/g, '')
+  const clean = decimalComma(text).replace(/[,₹\s]/g, '')
   const what = optional ? 'Enter a limit above zero, or leave it empty' : 'Enter an amount above zero'
   if (clean === '' && optional) return null
   if (!/^(\d+\.?\d*|\.\d+)$/.test(clean)) return what
@@ -377,7 +378,7 @@ const dayProblem = (v: unknown): string | null => {
 /** Optional plain decimal. `allowZero` is for a fee, which may be free. */
 const optionalMoney = (v: unknown, what: string, allowZero: boolean): string | null => {
   if (blank(v)) return null
-  const clean = String(v).replace(/[,₹\s]/g, '')
+  const clean = decimalComma(String(v)).replace(/[,₹\s]/g, '')
   if (!/^(\d+\.?\d*|\.\d+)$/.test(clean)) return `Enter ${what} as a number`
   const n = new D(clean)
   if (!allowZero && n.isZero()) return `Enter ${what} above zero, or leave it empty`
@@ -441,7 +442,7 @@ export function validateInstrumentDraft(d: InstrumentFields, budget: Pick<Budget
 }
 
 const orUndef = (v: string): string | undefined => (v === '' ? undefined : v)
-const plainMoney = (v: unknown): string | null => (blank(v) ? null : new D(String(v).replace(/[,₹\s]/g, '')).toFixed())
+const plainMoney = (v: unknown): string | null => (blank(v) ? null : new D(decimalComma(String(v)).replace(/[,₹\s]/g, '')).toFixed())
 const dayOrNull = (v: unknown): number | null => (blank(v) ? null : Number(String(v).trim()))
 
 /** Trims and checks a draft. Returns the clean fields or the reason it is not acceptable. Network is kept only for cards. Unset optional fields come back undefined. */
@@ -493,6 +494,67 @@ export interface BudgetExpense {
   refund?: boolean
   /** The recurring bill (RecurringItem.id) this entry was paid for. Set by "Repeats" and by marking a bill paid in Due. */
   recurringId?: string
+  /** What was changed after the entry was first saved (amount, date, category), oldest first, at most MAX_EDITS. A trail only: it never blocks saving. */
+  edits?: ExpenseEdit[]
+}
+
+/** One change to an entry. `from` and `to` are the old and new amount ("900"), date ("2026-11-02") or category id (null for Uncategorised). */
+export interface ExpenseEdit {
+  at: number
+  field: 'amount' | 'date' | 'category'
+  from: string | null
+  to: string | null
+}
+export const MAX_EDITS = 10
+const EDIT_FIELDS = ['amount', 'date', 'category'] as const
+
+/** The edit notes to add when an entry becomes `next`: one for each of amount, date and category that really changed. */
+export function expenseChanges(
+  old: Pick<BudgetExpense, 'amount' | 'date' | 'categoryId'>,
+  next: Pick<BudgetExpense, 'amount' | 'date' | 'categoryId'>,
+  at: number,
+): ExpenseEdit[] {
+  const out: ExpenseEdit[] = []
+  if (!new D(old.amount).eq(next.amount)) out.push({ at, field: 'amount', from: old.amount, to: next.amount })
+  if (old.date !== next.date) out.push({ at, field: 'date', from: old.date, to: next.date })
+  if (old.categoryId !== next.categoryId) out.push({ at, field: 'category', from: old.categoryId, to: next.categoryId })
+  return out
+}
+
+/** Adds notes to an entry's trail, keeping the newest MAX_EDITS. Returns undefined when the trail would be empty. */
+export function withEdits(trail: ExpenseEdit[] | undefined, add: ExpenseEdit[]): ExpenseEdit[] | undefined {
+  const all = [...(trail ?? []), ...add].slice(-MAX_EDITS)
+  return all.length > 0 ? all : undefined
+}
+
+/** Checks a stored trail: right shape, known fields, at most MAX_EDITS. Anything else is dropped. */
+export function sanitizeEdits(raw: unknown): ExpenseEdit[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const out: ExpenseEdit[] = []
+  for (const x of raw) {
+    if (typeof x !== 'object' || x === null) continue
+    const { at, field, from, to } = x as Record<string, unknown>
+    if (typeof at !== 'number' || !Number.isFinite(at) || !(EDIT_FIELDS as readonly unknown[]).includes(field)) continue
+    const text = (v: unknown) => (v === null ? null : typeof v === 'string' && v.length <= 64 ? v : undefined)
+    const f = text(from)
+    const t = text(to)
+    if (f === undefined || t === undefined) continue
+    out.push({ at, field: field as ExpenseEdit['field'], from: f, to: t })
+  }
+  return out.length > 0 ? out.slice(-MAX_EDITS) : undefined
+}
+
+const SHORT_DAY = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' })
+const dayWords = (key: string | null): string => {
+  const [y = 1970, m = 1, d = 1] = (key ?? '').split('-').map(Number)
+  return SHORT_DAY.format(new Date(y, m - 1, d))
+}
+
+/** "Changed 2 Nov: was ₹900". `money` formats a plain amount, `category` names a category id. */
+export function editWords(e: ExpenseEdit, money: (plain: string) => string, category: (id: string | null) => string): string {
+  const when = SHORT_DAY.format(new Date(e.at))
+  const was = e.field === 'amount' ? money(e.from ?? '0') : e.field === 'date' ? `date was ${dayWords(e.from)}` : `category was ${category(e.from)}`
+  return `Changed ${when}: ${e.field === 'amount' ? 'was ' : ''}${was}`
 }
 
 export type Settlement = 'cardBill' | 'transfer'

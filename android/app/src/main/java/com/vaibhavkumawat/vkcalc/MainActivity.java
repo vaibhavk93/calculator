@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
         // Local plugins must be registered before super.onCreate.
         registerPlugin(BackupFilePlugin.class);
         registerPlugin(SmsInboxPlugin.class);
+        registerPlugin(BatterySettingsPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

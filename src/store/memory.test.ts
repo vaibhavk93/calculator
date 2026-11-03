@@ -142,9 +142,22 @@ describe('taking a number to a list', () => {
     store.getState().toggleLine(id, a!.id)
     store.getState().toggleLine(id, b!.id)
     expect(get().cards[0]!.summary).toBe('2 of 3 done, ₹1,000.00 left')
+    // A second tap on the same line skips it (it leaves the totals); a third makes it pending again.
+    store.getState().toggleLine(id, b!.id)
+    expect(get().cards[0]!.summary).toBe('1 of 2 done, ₹1,000.00 left, 1 skipped')
     store.getState().toggleLine(id, b!.id)
     expect(get().cards[0]!.summary).toBe('1 of 3 done, ₹2,000.00 left')
     expect(get().cards[0]!.lines.filter((l) => l.done)).toHaveLength(1)
+  })
+
+  it('a skipped line leaves the list total and the card amount', () => {
+    const { store, get } = idsOf()
+    const id = store.getState().addToList({ title: 'Split' }, '1000', 3, '', true)!
+    const [a] = get().cards[0]!.lines
+    store.getState().toggleLine(id, a!.id)
+    store.getState().toggleLine(id, a!.id)
+    expect(get().cards[0]!.lines[0]).toMatchObject({ skip: true })
+    expect(get().cards[0]!.lines[0]!.done).toBeUndefined()
   })
 
   it('adds to an existing list and keeps its total right; a missing list returns null', () => {

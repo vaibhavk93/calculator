@@ -5,6 +5,7 @@ import { ScreenHeader } from '../../components/ScreenHeader'
 import { tintStyle } from '../../components/tint'
 import { useBackHandler } from '../../components/useBackHandler'
 import type { ToolSpec } from '../../lib/tool'
+import { yourTools } from '../../lib/toolUse'
 import { ScientificScreen } from '../calculator/ScientificScreen'
 import { groupById, groupOfTool, GROUPS, type ToolGroup } from './groups'
 import { ALL_TOOLS } from './registry'
@@ -72,6 +73,12 @@ export function ToolsScreen() {
   useBackHandler(!!group, () => setNav({ category: null }))
   useBackHandler(nav.scientific, () => setNav({ scientific: false }))
 
+  const toolUse = useApp((s) => s.settings.toolUse)
+  const pinnedTools = useApp((s) => s.settings.pinnedTools)
+  const mine = yourTools(toolUse, pinnedTools, (id) => ALL_TOOLS.some((t) => t.id === id))
+    .map((id) => ALL_TOOLS.find((t) => t.id === id))
+    .filter((t): t is ToolSpec => !!t)
+
   const found = q ? GROUPS.flatMap((g) => specsOf(g).filter((t) => matches(t, q))) : []
 
   return (
@@ -115,6 +122,26 @@ export function ToolsScreen() {
               <span>Scientific calculator</span>
               <Icon name="chevron" size={18} className="navrow__chev" />
             </button>
+            {mine.length > 0 && (
+              <>
+                <h2 className="section-head">Your tools</h2>
+                <div className="group">
+                  {mine.map((t) => (
+                    <button key={t.id} type="button" className="navrow tap-row" style={tintStyle(groupOfTool(t.id)?.tint ?? 8)} onClick={() => setNav({ tool: t.id })}>
+                      <span className="dot" aria-hidden="true" />
+                      <span className="navrow__label">{t.title}</span>
+                      {pinnedTools.includes(t.id) && (
+                        <>
+                          <Icon name="pinFilled" size={16} />
+                          <span className="sr-only">Pinned</span>
+                        </>
+                      )}
+                      <Icon name="chevron" size={18} className="navrow__chev" />
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             <h2 className="section-head">Browse by what you need</h2>
             <div className="tiles">
               {GROUPS.map((g) => (

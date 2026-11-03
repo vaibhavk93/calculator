@@ -15,6 +15,11 @@ describe('planNotifications', () => {
     expect(p!.title).toBe('HDFC card')
     expect(p!.body).toBe('₹57650 · due in 3 days')
   })
+  it('formats a non-money amount as what it is, not as rupees (B-10)', () => {
+    const fmt = (a: string, f?: string) => (f === 'number' ? a : `₹${a}`)
+    const [p] = planNotifications([rem({})], [{ ...card, amount: '24.5', amountFmt: 'number' } as SavedCard], NOW, fmt)
+    expect(p!.body).toBe('24.5 · due in 3 days')
+  })
   it('if the heads-up moment has passed but the due time has not, notifies at the due time', () => {
     const [p] = planNotifications([rem({ dueAt: NOW + 2 * DAY })], [card], NOW, money)
     expect(p!.at).toBe(NOW + 2 * DAY)
@@ -52,5 +57,32 @@ describe('planNotifications with a reminder time', () => {
     const today = new Date(2026, 10, 10, 9).getTime()
     expect(planNotifications([rem({ dueAt: today, leadDays: 0 })], [card], NOW, money, '18:00')).toHaveLength(1)
     expect(planNotifications([rem({ dueAt: today, leadDays: 0 })], [card], NOW, money, '11:00')).toHaveLength(0)
+  })
+})
+
+describe('planNotifications with several lead times', () => {
+  it('one notification for each heads-up time still ahead, soonest first', () => {
+    const plan = planNotifications([rem({ leadDays: 7, leads: [7, 1, 0] })], [card], NOW, money)
+    expect(plan.map((p) => p.at)).toEqual([NOW + 3 * DAY, NOW + 9 * DAY, NOW + 10 * DAY])
+    expect(plan.map((p) => p.body)).toEqual(['₹57650 · due in 7 days', '₹57650 · due tomorrow', '₹57650 · due today'])
+    // each notification has its own number, and the same reminder id
+    expect(new Set(plan.map((p) => p.id)).size).toBe(3)
+    expect(new Set(plan.map((p) => p.reminderId))).toEqual(new Set(['r1']))
+  })
+  it('a heads-up time that has passed is left out, the others stay', () => {
+    const plan = planNotifications([rem({ dueAt: NOW + 3 * DAY, leadDays: 7, leads: [7, 1] })], [card], NOW, money)
+    expect(plan.map((p) => p.at)).toEqual([NOW + 2 * DAY])
+  })
+  it('when every heads-up time has passed there is still one at the due time', () => {
+    const plan = planNotifications([rem({ dueAt: NOW + 2 * DAY, leadDays: 7, leads: [7, 3] })], [card], NOW, money)
+    expect(plan.map((p) => p.at)).toEqual([NOW + 2 * DAY])
+  })
+  it('an old reminder with only a number still gives one notification', () => {
+    expect(planNotifications([rem({})], [card], NOW, money)).toHaveLength(1)
+  })
+  it('with a reminder time, each lands at that time on its own day', () => {
+    const due = new Date(2026, 10, 20, 9).getTime()
+    const plan = planNotifications([rem({ dueAt: due, leadDays: 3, leads: [3, 0] })], [card], NOW, money, '18:30')
+    expect(plan.map((p) => [new Date(p.at).getDate(), new Date(p.at).getHours(), new Date(p.at).getMinutes()])).toEqual([[17, 18, 30], [20, 18, 30]])
   })
 })

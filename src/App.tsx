@@ -13,7 +13,8 @@ import { goBack } from './lib/backStack'
 import { createWakeLock } from './lib/device'
 import { exitApp, onHardwareBack } from './lib/nativeBack'
 import { setStatusBar } from './lib/statusBar'
-import { applyNotifications, ensurePermission, onNotificationAction, planNotifications } from './lib/notifications'
+import { ackReminder, markSeen, recordPlan, setMissed, verifyDelivery } from './lib/delivery'
+import { applyNotifications, deliveredIds, ensurePermission, notificationsSupported, onNotificationAction, planNotifications } from './lib/notifications'
 import { formatCell } from './lib/toolFormat'
 import { D } from './engine'
 import { applyTheme } from './lib/theme'
@@ -65,16 +66,41 @@ function useReminderNotifications() {
   }, [])
 
   useEffect(() => {
-    const money = (plain: string) => formatCell(new D(plain), 'money', { system, decimals })
+    const money = (plain: string, fmt?: Parameters<typeof formatCell>[1]) => formatCell(new D(plain), fmt ?? 'money', { system, decimals })
     const planned = planNotifications(reminders, cards, Date.now(), money, time)
     void (async () => {
       if (planned.length > 0 && !(await ensurePermission())) return
       await applyNotifications(planned)
+      // Remember what was scheduled, so a later open can tell when one that was due never showed (lib/delivery.ts).
+      if (notificationsSupported()) await recordPlan(planned, reminders)
     })()
   }, [reminders, cards, system, decimals, time, resumed])
 
+  // Delivery check: when the app opens or comes back, see whether a reminder came due while it was away and may not have shown.
+  // It waits a moment so a tap on a notification (which opened the app) is counted first.
+  const store = useAppStore()
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const verify = () => {
+      clearTimeout(timer)
+      timer = setTimeout(async () => {
+        const s = store.getState()
+        const missed = await verifyDelivery(s.reminders, s.cards, await deliveredIds())
+        if (missed) setMissed(missed)
+      }, 1500)
+    }
+    const onChange = () => (document.visibilityState === 'visible' ? verify() : void markSeen())
+    verify()
+    document.addEventListener('visibilitychange', onChange)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onChange)
+    }
+  }, [store])
+
   useEffect(() => {
     const stop = onNotificationAction((id, action) => {
+      ackReminder(id)
       if (action === 'paid') markPaid(id)
       else if (action === 'snooze') snooze(id, 1)
       else setTab('due')

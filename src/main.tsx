@@ -17,6 +17,7 @@ import './styles/lists.css'
 import './styles/history.css'
 import './styles/budget.css'
 import './styles/forms.css'
+import './styles/onboarding.css'
 
 import { App } from './App'
 import { StoreProvider } from './components/StoreProvider'

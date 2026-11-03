@@ -501,3 +501,83 @@ button.heat__cell:active {
   gap: var(--s-3);
   font-size: 0.9375rem;
 }
+
+/* Picking several entries to give them one category (Spending summary > Entries > Select). */
+.budget__main--pick {
+  cursor: pointer;
+}
+
+.budget__entry--off .budget__main--pick {
+  cursor: default;
+  color: var(--ink-3);
+}
+
+.budget__tick {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--ink-3);
+  border-radius: var(--r-sm);
+  color: var(--accent);
+  align-self: center;
+}
+
+.budget__main[aria-checked='true'] .budget__tick {
+  border-color: var(--accent);
+}
+
+.spend__bulk {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4) calc(var(--s-3) + var(--safe-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.spend__bulk .budget__note {
+  margin: 0;
+}
+
+.spend__bulkbtns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.spend__bulkbtns .btn {
+  flex: 1 1 auto;
+}
+
+/* The quiet "make it a bill?" offer and the list of past changes in the entry sheet. */
+.expense__guess {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-4);
+}
+
+.expense__trail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: 0 var(--s-4);
+}
+
+/* Paid with: sub-types under a way of paying */
+.paid__subs {
+  border-top: 1px solid var(--line);
+  background: transparent;
+}
+.paid__sub {
+  padding-left: var(--s-6);
+}
+.paid__all {
+  padding: 0 0 var(--s-2) var(--s-6);
+}
+.tap-row__chev--open {
+  transform: rotate(90deg);
+}
