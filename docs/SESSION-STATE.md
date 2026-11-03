@@ -37,6 +37,9 @@ Roadmap = `docs/MASTER-ROADMAP.md` (Phase 0 done, 1 next, 2 soon, 3 later, Ruled
 
 **Phase 3 helper status (11:50):** reminders/lists DONE (battery-settings guide per phone brand, may-not-have-shown notice, several lead times, repeat after tick, 3-state checklist lines, paste list, inline rename). Java for BatterySettingsPlugin built in the real APK next. Tools polish and budget/bugs helpers resumed after the 11:20 limit reset. Next: onboarding tours, payment-mode view, QA campaign, five-role review.
 
+**All build phases done (12:35):** Phase 1, 2, 3 (non-gated items), onboarding tours, Paid-with tree, committed e353bc1 locally (pushed up to 352f643). Phase 3 items NOT built on purpose (gated/large/permission): HRA, FD ladder, gold bill, LTCG harvest, widget, share-in, Quick Settings tile, iOS, remote rules packs, PDF/image export, exit settlement, multi-goal, photo on note, app lock, rewards helper.
+**Now running:** 4 QA helpers (budget-new, notes-due, tools, cross-cutting). Then: five-role review (PM, UX, UI, dev, QA) -> docs/ROLE-REVIEW-2026-11-03.md, fix, build, install real Calc, push, final report. Calc QA on phone has the 12:15 build (Java plugins compile).
+
 ## Working rules the owner set (also in CLAUDE.md)
 1. **Think at app level, always.** A request that names one screen is a sample of a pattern. Find every place with the same pattern and fix them all. Say what else you found.
 2. Ask only when a choice is expensive or cannot be undone. Otherwise decide, build, and report.
