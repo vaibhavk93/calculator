@@ -233,6 +233,32 @@ Full present-vs-absent tables: `docs/CAPABILITY-GAPS-2026-11-03.md`. Items marke
 
 ---
 
+## Phase 7 — Simpler app: turn modules and functions on or off (added 2026-11-03, owner request)
+
+**Why:** Calc now has 5 tabs, 57 calculators, Budget with cards/bills/bank messages, Notes + To-do, Due, and (planned) Portfolio. A person who only wants a calculator and a few tools should not see any of it. The owner asked for a way to switch parts of the app on or off by need, so the app feels simple.
+**Status: Planned. Not built. Critic review is still to be run before building** (it changes how the app behaves for every user), per the project rule.
+
+| Item | What it is | Why / rule | Effort | Status |
+|---|---|---|---|---|
+| **M1 "Choose what you see"** in Settings | One switch per module: **Tools, Notes, Due, Budget** (and Portfolio once it exists). **Calculate and Settings are always on.** The tab bar shows only what is on (a phone with 2 tabs is fine). Turning one off hides it; turning it on again brings it back | **Hiding never deletes data.** Everything stays in storage and in backups and returns when switched on. Every off switch says that in one line | M | Planned |
+| **M2 Presets** | Four starting points: "Just a calculator" (Calculate + Tools), "Calculator and notes", "Money tracker" (+ Budget, Due), "Everything" | One tap instead of four decisions; the choice is only a set of switches, always editable | S | Planned |
+| **M3 First-run question** | On first launch: "What will you use Calc for?" (the presets), skippable, same as the tours: never blocks. Existing users keep **Everything**, nothing disappears on update | Protects current users | S | Planned |
+| **M4 Switches inside a module** | Tools: hide whole groups (e.g. Tax, Business metrics, Loans). Budget: Cards and accounts, Bills, Add from bank messages, heatmap. Calculate: Scientific, History. Due: reminder packs | The finer level of the same idea; the module switches ship first | M | Planned |
+| **M5 Graceful links** | When a target module is off, the actions that lead to it disappear instead of breaking: "To list" and "Remind me" after `=`, "Add expense", "Use in…", suggestion chips, "Save my share to Budget", Home "Try it" links in tours | A button that opens a hidden screen is a bug. One helper decides "is module X on" for the whole app | M | Planned |
+| **M6 Reminders when Due is off** | Ask once, in words: "You have N active reminders. Keep them firing, or pause them?" Default **keep firing** (silent loss of a bill reminder is the worst outcome). Same question for recurring bills | Money-affecting; the user decides | S | Planned |
+| **M7 SMS reading when Budget is off** | Budget off means the bank-message scan is unreachable; the permission stays granted until the user revokes it, so say so and link to Android settings | Privacy honesty | S | Planned |
+| **M8 Tours and tips follow the switches** | No tour or "New here?" row for a module that is off; replays in Settings list only modules that are on | Keeps the simplified app quiet | S | Planned |
+
+**Design rules (decided now, to hold when it is built):**
+- The setting is data (`settings.modules`, additive, safe defaults = everything on; schema stays 3; old backups load as Everything).
+- One function answers "is this module on" and one list drives the tab bar, Settings, tours, links and search; no screen checks the switch on its own.
+- The five-tab limit stays; Portfolio replaces nothing, it only appears when on.
+- Settings can always be reached, and switching a module back on is always one tap away, so nobody can lock themselves out of a feature.
+- Testing needs: every combination of switches opens without error (2^4 = 16), no dead button, deep links from notifications into a hidden module land on a calm "Turned off. Turn on" screen, restore from a backup made with different switches.
+- Open question for the owner: should hidden modules still appear in global search results? Default proposed: no.
+
+---
+
 ## Ruled out — do not re-suggest these
 
 | Idea | Why ruled out | Source |
