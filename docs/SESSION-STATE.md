@@ -29,6 +29,11 @@ Roadmap = `docs/MASTER-ROADMAP.md` (Phase 0 done, 1 next, 2 soon, 3 later, Ruled
 | Owner still to pick from "Ruled out": list shown in final report |  |
 | Not pushed. Owner must say "push". Phone: only Calc QA gets test installs. |  |
 
+**Later messages (2026-11-03, after Phase 2):**
+- "for SMS parser ... add a module which changes the numbers via encoding so LLM does not read the actual data ... check how other apps allow sms reading under google ... SMS auto-logging is not working. test on phone. install ... solve issues and then push. after all these work on phase 3." DONE: sender filter bug (-S suffix) fixed, scan works on phone (117 payments found), allowlist masking module, Play policy checked (budget apps are a listed exception, needs declaration form), pushed 352f643, real Calc updated 07:43.
+- "possible to add categories and payment mode from the SMS?" DONE: mode read from text + matched card, cards/accounts offered via "Add to my cards", category by earlier payee else keyword guess.
+- "help user onboarding step by step for budget, notes and due, tell him what he can do. also add capability to check mode and sub payment mode or type of payment. test all the features you created step by step from 0 to 1 with all type of test cases and evaluate improvements as Experienced Product manager, UX designer, UI designer, developer and QA after building remaining phases."  PLAN: (1) wait for the 3 Phase 3 helpers; (2) onboarding tours for Budget/Notes/Due (+ replay in Settings); (3) payment-mode/sub-mode view (mode -> card/account/UPI source breakdown + filter); (4) QA campaign 0 to 1 across all features + a five-role review (PM, UX, UI, dev, QA) -> docs/ROLE-REVIEW-2026-11-03.md; (5) fix, build, install, report.
+
 ## Working rules the owner set (also in CLAUDE.md)
 1. **Think at app level, always.** A request that names one screen is a sample of a pattern. Find every place with the same pattern and fix them all. Say what else you found.
 2. Ask only when a choice is expensive or cannot be undone. Otherwise decide, build, and report.
