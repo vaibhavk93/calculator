@@ -189,6 +189,50 @@ same build.
 
 ---
 
+## Phase 5 — Portfolio (added 2026-11-03, owner request; critic verdict: build smaller)
+
+Full plan, data model and risks: `docs/PORTFOLIO-PLAN.md`. The owner asked for a place to log holdings with type, category, sub-category, invested amount and other details, and to watch growth over time. The repo had ruled out a net-worth *tracker* because hand-typed values go stale. So the plan is the smaller version the PRD already accepts (D14), plus dated value history, with cheap updating and loud staleness labels. Extras are gated on real use.
+
+| Item | What it is | Why / gate | Source | Effort | Status |
+|---|---|---|---|---|---|
+| **P1 Holdings + value history** | Add a holding (type, category, sub-category, platform, invested, start date, optional units, maturity, expected rate, note); "Update value" appends a dated snapshot; gain in ₹ and %, value age, group totals, hidden amounts, undoable deletes | The owner's request, built small. Age shown on every value | PORTFOLIO-PLAN | M | Planned |
+| P2 Add money / withdraw + XIRR, monthly update reminder, "Copy last values", portfolio CSV | Keeps invested honest, makes growth a real rate, makes updating one tap | **Gate: only if still updating after about a month** (unproven) | PORTFOLIO-PLAN | M | Planned, gated |
+| P3 Suggested lines from bank SMS | Mutual fund purchase / SIP / FD booking messages become "Add to Portfolio" suggestions the user confirms | Real inbox shows dozens of such messages; parser only guesses a category today | PORTFOLIO-PLAN, SMS-CAPTURE | M | Planned, after P2 |
+| P4 Allocation view and per-holding line chart | Shares by type/category as numbers and bars; a line over snapshots | Needs the chart-library decision (Phase 3 chart items) | PORTFOLIO-PLAN | M | Later |
+
+---
+
+## Phase 6 — Gaps found by the Notes / Due / Budget reassessment (2026-11-03)
+
+Full present-vs-absent tables: `docs/CAPABILITY-GAPS-2026-11-03.md`. Items marked **new** were not on the roadmap before.
+
+| Item | Section | Why | Effort | Status |
+|---|---|---|---|---|
+| **SMS: card statement due date -> Due reminder** ("Total due Rs X, min due Rs Y, pay by 25-Nov") | Due + Budget | **new.** Card bills are the costliest thing to miss; the message already arrives. Builds on the SMS reader | M | Planned |
+| **SMS: last known balance per account** ("Avl bal") shown on the card/account row with its date | Budget | **new.** Quick win from messages already read; label with the date | S | Planned |
+| **Income and net cash flow** (salary credit from SMS or typed; "saved this month") | Budget | **new.** Budget tracks spending only, so "did I save" cannot be answered | M | Planned |
+| Notification when a limit crosses 80% / 100% | Budget | **new.** "Needs attention" is only inside the app | S | Planned |
+| Month-end summary notification/card ("You spent ₹X, saved ₹Y, top 3 categories") | Budget | **new** | S | Planned |
+| Custom date range and a year view (year-over-year) | Budget | **new.** Today: month or statement cycle, 6-month bars | M | Planned |
+| Tags on expenses (cross-category labels, e.g. "Goa trip", "reimbursable") | Budget | **new.** Subcategories cover trips only inside one category | M | Planned |
+| Explicit merchant rules ("always put Swiggy in Food") that the user can see and edit | Budget | **new.** Today: remembers the last entry + built-in keyword guess, no list to edit | S-M | Planned |
+| Reimbursable / "paid for someone, expect back" marker with an open-items list | Budget | **new.** No ledger or groups (stays out), only a personal list of "to get back" | M | Planned |
+| Split one expense across categories | Budget | **new** | M | Planned |
+| Repeat end date or count ("EMI for 24 months") and a paid-history per bill | Due | **new.** Repeats are endless; no record of what was paid when | M | Planned |
+| More snooze choices (1 hour, tonight, tomorrow morning, next week) | Due | **new.** Only "Snooze 1 day" | S | Planned |
+| Skip this occurrence without marking paid | Due | **new** | S | Planned |
+| Calendar/month view of due items | Due | **new.** Only a list: Overdue / This week / Later | M | Planned |
+| Reminder packs beyond advance tax: insurance/LIC renewal, vehicle PUC and insurance, passport/licence expiry, GST dates (dates must come from primary sources) | Due | **new.** Longer lead times already exist | S each | Planned, GST/ITR gated on sources |
+| Quiet hours and an optional daily digest ("3 bills this week") | Due | **new.** Needs care not to become noise | S-M | Planned |
+| Plain text note (not a calculation or list) and Share a note/list as text | Notes | **new.** Notes only holds saved calculations and lists; Copy exists, Share does not | S | Planned |
+| To-do priority, steps, quick-add parser, tag filter, sort options | Notes | Already in the plan (NOTES-TODO-PLAN phases 2-4); still absent | M | Planned |
+| Export all notes and lists (text/CSV) and search inside list lines | Notes | **new** | S | Planned |
+| Add expense from a list total ("To list" has no reverse) | Notes + Budget | **new** | S | Planned |
+| Cash tracking: ATM withdrawals feed a cash balance that cash spending draws down | Budget | **new.** Cash entries have no balance | M | Planned |
+| Subscription price-change alert (the same payee charged more than before) | Budget | **new.** Uses the recurring record plus SMS | S | Planned |
+
+---
+
 ## Ruled out — do not re-suggest these
 
 | Idea | Why ruled out | Source |
@@ -201,7 +245,7 @@ same build.
 | Brokerage, margin, TDS calculators | Charges vary by broker and change by circular; no evidence the owner trades | REVIEW-NEW-FEATURES A9/D |
 | GST invoice maker | A different product entirely (numbering, GSTIN, legal format) — the GST *calculator* already covers the sum | PRD non-goals, REVIEW-NEW-FEATURES D |
 | Plot a function (Desmos-style) | No evidence of need, and Desmos already does this better and free | REVIEW-NEW-FEATURES A15/D |
-| Net-worth *tracker* (ongoing, not a one-off) | Needs constant manual updating or it goes stale and gets abandoned | ROADMAP §4, REVIEW-NEW-FEATURES D |
+| ~~Net-worth *tracker* (ongoing, not a one-off)~~ | **Partly overruled by the owner 2026-11-03: Portfolio section, built smaller (Phase 5).** Still out: live prices, advice, tax claims, pie charts | ROADMAP §4, REVIEW-NEW-FEATURES D, owner |
 | Auto-fetching live gold or FD rates | Adds network dependency and an ongoing freshness duty; user-typed is the deliberate design | DATA-FRESHNESS.md, REVIEW-NEW-FEATURES D |
 | Ads, analytics, or crash-reporting SDKs | Breaks the privacy promise outright | Owner promise, PRD |
 | Any paywall, subscription, or "Pro unlock" tier | This is a personal app, not a product being launched; the GTM doc that raises monetisation says explicitly to stop here for personal use. Every calculator, history, notes, reminders and widgets stay free by design regardless | GTM-STRATEGY.md §5, owner's stated use ("personal, no ads") |
