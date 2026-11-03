@@ -3,12 +3,17 @@ import { FormField, RequiredNote } from '../../components/FormField'
 import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { tintStyle } from '../../components/tint'
+import type { Dec } from '../../engine'
+import { formatCell } from '../../lib/toolFormat'
 import {
   ACCOUNT_TYPES,
   INSTRUMENT_KINDS,
   KNOWN_BANKS,
   MAX_REWARD_NOTE,
   NETWORKS,
+  cardCostIn,
+  cardOutstanding,
+  utilisationWords,
   dropInapplicable,
   validateInstrumentDraft,
   type AccountType,
@@ -38,6 +43,10 @@ export function InstrumentForm({ id, initialKind, initialNetwork, onClose, onSav
   onSaved?: (id: string) => void
 }) {
   const budget = useApp((s) => s.budget)
+  // Same formatting as useMoney in SpendSummary; not imported from there because SpendSummary imports the sheets that import this form.
+  const system = useApp((s) => s.settings.numberSystem)
+  const decimals = useApp((s) => s.settings.decimals)
+  const money = (v: Dec) => formatCell(v, 'money', { system, decimals })
   const store = useAppStore()
   const { addInstrument, updateInstrument, deleteInstrument } = store.getState()
   const cur = id === null ? undefined : budget.instruments.find((i) => i.id === id && i.deletedAt === null)
@@ -227,6 +236,14 @@ export function InstrumentForm({ id, initialKind, initialNetwork, onClose, onSav
             </details>
           )}
         </div>
+
+        {cur?.kind === 'credit' && (
+          <div className="save__card" style={tintStyle(7)} aria-label="This card so far">
+            <p className="ffield__hint">
+              {[utilisationWords(cardOutstanding(budget, cur.id), cur.creditLimit, money), cardCostIn(budget, cur, new Date().getFullYear(), money).words].filter(Boolean).join(' ')}
+            </p>
+          </div>
+        )}
 
         {cur &&
           (asking ? (

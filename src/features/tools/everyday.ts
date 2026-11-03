@@ -92,6 +92,7 @@ const unitSpec: ToolSpec = {
   title: 'Unit converter',
   blurb: 'Length, weight, area, temperature and more',
   category: 'everyday',
+  verified: { source: 'NIST SP 811 conversion factors' },
   keywords: ['convert', 'length', 'weight', 'mass', 'volume', 'area', 'temperature', 'speed', 'data', 'acre', 'cent', 'sq ft', 'hectare', 'celsius', 'fahrenheit'],
   fields: [
     { id: 'category', label: 'What to convert', kind: 'select', default: 'length', options: UNIT_CATEGORIES.map((c) => ({ value: c.id, label: c.label })) },
@@ -207,6 +208,7 @@ const gstSpec: ToolSpec = {
   title: 'GST',
   blurb: 'Add or remove GST from a price',
   category: 'everyday',
+  verified: { source: 'PIB release of 3 Sep 2025 (preset rates only)' },
   keywords: ['gst', 'tax', 'cgst', 'sgst', 'igst', 'invoice', 'inclusive', 'exclusive'],
   fields: [
     { id: 'amount', label: 'Amount', kind: 'number', unit: 'rupee', default: '10000' },
@@ -260,14 +262,20 @@ const tipSpec: ToolSpec = {
     const r = need(v, [{ id: 'bill', label: 'the bill' }, { id: 'pct', label: 'the tip percent' }, { id: 'people', label: 'the number of people' }])
     if (!r.ok) return r
     const x = tip(r.n.bill!, r.n.pct!, r.n.people!)
-    if (!x) return { error: 'Use a whole number of people, at least 1, and no negative amounts' }
+    if (!x) return { error: 'Use a whole number of people (1 to 1000), and no negative amounts' }
+    // Shares add up to the total to the paisa. The first few may pay one paisa more.
+    const base = x.shares[x.shares.length - 1]!
+    const extra = x.shares.filter((s) => s.gt(base)).length
     return {
       rows: [
-        { label: 'Each person pays', value: x.perPerson, fmt: 'money', main: true },
+        { label: extra ? 'Most people pay' : 'Each person pays', value: base, fmt: 'money', main: true },
         { label: 'Tip', value: x.tip, fmt: 'money' },
         { label: 'Total with tip', value: x.total, fmt: 'money' },
       ],
-      formula: ['tip = bill × tip% ÷ 100; each = (bill + tip) ÷ people', `${plain(r.n.bill!)} × ${plain(r.n.pct!)} ÷ 100; (${plain(r.n.bill!)} + ${plain(x.tip)}) ÷ ${plain(r.n.people!)}`],
+      note: extra
+        ? `₹0.01 extra goes to ${extra === 1 ? 'person 1' : `each of the first ${extra} people`} so the total matches.`
+        : undefined,
+      formula: ['tip = bill × tip% ÷ 100; each = (bill + tip) ÷ people, shared to the paisa', `${plain(r.n.bill!)} × ${plain(r.n.pct!)} ÷ 100; (${plain(r.n.bill!)} + ${plain(x.tip)}) ÷ ${plain(r.n.people!)}`],
     }
   },
 }
@@ -568,7 +576,7 @@ const bodySpec: ToolSpec = {
         'Ideal weight (Devine) = 50 kg (men) or 45.5 kg (women) + 2.3 kg per inch over 5 ft',
         'Body fat (Deurenberg) = 1.20 × BMI + 0.23 × age − 10.8 × (1 if male) − 5.4',
       ],
-      note: 'An estimate, not medical advice. BMI classes are the WHO adult ones; cut-offs for Asian adults can be lower.',
+      note: 'An estimate, not medical advice. BMI classes are the WHO adult ones, which assume an adult build; cut-offs for Asian adults can be lower, and BMI ignores muscle and body shape. The "healthy weight" range is the BMI 18.5 to 24.9 band.',
     }
   },
 }

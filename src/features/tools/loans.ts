@@ -113,6 +113,7 @@ const emiSpec: ToolSpec = {
   title: 'Loan EMI',
   blurb: 'Monthly payment, interest and total payable',
   category: 'loans',
+  verified: { source: 'Bajaj Finserv tables and Excel PMT' },
   keywords: ['emi', 'loan', 'instalment', 'installment', 'home loan', 'car loan', 'interest'],
   fields: [principalField(), rateField(), ...tenureFields()],
   compute: (v) => {
@@ -283,7 +284,7 @@ const reverseSpec: ToolSpec = {
         'P = EMI × ((1 + r)^n − 1) ÷ (r × (1 + r)^n), r = yearly rate ÷ 12 ÷ 100',
         `EMI = ${pay!.toFixed()}, r = ${rate!.toFixed()} ÷ 1200, n = ${n} → P = ${p.toFixed(2)}`,
       ],
-      note: 'Lenders also cap the EMI at a share of your income and look at your credit score, so they may offer less.',
+      note: 'Lenders also cap the EMI at a share of your income (the cap varies by lender) and look at your credit score, so they may offer less.',
     }
   },
 }
@@ -434,6 +435,7 @@ const homeTaxSpec: ToolSpec = {
   title: 'Home loan tax benefit',
   blurb: 'Tax saved on your home loan',
   category: 'loans',
+  verified: { source: 'Income-tax Act, 2025 gazette sections (the rules, not the results)' },
   keywords: ['24b', '80c', 'section 22', 'section 123', 'home loan tax', 'deduction', 'housing loan interest'],
   fields: [
     principalField(),
@@ -666,6 +668,7 @@ const cardSpec: ToolSpec = {
   title: 'Credit card EMI cost',
   blurb: 'True cost including GST',
   category: 'loans',
+  verified: { source: 'CBIC notifications 11/2017 and 12/2017 (the 18% GST)' },
   keywords: ['credit card', 'no cost emi', 'card emi', 'gst', 'processing fee'],
   fields: [
     { id: 'principal', label: 'Purchase amount', kind: 'number', unit: 'rupee', default: '60000' },

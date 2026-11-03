@@ -427,3 +427,40 @@ button.heat__cell:active {
 .row__hint {
   overflow-wrap: anywhere;
 }
+
+/* Add from messages */
+.import__intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-4) var(--s-4);
+}
+.import__intro p,
+.import__msg {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--ink-2);
+}
+.import__row {
+  flex-wrap: wrap;
+}
+.import__acts {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 0 0 var(--s-3) var(--s-4);
+  flex: 1 1 100%;
+}
+.import__log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.import__log li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}

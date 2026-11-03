@@ -6,6 +6,7 @@ import { Sheet } from '../../components/Sheet'
 import { tintStyle } from '../../components/tint'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import {
+  type ExpenseDraft,
   PAYMENT_MODES,
   UPI_DEFAULT_LABEL,
   activeCategories,
@@ -68,7 +69,7 @@ type View = { v: 'form' } | { v: 'category' } | { v: 'inst' } | { v: 'newInst'; 
  * the button is never disabled. The store checks again before it saves. A list of choices or the card form takes the
  * place of this form inside the same sheet (docs/FORMS-AND-SHEETS.md: never stack a sheet on a sheet), then returns here.
  */
-export function ExpenseSheet({ expense, onClose }: { expense?: BudgetExpense; onClose: () => void }) {
+export function ExpenseSheet({ expense, prefill, onSaved, onClose }: { expense?: BudgetExpense; /** A new entry that starts with these values (a calculator result, or a bank message being reviewed). */ prefill?: Partial<ExpenseDraft> & { amount: string; note: string }; /** Called after a NEW entry is saved. */ onSaved?: () => void; onClose: () => void }) {
   const budget = useApp((s) => s.budget)
   const add = useApp((s) => s.addExpense)
   const update = useApp((s) => s.updateExpense)
@@ -82,13 +83,13 @@ export function ExpenseSheet({ expense, onClose }: { expense?: BudgetExpense; on
     const keep = expense?.categoryId ?? null
     const card = expense?.settlement === 'cardBill' ? budget.instruments.find((i) => i.id === expense.instrumentId && i.deletedAt === null && i.kind === 'credit') : undefined
     return {
-      amount: expense?.amount ?? '',
-      date: expense?.date ?? dayKey(new Date()),
-      categoryId: expense && !validateExpense({ ...expense, amount: '1' }, budget, new Date(), keep).category ? expense.categoryId : null,
-      mode: expense?.mode ?? null,
-      instrumentId: expense?.settlement === 'cardBill' ? (card?.id ?? null) : expense && paymentError(budget, expense.mode, expense.instrumentId) === null ? expense.instrumentId : null,
-      note: expense?.note ?? '',
-      settlement: (expense?.settlement ?? null) as Settlement | null,
+      amount: expense?.amount ?? prefill?.amount ?? '',
+      date: expense?.date ?? prefill?.date ?? dayKey(new Date()),
+      categoryId: expense ? (!validateExpense({ ...expense, amount: '1' }, budget, new Date(), keep).category ? expense.categoryId : null) : (prefill?.categoryId ?? null),
+      mode: expense?.mode ?? prefill?.mode ?? null,
+      instrumentId: expense?.settlement === 'cardBill' ? (card?.id ?? null) : expense ? (paymentError(budget, expense.mode, expense.instrumentId) === null ? expense.instrumentId : null) : (prefill?.instrumentId ?? null),
+      note: expense?.note ?? prefill?.note ?? '',
+      settlement: (expense?.settlement ?? prefill?.settlement ?? null) as Settlement | null,
     }
   })
   const [amount, setAmount] = useState(start.amount)
@@ -127,7 +128,7 @@ export function ExpenseSheet({ expense, onClose }: { expense?: BudgetExpense; on
     const first = (['amount', 'date', 'category', 'paidWith'] as Field[]).find((f) => errors[f])
     if (first) return focusField(first === 'paidWith' && mode === null && settlement === null ? 'exp-mode' : FIELD_ID[first])
     const draft = { amount, categoryId, mode, instrumentId, date, note: note.trim(), settlement }
-    if (expense ? update(expense.id, draft) : add(draft)) return onClose()
+    if (expense ? update(expense.id, draft) : add(draft)) { if (!expense) onSaved?.(); return onClose() }
     setStoreError(store.getState().notice?.text ?? 'Could not save this entry')
   }
 

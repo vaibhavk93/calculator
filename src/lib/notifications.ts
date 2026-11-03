@@ -1,10 +1,12 @@
 import { Capacitor } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
-import { dueLabel } from './reminders'
+import { atTime, dueLabel } from './reminders'
 import type { Reminder, SavedCard } from './memory'
 
 const DAY = 86_400_000
 const ACTION_TYPE = 'REMINDER'
+/** The one-off "test reminder" notification. Reminders never use this id, and rescheduling leaves it alone. */
+const TEST_ID = 2_147_483_000
 
 export interface Planned {
   id: number
@@ -21,23 +23,33 @@ export function numericId(id: string): number {
   return Math.abs(h) || 1
 }
 
+/** The same time of day, `n` calendar days earlier (a daylight-saving change cannot shift it). */
+const daysBefore = (ts: number, n: number) => {
+  const d = new Date(ts)
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - n, d.getHours(), d.getMinutes()).getTime()
+}
+
 /**
  * Which notifications should exist right now: one per open reminder, `leadDays` before it is due
  * (or at the due time, if that heads-up moment has already passed). Overdue ones are left to the
- * Due tab: re-notifying forever is how apps get muted.
+ * Due tab: re-notifying forever is how apps get muted. With `time` ("HH:MM"), every notification
+ * comes at that time of day instead of the 9:00 a reminder is stored with, worked out in the phone's
+ * current time zone, so a time-zone change is fixed by planning again.
  */
-export function planNotifications(reminders: Reminder[], cards: SavedCard[], now: number, money: (plain: string) => string): Planned[] {
+export function planNotifications(reminders: Reminder[], cards: SavedCard[], now: number, money: (plain: string) => string, time?: string): Planned[] {
   const out: Planned[] = []
+  const when = (ts: number) => (time ? atTime(ts, time) : ts)
   for (const r of reminders) {
     const card = cards.find((c) => c.id === r.cardId && c.deletedAt === null)
-    if (r.done || !card || r.dueAt <= now) continue
-    const heads = r.dueAt - r.leadDays * DAY
-    const at = heads > now ? heads : r.dueAt
+    const dueAt = when(r.dueAt)
+    if (r.done || !card || dueAt <= now) continue
+    const heads = time ? atTime(daysBefore(r.dueAt, r.leadDays), time) : r.dueAt - r.leadDays * DAY
+    const at = heads > now ? heads : dueAt
     out.push({
       id: numericId(r.id),
       at,
       title: card.title,
-      body: [card.amount !== null ? money(card.amount) : '', `due ${dueLabel(r.dueAt, at).toLowerCase()}`].filter(Boolean).join(' · '),
+      body: [card.amount !== null ? money(card.amount) : '', `due ${dueLabel(dueAt, at).toLowerCase()}`].filter(Boolean).join(' · '),
       reminderId: r.id,
     })
   }
@@ -96,7 +108,8 @@ export async function applyNotifications(planned: Planned[]): Promise<void> {
   try {
     const exact = (await checkReminderPermissions()).exact
     const { notifications } = await LocalNotifications.getPending()
-    if (notifications.length > 0) await LocalNotifications.cancel({ notifications })
+    const stale = notifications.filter((n) => n.id !== TEST_ID)
+    if (stale.length > 0) await LocalNotifications.cancel({ notifications: stale })
     if (planned.length === 0) return
     await LocalNotifications.registerActionTypes({
       types: [{ id: ACTION_TYPE, actions: [{ id: 'paid', title: 'Mark paid' }, { id: 'snooze', title: 'Snooze 1 day' }] }],
@@ -126,4 +139,33 @@ export async function onNotificationAction(cb: (reminderId: string, action: 'pai
     cb(reminderId, e.actionId === 'paid' ? 'paid' : e.actionId === 'snooze' ? 'snooze' : 'open')
   })
   return () => void handle.remove()
+}
+
+export type TestResult = { ok: true; at: number; exact: boolean } | { ok: false; reason: 'web' | 'denied' | 'failed' }
+
+/**
+ * Schedules one notification about a minute from now, through the same channel and exactness as real
+ * reminders. It is a notification only: no reminder, so nothing appears in the Due tab.
+ */
+export async function scheduleTestReminder(now = Date.now()): Promise<TestResult> {
+  if (!notificationsSupported()) return { ok: false, reason: 'web' }
+  if (!(await ensurePermission())) return { ok: false, reason: 'denied' }
+  try {
+    const exact = (await checkReminderPermissions()).exact
+    const at = now + 60_000
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: TEST_ID,
+          title: 'Test reminder',
+          body: 'Reminders can reach you on this phone.',
+          schedule: { at: new Date(at), allowWhileIdle: true },
+          isExactNotification: exact,
+        },
+      ],
+    })
+    return { ok: true, at, exact }
+  } catch {
+    return { ok: false, reason: 'failed' }
+  }
 }

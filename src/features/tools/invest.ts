@@ -297,6 +297,7 @@ const ppfSpec: ToolSpec = {
   title: 'Public Provident Fund',
   blurb: 'PPF maturity, tax-free',
   category: 'invest',
+  verified: { source: 'PPF Scheme 2019 gazette (yearly limit and term)' },
   keywords: ['ppf', 'public provident fund', 'tax free', '80c', 'post office'],
   fields: [
     num('yearly', 'Yearly deposit', '150000', 'rupee', `₹${Number(PPF.minYearly).toLocaleString('en-IN')} to ₹${Number(PPF.maxYearly).toLocaleString('en-IN')} a year`),
@@ -465,6 +466,7 @@ const returnSpec: ToolSpec = {
   title: 'Investment return',
   blurb: 'Yearly growth rate of an investment',
   category: 'invest',
+  verified: { source: 'Excel XIRR documentation example (XIRR only)' },
   keywords: ['cagr', 'xirr', 'annualised return', 'irr', 'returns', 'cashflow'],
   fields: [
     {

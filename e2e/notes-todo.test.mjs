@@ -57,6 +57,12 @@ const noOverflow = async (p, where) => { const o = await overflowing(p); eq(o.le
 /** Taps a button inside the Save sheet or a header by its exact text. */
 const btn = (p, name, scope = '.app') => p.locator(scope).getByRole('button', { name, exact: true })
 
+/** Opens Loan EMI the way a person does: Tools tab, the "Loans and EMI" tile, the row. */
+const openEmi = async (p) => {
+  await tab(p, 'Tools'); await p.locator('.tile', { hasText: 'Loans and EMI' }).click()
+  await p.locator('.navrow .row__label').filter({ hasText: 'Loan EMI' }).first().click(); await p.waitForSelector('.tool')
+}
+
 /** Opens the Save sheet of the EMI card that is open (header "Update"/"Save"). */
 const headerSave = (p) => p.locator('.screen__bar .link-btn').click()
 
@@ -267,7 +273,7 @@ T('N28', 'CORNER', 'At 500 saved items a new task is refused with a clear messag
 })
 T('N29', 'CORNER', 'At 500 saved items a calculation cannot be saved either, and says why', async () => {
   const { page: p } = await open(seed({ cards: Array.from({ length: 500 }, (_, i) => emi('c' + i, 'Item ' + i)) }))
-  await tab(p, 'Tools'); await p.getByText('Loan EMI').first().click()
+  await openEmi(p)
   await headerSave(p); await sheetSave(p); await wait(200)
   has(await text(p), 'up to 500'); eq((await st(p)).cards.length, 500, 'cards stored')
 })
@@ -311,21 +317,39 @@ T('N38', 'POS', 'Sections: Pinned, Lists and Calculations separate', async () =>
   const t = await text(p, '.tools__list'); for (const h of ['Pinned', 'Lists', 'Calculations']) has(t, h)
 })
 T('N39', 'CORNER', 'Saving a calculation from Tools: new card with snack "Saved to Notes" and View link', async () => {
-  const { page: p } = await open(); await tab(p, 'Tools'); await p.getByText('Loan EMI').first().click()
+  const { page: p } = await open(); await openEmi(p)
   await headerSave(p); await sheetSave(p)
   const s = await snackText(p); has(s, 'Saved to Notes'); has(s, 'View')
   await p.locator('.snack').getByRole('button', { name: 'View' }).click()
   has(await text(p, '.tools__list'), 'Loan EMI')
 })
 T('N40', 'UX', 'Save sheet closes with Escape and X; X is labelled', async () => {
-  const { page: p } = await open(); await tab(p, 'Tools'); await p.getByText('Loan EMI').first().click()
+  const { page: p } = await open(); await openEmi(p)
   await headerSave(p); await p.keyboard.press('Escape'); eq(await p.locator('.sheet').count(), 0, 'sheet after Escape')
   await headerSave(p); await p.getByRole('button', { name: 'Close Save' }).click(); eq(await p.locator('.sheet').count(), 0, 'sheet after X')
 })
 T('N41', 'UI', 'Sheets cover the tab bar (scrim and sheet above it)', async () => {
-  const { page: p } = await open(); await tab(p, 'Tools'); await p.getByText('Loan EMI').first().click(); await headerSave(p)
+  const { page: p } = await open(); await openEmi(p); await headerSave(p)
   const tb = await box(p.locator('.tabbar')); const hit = await p.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return e ? (e.closest('.sheet,.scrim') ? 'cover' : e.className) : 'none' }, [tb.x + tb.width / 2, tb.y + tb.height / 2])
   eq(hit, 'cover', 'element at the tab bar centre')
+})
+T('R01', 'POS', 'Due: "Add a pack" adds the four advance-tax reminders once, never twice', async () => {
+  const { page: p } = await open(); await tab(p, 'Due')
+  await p.getByRole('button', { name: /Add advance tax reminders/ }).click(); await wait(200)
+  let s = await st(p); eq(s.reminders.length, 4, 'reminders after first add'); eq(s.cards.every((c) => /^Advance tax instalment \d of 4 \(\d+% due\)$/.test(c.title)), true, 'titles')
+  await p.getByRole('button', { name: /Add a pack/ }).click(); await wait(200)
+  s = await st(p); eq(s.reminders.length, 4, 'reminders after second add'); has(await snackText(p), 'already there')
+})
+T('R02', 'POS', 'Settings: reminder time is saved, and the test reminder says it needs the Android app on the web', async () => {
+  const { page: p } = await open(); await p.getByRole('button', { name: 'Settings' }).click()
+  await p.locator('input[type=time]').fill('18:30'); await p.getByText('Send a test reminder').click()
+  has(await snackText(p), 'only works in the Android app'); eq((await st(p)).settings.reminderTime, '18:30', 'saved time')
+})
+T('R03', 'POS', 'Backup nudge: shown once on Settings with 25+ items and no backup, and Dismiss hides it', async () => {
+  const { page: p } = await open(seed({ cards: Array.from({ length: 25 }, (_, i) => emi('c' + i, 'Item ' + i)) })); await wait(300)
+  has(await snackText(p), '25 items and no backup yet')
+  await p.getByRole('button', { name: 'Settings' }).click(); has(await text(p, '.screen__body'), '25 items and no backup yet')
+  await p.getByRole('button', { name: 'Dismiss' }).click(); lacks(await text(p, '.screen__body'), 'no backup yet')
 })
 T('N42', 'RUNTIME', 'Reload keeps cards, tags, pinned, note, reminders', async () => {
   const { page: p } = await open(seed({ cards: [emi('a', 'Keep', { tags: ['Loan'], pinned: true, note: 'hello' })], reminders: [rem('r', 'a', NOW + 5 * DAY, { repeat: 'monthly' })] }))

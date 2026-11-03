@@ -263,7 +263,7 @@ function Chart({ chart }: { chart: ResultChart }) {
   )
 }
 
-function Result({ out, mainRef }: { out: Output; mainRef: React.RefObject<HTMLDivElement> }) {
+function Result({ out, mainRef, verified }: { out: Output; mainRef: React.RefObject<HTMLDivElement>; verified?: ToolSpec['verified'] }) {
   const system = useApp((s) => s.settings.numberSystem)
   const decimals = useApp((s) => s.settings.decimals)
   const fmt = (c: Parameters<typeof formatCell>[0], f?: Fmt) => formatCell(c, f, { system, decimals })
@@ -284,6 +284,7 @@ function Result({ out, mainRef }: { out: Output; mainRef: React.RefObject<HTMLDi
         </div>
       ))}
       {out.note && <p className="result__note">{out.note}</p>}
+      {verified && <p className="result__checked">Checked against {verified.source}</p>}
       {out.chart && <Chart chart={out.chart} />}
       {out.table && <Table table={out.table} fmt={fmt} />}
       {out.formula && (
@@ -439,7 +440,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
         )}
 
         {/* 2. Result: what it comes to. A plain card, never tinted. */}
-        {ok && <Result out={computed} mainRef={mainRef} />}
+        {ok && <Result out={computed} mainRef={mainRef} verified={spec.verified} />}
 
         {/* 3. Keep and share: what to do with it. */}
         {ok && (

@@ -15,6 +15,10 @@ and the test comments. Update a row when you check something; never upgrade a ro
 A wrong number that looks right is the worst failure here, so rows marked **C** or **D** that handle
 **money you might act on** are the ones to cross-check first (last column).
 
+## What the app shows
+
+A result carries a quiet "Checked against <source>" line only for tools rated **A** here: unit converter, GST (preset rates), EMI, home loan tax (rules), card EMI (GST rate), investment return (XIRR), PPF (limit and term), income tax (slabs), A/B sample size. It is the `verified` field on the tool spec. Rows rated B, C or D show nothing, because "recomputed only" is not a claim worth printing. When a row is upgraded to A, add `verified` to that spec.
+
 ## Everyday
 
 | Calculator | Status | Basis | Next cross-check |
@@ -24,6 +28,7 @@ A wrong number that looks right is the worst failure here, so rows marked **C** 
 | Currency | A for rates, D for cross rates | ECB via Frankfurter, dated 2026-10-30. Bundled snapshot, **not live** | Live refresh (not built) |
 | Fuel efficiency | B | mpg conversions recalled from memory | — |
 | Discount, tip, unit price, number base, fuel cost, grade average | D | Plain arithmetic | — |
+| Split allocation (Tip and split shares) | D | Largest-remainder method. Tests check the shares always add to the total exactly (100/3, 0.01/3, 1/7, weights, zero, negative). No outside source needed: it is integer arithmetic | — |
 | Date calculator, world time | D | Calendar and time-zone rules | — |
 | Body metrics (BMI, BMR, ideal weight, body fat) | D | Published coefficients, not compared with another calculator | Low priority |
 | Ovulation | D | Rule given in the brief, **no clinical source** | Low priority. Not contraception |

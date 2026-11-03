@@ -7,6 +7,7 @@ import {
 } from './budget'
 import { dailyTotals, dayLongLabel, limitLabel, monthShortLabel, monthWeeks, monthWindow, owesWords, recentCategoryIds } from './budget'
 import type { BudgetData, BudgetExpense, PayInstrument } from './budget'
+import { cardCostIn, isCostCategory, utilisationWords } from './budget'
 
 const cat = (id: string, limit: string | null = null, deletedAt: number | null = null, parentId: string | null = null) => ({ id, name: id, limit, parentId, deletedAt })
 const exp = (id: string, date: string, amount: string, categoryId: string | null, deletedAt: number | null = null) => ({ id, date, amount, categoryId, mode: null, instrumentId: null, note: '', deletedAt })
@@ -772,5 +773,52 @@ describe('screen helpers', () => {
     expect(owesWords(new D('1200.5'), m)).toBe('Owes ₹1200.50')
     expect(owesWords(new D('-10'), m)).toBe('Paid ₹10.00 ahead')
     expect(owesWords(new D(0), m)).toBe('Nothing owed')
+  })
+})
+
+describe('card utilisation and cost', () => {
+  const money = (v: InstanceType<typeof D>) => `₹${v.toFixed(0)}`
+  it('says how much of the limit is used, in words', () => {
+    expect(utilisationWords(new D(51000), '150000', money)).toBe('Using 34% of ₹150000 limit')
+    expect(utilisationWords(new D(0), '150000', money)).toBe('Using 0% of ₹150000 limit')
+  })
+  it('paid ahead counts as 0%; over the limit says so in words', () => {
+    expect(utilisationWords(new D(-500), '150000', money)).toBe('Using 0% of ₹150000 limit')
+    expect(utilisationWords(new D(165000), '150000', money)).toBe('Using 110% of ₹150000 limit, over the limit')
+  })
+  it('shows nothing without a usable limit, and never divides by zero', () => {
+    expect(utilisationWords(new D(100), null, money)).toBeNull()
+    expect(utilisationWords(new D(100), undefined, money)).toBeNull()
+    expect(utilisationWords(new D(100), '0', money)).toBeNull()
+    expect(utilisationWords(new D(100), 'abc', money)).toBeNull()
+  })
+
+  const b: BudgetData = {
+    overall: null,
+    instruments: [],
+    categories: [cat('food'), cat('fees'), cat('life', null, null, null), { ...cat('late', null, null, 'fees'), name: 'Late payment' }, { ...cat('int', null, 1), name: 'Interest' }],
+    expenses: [
+      { ...exp('1', '2026-03-02', '300', 'fees'), instrumentId: 'cc', mode: 'credit' },
+      { ...exp('2', '2026-04-02', '40.50', 'late'), instrumentId: 'cc', mode: 'credit' }, // a subcategory of Fees
+      { ...exp('3', '2026-04-03', '999', 'food'), instrumentId: 'cc', mode: 'credit' }, // ordinary spending
+      { ...exp('4', '2025-12-03', '700', 'fees'), instrumentId: 'cc', mode: 'credit' }, // another year
+      { ...exp('5', '2026-05-03', '50', 'fees'), instrumentId: 'other', mode: 'credit' }, // another card
+      { ...exp('6', '2026-05-04', '60', 'fees', 9), instrumentId: 'cc', mode: 'credit' }, // deleted
+    ],
+  }
+  it('only categories the user named interest, fee or charge count, parent or sub', () => {
+    expect(isCostCategory(b, 'fees')).toBe(true)
+    expect(isCostCategory(b, 'late')).toBe(true)
+    expect(isCostCategory(b, 'food')).toBe(false)
+    expect(isCostCategory(b, null)).toBe(false)
+  })
+  it('adds the annual fee and the recorded charges for one year, exactly', () => {
+    const r = cardCostIn(b, { id: 'cc', annualFee: '2500' }, 2026, money)
+    expect(r.total.toFixed(2)).toBe('2840.50')
+    expect(r.words).toBe('In 2026 this card has cost you ₹2841: ₹2500 annual fee and ₹341 in interest and fees you recorded.')
+  })
+  it('says plainly when nothing is recorded', () => {
+    expect(cardCostIn({ ...b, expenses: [] }, { id: 'cc', annualFee: null }, 2026, money).words).toBe('No annual fee, interest or fees recorded for this card in 2026.')
+    expect(cardCostIn({ ...b, expenses: [] }, { id: 'cc', annualFee: '500' }, 2026, money).words).toBe('In 2026 this card has cost you ₹500: ₹500 annual fee.')
   })
 })

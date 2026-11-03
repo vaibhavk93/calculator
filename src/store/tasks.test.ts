@@ -188,3 +188,14 @@ describe('old data and backup', () => {
     expect(b.get().cards.find((c) => c.id === rent)!.pinned).toBe(true)
   })
 })
+
+describe('addAdvanceTaxPack', () => {
+  it('adds four yearly reminders once, and never doubles them', () => {
+    const c = setup()
+    expect(c.get().addAdvanceTaxPack()).toBe(4)
+    expect(c.get().reminders).toHaveLength(4)
+    expect(c.get().reminders.every((r) => r.repeat === 'yearly')).toBe(true)
+    expect(c.get().addAdvanceTaxPack()).toBe(0)
+    expect(c.get().reminders).toHaveLength(4)
+  })
+})

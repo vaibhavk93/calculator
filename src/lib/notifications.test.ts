@@ -40,3 +40,17 @@ describe('numericId', () => {
     }
   })
 })
+
+describe('planNotifications with a reminder time', () => {
+  it('moves the notification to that time of day, for the due day and for the heads-up day', () => {
+    const due = new Date(2026, 10, 20, 9).getTime()
+    const [p] = planNotifications([rem({ dueAt: due })], [card], NOW, money, '18:30')
+    const d = new Date(p!.at)
+    expect([d.getDate(), d.getHours(), d.getMinutes()]).toEqual([17, 18, 30])
+  })
+  it('a reminder due later today still notifies when the chosen time has not come yet, and is skipped once it has', () => {
+    const today = new Date(2026, 10, 10, 9).getTime()
+    expect(planNotifications([rem({ dueAt: today, leadDays: 0 })], [card], NOW, money, '18:00')).toHaveLength(1)
+    expect(planNotifications([rem({ dueAt: today, leadDays: 0 })], [card], NOW, money, '11:00')).toHaveLength(0)
+  })
+})

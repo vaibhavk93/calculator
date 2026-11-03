@@ -1,6 +1,7 @@
 import { INITIAL_INPUT, type InputState } from '../engine'
 import { ACCENT_NAMES, type AccentName, type ThemePreference } from '../lib/theme'
 import type { KeyValueStorage } from '../lib/storage'
+import { parseTime } from '../lib/reminders'
 import { isAccountType, isMonthKey, isSettlement } from '../lib/budget'
 import {
   DEFAULT_SETTINGS,
@@ -57,6 +58,9 @@ const oneOf = <T extends string>(v: unknown, allowed: readonly T[], fallback: T)
   typeof v === 'string' && (allowed as readonly string[]).includes(v) ? (v as T) : fallback
 const bool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fallback)
 
+/** A time in ms, or null. */
+const stamp = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null)
+
 /** Never trusts what is on disk: every field is checked and falls back to its default. */
 export function sanitizeSettings(raw: unknown): Settings {
   const r = isObject(raw) ? raw : {}
@@ -78,6 +82,10 @@ export function sanitizeSettings(raw: unknown): Settings {
     keepAwake: bool(r.keepAwake, d.keepAwake),
     keepHistory: bool(r.keepHistory, d.keepHistory),
     copyFormat: oneOf(r.copyFormat, ['ask', 'with', 'without'] as const, d.copyFormat),
+    reminderTime: parseTime(r.reminderTime) ? (r.reminderTime as string) : d.reminderTime,
+    lastBackupAt: stamp(r.lastBackupAt),
+    backupNudgedAt: stamp(r.backupNudgedAt),
+    backupDismissedAt: stamp(r.backupDismissedAt),
   }
 }
 
@@ -247,6 +255,11 @@ const ifSet = <T extends object>(o: T): Partial<T> => Object.fromEntries(Object.
 
 const DAY_KEY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
 
+const seenList = (v: unknown): string[] | undefined => {
+  const out = (Array.isArray(v) ? v : []).filter((x): x is string => typeof x === 'string' && /^[0-9a-z]{4,30}$/.test(x)).slice(0, 5000)
+  return out.length > 0 ? out : undefined
+}
+
 export function sanitizeBudget(raw: unknown): BudgetData {
   if (!isObject(raw)) return starterBudget()
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
@@ -336,7 +349,7 @@ export function sanitizeBudget(raw: unknown): BudgetData {
     })
     if (expenses.length >= MAX_EXPENSES) break
   }
-  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, ...ifSet({ overallByMonth: limitMap(raw.overallByMonth) }), categories: cats, instruments, expenses }
+  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, ...ifSet({ overallByMonth: limitMap(raw.overallByMonth) }), categories: cats, instruments, expenses, ...ifSet({ smsSeen: seenList(raw.smsSeen) }) }
 }
 
 type Migration = (data: Record<string, unknown>) => Record<string, unknown>

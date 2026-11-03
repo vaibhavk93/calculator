@@ -3,6 +3,7 @@ import { FormField, RequiredNote } from '../../components/FormField'
 import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { MAX_PINNED, MAX_TASK_TAGS, MAX_TASK_TITLE, type Repeat, type SavedCard } from '../../lib/memory'
+import { timeLabel } from '../../lib/reminders'
 import { dayText, hasErrors, taskSummary, validateTask } from '../../lib/tasks'
 import { Segmented, Toggle } from '../settings/controls'
 
@@ -16,6 +17,7 @@ export function TaskSheet({ card, onClose }: { card?: SavedCard; onClose: () => 
   const deleteCard = useApp((s) => s.deleteCard)
   const togglePin = useApp((s) => s.togglePin)
   const cards = useApp((s) => s.cards)
+  const reminderTime = useApp((s) => s.settings.reminderTime)
   const reminder = useApp((s) => (card ? s.reminders.find((r) => r.cardId === card.id) : undefined))
 
   const [title, setTitle] = useState(card?.title ?? '')
@@ -83,7 +85,7 @@ export function TaskSheet({ card, onClose }: { card?: SavedCard; onClose: () => 
         </div>
 
         <div className="save__card">
-          <FormField label="Due date" htmlFor="task-date" error={err.date} hint="Optional. Reminders come at 9:00 am on that day.">
+          <FormField label="Due date" htmlFor="task-date" error={err.date} hint={`Optional. Reminders come at ${timeLabel(reminderTime)} on that day.`}>
             <input
               id="task-date"
               className="field field--mono field--date"

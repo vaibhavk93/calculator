@@ -20,3 +20,13 @@ describe('tip', () => {
     expect(t('500', '-1', '2')).toBeNull()
   })
 })
+
+describe('tip shares', () => {
+  it('add up to the rounded total, extra paisa to person 1', () => {
+    const r = t('100', '0', '3')!
+    expect(r.shares.map((v) => v.toFixed())).toEqual(['33.34', '33.33', '33.33'])
+  })
+  it('more than 1000 people is refused', () => {
+    expect(t('500', '10', '1001')).toBeNull()
+  })
+})

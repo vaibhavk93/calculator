@@ -71,3 +71,58 @@ export function dueLabel(dueAt: number, now: number): string {
   if (days > 1) return `In ${days} days`
   return days === -1 ? '1 day overdue' : `${-days} days overdue`
 }
+
+// ------------------------------------------------------------------ time of day
+
+export const DEFAULT_REMINDER_TIME = '09:00'
+
+/** "HH:MM" (24 hour) as [hour, minute], or null when it is not a real time. */
+export function parseTime(text: unknown): [number, number] | null {
+  const m = typeof text === 'string' ? /^([01]\d|2[0-3]):([0-5]\d)$/.exec(text) : null
+  return m ? [Number(m[1]), Number(m[2])] : null
+}
+
+/** The same calendar day as `ts` (local), at `time`. A bad time falls back to 9:00. */
+export function atTime(ts: number, time: string): number {
+  const [h, min] = parseTime(time) ?? [9, 0]
+  const d = new Date(ts)
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, min).getTime()
+}
+
+/** "9:00 am", "6:30 pm". */
+export function timeLabel(time: string): string {
+  const [h, m] = parseTime(time) ?? [9, 0]
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`
+}
+
+// ------------------------------------------------------------------ advance-tax pack
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+/** 15 Jun, 15 Sep, 15 Dec, 15 Mar, with the share of the year's tax that should be paid in total by then. */
+const ADVANCE_TAX = [
+  { month: 5, pct: 15 },
+  { month: 8, pct: 45 },
+  { month: 11, pct: 75 },
+  { month: 2, pct: 100 },
+] as const
+
+export interface PackItem {
+  title: string
+  note: string
+  dueAt: number
+}
+
+/** The four advance-tax reminders: each date's next occurrence after `now`, at `time`. ITR filing dates are deliberately not here. */
+export function advanceTaxPack(now: number, time: string): PackItem[] {
+  const [h, min] = parseTime(time) ?? [9, 0]
+  const year = new Date(now).getFullYear()
+  return ADVANCE_TAX.map((p, i) => {
+    let dueAt = new Date(year, p.month, 15, h, min).getTime()
+    if (dueAt <= now) dueAt = new Date(year + 1, p.month, 15, h, min).getTime()
+    return {
+      title: `Advance tax instalment ${i + 1} of 4 (${p.pct}% due)`,
+      note: `By 15 ${MONTH_NAMES[p.month]}, you should have paid ${p.pct}% of this year's tax in total, counting earlier instalments. Open Tools, Advance tax, to work out the amount.`,
+      dueAt,
+    }
+  })
+}

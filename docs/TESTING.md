@@ -42,6 +42,8 @@ Update its selectors before relying on it. Until then, do this by hand or with t
 4. Open every calculator once. None may show an error or `NaN`.
 5. Tap the tab you are on from inside a calculator: it must return to that tab's start.
 
+**Add expense: first tap below an empty Amount.** The sheet opens with the cursor in Amount. When Amount loses focus empty, "Enter an amount above zero" appears and pushes everything below down. A click fires on mouse-down, so a first tap on More, a payment chip or a card that is also the tap that blurs Amount can move its target before mouse-up and be lost. `e2e/budget.test.mjs` handles this with `settle(page)` (blur, wait two frames) before the first click. Not yet checked with a real thumb on the phone: if it happens there, show the error without moving the layout (reserve its line).
+
 ## 3. By hand: the phone checklist
 
 Build and install first (`docs/BUILD-ANDROID.md`). Run after every release candidate.

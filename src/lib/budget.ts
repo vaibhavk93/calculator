@@ -503,6 +503,8 @@ export interface BudgetData {
   categories: BudgetCategory[]
   instruments: PayInstrument[]
   expenses: BudgetExpense[]
+  /** Fingerprints of bank messages already added or skipped (see smsParse.fingerprint). Not the text. Newest first. */
+  smsSeen?: string[]
 }
 
 /** What the add/edit sheet sends. Mode and instrument must go together (see paymentError). */
@@ -981,4 +983,47 @@ export function owesWords(owed: Dec, money: (v: Dec) => string): string {
   if (owed.gt(0)) return `Owes ${money(owed)}`
   if (owed.lt(0)) return `Paid ${money(owed.abs())} ahead`
   return 'Nothing owed'
+}
+
+/**
+ * How much of a credit limit is in use, in words: "Using 34% of ₹1,50,000 limit". Null when no usable limit is set (missing,
+ * zero or not a number), so nothing is shown rather than a made-up figure. Paid ahead counts as 0%. Over the limit says so in words.
+ */
+export function utilisationWords(owed: Dec, creditLimit: string | null | undefined, money: (v: Dec) => string): string | null {
+  const limit = creditLimit ? parse(creditLimit) : null
+  if (!limit || !limit.gt(0)) return null
+  const pct = owed.gt(0) ? Math.round(owed.div(limit).times(100).toNumber()) : 0
+  const base = `Using ${pct}% of ${money(limit)} limit`
+  return owed.gt(limit) ? `${base}, over the limit` : base
+}
+
+/** True for a category whose own name, or its parent's, says interest, fee or charge. Only what the user named counts. */
+const COST_WORDS = /interest|fee|charge/i
+export function isCostCategory(budget: Pick<BudgetData, 'categories'>, id: string | null): boolean {
+  const c = budget.categories.find((x) => x.id === id && x.deletedAt === null)
+  if (!c) return false
+  const p = c.parentId === null ? undefined : budget.categories.find((x) => x.id === c.parentId)
+  return COST_WORDS.test(c.name) || (p !== undefined && COST_WORDS.test(p.name))
+}
+
+/**
+ * What a card has cost in one year: its annual fee (once) plus entries paid with it that the user put in an interest, fee or
+ * charge category. Only recorded data: nothing is guessed. Returns the parts and a plain sentence.
+ */
+export function cardCostIn(
+  budget: BudgetData,
+  card: Pick<PayInstrument, 'id' | 'annualFee'>,
+  year: number,
+  money: (v: Dec) => string,
+): { fee: Dec; charges: Dec; total: Dec; words: string } {
+  const fee = (card.annualFee ? parse(card.annualFee) : null) ?? ZERO()
+  let charges = ZERO()
+  for (const e of budget.expenses) {
+    if (e.deletedAt !== null || e.settlement || e.instrumentId !== card.id || !e.date.startsWith(`${year}-`)) continue
+    if (isCostCategory(budget, e.categoryId)) charges = charges.plus(parse(e.amount) ?? ZERO())
+  }
+  const total = fee.plus(charges)
+  const parts = [fee.gt(0) ? `${money(fee)} annual fee` : '', charges.gt(0) ? `${money(charges)} in interest and fees you recorded` : ''].filter(Boolean)
+  const words = parts.length === 0 ? `No annual fee, interest or fees recorded for this card in ${year}.` : `In ${year} this card has cost you ${money(total)}: ${parts.join(' and ')}.`
+  return { fee, charges, total, words }
 }

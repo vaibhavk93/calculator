@@ -30,6 +30,7 @@ import { formatCell } from '../../lib/toolFormat'
 import { Segmented } from '../settings/controls'
 import { FilterSheet, scopeKey, scopeLabel, type Scope } from './FilterSheet'
 import { Heatmap } from './Heatmap'
+import { ExportSheet } from './ExportSheet'
 import { ExpenseSheet } from './sheets'
 
 export type SummaryTab = 'summary' | 'entries'
@@ -153,6 +154,7 @@ export function SpendSummary({
   const [cat, setCat] = useState<string | null>(initialCategory)
   const [day, setDay] = useState<string | null>(null)
   const [picking, setPicking] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   useBackHandler(editing !== null, () => setEditing(null))
 
@@ -397,7 +399,9 @@ export function SpendSummary({
         <div className="sections">
           {empty ?? (tab === 'summary' ? summaryCards : entryList)}
         </div>
+        <button type="button" className="link-btn" onClick={() => setExporting(true)}>Export expenses as a spreadsheet</button>
       </div>
+      {exporting && <ExportSheet onClose={() => setExporting(false)} />}
       {picking && <FilterSheet budget={budget} value={scope} onPick={setScope} onClose={() => setPicking(false)} />}
       {editing !== null && <ExpenseSheet expense={budget.expenses.find((e) => e.id === editing)} onClose={() => setEditing(null)} />}
     </div>

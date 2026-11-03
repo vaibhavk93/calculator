@@ -46,6 +46,13 @@ Nothing is proven on a real phone except the items the owner has used. Reminders
 | 31 | App-wide | Tappable things look tappable (chevrons, underlines, press states) | Code (Tools, Settings, Due); Running (Budget); to do (Notes, History rows) |
 | 32 | App-wide | Safe deletes: Empty Trash and Remove reminder ask first | Code |
 | 33 | App-wide | Pop-ups cover the tab bar; keyboard resizes the page | Code |
+| 33a | Settings | Reminder time (default 9:00 am) and "Send a test reminder" (one notification about a minute out) | Browser (web toast); phone delivery unproven |
+| 33b | Due | "Add a pack": 4 advance-tax reminders (15 Jun/Sep/Dec/Mar, 15/45/75/100%), yearly, never doubled. ITR dates left out on purpose | Browser |
+| 33d | Budget | Credit utilisation per card: "Using 34% of ₹1,50,000 limit" on the card row (only when a limit is set; over the limit says so in words) | Browser |
+| 33e | Budget | "What this card has cost you": annual fee plus entries the user put in an interest/fee/charge category, for this year, in the card's edit form. Nothing is guessed | Browser |
+| 33f | Data | Export expenses as CSV (BOM for Excel, RFC 4180 quoting, formula-injection guard). Range: This month / Last 3 months / This year / All. From Settings > Your data and the Spending summary. Saves to Download/Calc like a backup; browser downloads. Needs `npx cap sync android` (plugin now takes a mime type) | Browser; phone unproven |
+| 33g | Calculate | "Add expense" chip after "=" for a positive result (opens Add expense with the amount and note "from calculator"). Fits 360px at 100% and 200% font. Not added to tool results: their headline is not always money and that icon row is already full | Browser |
+| 33c | Settings | Backup nudge: one dismissible line plus one launch message (25+ items, no backup or older than 30 days, at most once per 14 days) | Browser |
 
 ## 2. By phase
 
@@ -123,6 +130,10 @@ Nothing is proven on a real phone except the items the owner has used. Reminders
 | Light-theme sweep of app pages | To do |
 | Repair `e2e/smoke.mjs` (stale) | To do |
 | Test on the phone: scientific keypad, huge numbers, Budget | Next after install |
+| Exact split: shares add up to the total to the paisa (largest remainder, `src/engine/convert/allocate.ts`); Tip and split uses it and says "₹0.01 extra goes to person 1" | Code |
+| Rules of thumb state their condition (CAC:LTV 3:1, payback, Rule of 40 and burn bands, EMI cap, BMI range). Emergency fund, DTI and savings rate do not exist yet, so they carry no text | Code |
+| "Checked against <source>" line under a result, only for the 9 tools VERIFICATION.md rates A (`verified` on the tool spec); other tools show nothing | Code |
+| Budget browser test: the CG07-10 and PM13-26 timeout cluster is fixed (cause: a lost first tap, see TESTING.md). 117 cases, 109 pass, 8 fail on purpose (known bugs B-06, B-22, B-23) | Code |
 
 ### Phase 9: Later (not this round)
 | Feature | Why later |
@@ -131,4 +142,5 @@ Nothing is proven on a real phone except the items the owner has used. Reminders
 | Expose the calculator engine as a tool for AI assistants | Cheap, not asked |
 | iOS | Needs a Mac build |
 | Play Store release | Exact-alarm permission needs a decision first |
-| SMS, email or bank-statement reading | Rejected: breaks "no account, almost no permissions" |
+| SMS capture | **Built (Code)**, see `docs/SMS-CAPTURE.md`. Owner overruled the old rejection |
+| Bank statement file import (CSV) | **Built (Code)**; PDF later |

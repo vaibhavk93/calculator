@@ -1226,3 +1226,16 @@ button:disabled {
     transition-duration: 1ms !important;
   }
 }
+
+/* Due: the "add a pack" block under the list. */
+.due__pack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-4);
+}
+
+.due__pack .note {
+  margin: 0;
+}

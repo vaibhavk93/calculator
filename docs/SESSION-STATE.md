@@ -6,6 +6,25 @@ This file is updated after each step. The full history is in git (`git log --one
 
 Last updated: 2026-11-02 20:55. Round 4 running. At ~19:20 the account hit its 5-hour limit and the 5 helper agents stopped before saving code; limit reset 20:20 and they were restarted from the start of their briefs. Phone was disconnected at 20:50 (adb: device not found). Branch `dev` (tracks `origin/claude/personalized-calculator-research-dl43uk`).
 
+## Round 6 (2026-11-03): work the MASTER-ROADMAP phase by phase
+
+**Last prompt (verbatim):** "check the updated roadmap and start working on phase 1, phase 2 and others one by one. also let me cherry pic from "Ruled out — do not re-suggest these" items like "Read SMS, email, or bank statements to auto-log spending" is absolute must to actually make things easy for users."
+**Later message:** "for SMS parser let it keep log so that we can check where it failed and improve the parser next time based on that."
+
+Roadmap = `docs/MASTER-ROADMAP.md` (Phase 0 done, 1 next, 2 soon, 3 later, Ruled out). Order of work: Phase 1 -> Phase 2 -> pick from Phase 3.
+
+| Step | Status |
+|---|---|
+| Critic on SMS capture (verdict: build, smaller v1, 8 guard-rails) | done |
+| SMS capture: plugin, parser + 29 tests, review screen, redacted reader log, `docs/SMS-CAPTURE.md`, allowBackup=false | built (code); not yet on a phone |
+| Phase 1 reminders (time picker, test reminder, advance-tax pack, backup nudge, stale e2e) | done (helper) |
+| Phase 1 Budget (utilisation, card cost, CSV export, add expense from calculator) | helper running |
+| Phase 1 tools (exact split, rule-of-thumb conditions, checked-against label, budget e2e) | helper running |
+| Phase 2 | not started |
+| Statement CSV import (extension of SMS capture) | planned |
+| Owner still to pick from "Ruled out": list shown in final report |  |
+| Not pushed. Owner must say "push". Phone: only Calc QA gets test installs. |  |
+
 ## Working rules the owner set (also in CLAUDE.md)
 1. **Think at app level, always.** A request that names one screen is a sample of a pattern. Find every place with the same pattern and fix them all. Say what else you found.
 2. Ask only when a choice is expensive or cannot be undone. Otherwise decide, build, and report.

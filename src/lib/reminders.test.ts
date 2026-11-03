@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advance, addMonths, dueLabel, dueSoonTotal, groupReminders } from './reminders'
+import { advance, addMonths, advanceTaxPack, atTime, dueLabel, dueSoonTotal, groupReminders, parseTime, timeLabel } from './reminders'
 import type { Reminder, SavedCard } from './memory'
 
 const at = (y: number, m: number, d: number, h = 9) => new Date(y, m - 1, d, h).getTime()
@@ -63,5 +63,43 @@ describe('dueSoonTotal and dueLabel', () => {
     expect(dueLabel(at(2026, 11, 11), now)).toBe('Tomorrow')
     expect(dueLabel(at(2026, 11, 13), now)).toBe('In 3 days')
     expect(dueLabel(at(2026, 11, 8), now)).toBe('2 days overdue')
+  })
+})
+
+describe('reminder time of day', () => {
+  it('parses HH:MM and rejects junk', () => {
+    expect(parseTime('18:30')).toEqual([18, 30])
+    for (const bad of ['24:00', '9:00', '09:60', '', null, 5]) expect(parseTime(bad)).toBeNull()
+  })
+  it('puts a day at the chosen time, and falls back to 9:00', () => {
+    const d = new Date(2026, 10, 10, 9).getTime()
+    expect(new Date(atTime(d, '18:30')).getHours()).toBe(18)
+    expect(new Date(atTime(d, '18:30')).getMinutes()).toBe(30)
+    expect(new Date(atTime(d, 'nope')).getHours()).toBe(9)
+  })
+  it('labels times in words', () => {
+    expect(timeLabel('09:00')).toBe('9:00 am')
+    expect(timeLabel('00:05')).toBe('12:05 am')
+    expect(timeLabel('12:00')).toBe('12:00 pm')
+    expect(timeLabel('18:30')).toBe('6:30 pm')
+  })
+})
+
+describe('advanceTaxPack', () => {
+  it('gives the next 15 Jun, 15 Sep, 15 Dec, 15 Mar with cumulative percentages', () => {
+    const pack = advanceTaxPack(new Date(2026, 10, 3, 12).getTime(), '09:00')
+    const days = pack.map((p) => { const d = new Date(p.dueAt); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}` })
+    expect(days).toEqual(['2027-6-15', '2027-9-15', '2026-12-15', '2027-3-15'])
+    expect(pack.map((p) => p.title)).toEqual([
+      'Advance tax instalment 1 of 4 (15% due)',
+      'Advance tax instalment 2 of 4 (45% due)',
+      'Advance tax instalment 3 of 4 (75% due)',
+      'Advance tax instalment 4 of 4 (100% due)',
+    ])
+  })
+  it('on the day itself, a time that has passed rolls to next year', () => {
+    const pack = advanceTaxPack(new Date(2026, 5, 15, 10).getTime(), '09:00')
+    expect(new Date(pack[0]!.dueAt).getFullYear()).toBe(2027)
+    expect(new Date(advanceTaxPack(new Date(2026, 5, 15, 8).getTime(), '09:00')[0]!.dueAt).getFullYear()).toBe(2026)
   })
 })

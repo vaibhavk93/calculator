@@ -31,7 +31,7 @@ describe('saveBackupFile', () => {
   it('web: downloads and never asks', async () => {
     const confirm = vi.fn()
     const r = await saveBackupFile('a.json', '{}', confirm)
-    expect(h.download).toHaveBeenCalledWith('a.json', '{}')
+    expect(h.download).toHaveBeenCalledWith('a.json', '{}', 'application/json')
     expect(confirm).not.toHaveBeenCalled()
     expect(r).toMatchObject({ ok: true, where: 'your downloads' })
   })

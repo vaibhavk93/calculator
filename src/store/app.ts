@@ -51,8 +51,8 @@ import {
   type Tab,
   type BudgetData,
 } from './types'
-import { advance } from '../lib/reminders'
-import { isTaskDone, nextOccurrence, shortDate } from '../lib/tasks'
+import { advance, advanceTaxPack } from '../lib/reminders'
+import { isTaskDone, nextOccurrence, shortDate, taskSummary } from '../lib/tasks'
 import { listSummary, repeatLines, tapeTotal } from '../lib/tape'
 
 export type Overlay = 'none' | 'settings' | 'history'
@@ -149,6 +149,8 @@ export interface AppState {
   updateExpense: (id: string, draft: ExpenseDraft) => boolean
   /** Removes an entry; the snackbar offers Undo. */
   deleteExpense: (id: string) => void
+  /** Remembers bank messages that were added or skipped, so a later scan does not offer them again. */
+  markSmsSeen: (ids: string[]) => void
   /** A monthly limit for one category, or null to remove it. */
   setCategoryLimit: (id: string, limit: string | null, scope?: LimitScope) => boolean
   /** One limit for everything spent in a month, or null to remove it. */
@@ -222,6 +224,11 @@ export interface AppState {
   setTaskDone: (id: string, done: boolean) => boolean
   /** Moves every finished task to Trash (undoable). Returns how many. */
   clearDoneTasks: () => number
+  /**
+   * Adds the four advance-tax reminders (15 Jun, 15 Sep, 15 Dec, 15 Mar). One already there with the same
+   * title is left alone, so adding twice never doubles them. Returns how many were added.
+   */
+  addAdvanceTaxPack: () => number
 
   updateSettings: (patch: Partial<Settings>) => void
   setTab: (tab: Tab) => void
@@ -543,6 +550,12 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         return true
       },
 
+      markSmsSeen: (ids) => {
+        const { budget } = get()
+        const next = [...new Set([...ids, ...(budget.smsSeen ?? [])])].slice(0, 5000)
+        set({ budget: { ...budget, smsSeen: next } })
+      },
+
       deleteExpense: (id) => {
         const { budget } = get()
         const target = budget.expenses.find((x) => x.id === id && x.deletedAt === null)
@@ -742,7 +755,8 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const { cards } = get()
         if (cards.filter((c) => c.deletedAt === null).length >= MAX_CARDS) {
           const text = draft.kind === 'task' ? `You can keep up to ${MAX_CARDS} notes and tasks. Delete some first.` : `You can keep up to ${MAX_CARDS} saved items. Delete some first.`
-          set({ notice: { id: nextId(), text, tone: 'error' } })
+          // `notice` is only drawn on Calculate, so also say it in the snackbar every screen has.
+          set({ notice: { id: nextId(), text, tone: 'error' }, snack: { id: nextId(), text, canUndo: false } })
           return null
         }
         const now = deps.now()
@@ -900,6 +914,22 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
           snack: { id: snackId, text: `Moved ${doneIds.size} done ${doneIds.size === 1 ? 'task' : 'tasks'} to Trash`, canUndo: true },
         })
         return doneIds.size
+      },
+
+      addAdvanceTaxPack: () => {
+        const now = deps.now()
+        const have = new Set(get().cards.filter((c) => c.deletedAt === null).map((c) => c.title))
+        let added = 0
+        for (const p of advanceTaxPack(now, get().settings.reminderTime)) {
+          if (have.has(p.title)) continue
+          // Yearly, so ticking one off moves it to the same date next year.
+          const id = get().saveCard({ title: p.title, kind: 'task', toolId: null, inputs: null, summary: taskSummary(p.dueAt, 'yearly'), amount: null, lines: [], note: p.note, tags: ['Tax'] }, { dueAt: p.dueAt, repeat: 'yearly', leadDays: 7 })
+          if (!id) break
+          added++
+        }
+        const text = added === 4 ? 'Added 4 advance tax reminders' : added === 0 ? 'Advance tax reminders are already there' : `Added ${added} advance tax reminders. The rest were already there`
+        set({ snack: { id: nextId(), text, canUndo: false } })
+        return added
       },
 
       updateSettings: (patch) => set({ settings: sanitizeSettings({ ...get().settings, ...patch }) }),

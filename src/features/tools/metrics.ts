@@ -80,8 +80,8 @@ const cacLtvSpec: ToolSpec = {
       : ratio.lt(1)
         ? 'A customer earns back less profit than they cost to win, so this loses money.'
         : ratio.lt(3)
-          ? 'Below the common 3:1 benchmark (a rule of thumb), so winning customers is costly for what they return.'
-          : 'At or above the common 3:1 benchmark (a rule of thumb), so customers return well over what they cost.'
+          ? 'Below the common 3:1 benchmark (a rule of thumb), so winning customers is costly for what they return. 3:1 is a common SaaS target; it depends on margins and growth stage.'
+          : 'At or above the common 3:1 benchmark (a rule of thumb), so customers return well over what they cost. 3:1 is a common SaaS target; it depends on margins and growth stage.'
     return {
       rows: [
         { label: 'CAC (cost to win one customer)', value: x.cac, fmt: 'money', main: true },
@@ -130,10 +130,10 @@ const paybackSpec: ToolSpec = {
       ],
       formula: ['CAC payback = CAC ÷ (ARPU × gross margin)', `${f(cac!)} ÷ (${f(arpu!)} × ${f(margin!)}%) = ${f2(months)} months`],
       note: months.lte(12)
-        ? 'Under 12 months is commonly seen as healthy (a rule of thumb).'
+        ? 'Under 12 months is commonly seen as healthy (a rule of thumb for subscription businesses; it depends on churn and how much cash you have).'
         : months.lte(18)
-          ? 'Between 12 and 18 months is commonly seen as acceptable but slow (a rule of thumb).'
-          : 'Over 18 months is commonly seen as slow, so cash stays tied up for long (a rule of thumb).',
+          ? 'Between 12 and 18 months is commonly seen as acceptable but slow (a rule of thumb; it depends on churn and cash).'
+          : 'Over 18 months is commonly seen as slow, so cash stays tied up for long (a rule of thumb; it depends on churn and cash).',
     }
   },
 }
@@ -260,6 +260,7 @@ const sampleSpec: ToolSpec = {
   title: 'A/B test sample size',
   blurb: 'Visitors and days an A/B test needs',
   category: 'metrics',
+  verified: { source: 'R power.prop.test documentation' },
   keywords: ['ab test', 'a/b', 'sample size', 'experiment', 'mde', 'power', 'significance', 'conversion', 'duration'],
   fields: [
     { id: 'baseline', label: 'Current conversion rate', kind: 'number', unit: 'percent', default: '20' },
@@ -410,7 +411,7 @@ const rule40Spec: ToolSpec = {
         bm ? `${f(burn!)} ÷ ${f(newArr!)} = ${f2(bm)}` : 'Net new ARR is zero or negative, so there is no multiple',
         'Rules of thumb for burn multiple: below 1 great, 1 to 1.5 good, 1.5 to 2 okay, 2 to 3 weak, above 3 bad',
       ],
-      note: `The score ${passes ? 'passes' : 'is below'} the 40 mark and ${bandText}; both are rules of thumb, not laws.`,
+      note: `The score ${passes ? 'passes' : 'is below'} the 40 mark and ${bandText}; both are rules of thumb, not laws. The 40 mark is aimed at SaaS companies past early stage; the burn bands assume a growing company.`,
     }
   },
 }

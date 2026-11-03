@@ -17,6 +17,7 @@ import { applyNotifications, ensurePermission, onNotificationAction, planNotific
 import { formatCell } from './lib/toolFormat'
 import { D } from './engine'
 import { applyTheme } from './lib/theme'
+import { backupNudge, countItems } from './lib/backupNudge'
 
 /** Keeps the document's colours, and the screen's wake lock, in step with settings. */
 function useSettingsEffects() {
@@ -50,11 +51,12 @@ function useReminderNotifications() {
   const cards = useApp((s) => s.cards)
   const system = useApp((s) => s.settings.numberSystem)
   const decimals = useApp((s) => s.settings.decimals)
+  const time = useApp((s) => s.settings.reminderTime)
   const markPaid = useApp((s) => s.markPaid)
   const snooze = useApp((s) => s.snooze)
   const setTab = useApp((s) => s.setTab)
 
-  // Coming back from Android's permission screens re-plans, so a newly allowed exact alarm takes effect.
+  // Coming back to the app re-plans: a newly allowed exact alarm, a changed time zone or a new day all take effect.
   const [resumed, setResumed] = useState(0)
   useEffect(() => {
     const onShow = () => document.visibilityState === 'visible' && setResumed((n) => n + 1)
@@ -64,12 +66,12 @@ function useReminderNotifications() {
 
   useEffect(() => {
     const money = (plain: string) => formatCell(new D(plain), 'money', { system, decimals })
-    const planned = planNotifications(reminders, cards, Date.now(), money)
+    const planned = planNotifications(reminders, cards, Date.now(), money, time)
     void (async () => {
       if (planned.length > 0 && !(await ensurePermission())) return
       await applyNotifications(planned)
     })()
-  }, [reminders, cards, system, decimals, resumed])
+  }, [reminders, cards, system, decimals, time, resumed])
 
   useEffect(() => {
     const stop = onNotificationAction((id, action) => {
@@ -79,6 +81,19 @@ function useReminderNotifications() {
     })
     return () => void stop.then((f) => f())
   }, [markPaid, snooze, setTab])
+}
+
+/** Once at launch, suggests a backup when there is real data and none is saved (at most once per 14 days). */
+function useBackupNudge() {
+  const store = useAppStore()
+  useEffect(() => {
+    const s = store.getState()
+    const now = Date.now()
+    const text = backupNudge(countItems(s), s.settings.lastBackupAt, s.settings.backupNudgedAt, now)
+    if (!text) return
+    s.toast(text)
+    s.updateSettings({ backupNudgedAt: now })
+  }, [store])
 }
 
 /**
@@ -122,6 +137,7 @@ export function App() {
   useSettingsEffects()
   useBlurAfterPointerClick()
   useReminderNotifications()
+  useBackupNudge()
   useHardwareBack()
   const tab = useApp((s) => s.tab)
   const overlay = useApp((s) => s.overlay)

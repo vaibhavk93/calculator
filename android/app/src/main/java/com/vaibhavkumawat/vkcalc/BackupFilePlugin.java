@@ -65,7 +65,7 @@ public class BackupFilePlugin extends Plugin {
         ContentResolver resolver = getContext().getContentResolver();
         ContentValues v = new ContentValues();
         v.put(MediaStore.MediaColumns.DISPLAY_NAME, filename);
-        v.put(MediaStore.MediaColumns.MIME_TYPE, "application/json");
+        v.put(MediaStore.MediaColumns.MIME_TYPE, call.getString("mime", "application/json"));
         v.put(MediaStore.MediaColumns.RELATIVE_PATH, DIR);
         v.put(MediaStore.MediaColumns.IS_PENDING, 1);
         Uri uri = null;

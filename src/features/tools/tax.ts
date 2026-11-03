@@ -71,6 +71,7 @@ const incomeTaxSpec: ToolSpec = {
   title: 'Income tax: old vs new',
   blurb: 'Which regime saves you more',
   category: 'tax',
+  verified: { source: 'Budget Speech slab table and incometax.gov.in (slabs only)' },
   keywords: ['income tax', 'regime', 'slab', '80C', '80D', 'NPS', 'rebate', '87A', 'surcharge', 'old vs new'],
   fields: [
     money('salary', 'Yearly salary before tax', '1500000', 'Before standard deduction. Include employer NPS.'),

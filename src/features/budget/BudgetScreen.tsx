@@ -5,11 +5,12 @@ import { useApp } from '../../components/StoreProvider'
 import { tintStyle } from '../../components/tint'
 import { useBackHandler } from '../../components/useBackHandler'
 import { limitState, monthKey, monthLabel, monthShortLabel, needsAttention, paceLeft, summarise } from '../../lib/budget'
+import { ImportScreen } from './ImportScreen'
 import { ManageScreen } from './ManageScreen'
 import { ExpenseSheet } from './sheets'
 import { Bar, EntryRow, MonthNav, SpendSummary, limitWords, useMoney, type SummaryTab } from './SpendSummary'
 
-type Page = 'home' | 'summary' | 'manage'
+type Page = 'home' | 'summary' | 'manage' | 'import'
 type SheetState = null | { id: string | null }
 
 const entriesWord = (n: number) => `${n} ${n === 1 ? 'entry' : 'entries'}`
@@ -49,6 +50,7 @@ export function BudgetScreen() {
     <>
       {page === 'summary' && <SpendSummary month={month} onMonth={setMonth} onBack={() => setPage('home')} onManage={() => setPage('manage')} initialTab={open.tab} initialCategory={open.categoryId} />}
       {page === 'manage' && <ManageScreen onBack={() => setPage('home')} month={month} />}
+      {page === 'import' && <ImportScreen onBack={() => setPage('home')} />}
     </>
   )
 
@@ -60,6 +62,7 @@ export function BudgetScreen() {
           action={
             <>
               <button type="button" className="btn btn--primary" onClick={() => setSheet({ id: null })}>Add expense</button>
+              <button type="button" className="link-btn" onClick={() => setPage('import')}>Add from bank messages</button>
               <button type="button" className="link-btn" onClick={() => setPage('manage')}>Set a monthly limit</button>
               <button type="button" className="link-btn" onClick={() => setPage('manage')}>Categories and cards</button>
             </>
@@ -150,6 +153,14 @@ export function BudgetScreen() {
             {recent.map((e) => <EntryRow key={e.id} e={e} onEdit={(id) => setSheet({ id })} />)}
             {s.entries.length > 0 && <button type="button" className="link-btn spend__link" onClick={() => goSummary('entries')}>All entries ({s.entries.length})</button>}
           </div>
+        </section>
+
+        <section className="sect" style={tintStyle(7)} aria-label="Add from messages">
+          <button type="button" className="budget__row tap-row" onClick={() => setPage('import')}>
+            <span className="row__label">Add from bank messages</span>
+            <Icon name="chevron" size={18} className="tap-row__chev" />
+            <span className="budget__note">Finds payments in your bank texts, on this phone. You pick what to add.</span>
+          </button>
         </section>
 
         <section className="sect" style={tintStyle(7)} aria-label="Categories and cards">

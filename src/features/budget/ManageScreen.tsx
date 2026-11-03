@@ -18,6 +18,7 @@ import {
   monthShortLabel,
   networkLabel,
   owesWords,
+  utilisationWords,
   type PayInstrument,
 } from '../../lib/budget'
 import { CategoryEditSheet } from './CategoryEditSheet'
@@ -49,7 +50,7 @@ export function ManageScreen({ onBack, month = monthKey(new Date()) }: { onBack:
   const amountText = (limit: string | null) => (limit ? money(new D(limit)) : null)
 
   const instrumentHint = (i: PayInstrument) =>
-    [i.network ? networkLabel(i.network) : '', i.bank, i.kind === 'credit' ? owesWords(cardOutstanding(budget, i.id), money) : ''].filter(Boolean).join(' · ')
+    [i.network ? networkLabel(i.network) : '', i.bank, i.kind === 'credit' ? owesWords(cardOutstanding(budget, i.id), money) : '', i.kind === 'credit' ? (utilisationWords(cardOutstanding(budget, i.id), i.creditLimit, money) ?? '') : ''].filter(Boolean).join(' · ')
 
   const row = (key: string, label: string, hint: string | undefined, onOpen: () => void, sub = false) => (
     <button key={key} type="button" className={sub ? 'navrow tap-row manage__sub' : 'navrow tap-row'} onClick={onOpen}>

@@ -193,7 +193,7 @@ same build.
 
 | Idea | Why ruled out | Source |
 |---|---|---|
-| Read SMS, email, or bank statements to auto-log spending | Breaks "almost no permissions"; bank SMS formats change and silently corrupt a parsed total | REVIEW-NEW-FEATURES D, COMPETITIVE-RESEARCH §3b |
+| ~~Read SMS, email, or bank statements to auto-log spending~~ | **Overruled by the owner 2026-11-03: a must-have.** SMS scan built with a review queue and guard-rails (`docs/SMS-CAPTURE.md`). Statement-file import next. Direct email access stays out (needs sign-in and network) | owner |
 | Bank linking / Account Aggregator | Needs a licensed partner and a server; both sibling repos independently concluded this is blocked | BUDGET-PLAN I, COMPETITIVE-RESEARCH |
 | Accounts, cloud sync, shared household budgets | Breaks "no account, nothing leaves the phone" | PRD, owner promise |
 | YNAB-style "give every rupee a job," rollover, age of money | A behaviour-change product, known to be abandoned in week two by the owner's own prior research; Budget is already unproven without adding this risk | ROADMAP §4, REVIEW-NEW-FEATURES D |

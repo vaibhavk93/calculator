@@ -12,7 +12,7 @@ import { downloadTextFile } from './device'
  */
 interface BackupFilePlugin {
   hasBackupFolder(): Promise<{ exists: boolean }>
-  saveBackup(o: { filename: string; text: string }): Promise<{ uri: string; path: string }>
+  saveBackup(o: { filename: string; text: string; mime?: string }): Promise<{ uri: string; path: string }>
   openBackupFolder(o?: { uri?: string }): Promise<{ opened: 'folder' | 'downloads' }>
 }
 
@@ -30,10 +30,11 @@ export async function saveBackupFile(
   filename: string,
   text: string,
   confirmCreate: () => Promise<boolean>,
+  mime = 'application/json',
 ): Promise<SaveBackupResult> {
   if (!Capacitor.isNativePlatform()) {
     try {
-      downloadTextFile(filename, text)
+      downloadTextFile(filename, text, mime)
       return { ok: true, where: 'your downloads' }
     } catch (e) {
       return { ok: false, reason: 'failed', message: errText(e) }
@@ -44,7 +45,7 @@ export async function saveBackupFile(
     if (!remembered && !(await plugin.hasBackupFolder()).exists) {
       if (!(await confirmCreate())) return { ok: false, reason: 'declined', message: 'No backup was saved.' }
     }
-    const saved = await plugin.saveBackup({ filename, text })
+    const saved = await plugin.saveBackup({ filename, text, mime })
     await Preferences.set({ key: FOLDER_OK_KEY, value: '1' })
     return {
       ok: true,

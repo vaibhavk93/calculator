@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../../components/StoreProvider'
+import { D } from '../../engine'
+import { ExpenseSheet } from '../budget/sheets'
 import { listSummary, tapeTotal } from '../../lib/tape'
 import { SaveSheet } from './SaveSheet'
 import { ToListSheet } from './ToListSheet'
@@ -18,9 +20,12 @@ export function ResultActions({ value, active }: { value: string; active: boolea
   const showNotice = useApp((s) => s.showNotice)
   const system = useApp((s) => s.settings.numberSystem)
   const decimals = useApp((s) => s.settings.decimals)
-  const [open, setOpen] = useState<'list' | 'remind' | null>(null)
+  const [open, setOpen] = useState<'list' | 'remind' | 'expense' | null>(null)
 
   const show = active && PLAIN_NUMBER.test(value)
+  // "Add expense" only for a positive amount that is still at least 1 paisa after rounding to 2 places.
+  const expenseAmount = show ? new D(value).toDecimalPlaces(2).toFixed() : '0'
+  const canExpense = show && new D(expenseAmount).gt(0)
 
   const line = { id: 'one', label: '', value }
   const lines = [line]
@@ -32,10 +37,12 @@ export function ResultActions({ value, active }: { value: string; active: boolea
           <>
             <button type="button" className="chip" onClick={() => setOpen('list')}>To list</button>
             <button type="button" className="chip" onClick={() => setOpen('remind')}>Remind me</button>
+            {canExpense && <button type="button" className="chip" onClick={() => setOpen('expense')}>Add expense</button>}
           </>
         )}
       </div>
 
+      {open === 'expense' && <ExpenseSheet prefill={{ amount: expenseAmount, note: 'from calculator' }} onClose={() => setOpen(null)} />}
       {open === 'list' && <ToListSheet value={value} onClose={() => setOpen(null)} onDone={showCard} />}
       {open === 'remind' && (
         <SaveSheet

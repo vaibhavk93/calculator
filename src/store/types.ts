@@ -22,6 +22,14 @@ export interface Settings {
   keepHistory: boolean
   /** Copying a number: ask each time, or always with / without thousands commas. */
   copyFormat: CopyFormat
+  /** When reminder notifications arrive, "HH:MM" (24 hour). */
+  reminderTime: string
+  /** When a backup file was last saved from Settings, in ms. Null: never. */
+  lastBackupAt: number | null
+  /** When the launch reminder to back up was last shown, in ms. At most one per 14 days. */
+  backupNudgedAt: number | null
+  /** When the backup line at the top of Settings was last dismissed, in ms. */
+  backupDismissedAt: number | null
 }
 
 export type CopyFormat = 'ask' | 'with' | 'without'
@@ -38,6 +46,10 @@ export const DEFAULT_SETTINGS: Settings = {
   keepAwake: false,
   keepHistory: true,
   copyFormat: 'ask',
+  reminderTime: '09:00',
+  lastBackupAt: null,
+  backupNudgedAt: null,
+  backupDismissedAt: null,
 }
 
 export interface HistoryEntry {

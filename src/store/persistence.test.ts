@@ -471,3 +471,20 @@ describe('capHistory', () => {
     expect(out).toHaveLength(3)
   })
 })
+
+describe('sanitizeSettings: reminder and backup fields', () => {
+  it('defaults to 9:00 and no backup, and rejects junk', () => {
+    expect(sanitizeSettings({}).reminderTime).toBe('09:00')
+    expect(sanitizeSettings({ reminderTime: '7:5' }).reminderTime).toBe('09:00')
+    expect(sanitizeSettings({ reminderTime: '18:30' }).reminderTime).toBe('18:30')
+    const s = sanitizeSettings({ lastBackupAt: 'x', backupNudgedAt: -5, backupDismissedAt: 1700000000000 })
+    expect([s.lastBackupAt, s.backupNudgedAt, s.backupDismissedAt]).toEqual([null, null, 1700000000000])
+  })
+})
+
+describe('smsSeen (bank messages already handled)', () => {
+  it('keeps valid fingerprints, drops junk, and is absent when empty', () => {
+    expect(sanitizeBudget({ ...starterBudget(), smsSeen: ['abc123', 5, '<script>', 'zz99a'] }).smsSeen).toEqual(['abc123', 'zz99a'])
+    expect(sanitizeBudget({ ...starterBudget(), smsSeen: 'nope' }).smsSeen).toBeUndefined()
+  })
+})

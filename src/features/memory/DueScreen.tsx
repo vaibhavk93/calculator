@@ -23,6 +23,7 @@ export function DueScreen() {
   const snooze = useApp((s) => s.snooze)
   const remove = useApp((s) => s.removeReminder)
   const setTab = useApp((s) => s.setTab)
+  const addPack = useApp((s) => s.addAdvanceTaxPack)
   const [openId, setOpenId] = useState<string | null>(null)
   // A reminder cannot be brought back once removed, so Remove asks first (the store has no undo for reminders).
   const [askId, setAskId] = useState<string | null>(null)
@@ -42,7 +43,12 @@ export function DueScreen() {
     return (
       <EmptyState
         title="No reminders yet"
-        action={<button type="button" className="btn btn--primary" onClick={() => setTab('saved')}>Open notes</button>}
+        action={
+          <>
+            <button type="button" className="btn btn--primary" onClick={() => setTab('saved')}>Open notes</button>
+            <button type="button" className="btn" onClick={addPack}>Add advance tax reminders</button>
+          </>
+        }
       >
         Save a calculation, such as a card total or an EMI, and add a reminder. It will show up here and tell you when it is due. No account, no internet.
       </EmptyState>
@@ -113,6 +119,10 @@ export function DueScreen() {
         {section('Overdue', g.overdue, 8, true)}
         {section('This week', g.week, 5)}
         {section('Later', g.later, 8)}
+      </div>
+      <div className="due__pack">
+        <p className="note">Advance tax is due 15 Jun, 15 Sep, 15 Dec and 15 Mar. Add all four, then edit them like any reminder.</p>
+        <button type="button" className="btn" onClick={addPack}>Add a pack: advance tax</button>
       </div>
       {open && <CardView card={open} onBack={() => setOpenId(null)} />}
     </div>

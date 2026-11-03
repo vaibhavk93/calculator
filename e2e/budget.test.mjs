@@ -10,7 +10,8 @@ import { startApp, openApp, tab, overflowing, stored } from './lib.mjs'
 const cases = []
 const T = (id, type, title, fn, opts = {}) => cases.push({ id, type, title, fn, ...opts })
 const fail = (m) => { throw new Error(m) }
-const eq = (a, b, m = '') => { if (JSON.stringify(a) !== JSON.stringify(b)) fail(`${m ? m + ': ' : ''}got ${JSON.stringify(a)} expected ${JSON.stringify(b)}`) }
+const J = (v) => JSON.stringify(v, (_, x) => (typeof x === 'bigint' ? x.toString() + 'n' : x)) // BigInt cents are compared in ST04 and ST06
+const eq = (a, b, m = '') => { if (J(a) !== J(b)) fail(`${m ? m + ': ' : ''}got ${J(a)} expected ${J(b)}`) }
 const ok = (c, m = 'condition false') => { if (!c) fail(m) }
 const has = (text, part, m = '') => { if (!String(text).includes(part)) fail(`${m ? m + ': ' : ''}${JSON.stringify(String(text).slice(0, 220))} lacks ${JSON.stringify(part)}`) }
 const lacks = (text, part, m = '') => { if (String(text).includes(part)) fail(`${m ? m + ': ' : ''}${JSON.stringify(String(text).slice(0, 220))} contains ${JSON.stringify(part)}`) }
@@ -69,6 +70,14 @@ const makeCtx = () => {
 const S = (page) => page.locator('.sheet')
 const addBtn = (page) => page.getByRole('button', { name: 'Add expense', exact: true }).first()
 const openAdd = async (page) => { await addBtn(page).click(); await page.locator('.sheet').waitFor() }
+/**
+ * Blurs whatever has focus and waits two frames. The Add expense form shows "Enter an amount above zero" the moment the empty
+ * Amount box loses focus, and that line pushes everything below it down. A click lands on mouse-down, so if it is the click that
+ * blurs the box, the button moves before mouse-up and the click is lost. That is why the CG07-10 and PM13-26 cases timed out:
+ * the cases never reached the control. Call this before the first click on anything below Amount. (A real thumb can hit the same
+ * shift: see docs/TESTING.md, "Add expense: first tap below an empty Amount".)
+ */
+const settle = async (page) => { await page.evaluate(() => { const a = document.activeElement; if (a instanceof HTMLElement) a.blur() }); await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))) }
 const footBtn = (page) => S(page).locator('.sheet__foot .btn--primary').first()
 const errs = (page) => S(page).locator('.ffield__error').allInnerTexts()
 const waitStored = async (page, pred, ms = 3000) => {
@@ -97,6 +106,7 @@ const noBadText = (t) => { for (const w of ['NaN', 'undefined', 'Infinity', 'nul
 /** Fills the Add expense form. Fields left out are untouched. mode is a label like 'UPI'. */
 async function fillExpense(page, f = {}) {
   const s = S(page)
+  if (f.amount === undefined) await settle(page)
   if (f.amount !== undefined) await s.locator('#exp-amount').fill(f.amount)
   if (f.date !== undefined) await s.locator('#exp-date').fill(f.date)
   if (f.settlement) await s.getByRole('radio', { name: f.settlement, exact: true }).click()
@@ -107,6 +117,7 @@ async function fillExpense(page, f = {}) {
 }
 async function chooseCat(page, name) {
   const s = S(page)
+  await settle(page)
   const pill = s.locator('#exp-cat .pill:not(.pill--more)', { hasText: new RegExp('^' + name.replace('›', '›') + '$') })
   if (await pill.count()) return pill.first().click()
   await s.locator('#exp-cat .pill--more').click()
@@ -114,6 +125,7 @@ async function chooseCat(page, name) {
 }
 async function chooseInst(page, label) {
   const s = S(page)
+  await settle(page)
   const pill = s.locator('#exp-inst .pill', { hasText: label })
   if (await pill.count()) return pill.first().click()
   await s.locator('button#exp-inst').click()
@@ -490,12 +502,12 @@ T('CG06', 'CORNER', 'editing an old entry whose category is not active that mont
 T('CG07', 'UX', 'More list gets a search box when there are many categories', async (c) => {
   const cats = Array.from({ length: 12 }, (_, i) => cat('k' + i, 'Cat' + i))
   const { page } = await c.open({ budget: budgetOf({ categories: cats }) })
-  await openAdd(page); await S(page).locator('#exp-cat .pill--more').click()
+  await openAdd(page); await settle(page); await S(page).locator('#exp-cat .pill--more').click()
   await page.locator('input[type=search]').fill('cat11'); eq(await page.locator('.pick__opt:not(.pick__opt--add)').count(), 1)
 })
 T('CG08', 'POS', 'add a category from the More list: it is created and chosen', async (c) => {
   const { page } = await c.open({ budget: BASE() })
-  await openAdd(page); await S(page).locator('#exp-cat .pill--more').click()
+  await openAdd(page); await settle(page); await S(page).locator('#exp-cat .pill--more').click()
   await page.getByRole('button', { name: /Add category/ }).click()
   await page.locator('#pick-add-name').fill('Pets'); await page.getByRole('button', { name: 'Add', exact: true }).click()
   await S(page).waitFor(); eq(await S(page).locator('#exp-cat .pill[aria-pressed="true"]').allInnerTexts(), ['Pets'])
@@ -504,7 +516,7 @@ T('CG08', 'POS', 'add a category from the More list: it is created and chosen', 
 })
 T('CG09', 'CORNER', 'adding a category name that exists selects the existing one (no duplicate)', async (c) => {
   const { page } = await c.open({ budget: BASE() })
-  await openAdd(page); await S(page).locator('#exp-cat .pill--more').click()
+  await openAdd(page); await settle(page); await S(page).locator('#exp-cat .pill--more').click()
   await page.getByRole('button', { name: /Add category/ }).click()
   await page.locator('#pick-add-name').fill('fOOd'); await page.getByRole('button', { name: 'Add', exact: true }).click()
   await S(page).waitFor(); eq(await S(page).locator('#exp-cat .pill[aria-pressed="true"]').allInnerTexts(), ['Food'])
@@ -513,7 +525,7 @@ T('CG09', 'CORNER', 'adding a category name that exists selects the existing one
 })
 T('CG10', 'NEG', 'adding the reserved name "Uncategorised" or an empty name shows a message', async (c) => {
   const { page } = await c.open({ budget: BASE() })
-  await openAdd(page); await S(page).locator('#exp-cat .pill--more').click()
+  await openAdd(page); await settle(page); await S(page).locator('#exp-cat .pill--more').click()
   await page.getByRole('button', { name: /Add category/ }).click()
   await page.locator('#pick-add-name').fill('Uncategorised'); await page.getByRole('button', { name: 'Add', exact: true }).click()
   has(await page.locator('#pick-add-msg').innerText(), 'kept for entries with no category')

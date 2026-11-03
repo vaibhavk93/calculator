@@ -6,11 +6,14 @@ import { ScreenHeader } from '../../components/ScreenHeader'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { saveBackupFile } from '../../lib/backupFile'
 import { Sheet } from '../../components/Sheet'
-import { checkReminderPermissions, ensurePermission, notificationsSupported, openExactAlarmSettings, type ReminderPermissions } from '../../lib/notifications'
+import { backupNudge, countItems } from '../../lib/backupNudge'
+import { checkReminderPermissions, ensurePermission, notificationsSupported, openExactAlarmSettings, scheduleTestReminder, type ReminderPermissions } from '../../lib/notifications'
+import { timeLabel } from '../../lib/reminders'
 import { ACCENT_NAMES, ACCENTS } from '../../lib/theme'
 import { backupFilename, buildBackup, parseBackup } from '../../store/backup'
 import { TABS, type CopyFormat, type PersistedData, type Tab } from '../../store/types'
 import pkg from '../../../package.json'
+import { ExportSheet } from '../budget/ExportSheet'
 import { ManageScreen } from '../budget/ManageScreen'
 import { ALL_TOOLS } from '../tools/registry'
 import { GROUPS } from '../tools/groups'
@@ -42,7 +45,7 @@ function ReminderPermissionRows() {
   }, [refresh])
   if (!perm) return null
   return (
-    <Section title="Reminders">
+    <>
         <button type="button" className="row row--button tap-row" disabled={perm.notifications} onClick={() => void ensurePermission().then(refresh)}>
           <span className="row__text">
             <span className="row__label">Notifications: {perm.notifications ? 'allowed' : 'not allowed'}</span>
@@ -61,6 +64,48 @@ function ReminderPermissionRows() {
           </span>
           {!perm.exact && <Icon name="chevron" size={18} className="tap-row__chev" />}
         </button>
+    </>
+  )
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** When reminders arrive, a way to prove they do, and (on the phone) what the system allows. */
+function ReminderSettings() {
+  const time = useApp((x) => x.settings.reminderTime)
+  const update = useApp((x) => x.updateSettings)
+  const toast = useApp((x) => x.toast)
+
+  const sendTest = async () => {
+    const r = await scheduleTestReminder()
+    if (r.ok) {
+      const d = new Date(r.at)
+      toast(`Test reminder set for ${timeLabel(`${pad2(d.getHours())}:${pad2(d.getMinutes())}`)}. Lock the phone and wait.${r.exact ? '' : ' It may be a few minutes late: "Alarms and reminders" is off.'}`)
+    } else if (r.reason === 'web') toast('A test reminder only works in the Android app.')
+    else if (r.reason === 'denied') toast('Notifications are not allowed. Allow them above, then try again.')
+    else toast('Could not set the test reminder.')
+  }
+
+  return (
+    <Section title="Reminders">
+      <Row label="Reminder time" hint="Reminders arrive at this time on their day">
+        <input
+          type="time"
+          className="field field--mono"
+          style={{ width: '8rem', textAlign: 'right' }}
+          aria-label="Reminder time"
+          value={time}
+          onChange={(e) => e.target.value && update({ reminderTime: e.target.value })}
+        />
+      </Row>
+      <button type="button" className="row row--button tap-row" onClick={() => void sendTest()}>
+        <span className="row__text">
+          <span className="row__label">Send a test reminder</span>
+          <span className="row__hint">Arrives in about a minute. If it shows with the phone locked, real reminders can reach you too</span>
+        </span>
+        <Icon name="chevron" size={18} className="tap-row__chev" />
+      </button>
+      {notificationsSupported() && <ReminderPermissionRows />}
     </Section>
   )
 }
@@ -87,15 +132,19 @@ export function SettingsScreen() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [backup, setBackup] = useState<Backup>({ state: 'idle' })
   const [manageBudget, setManageBudget] = useState(false)
+  const [exportCsv, setExportCsv] = useState(false)
 
   // Asks before the first save creates the Calc folder in Downloads. Resolves true to go ahead.
   const [folderAsk, setFolderAsk] = useState<((ok: boolean) => void) | null>(null)
   const showLinkSnack = useApp((x) => x.showLinkSnack)
   const showNotice = useApp((x) => x.showNotice)
+  const items = useApp((x) => countItems(x))
+  const nudge = backupNudge(items, s.lastBackupAt, s.backupDismissedAt, Date.now())
 
   const exportBackup = async () => {
     const r = await saveBackupFile(backupFilename(), buildBackup(store.getState().snapshot()), () => new Promise<boolean>((resolve) => setFolderAsk(() => resolve)))
     setFolderAsk(null)
+    if (r.ok) update({ lastBackupAt: Date.now() })
     if (r.ok && r.open) showLinkSnack(`Backup saved to ${r.where}`, { label: 'Open folder', run: () => void r.open!() })
     else if (r.ok) showNotice(`Backup saved to ${r.where}`, 'info')
     else if (r.reason === 'failed') showNotice(r.message, 'error')
@@ -119,6 +168,14 @@ export function SettingsScreen() {
       <ScreenHeader title="Settings" onBack={() => setOverlay('none')} />
 
       <div className="screen__body">
+        {nudge && (
+          <p className="note" role="status">
+            {nudge}{' '}
+            <button type="button" className="link-btn" onClick={() => update({ backupDismissedAt: Date.now() })}>
+              Dismiss
+            </button>
+          </p>
+        )}
         <Section title="Appearance">
           <Row label="Theme">
             <Segmented
@@ -206,7 +263,7 @@ export function SettingsScreen() {
           </Row>
         </Section>
 
-        {notificationsSupported() && <ReminderPermissionRows />}
+        <ReminderSettings />
 
         <Section title="Your data">
           <button type="button" className="row row--button tap-row" onClick={() => setManageBudget(true)}>
@@ -220,6 +277,13 @@ export function SettingsScreen() {
             <span className="row__text">
               <span className="row__label">Export a backup</span>
               <span className="row__hint">History and settings, as one file you keep</span>
+            </span>
+            <Icon name="chevron" size={18} className="tap-row__chev" />
+          </button>
+          <button type="button" className="row row--button tap-row" onClick={() => setExportCsv(true)}>
+            <span className="row__text">
+              <span className="row__label">Export expenses</span>
+              <span className="row__hint">Budget entries as a spreadsheet file (CSV)</span>
             </span>
             <Icon name="chevron" size={18} className="tap-row__chev" />
           </button>
@@ -266,6 +330,7 @@ export function SettingsScreen() {
         </Section>
       </div>
       {manageBudget && <ManageScreen onBack={() => setManageBudget(false)} />}
+      {exportCsv && <ExportSheet onClose={() => setExportCsv(false)} />}
       {folderAsk && (
         <Sheet
           title="Make a Calc folder?"

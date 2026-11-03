@@ -100,6 +100,8 @@ export interface ToolSpec {
   category: Category
   /** Extra words the search box matches, and the natural-language input later. */
   keywords: string[]
+  /** Set ONLY when docs/VERIFICATION.md names an outside source (status A). Shown as a quiet line under the result. Leave unset otherwise: no label beats a weak claim. */
+  verified?: { source: string }
   fields: Field[]
   compute: (values: Values) => Computed
 }
