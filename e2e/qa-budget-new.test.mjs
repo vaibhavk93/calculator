@@ -65,8 +65,12 @@ const waitStored = async (page, pred, ms = 3000) => { const t0 = Date.now(); let
 const budgetNow = async (page) => (await waitStored(page, () => false, 450))?.budget
 const liveE = (b) => b.expenses.filter((e) => e.deletedAt === null)
 const pageOf = (page, name) => page.locator(`.screen[aria-label="${name}"]`)
-const toSummary = async (page) => { await page.locator('button.tap-row', { hasText: 'Spending summary' }).first().click(); await pageOf(page, 'Spending summary').waitFor() }
-const toBills = async (page) => { await page.locator('button.tap-row', { hasText: 'Bills and subscriptions' }).first().click(); await pageOf(page, 'Bills and subscriptions').waitFor() }
+// By accessible name, not a CSS class: the home screen's navigation row carries class "tap-row" (any
+// spending logged this month) or "link-btn" (the empty state's own action list, no spending yet) -- same
+// button, same destination, two different presentations. A selector pinned to one class breaks on
+// whichever seed the test happens to use. getByRole matches either.
+const toSummary = async (page) => { await page.getByRole('button', { name: /Spending summary/ }).first().click(); await pageOf(page, 'Spending summary').waitFor() }
+const toBills = async (page) => { await page.getByRole('button', { name: /Bills and subscriptions/ }).first().click(); await pageOf(page, 'Bills and subscriptions').waitFor() }
 const toManage = async (page) => { await page.getByRole('button', { name: /Categories and cards/ }).first().click(); await pageOf(page, 'Categories and cards').waitFor() }
 const toImport = async (page) => { await page.getByText('Add from bank messages').first().click(); await pageOf(page, 'Add from messages').waitFor() }
 const SUM = (page) => pageOf(page, 'Spending summary')

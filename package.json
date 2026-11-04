@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0-P1",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "prebuild": "vitest run src/architecture.test.ts",
@@ -12,6 +15,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "check": "tsc --noEmit && vitest run",
+    "e2e": "node e2e/run-all.mjs",
+    "e2e:fast": "node e2e/run-all.mjs --fast",
     "build:apk": "npm run build && npx cap sync && npx cap open android",
     "build:ios": "npm run build && npx cap sync && npx cap open ios",
     "cap:sync": "npx cap sync",

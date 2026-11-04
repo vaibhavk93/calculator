@@ -82,6 +82,14 @@
   overflow-wrap: anywhere;
 }
 
+/* Budget home's "Needs attention" and "Recent" groups: a plain hairline list, no tinted card around it
+   (docs/THE-PLAN.md section 7). .budget__row and .budget__entry carry their own top hairline already;
+   this closes the bottom edge the way .group > .row:last-child already does for the plain row pattern. */
+.group > .budget__row:last-child,
+.group > .budget__entry:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
 .budget__row > .budget__track,
 .budget__row > .budget__note {
   flex: 1 1 100%;

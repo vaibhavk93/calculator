@@ -81,23 +81,31 @@ passes.** See §6.
 
 ## 4. What we do next, in order
 
-### Block A — Make the audit trustworthy *(do this first; everything else is guesswork without it)*
+### Block A — Make the audit trustworthy *(do this first; everything else is guesswork without it)* — **A1, A2 done 2026-11-04**
 
-| # | Item | Size |
-|---|---|---|
-| A1 | `.nvmrc` + `engines` pinning Node 20+, and an `npm run e2e` script, so the browser suites actually run | S |
-| A2 | **Layout contract suite**: every screen × 3 widths (320/360/412) × 2 font scales (100%/200%) × seeded long content. Fails on sideways overflow, on any interactive element covered by another, on clipped text, on a tap target under 44px | M |
-| A3 | Put `npm run check` + the layout suite in one command, and never report a result from a piped exit code | S |
+| # | Item | Size | Status |
+|---|---|---|---|
+| A1 | `.nvmrc` (pins 22) + `engines: {node: ">=20"}` in `package.json`, and `npm run e2e` / `npm run e2e:fast` running every `e2e/*.test.mjs` suite in one command (`e2e/run-all.mjs`). Checks the Node version itself first, with the fix in the error message, instead of a confusing Playwright crash | S | **Done** |
+| A2 | **Layout contract suite** (`e2e/layout-contract.test.mjs`): every tab × 3 widths (320/360/412) × 2 font scales (100%/200%) × seeded long content (long names, 40 expenses, long notes, long tags). Asserts sideways overflow, control-on-control overlap, every control ≥44px **in one direction** (not both — matches `DESIGN-SYSTEM.md` section 9, not a stricter rule invented for the test), true text clipping (not a designed ellipsis or `sr-only`), and every button/link has a name. 144/144 passing | M | **Done** |
+| A3 | Put `npm run check` + the layout suite in one command, and never report a result from a piped exit code | S | Not done — `npm run e2e` is separate from `check` on purpose (see note below) |
 
-### Block B — The design reset *(see §7 for the thinking)*
+**Why `e2e` is not folded into `release`:** `tools1.test.mjs` alone takes 20+ minutes; the full suite is well over an hour. Gating every release on that is impractical. Run `npm run e2e:fast` (skips the 10 suites with hundreds of cases) for a quick pass, `npm run e2e` before anything that touches shared layout.
 
-| # | Item | Size |
-|---|---|---|
-| B1 | Write the **three-tier hierarchy rule** into `DESIGN-SYSTEM.md` and apply it to one screen as the reference | S |
-| B2 | Rebuild **Budget home** to that rule: money above the fold, navigation below it | M |
-| B3 | Demote the post-"=" actions (To list / Remind me / Add expense) from equal chips to a quiet icon row | S |
-| B4 | Replace tinted section cards with hairline groups on Tools, Notes, Budget | M |
-| B5 | Apply to Notes, Due, Tools | M |
+**Two false positives found and fixed *while building* A2** — worth keeping in mind for every future layout test:
+1. `getBoundingClientRect()` ignores scroll clipping. A row scrolled below the fold inside an `overflow:auto` list still reports its full, unclipped position, which can coincidentally land on something real far away (a tab-bar label). Fixed by intersecting each control's rect against every scrolling/clipping ancestor's box before comparing — not a yes/no "is it visible" check, a real geometric clip, since a row can be half-clipped and the visible half still matters.
+2. The 44px rule itself was mis-encoded as "both dimensions ≥44" when the project's own documented rule (`DESIGN-SYSTEM.md` section 9) is "at least 44px in **one** direction" — a wide chip or a tall narrow tab is fine. The stricter version flagged 8 controls that were working exactly as designed (the chip touch-area technique at `tools.css:696-712`, the Notes/To-do segmented tabs).
+
+### Block B — The design reset *(see §7 for the thinking)* — **B1, B2 done 2026-11-04**
+
+| # | Item | Size | Status |
+|---|---|---|---|
+| B1 | Write the **three-tier hierarchy rule** into `DESIGN-SYSTEM.md` ("Three tiers on a screen", after the Section-colour rules) and apply it to one screen as the reference | S | **Done** |
+| B2 | Rebuild **Budget home** to that rule: the hero figure bare (no card), Needs attention + Recent as hairline `.group`/`.row` lists (no tint), and the four navigation links (Spending summary, Bills, Add from bank messages, Categories and cards) collapsed from four separate tinted cards into one `.navrow`/`tap-row` list under "More in Budget" — the exact pattern `ManageScreen.tsx` already used, reused rather than invented | M | **Done**, verified in browser + `npm run check` (2529 pass) + `layout-contract`/`answerbar`/`budget`/`qa-budget-new` e2e (zero regressions — confirmed by diffing the failure list against the pre-change commit, byte-identical except one test now passing, see below) |
+| B3 | Demote the post-"=" actions (To list / Remind me / Add expense) from equal chips to a quiet icon row | S | Not started |
+| B4 | Replace tinted section cards with hairline groups on Tools, Notes | M | Not started |
+| B5 | Apply the B2 pattern to Notes, Due, Tools home screens | M | Not started |
+
+**One real pre-existing bug found and fixed in passing (B2's verification, not B2 itself):** `e2e/qa-budget-new.test.mjs`'s `toBills`/`toSummary` navigation helpers were pinned to `button.tap-row` — but Budget's empty state (zero expenses ever logged) renders the same navigation as `.link-btn`, not `.tap-row`. Any test that seeded an empty budget and then tried to reach Bills or Spending Summary timed out. Fixed by matching on accessible name (`getByRole`) instead of a CSS class, the same way `toManage` already did it correctly. This was failing identically before any of today's redesign work (verified with `git stash`) — not a regression, a pre-existing gap this session happened to touch. Fixed `toBills`'s case (B-206, now passing); `toSummary` from a **fully** empty budget still fails (B-401's second half) because the empty state has no "Spending summary" link at all — there is genuinely nowhere to send that click, which is a real product question (should an empty month still offer a — necessarily empty — Spending Summary?), not a selector bug. Left open, noted here rather than silently worked around.
 
 ### Block C — Notes becomes a real Notes tab
 

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { EmptyState } from '../../components/EmptyState'
 import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
-import { tintStyle } from '../../components/tint'
 import { useBackHandler } from '../../components/useBackHandler'
 import { limitState, monthKey, monthLabel, monthShortLabel, needsAttention, paceLeft, summarise } from '../../lib/budget'
 import { billTotals, liveBills } from '../../lib/recurring'
@@ -114,33 +113,35 @@ export function BudgetScreen() {
       )}
 
       {tour.row}
-      <div className="tools__list sections">
-        <section className="sect" style={tintStyle(3)} aria-label="Summary">
-          <div className="budget__sum">
-            <span className="result__label">{`${s.overall ? 'Left' : 'Spent'} ${month === monthKey(new Date()) ? 'this month' : `in ${monthLabel(month)}`}`}</span>
-            <span className="budget__hero">{money(over ? heroValue.abs() : heroValue)}</span>
-            {s.overall ? (
-              <>
-                <Bar pct={s.overall.pct} />
-                <span className={over ? 'budget__note budget__note--over' : 'budget__note'}>
-                  {over ? `Over by ${money(s.overall.left.abs())}` : `${money(s.spent)} spent of ${money(s.overall.limit)}`}
-                </span>
-                {s.overall.scope === 'month' && <span className="budget__note">Limit for {monthShortLabel(month)} only</span>}
-                {pace && paceDay && <span className="budget__note">About {money(paceDay.gt(0) ? paceDay : pace.perDay)} a day for the next {pace.days} {pace.days === 1 ? 'day' : 'days'}</span>}
-              </>
-            ) : null}
-            <button type="button" className="link-btn budget__link" onClick={() => setPage('manage')}>{s.overall ? 'Change limits' : 'Set a monthly limit'}</button>
-          </div>
-        </section>
+      <div className="tools__list">
+        {/* Tier 1, the answer: the one figure this screen exists to show. No card, no tint -- see
+            docs/THE-PLAN.md section 7. */}
+        <div className="budget__sum">
+          <span className="result__label">{`${s.overall ? 'Left' : 'Spent'} ${month === monthKey(new Date()) ? 'this month' : `in ${monthLabel(month)}`}`}</span>
+          <span className="budget__hero">{money(over ? heroValue.abs() : heroValue)}</span>
+          {s.overall ? (
+            <>
+              <Bar pct={s.overall.pct} />
+              <span className={over ? 'budget__note budget__note--over' : 'budget__note'}>
+                {over ? `Over by ${money(s.overall.left.abs())}` : `${money(s.spent)} spent of ${money(s.overall.limit)}`}
+              </span>
+              {s.overall.scope === 'month' && <span className="budget__note">Limit for {monthShortLabel(month)} only</span>}
+              {pace && paceDay && <span className="budget__note">About {money(paceDay.gt(0) ? paceDay : pace.perDay)} a day for the next {pace.days} {pace.days === 1 ? 'day' : 'days'}</span>}
+            </>
+          ) : null}
+          <button type="button" className="link-btn budget__link" onClick={() => setPage('manage')}>{s.overall ? 'Change limits' : 'Set a monthly limit'}</button>
+        </div>
 
         <div className="budget__add">
           <button type="button" className="btn btn--primary" onClick={() => setSheet({ id: null })}>Add expense</button>
         </div>
 
+        {/* Tier 2, content: hairline rows, no card. Needs attention only shows when there is something
+            to act on, so it never competes with Recent for the top of the list when empty. */}
         {attention.length > 0 && (
-          <section className="sect" style={tintStyle(4)} aria-label="Needs attention">
-            <h2 className="sect__head"><span>Needs attention</span></h2>
-            <div className="sect__body">
+          <>
+            <h2 className="group__title">Needs attention</h2>
+            <div className="group">
               {attention.map((a) => (
                 <button key={a.id} type="button" className="budget__row tap-row" aria-label={`${a.name}: ${limitWords(a.state, a.left, a.limit, money)}. Show its entries`} onClick={() => goSummary('entries', a.id)}>
                   <span className="row__label">{a.name}</span>
@@ -149,57 +150,62 @@ export function BudgetScreen() {
                 </button>
               ))}
             </div>
-          </section>
+          </>
         )}
 
-        <section className="sect" style={tintStyle(5)} aria-label="Spending summary">
-          <button type="button" className="budget__row tap-row" onClick={() => goSummary('summary')}>
-            <span className="row__label">Spending summary</span>
-            <Icon name="chevron" size={18} className="tap-row__chev" />
-            <span className="budget__note">
-              {s.entries.length === 0
-                ? `Nothing spent in ${monthLabel(month)}`
-                : `Biggest: ${biggest ? `${biggest.name} ${money(biggest.spent)}` : `Uncategorised ${money(s.uncategorised)}`} · ${entriesWord(s.entries.length)}`}
+        <h2 className="group__title">Recent</h2>
+        <div className="group" aria-label="Recent">
+          {recent.length === 0 && <p className="budget__none">Nothing spent in {monthLabel(month)}. Tap Add expense to add the first.</p>}
+          {recent.map((e) => <EntryRow key={e.id} e={e} onEdit={(id) => setSheet({ id })} />)}
+        </div>
+        {s.entries.length > 0 && (
+          <button type="button" className="link-btn spend__link" onClick={() => goSummary('entries')}>
+            All entries ({s.entries.length})
+          </button>
+        )}
+
+        {/* Tier 3, navigation: four destinations that were four separate tinted cards, each carrying the
+            same visual weight as the content above -- collapsed into one quiet list. Reuses .navrow, the
+            same pattern Manage already uses for its own navigation. */}
+        <h2 className="group__title">More in Budget</h2>
+        <div className="group">
+          <button type="button" className="navrow tap-row" onClick={() => goSummary('summary')}>
+            <span className="row__text">
+              <span className="row__label">Spending summary</span>
+              <span className="row__hint">
+                {s.entries.length === 0
+                  ? `Nothing spent in ${monthLabel(month)}`
+                  : `Biggest: ${biggest ? `${biggest.name} ${money(biggest.spent)}` : `Uncategorised ${money(s.uncategorised)}`} · ${entriesWord(s.entries.length)}`}
+              </span>
             </span>
+            <Icon name="chevron" size={18} className="navrow__chev" />
           </button>
-        </section>
-
-        <section className="sect" style={tintStyle(4)} aria-label="Recent">
-          <h2 className="sect__head"><span>Recent</span></h2>
-          <div className="sect__body">
-            {recent.length === 0 && <p className="budget__none">Nothing spent in {monthLabel(month)}. Tap Add expense to add the first.</p>}
-            {recent.map((e) => <EntryRow key={e.id} e={e} onEdit={(id) => setSheet({ id })} />)}
-            {s.entries.length > 0 && <button type="button" className="link-btn spend__link" onClick={() => goSummary('entries')}>All entries ({s.entries.length})</button>}
-          </div>
-        </section>
-
-        <section className="sect" style={tintStyle(7)} aria-label="Bills and subscriptions">
-          <button type="button" className="budget__row tap-row" onClick={() => setPage('bills')}>
-            <span className="row__label">Bills and subscriptions</span>
-            <Icon name="chevron" size={18} className="tap-row__chev" />
-            <span className="budget__note">
-              {bills.count > 0
-                ? `${bills.count} running · about ${money(bills.perMonth)} a month = ${money(bills.perYear)} a year`
-                : 'Rent, Netflix, insurance. See what they cost a year and get reminded.'}
+          <button type="button" className="navrow tap-row" onClick={() => setPage('bills')}>
+            <span className="row__text">
+              <span className="row__label">Bills and subscriptions</span>
+              <span className="row__hint">
+                {bills.count > 0
+                  ? `${bills.count} running · about ${money(bills.perMonth)} a month = ${money(bills.perYear)} a year`
+                  : 'Rent, Netflix, insurance. See what they cost a year and get reminded.'}
+              </span>
             </span>
+            <Icon name="chevron" size={18} className="navrow__chev" />
           </button>
-        </section>
-
-        <section className="sect" style={tintStyle(7)} aria-label="Add from messages">
-          <button type="button" className="budget__row tap-row" onClick={() => setPage('import')}>
-            <span className="row__label">Add from bank messages</span>
-            <Icon name="chevron" size={18} className="tap-row__chev" />
-            <span className="budget__note">Finds payments in your bank texts, on this phone. You pick what to add.</span>
+          <button type="button" className="navrow tap-row" onClick={() => setPage('import')}>
+            <span className="row__text">
+              <span className="row__label">Add from bank messages</span>
+              <span className="row__hint">Finds payments in your bank texts, on this phone. You pick what to add.</span>
+            </span>
+            <Icon name="chevron" size={18} className="navrow__chev" />
           </button>
-        </section>
-
-        <section className="sect" style={tintStyle(7)} aria-label="Categories and cards">
-          <button type="button" className="budget__row tap-row" onClick={() => setPage('manage')}>
-            <span className="row__label">Categories and cards</span>
-            <Icon name="chevron" size={18} className="tap-row__chev" />
-            <span className="budget__note">Limits, subcategories, months, cards and accounts</span>
+          <button type="button" className="navrow tap-row" onClick={() => setPage('manage')}>
+            <span className="row__text">
+              <span className="row__label">Categories and cards</span>
+              <span className="row__hint">Limits, subcategories, months, cards and accounts</span>
+            </span>
+            <Icon name="chevron" size={18} className="navrow__chev" />
           </button>
-        </section>
+        </div>
       </div>
     </div>
     {/* sheets and pages sit at the same place in the tree as in the empty-state return above, so adding the first

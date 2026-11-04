@@ -1,5 +1,41 @@
 # Session state: resume here
 
+## Round 11 (2026-11-04): Block A (trustworthy tests) and Block B1/B2 (Budget home redesign) done
+
+**Last prompt:** "sure lets start" (confirming Block A + B2 from `docs/THE-PLAN.md`).
+
+**Built:**
+- `.nvmrc` (22) + `engines` in `package.json` + `e2e/run-all.mjs` (`npm run e2e` / `npm run e2e:fast`) —
+  checks the Node version itself first, with the fix in the error message.
+- `e2e/layout-contract.test.mjs` — every tab x 3 widths x 2 font scales x seeded long content. **144/144
+  passing.** Caught and fixed two bugs in the TEST ITSELF while building it (both documented at length
+  in `docs/THE-PLAN.md` Block A): `getBoundingClientRect()` ignoring scroll-clipping caused false
+  "overlap with the tab bar" reports; the 44px rule was wrongly encoded as "both dimensions" when the
+  project's own rule (`DESIGN-SYSTEM.md` section 9) is "one direction".
+- Budget home rebuilt per a new "three tiers" design rule (`DESIGN-SYSTEM.md`, new section after Section
+  colours): the hero figure is now bare (no card), Needs attention + Recent are hairline lists (no tint),
+  and 4 separate tinted navigation cards (Spending summary / Bills / Add from bank messages / Categories
+  and cards) collapsed into one `.navrow` list under "More in Budget" — reusing the exact pattern
+  `ManageScreen.tsx` already had, not inventing a new one.
+- Fixed a real pre-existing bug found while verifying B2: `qa-budget-new.test.mjs`'s `toBills`/`toSummary`
+  helpers were pinned to `.tap-row`, which Budget's EMPTY state doesn't use (it uses `.link-btn`) — fixed
+  by matching on accessible name instead. Confirmed pre-existing with `git stash` before fixing (not
+  something this session's edits caused).
+
+**Verified, zero regressions:** `npm run check` (2529 pass, 16 skipped) + `answerbar`/`layout-contract` e2e
+(both 100%) + `budget.test.mjs`/`qa-budget-new.test.mjs` failure lists diffed against the pre-change commit
+— identical except one test (B-206) now passing. Visually confirmed in the browser against real seeded
+Budget data (12 expenses, categories, a card): bare hero, hairline Recent list, collapsed nav list, no
+console errors.
+
+**Still open (not this round):** B-401 (Spending Summary unreachable from a *fully* empty budget — no
+such link exists in the empty state; a real product question, not a selector bug) and B-212 (a stopped
+bill possibly leaving a ghost reminder) — both pre-existing, found while verifying, out of scope to chase
+further right now. B3/B4/B5 (demote post-"=" chips, apply the three-tier rule to Notes/Due/Tools) not
+started. The `ink-3` contrast decision from Round 10 is still open.
+
+**Not committed, not pushed yet when this was written** — commit and push next.
+
 ## Round 10 (2026-11-04): all plans consolidated into `docs/THE-PLAN.md`
 
 **`docs/THE-PLAN.md` is now the single plan.** It replaces MASTER-ROADMAP, ROADMAP, BACKLOG,

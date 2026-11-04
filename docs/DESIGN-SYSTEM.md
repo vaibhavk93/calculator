@@ -216,6 +216,62 @@ Constraints, all asserted in `theme.test.ts`:
 3. **Never colour alone.** Every section has a title and a count, so the colour only helps; remove it and the structure stays.
 4. **One level of card.** A section card holds rows, not cards. Result and schedule rows are plain rows, never nested cards.
 
+### Three tiers on a screen
+
+**Added 2026-11-04**, after the owner named Budget, Notes, Due and Tools as "bulky" and "a lot of list,
+a lot of card" next to a calculator that already reads clearly. The calculator earns that clarity from a
+hierarchy it never breaks: the number is huge and bare, the expression is quiet, the keys are uniform.
+The rest of the app had flattened that hierarchy — stacking 5 to 7 tinted cards of equal visual weight,
+so nothing on the page told the eye where to look first.
+
+A screen's content is one of three tiers. Decide the tier before deciding the container:
+
+| Tier | What it is | How it looks |
+|---|---|---|
+| **1 — The answer** | The one number or fact the screen exists to show (Budget's "Spent this month", a calculator's result) | Large, Plex Mono, **no card, no tint, no border** |
+| **2 — Content** | Entries, rows, results that belong to this screen right now (a list of expenses, "Needs attention") | Hairline-separated rows (`.group` / `.row`, or a content-specific row class). **No tint** |
+| **3 — Actions and navigation** | Links to somewhere else, or quiet post-result actions (Copy, Share, "see all") | Quiet: icon with a word, or a single collapsed `.navrow` list. Never the same weight as tier 1 |
+
+**This refines, it does not replace, "Where a tint may appear" above.** A tint still marks a *group page's*
+own section cards (Tools home tiles, a calculator's input card) — those are a single destination you
+chose to open, so one tinted card for it is correct. What changes is a **root tab's home screen**
+(Budget, and — not yet done, see `docs/THE-PLAN.md` Block B5 — Notes, Due, Tools): several *navigation
+links to other screens*, stacked as separate tinted cards, read as equally important destinations when
+they are not. Collapse them into one tier-3 list instead.
+
+**Worked example — Budget home**, the reference screen this was first applied to:
+
+```
+BEFORE: 7 stacked tinted cards, equal weight      AFTER: three tiers, one screen
+┌─────────────────────────┐                       Spent this month
+│ Summary (tint 3)        │                       ₹42,310                    <- tier 1, bare
+└─────────────────────────┘                       [ Add expense ]
+┌─────────────────────────┐
+│ Needs attention (tint 4)│                        Needs attention
+└─────────────────────────┘                        Food  Over by ₹500        <- tier 2, hairline
+┌─────────────────────────┐                        Recent
+│ Spending summary (t 5)  │                        ₹500  Food · 2 Nov        <- tier 2, hairline
+└─────────────────────────┘
+┌─────────────────────────┐                        More in Budget
+│ Recent (tint 4)         │                        Spending summary      >   <- tier 3, one
+└─────────────────────────┘                        Bills and subscriptions > list, quiet
+┌─────────────────────────┐                        Add from bank messages >
+│ Bills (tint 7)          │                        Categories and cards  >
+└─────────────────────────┘
+┌─────────────────────────┐
+│ Add from messages (t 7) │
+└─────────────────────────┘
+┌─────────────────────────┐
+│ Categories, cards (t 7) │
+└─────────────────────────┘
+```
+
+Four separate navigation cards (Spending summary, Bills, Add from bank messages, Categories and cards)
+became one `.group` of `.navrow.tap-row` rows — the exact pattern `ManageScreen.tsx` already used for its
+own sub-navigation, reused rather than invented. "Needs attention" and "Recent" kept their row-level
+content (`.budget__row`, `.budget__entry`) but lost their tinted wrapper; a `.group > .budget__row:last-child`
+rule closes the list with a hairline the same way `.group > .row:last-child` always has.
+
 ---
 
 ## 4. Typography
