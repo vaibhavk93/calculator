@@ -114,6 +114,9 @@ export function HistoryRowSheet({ id, onClose }: { id: string; onClose: () => vo
     )
   }
 
+  // "Copy as" takes the menu's place instead of stacking on it.
+  if (copySheet) return <>{copySheet}</>
+
   return (
     <>
       <Sheet
@@ -155,7 +158,6 @@ export function HistoryRowSheet({ id, onClose }: { id: string; onClose: () => vo
           />
         </div>
       </Sheet>
-      {copySheet}
     </>
   )
 }

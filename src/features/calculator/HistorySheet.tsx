@@ -46,6 +46,9 @@ export function HistorySheet() {
     setDraft('')
   }
 
+  // One sheet at a time (docs/FORMS-AND-SHEETS.md): the row menu takes this sheet's place, X returns here.
+  if (rowId) return <HistoryRowSheet id={rowId} onClose={() => setRowId(null)} />
+
   return (
     <Sheet
       title="History"
@@ -192,7 +195,6 @@ export function HistorySheet() {
         </ul>
         </>
       )}
-      {rowId ? <HistoryRowSheet id={rowId} onClose={() => setRowId(null)} /> : null}
     </Sheet>
   )
 }
