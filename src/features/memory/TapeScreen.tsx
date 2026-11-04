@@ -23,6 +23,7 @@ export function TapeScreen({ card, onBack }: { card?: SavedCard; onBack: () => v
   const deleteCard = useApp((s) => s.deleteCard)
   const showNotice = useApp((s) => s.showNotice)
   const toggleLine = useApp((s) => s.toggleLine)
+  const removeLine = useApp((s) => s.removeLine)
   const setChecklist = useApp((s) => s.setChecklist)
   useBackHandler(true, onBack)
 
@@ -195,7 +196,7 @@ export function TapeScreen({ card, onBack }: { card?: SavedCard; onBack: () => v
                 >
                   <span className="result__value">{money(l.value)}</span>
                 </button>
-                <button type="button" className="icon-btn" aria-label={`Remove ${name}`} onClick={() => persist(lines.filter((x) => x.id !== l.id))}>
+                <button type="button" className="icon-btn" aria-label={`Remove ${name}`} onClick={() => (id ? removeLine(id, l.id) : persist(lines.filter((x) => x.id !== l.id)))}>
                   <Icon name="close" size={18} />
                 </button>
               </li>

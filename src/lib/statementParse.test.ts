@@ -59,14 +59,17 @@ describe('buildStatementCandidates', () => {
     expect(buildStatementCandidates('a,b\n1,2', starterBudget(), null, none)).toMatchObject({ ok: false })
     expect(findColumns([['x']])).toBeNull()
   })
-  it('does not offer a row twice or one already handled, and flags one already in the budget', () => {
+  it('keeps two identical rows (two real payments), each with its own stable id; one already handled is not offered again', () => {
+    // QA B-112 (2026-11-03): this used to expect ONE row, which silently lost the second of two identical purchases on a day.
     const csv = 'Date,Narration,Debit\n02/11/2026,SWIGGY,450.00\n02/11/2026,SWIGGY,450.00'
     const once = buildStatementCandidates(csv, starterBudget(), null, none)
     if (!once.ok) throw new Error(once.message)
-    expect(once.result.found).toHaveLength(1)
+    expect(once.result.found).toHaveLength(2)
+    expect(new Set(once.result.found.map((c) => c.id)).size).toBe(2)
     const again = buildStatementCandidates(csv, { ...starterBudget(), smsSeen: [once.result.found[0]!.id] }, null, none)
     if (!again.ok) throw new Error(again.message)
-    expect(again.result.found).toHaveLength(0)
+    expect(again.result.found).toHaveLength(1)
+    expect(again.result.found[0]!.id).toBe(once.result.found[1]!.id)
     const b = { ...starterBudget(), expenses: [{ id: 'e', date: '2026-11-02', amount: '450.00', categoryId: null, mode: null, instrumentId: null, note: 'Swiggy', deletedAt: null }] }
     const dup = buildStatementCandidates(csv, b, null, none)
     if (!dup.ok) throw new Error(dup.message)

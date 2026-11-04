@@ -67,6 +67,7 @@ export function BudgetScreen() {
   if (never && s.entries.length === 0) {
     return (
       <>
+        <>
         {tour.row}
         <EmptyState
           title="No spending yet"
@@ -83,6 +84,7 @@ export function BudgetScreen() {
         >
           Add what you spend, one entry at a time. Set a monthly limit and this page shows what is left. It all stays on this phone.
         </EmptyState>
+        </>
         {sheets}
         {pages}
         {tour.sheet}

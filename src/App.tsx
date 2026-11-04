@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { SnackBar } from './components/SnackBar'
 import { useApp, useAppStore } from './components/StoreProvider'
 import { TabBar } from './components/TabBar'
@@ -167,6 +168,7 @@ export function App() {
   useHardwareBack()
   const tab = useApp((s) => s.tab)
   const overlay = useApp((s) => s.overlay)
+  const store = useAppStore()
 
   // While a sheet or the settings screen is open, the page behind it is out of reach
   // of the keyboard and of screen readers.
@@ -174,20 +176,22 @@ export function App() {
 
   return (
     <div className="app">
-      <main className="app__body" {...behind}>
-        {tab === 'calculate' && <CalculatorScreen />}
-        {tab === 'tools' && <ToolsScreen />}
-        {tab === 'saved' && <SavedScreen />}
-        {tab === 'due' && <DueScreen />}
-        {tab === 'budget' && <BudgetScreen />}
-      </main>
+      <ErrorBoundary resetKey={tab} onHome={() => { store.getState().setOverlay('none'); store.getState().setTab('calculate') }}>
+        <main className="app__body" {...behind}>
+          {tab === 'calculate' && <CalculatorScreen />}
+          {tab === 'tools' && <ToolsScreen />}
+          {tab === 'saved' && <SavedScreen />}
+          {tab === 'due' && <DueScreen />}
+          {tab === 'budget' && <BudgetScreen />}
+        </main>
+
+        {overlay === 'history' && <HistorySheet />}
+        {overlay === 'settings' && <SettingsScreen />}
+      </ErrorBoundary>
 
       <div className="app__nav" {...behind}>
         <TabBar />
       </div>
-
-      {overlay === 'history' && <HistorySheet />}
-      {overlay === 'settings' && <SettingsScreen />}
       <SnackBar />
     </div>
   )

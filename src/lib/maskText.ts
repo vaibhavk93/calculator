@@ -31,7 +31,7 @@ const at = (salt: string, token: string, i: number) => keyedHash(salt, `${token}
 /** Digits -> other digits, everything else kept. A leading non-zero digit stays non-zero so lengths look natural. */
 export function fakeNumber(token: string, salt: string): string {
   let first = true
-  return token.replace(/\d/g, (d, i: number) => {
+  return token.replace(/\p{Nd}/gu, (d, i: number) => {
     let n = at(salt, token, i) % 10
     if (first && d !== '0' && n === 0) n = 1
     first = false
@@ -41,7 +41,8 @@ export function fakeNumber(token: string, salt: string): string {
 
 /** Letters -> other letters of the same case, everything else kept. */
 export function fakeWord(token: string, salt: string): string {
-  return token.replace(/[A-Za-z]/g, (c, i: number) => {
+  // Any script (Devanagari, accented Latin...) becomes plain a-z. Combining marks vanish so the length stays about the same.
+  return token.replace(/\p{M}/gu, '').replace(/\p{L}/gu, (c, i: number) => {
     const n = at(salt, token, i) % 26
     return String.fromCharCode((c === c.toUpperCase() ? 65 : 97) + n)
   })
@@ -79,7 +80,9 @@ jan feb mar apr may jun jul aug sep oct nov dec
 export function maskText(body: string, salt: string): string {
   const kept: string[] = []
   const hold = (s: string) => String.fromCharCode(HELD_BASE + kept.push(s) - 1)
-  let t = body.replace(/\s+/g, ' ').trim()
+  // The log keeps 400 characters, so there is no reason to scan more: the UPI-handle pattern below is quadratic on a very long
+  // unbroken run of letters (a 100,000-character text took over a minute).
+  let t = body.slice(0, 1200).replace(/\s+/g, ' ').trim()
 
   t = t.replace(/https?:\/\/\S+|www\.\S+/gi, () => hold('<link>'))
   // dates first, so their digits are not masked as plain numbers
@@ -88,9 +91,9 @@ export function maskText(body: string, salt: string): string {
   t = t.replace(/([\w.\-]{2,})@([\w.]+)/g, (_m, local: string, host: string) => hold(`${fakeNumber(fakeWord(local, salt), salt)}@${host}`))
   // words: only a fixed list of structure words (debited, A/c, Ref, bank names...) survive. Every other word, which
   // could be a name, a payee, a fund, an address, is swapped letter for letter. Strings of x or * (hidden digits) stay.
-  t = t.replace(/[A-Za-z]+/g, (w) => (w.length <= 1 || /^[xX]+$/.test(w) || KEEP.has(w.toLowerCase()) ? w : fakeWord(w, salt)))
-  // all remaining numbers
-  t = t.replace(/\d[\d,]*(?:\.\d+)?/g, (m) => hold(fakeNumber(m, salt)))
+  t = t.replace(/[\p{L}\p{M}]+/gu, (w) => (w.length <= 1 && /[A-Za-z]/.test(w) ? w : /^[xX]+$/.test(w) || KEEP.has(w.toLowerCase()) ? w : fakeWord(w, salt)))
+  // all remaining numbers (any script's digits)
+  t = t.replace(/\p{Nd}[\p{Nd},]*(?:\.\p{Nd}+)?/gu, (m) => hold(fakeNumber(m, salt)))
   return t.replace(new RegExp(HELD, 'g'), (c) => kept[c.charCodeAt(0) - HELD_BASE] ?? '').slice(0, 400)
 }
 

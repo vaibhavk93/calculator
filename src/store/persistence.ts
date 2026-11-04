@@ -175,7 +175,8 @@ function sanitizeValues(raw: unknown): Values | null {
   if (!isObject(raw)) return null
   const out: Values = {}
   for (const [k, v] of Object.entries(raw).slice(0, 60)) {
-    if (k.length > 64) continue
+    // "__proto__" as a key would swap the prototype of `out` for the value (QA-F2).
+    if (k.length > 64 || k === '__proto__') continue
     if (typeof v === 'string') out[k] = v.slice(0, 200)
     else if (Array.isArray(v))
       out[k] = v.slice(0, 50).map((row) => (Array.isArray(row) ? row.slice(0, 8).map((c) => str(c, 200)) : []))
@@ -503,7 +504,10 @@ export async function loadChecked(storage: KeyValueStorage): Promise<Loaded> {
   }
   if (text === null) return { data: defaultPersisted(), failed: 'none' }
   try {
-    return { data: migrate(JSON.parse(text)), failed: 'none' }
+    const json: unknown = JSON.parse(text)
+    // Valid JSON that is not an object (null, [], 42, "x") is not our file: treat it like a damaged one so a copy is kept (QA-F4).
+    if (!isObject(json)) throw new Error('not an object')
+    return { data: migrate(json), failed: 'none' }
   } catch {
     try {
       await storage.set(BAD_KEY, text)

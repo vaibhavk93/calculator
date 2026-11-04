@@ -61,11 +61,12 @@ import {
   type Reminder,
   type Repeat,
   type SavedCard,
+  type TapeLine,
   type Settings,
   type Tab,
   type BudgetData,
 } from './types'
-import { advance, advanceTaxPack, atTime } from '../lib/reminders'
+import { addDaysAt, advance, advanceTaxPack, atTime } from '../lib/reminders'
 import { billForCard, cardBillDue, cardBillFor, firstDue, liveBills, rollForward, validateBill } from '../lib/recurring'
 import { isTaskDone, nextOccurrence, parseDay, shortDate, taskSummary } from '../lib/tasks'
 import { lineState, listSummary, nextLineState, repeatLines, tapeTotal, withLineState } from '../lib/tape'
@@ -250,6 +251,8 @@ export interface AppState {
   addToList: (target: { cardId: string } | { title: string }, value: string, count?: number, label?: string, checklist?: boolean) => string | null
   /** Ticks or unticks one line of a list. */
   toggleLine: (cardId: string, lineId: string) => void
+  /** Takes one line out of a list. Offers Undo, which puts it back where it was. */
+  removeLine: (cardId: string, lineId: string) => void
   togglePin: (id: string) => void
   deleteCard: (id: string) => void
   restoreCard: (id: string) => void
@@ -1056,6 +1059,23 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         set({ cards: cards.map((c) => (c.id === cardId ? { ...c, lines, summary: listSummary(lines, !!c.checklist, opts), updatedAt: deps.now() } : c)) })
       },
 
+      removeLine: (cardId, lineId) => {
+        const card = get().cards.find((c) => c.id === cardId && c.deletedAt === null)
+        const index = card ? card.lines.findIndex((l) => l.id === lineId) : -1
+        if (!card || index < 0) return
+        const line = card.lines[index]!
+        const { settings } = get()
+        const opts = { system: settings.numberSystem, decimals: settings.decimals }
+        const setLines = (lines: TapeLine[]) =>
+          set({ cards: get().cards.map((c) => (c.id === cardId ? { ...c, lines, amount: toPlain(tapeTotal(lines)), summary: listSummary(lines, !!c.checklist, opts), updatedAt: deps.now() } : c)) })
+        setLines(card.lines.filter((l) => l.id !== lineId))
+        undoable(`Removed "${line.label || 'line'}" from the list`, () => {
+          const cur = get().cards.find((c) => c.id === cardId)
+          if (!cur || cur.lines.some((l) => l.id === lineId)) return
+          setLines([...cur.lines.slice(0, index), line, ...cur.lines.slice(index)])
+        })
+      },
+
       togglePin: (id) => {
         const { cards } = get()
         const card = cards.find((c) => c.id === id)
@@ -1076,7 +1096,16 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         undoable(`Moved "${card.title}" to Trash`, () => get().restoreCard(id))
       },
 
-      restoreCard: (id) => set({ cards: get().cards.map((c) => (c.id === id ? { ...c, deletedAt: null } : c)) }),
+      restoreCard: (id) => {
+        const { cards } = get()
+        if (!cards.some((c) => c.id === id && c.deletedAt !== null)) return
+        // Restoring is saving again: past the cap the extra card would be dropped, unseen, the next time the app opens (QA N-140).
+        if (cards.filter((c) => c.deletedAt === null).length >= MAX_CARDS) {
+          const text = `You can keep up to ${MAX_CARDS} notes and tasks. Delete some first.`
+          return set({ notice: { id: nextId(), text, tone: 'error' }, snack: { id: nextId(), text, canUndo: false } })
+        }
+        set({ cards: cards.map((c) => (c.id === id ? { ...c, deletedAt: null } : c)) })
+      },
 
       emptyTrash: () => {
         const cards = get().cards.filter((c) => c.deletedAt === null)
@@ -1087,22 +1116,24 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       markPaid: (reminderId) => {
         const r = get().reminders.find((x) => x.id === reminderId)
         if (!r) return
-        const amount = get().cards.find((c) => c.id === r.cardId)?.amount ?? null
-        const next = advance(r, deps.now())
+        const card = get().cards.find((c) => c.id === r.cardId)
+        const amount = card?.amount ?? null
+        // A plain task caught up late jumps to its next FUTURE date, as ticking it in To-do does (QA N-125). A bill pays each period in turn.
+        const next = card?.kind === 'task' && !billForCard(get().budget, r.cardId) ? nextOccurrence(r, deps.now()) : advance(r, deps.now())
         const paid = { ...r, history: [...r.history, { paidAt: deps.now(), amount }].slice(-200) }
         // A bill that repeats also puts this period's payment in the budget (once), and Undo takes both back.
         const added = settleBill(r)
         set({ reminders: get().reminders.map((x) => (x.id === reminderId ? (next === null ? { ...paid, done: true } : { ...paid, dueAt: next }) : x)) })
-        if (added) {
-          undoable('Paid. Added to your budget', () => {
-            dropExpense(added)
-            set({ reminders: get().reminders.map((x) => (x.id === reminderId ? r : x)) })
-          })
-        }
+        // A wrong tap on Mark paid takes a reminder out of Due, so it always offers Undo (QA N-133).
+        undoable(added ? 'Paid. Added to your budget' : card ? `${card.kind === 'task' ? 'Done' : 'Marked paid'}: "${card.title}"` : 'Marked paid', () => {
+          if (added) dropExpense(added)
+          set({ reminders: get().reminders.map((x) => (x.id === reminderId ? r : x)) })
+        })
       },
 
+      // Calendar days, so a daylight-saving change cannot move the time of day (QA N-112).
       snooze: (reminderId, days) =>
-        set({ reminders: get().reminders.map((r) => (r.id === reminderId ? { ...r, dueAt: Math.max(r.dueAt, deps.now()) + days * DAY } : r)) }),
+        set({ reminders: get().reminders.map((r) => (r.id === reminderId ? { ...r, dueAt: addDaysAt(Math.max(r.dueAt, deps.now()), days, Math.max(r.dueAt, deps.now())) } : r)) }),
 
       removeReminder: (reminderId) => {
         const r = get().reminders.find((x) => x.id === reminderId)

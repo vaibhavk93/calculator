@@ -77,56 +77,71 @@
   text-overflow: ellipsis;
 }
 
-/* The answer follows you down a long form as a button at the bottom edge, so it can never be mistaken for a heading. */
+/* The answer follows you down a long form as a button at the bottom edge, so it can never be mistaken for a heading.
+   A grid, not wrapping flex: the label and value stack in column 1 and the arrow holds column 2, so the arrow can
+   never be pushed onto a line of its own. That also makes the bar's height predictable, which is what
+   .tool--answerbar below reserves. */
 .answer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s-1) var(--s-4);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0 var(--s-3);
   width: 100%;
   min-height: 44px;
   padding: var(--s-2) var(--s-4);
   background: var(--raised);
-  border: 1px solid var(--ink-3);
+  /* Accent border and arrow: in this app accent means "you can act on this", which is exactly what
+     this is — a button that takes you back to the answer. Without it the bar reads as a stray result row. */
+  border: 1px solid var(--accent);
   border-radius: var(--r-md);
   text-align: left;
   color: var(--ink);
 }
 
-/* The anchor takes no room. It sticks to the bottom edge of the page only while the real answer is scrolled away. */
+/* The bar sticks to the bottom edge while the real answer is scrolled away, and comes to rest at the end of the
+   page once you reach it.
+   The bar sits in NORMAL FLOW inside this sticky anchor, so the anchor is as tall as the bar. It used to be
+   `height: 0` with the bar absolutely positioned, which made the bar cover the last thing on the page — the
+   Copy / Share / Add to a list / Remind me row. Padding on the scrolling box does not fix that: a sticky element
+   is clamped to its parent's CONTENT box, so it cannot travel down into the padding. Real height is what gives
+   it room, and taking the height from the bar itself keeps it right at 200% font size. */
 .answer-anchor {
   position: sticky;
-  bottom: 0;
-  height: 0;
+  bottom: var(--s-3);
   z-index: 2;
+  margin: var(--s-3) var(--s-4) 0;
 }
 
-.answer-anchor > .answer {
-  position: absolute;
-  left: var(--s-4);
-  right: var(--s-4);
-  bottom: var(--s-3);
-  width: auto;
+/* No answer, no bar, no room taken. */
+.answer-anchor:empty {
+  margin: 0;
+}
+
+/* The answer is on screen, so the bar has nothing to say — but it keeps its space, so the page height
+   never changes as it comes and goes. `visibility` (not `display`) is what keeps the space. */
+.answer--idle {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .answer__icon {
+  grid-column: 2;
+  grid-row: 1 / 3;
   flex: none;
   color: var(--accent);
   align-self: center;
 }
 
 .answer__label {
-  flex: 1 1 8rem;
+  grid-column: 1;
   min-width: 0;
   font-size: 0.875rem;
   color: var(--ink-2);
 }
 
 .answer__value {
-  flex: 0 1 auto;
+  grid-column: 1;
   min-width: 0;
-  margin-left: auto;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 1.0625rem;
@@ -433,8 +448,15 @@
   min-width: 0;
 }
 
+/* The headline answer. The floating bar sends you here, so it has to be obvious which row it meant:
+   a weight of 500 on the number alone was not enough to pick it out of five similar rows. */
 .result__row--main .result__value {
-  font-weight: 500;
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+
+.result__row--main .result__label {
+  color: var(--ink);
 }
 
 .result__note,
@@ -674,6 +696,7 @@
 .chip {
   position: relative;
   min-height: 32px;
+  min-width: 44px; /* a short label such as "All" still has a 44px target (it was 41px wide) */
   padding: 0 var(--s-3);
   border: 1px solid var(--ink-3);
   border-radius: var(--r-md);

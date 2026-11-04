@@ -3,7 +3,7 @@ import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { tintStyle } from '../../components/tint'
 import { saveBackupFile } from '../../lib/backupFile'
-import { EXPORT_RANGES, buildExpensesCsv, expensesCsvFilename, type ExportRange } from '../../lib/csv'
+import { EXPORT_RANGES, buildExpensesCsv, expensesCsvFilename, exportEntries, type ExportRange } from '../../lib/csv'
 
 /**
  * "Export expenses": pick a date range, then save one CSV file (opens in Excel or Sheets). It goes the same way a backup
@@ -20,7 +20,7 @@ export function ExportSheet({ onClose }: { onClose: () => void }) {
   // Set while the first save asks whether to create the Calc folder. It takes the place of the form, not a second sheet.
   const [folderAsk, setFolderAsk] = useState<((ok: boolean) => void) | null>(null)
 
-  const count = (r: ExportRange) => buildExpensesCsv(store.getState().budget, r).split('\r\n').length - 2
+  const count = (r: ExportRange) => exportEntries(store.getState().budget, r).length
   const n = count(range)
 
   const exportNow = async () => {

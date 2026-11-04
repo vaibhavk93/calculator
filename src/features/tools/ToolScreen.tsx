@@ -414,6 +414,8 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
   const mainRef = useRef<HTMLDivElement>(null)
   // The floating answer bar shows only once the real answer has scrolled out of sight.
   const [mainSeen, setMainSeen] = useState(true)
+  // Which way the bar's arrow points: the answer is usually above, but it is below while the form is long.
+  const [mainAbove, setMainAbove] = useState(true)
   const showCard = useApp((s) => s.showCard)
   const showLinkSnack = useApp((s) => s.showLinkSnack)
   const toast = useApp((s) => s.toast)
@@ -529,12 +531,28 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
       })
     : ''
 
-  // Watch the main answer row; when it is not on screen, the answer bar floats over the top of the page.
+  // Watch the main answer row; when it is not on screen, the answer bar floats at the bottom edge.
+  //
+  // Two thresholds, not one. A single threshold makes the show point and the hide point the same
+  // pixel, so a 3px scroll (or one frame of momentum) flips the bar on and off repeatedly. Showing
+  // only below 5% and hiding only above 60% leaves a wide band where nothing changes.
   useEffect(() => {
     const target = mainRef.current
     const root = bodyRef.current
     if (!target || !root || typeof IntersectionObserver === 'undefined') return
-    const io = new IntersectionObserver(([entry]) => setMainSeen(entry?.isIntersecting ?? true), { root, threshold: 0.2 })
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry) return
+        // Which way to point: the answer is above when its top is past the top of the scrolling box.
+        // rootBounds is null in some browsers when the root is cross-origin; fall back to the live box.
+        const rootTop = entry.rootBounds?.top ?? root.getBoundingClientRect().top
+        setMainAbove(entry.boundingClientRect.top < rootTop)
+        if (entry.intersectionRatio >= 0.6) setMainSeen(true)
+        else if (entry.intersectionRatio <= 0.05) setMainSeen(false)
+        // In between: leave it as it is. That gap is the hysteresis.
+      },
+      { root, threshold: [0, 0.05, 0.6, 1] },
+    )
     io.observe(target)
     return () => io.disconnect()
   }, [ok, computed])
@@ -620,12 +638,17 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
         )}
 
         {/* Takes no room: while the answer above is out of sight, this button floats at the bottom edge. Tapping it scrolls back to the answer. */}
+        {/* The bar stays in the page whenever there is an answer, and only turns invisible — it is never removed.
+            Removing it changed the page's height, which meant that arriving at the bottom made the bar appear,
+            which made the page taller, which meant you were no longer at the bottom, so the bar stayed pinned
+            over the Copy / Share row. Keeping its space always reserved is what stops that. */}
         <div className="answer-anchor">
-          {ok && main && !mainSeen && (
-            <button type="button" className="answer" aria-label={`${main.label}: ${formatCell(main.value, main.fmt, opts)}. Show the result.`} onClick={() => mainRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
+          {ok && main && (
+            <button type="button" className={`answer${mainSeen ? ' answer--idle' : ''}`} aria-hidden={mainSeen || undefined} tabIndex={mainSeen ? -1 : undefined} aria-label={`${main.label}: ${formatCell(main.value, main.fmt, opts)}. Show the result.`} onClick={() => mainRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
               <span className="answer__label">{main.label}</span>
               <span className="answer__value">{formatCell(main.value, main.fmt, opts)}</span>
-              <Icon name="down" size={18} className="answer__icon" />
+              {/* Points at where the answer actually is, so the arrow never sends you the wrong way. */}
+              <Icon name={mainAbove ? 'up' : 'down'} size={18} className="answer__icon" />
             </button>
           )}
         </div>

@@ -95,7 +95,7 @@ export interface PastedList {
 }
 
 /** A list bullet, a number ("1." or "2)"), a box ("[ ]", "[x]", ☐, ☑, ✔) at the start of a line. */
-const BULLET = /^\s*(?:[-*•·▪◦–](?=\s)|\d{1,3}[.)](?=\s)|\[[ xX✓✔]?\]|[☐☑☒✔✓])\s*/
+const BULLET = /^\s*(?:[-*•·▪◦–](?=\s|$)|\d{1,3}[.)](?=\s)|\[[ xX✓✔]?\]|[☐☑☒✔✓])\s*/
 
 /**
  * Turns pasted text with several lines into list items: one per non-empty line. A line like "Flights 24000" keeps

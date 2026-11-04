@@ -250,14 +250,14 @@ T('A07', 'ERR', 'localStorage blocked entirely: app opens, settings still change
   const init = `Object.defineProperty(window,'localStorage',{get(){throw new DOMException('denied','SecurityError')}})`
   const { page, up } = await open(app, { empty: true, init })
   ok(up, 'app did not render')
-  await openSettings(page); await page.click('[role=radio][aria-label=Light]'); await settle(page, 100)
+  await openSettings(page); await page.click('[role=radio]:text-is("Light")'); await settle(page, 100)
   ok(await dataTheme(page) === 'light', 'theme did not change')
 })
 T('A08', 'ERR', 'known B-17: a failed save shows a warning', async (app) => {
   const init = `const o=Storage.prototype.setItem; Storage.prototype.setItem=function(k,v){ if(k==='vkcalc.data' && window.__failSave) throw new DOMException('full','QuotaExceededError'); return o.call(this,k,v) }`
   const { page } = await open(app, { empty: true, init })
   await page.evaluate(() => { window.__failSave = true })
-  await openSettings(page); await page.click('[role=radio][aria-label=Light]'); await settle(page, 600)
+  await openSettings(page); await page.click('[role=radio]:text-is("Light")'); await settle(page, 600)
   const t = await body(page)
   ok(/could(n't| not)|can't|not saved|failed|full|backup/i.test(t.replace(/Export a backup|Restore from a backup/g, '')), KNOWN('B-17', 'storage refused the save and the screen says nothing'))
 })
@@ -308,7 +308,7 @@ T('A15', 'CORNER', 'older schema fixture (v1: no cards, reminders or budget) ope
 })
 T('A16', 'RUNTIME', 'a changed setting and a typed expression survive a reload', async (app) => {
   const { page } = await open(app, { empty: true })
-  await openSettings(page); await page.click('[role=radio][aria-label=Light]'); await page.click('text=International'); await page.click('button.row--button >> text=Indian').catch(() => {})
+  await openSettings(page); await page.click('[role=radio]:text-is("Light")'); await page.click('text=International'); await page.click('button.row--button >> text=Indian').catch(() => {})
   await page.click('[role=radio]:has-text("International")'); await settle(page, 100)
   await page.click('[aria-label=Back]'); await settle(page, 100)
   await keys(page, '1', '2', 'Add'); await settle(page, 600)
@@ -319,7 +319,7 @@ T('A16', 'RUNTIME', 'a changed setting and a typed expression survive a reload',
 })
 T('A17', 'RUNTIME', 'hiding the app flushes the last change at once (no 250 ms loss)', async (app) => {
   const { page } = await open(app, { empty: true })
-  await openSettings(page); await page.click('[role=radio][aria-label=Light]'); await hide(page)
+  await openSettings(page); await page.click('[role=radio]:text-is("Light")'); await hide(page)
   await page.reload(); await page.waitForSelector('.app')
   ok(await dataTheme(page) === 'light', 'last change lost')
 })
@@ -498,13 +498,13 @@ T('N24', 'UX', 'every full screen has a visible Back that is at least 44 px', as
 // ================================================================== S. SETTINGS, every control
 T('S01', 'POS', 'Theme Dark: root marked dark, ground is near black', async (app) => {
   const { page } = await open(app, { data: seed({ settings: { theme: 'light' } }) }); await openSettings(page)
-  await page.click('[role=radio][aria-label=Dark]'); await settle(page, 100)
+  await page.click('[role=radio]:text-is("Dark")'); await settle(page, 100)
   ok(await dataTheme(page) === 'dark', 'data-theme'); ok(/rgb\(6, 6, 6\)/.test(await bgOf(page)), await bgOf(page))
-  ok(await page.locator('[role=radio][aria-label=Dark]').getAttribute('aria-checked') === 'true', 'aria-checked')
+  ok(await page.locator('[role=radio]:text-is("Dark")').getAttribute('aria-checked') === 'true', 'aria-checked')
 })
 T('S02', 'POS', 'Theme Light: root marked light, ground is white', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page)
-  await page.click('[role=radio][aria-label=Light]'); await settle(page, 100)
+  await page.click('[role=radio]:text-is("Light")'); await settle(page, 100)
   ok(await dataTheme(page) === 'light', 'data-theme'); ok(/rgb\(255, 255, 255\)/.test(await bgOf(page)), await bgOf(page))
   ok(await page.evaluate(() => document.querySelector('meta[name=theme-color]').content) === '#FFFFFF', 'meta theme-color not updated')
 })
@@ -652,7 +652,7 @@ T('S25', 'POS', 'About shows version 0.1.0-P1 and the privacy line', async (app)
 })
 T('S26', 'RUNTIME', 'every Settings control, changed once, survives a reload together', async (app) => {
   const { page } = await open(app, { empty: true }); await openSettings(page)
-  await page.click('[role=radio][aria-label=Light]'); await page.click('[role=radio][aria-label=Sky]'); await page.click('[role=radio]:has-text("International")')
+  await page.click('[role=radio]:text-is("Light")'); await page.click('[role=radio][aria-label=Sky]'); await page.click('[role=radio]:has-text("International")')
   await pickFrom(page, 'Decimal places', '4'); await pickFrom(page, 'Copying numbers', 'Without'); await page.click('[role=radio]:has-text("Radians")')
   await page.click('[role=switch][aria-label="Vibrate on key press"]'); await page.click('[role=switch][aria-label="Keep the screen on"]'); await page.click('[role=switch][aria-label="Keep calculation history"]')
   await settle(page, 600); await page.reload(); await page.waitForSelector('.app')
@@ -663,7 +663,7 @@ T('S26', 'RUNTIME', 'every Settings control, changed once, survives a reload tog
 T('S27', 'UX', 'a Settings change takes effect at once with no Save button', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page)
   ok(await page.locator('.screen .btn--primary').count() === 0, 'a primary Save-type button exists')
-  await page.click('[role=radio][aria-label=Light]'); ok(await dataTheme(page) === 'light', 'not immediate')
+  await page.click('[role=radio]:text-is("Light")'); ok(await dataTheme(page) === 'light', 'not immediate')
 })
 T('S28', 'NEG', 'Settings controls cannot be set to an invalid value through hand-edited data', async (app) => {
   const { page } = await open(app, { raw: JSON.stringify({ schemaVersion: 3, settings: { decimals: 99, accent: 'neon', theme: 'blue', startupTab: 'x', startupTool: '../../etc' } }) })
@@ -988,7 +988,7 @@ T('Y15', 'UI', 'radio groups (theme, number format, angle, accent) have a group 
 })
 T('Y16', 'UI', 'radio groups can be driven by keyboard: Tab reaches an option and Space selects it', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page)
-  await page.focus('[role=radio][aria-label=Light]'); await page.keyboard.press('Space'); await settle(page, 100); ok(await dataTheme(page) === 'light', 'Space did not select')
+  await page.focus('[role=radio]:text-is("Light")'); await page.keyboard.press('Space'); await settle(page, 100); ok(await dataTheme(page) === 'light', 'Space did not select')
   note('Segmented radios are separate tab stops and arrow keys do nothing (not the ARIA radio-group pattern). IMPROVE: roving tabindex + arrow keys, or use buttons with aria-pressed.')
 })
 
@@ -1201,7 +1201,7 @@ T('R02', 'RUNTIME', '60 rapid tab taps in 1 s raise no errors and end on the rig
 })
 T('R03', 'RUNTIME', 'two tabs of the same app: a change in one does not corrupt the other (last writer wins, no crash)', async (app) => {
   const { page, context, errors } = await open(app, { data: seed() }); const p2 = await context.newPage(); const e2 = []; p2.on('pageerror', (e) => e2.push(e.message)); await p2.goto(app.url); await p2.waitForSelector('.app')
-  await openSettings(page); await page.click('[role=radio][aria-label=Light]'); await settle(page, 500)
+  await openSettings(page); await page.click('[role=radio]:text-is("Light")'); await settle(page, 500)
   await p2.reload(); await p2.waitForSelector('.app'); ok(await p2.evaluate(() => document.documentElement.dataset.theme) === 'light', 'second tab did not pick up the change on reload'); ok(errors.length === 0 && e2.length === 0, errors.concat(e2).join(';'))
   note('IMPROVE: two open windows each keep their own copy in memory and the last save wins; it is only a risk on desktop browsers, not on the phone.')
 })
@@ -1232,7 +1232,7 @@ T('R09', 'UI', 'Settings headings, section order and the Reminders-free layout r
   const h = await page.locator('.screen h1, .screen h2').allInnerTexts(); ok(h.join('|') === 'Settings|Appearance|Numbers|Behaviour|Your data|About', h.join('|'))
 })
 T('R10', 'RUNTIME', 'document title, theme-color meta and html lang stay valid after a theme change', async (app) => {
-  const { page } = await open(app, { data: seed() }); await openSettings(page); await page.click('[role=radio][aria-label=Light]')
+  const { page } = await open(app, { data: seed() }); await openSettings(page); await page.click('[role=radio]:text-is("Light")')
   ok(await page.evaluate(() => document.querySelector('meta[name=theme-color]').content) === '#FFFFFF', 'theme-color')
   ok(await page.evaluate(() => document.documentElement.style.colorScheme) === 'light', 'color-scheme')
 })

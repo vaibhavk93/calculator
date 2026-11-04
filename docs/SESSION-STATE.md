@@ -1,5 +1,79 @@
 # Session state: resume here
 
+## Round 10 (2026-11-04): all plans consolidated into `docs/THE-PLAN.md`
+
+**`docs/THE-PLAN.md` is now the single plan.** It replaces MASTER-ROADMAP, ROADMAP, BACKLOG,
+IMPROVEMENT-PLAN, UI-UX-PLAN, UX-AUDIT, TOOLS-UX-REVIEW, TAP-AUDIT, UX-IMPROVEMENT-PLAN-2026-11-04,
+CAPABILITY-GAPS, TEST-PLAN-REMAINING, the 6 REVIEW-* files, the 6 TEST-REPORT-* files,
+COMPETITIVE-RESEARCH-AND-PLAN, GTM-STRATEGY, and the "what's left" halves of BUDGET-PLAN /
+NOTES-TODO-PLAN / PORTFOLIO-PLAN / FEATURES. Those files are kept as history, not plans.
+
+**Two infrastructure facts that explain why audits kept missing real bugs:**
+1. **`npm run check | tail` returns tail's exit code.** A previous session reported green while
+   typecheck was exiting 2. Never read a result from a piped exit code.
+2. **Default `node` here is 18; Playwright needs 20+.** Node 22 is installed at
+   `~/.nvm/versions/node/v22.23.1/bin`. **e2e suites cannot run without putting it on PATH:**
+   `export PATH="$HOME/.nvm/versions/node/v22.23.1/bin:$PATH"`. Needs an `.nvmrc` (Block A1).
+
+**The answer-bar fix took three attempts; the first two looked right and were not:**
+- Attempt 1 (`padding-bottom` on the scrolling box) fails because **a sticky element is clamped to its
+  parent's content box** and cannot travel into padding.
+- Attempt 2 (real-height anchor) fails because **showing the bar made the page taller**, so arriving at
+  the bottom pushed the bottom further away and the bar stayed pinned over the Copy/Share row.
+- Attempt 3, correct: the bar is **always in the DOM** and only becomes `visibility: hidden`
+  (`.answer--idle`), so the page height never changes.
+- **A manual browser check at 375×812 passed attempt 2. The automated test at 360×790 caught it.**
+  This is the strongest evidence yet that checking one size by hand produces false passes.
+
+**Verified before pushing:** typecheck clean · 2529 unit tests pass, 16 skipped · `e2e/answerbar.test.mjs`
+7/7 · `e2e/tools1.test.mjs` 417/461 (was 384/461 — improved, no regression).
+
+**Open SMS findings (need a phone to confirm):** `SmsInboxPlugin.java:73` uses `now − N×24h`, not calendar
+days, so "last 7 days" means something different depending on the hour. And `markSmsSeen` (`app.ts:779`)
+silently hides already-reviewed messages with no count shown, so a scan can look broken when it is not.
+
+**Owner decisions still open:** see `docs/THE-PLAN.md` §5 — `ink-3` contrast (3 options), date locale,
+Phase 7 module switches, Portfolio timing.
+
+## Round 9 (2026-11-04): open tasks closed, six-area improvement plan written
+
+**Last prompt (verbatim):** "start with open / not yet done tasks / create plan to improve / 1. Calculation
+bottomsheet UI and UX, check if we need all the details present or not Or if any other use case is missing /
+2. On Recurring revenue forecast and other similar pages - yearly revenue (ARR) after 12 months is partly
+floating and inappropriately show/hide at any times - review and make corrections. if this is hyperlink then
+it should be appropriately presented on UI and UX / 3. Icons of copy, share are not appropriate shown, placed
+in terms of UI and UX / 4. UI, UX, capability and features of Notes and to-do is not appropriate / 5. Notes
+can be anything but we specifically only created list, Label + amount, it is only limited to few cases. I want
+you to research on how to improve "Notes" / 6. Same goes for budget as well, check what and how can we improve
+/ 7. For all above i want you to look or research from multiple POV - UI, UX, Features, User Flow, improvement"
+
+**Plan written: `docs/UX-IMPROVEMENT-PLAN-2026-11-04.md`.** Nothing from Part B/C is built yet.
+
+| Step | Status |
+|---|---|
+| `npm run check` was **broken** — tsc exited 2 on 3 errors in the uncommitted QA files, so unit tests never ran | **FIXED** (`qa-fuzz.test.ts` generic `big<T>`, unused `atTime` import dropped) |
+| Unit tests now run | 2504 pass, **9 fail** |
+| 8 failures = `qa-contrast.test.ts`, `ink-3`/`alert` on all 8 dark tints | **Real bug, not fixed** — palette change, needs a deliberate decision |
+| 1 failure = `expenseEdits.test.ts` "2 Nov" vs "Nov 2" | **Test bug** — dates use device locale (`Intl.DateTimeFormat(undefined,…)`, 10 call sites). Pin the locale in the test |
+| ARR floating bar: 4 bugs **measured in a real browser**, not inferred | planned, not fixed |
+| Critic run on "calculation-aware notes" | **Verdict: BUILD SMALLER.** Auto-detect cut; plain `kind: 'text'` note only |
+
+**⚠ Remember:** a previous session reported `npm run check` as passing when it was not. `npm run check | tail`
+returns *tail's* exit code. Check `${PIPESTATUS[0]}`, or do not pipe.
+
+**The four measured ARR-bar bugs** (`ToolScreen.tsx:622-631`, `tools.css:81-117`) — all app-level, they affect
+every tool with a `main: true` row:
+1. **Strobes.** One `threshold: 0.2` with no hysteresis; scrolling 3px (592↔598) toggles it on and off.
+2. **Arrow points down** while the answer is above (measured `mainTop: -18.5`). Hardcoded `name="down"`.
+3. **Covers the Copy/Share row entirely** (measured `coveredByAnswerBar: true`). This makes owner issues 2 and 3 the same bug.
+4. `.result__row--main` is styled identically to every other row, so the bar's destination is unmarked.
+
+**Still unresolved from Round 8, still needs the owner:** the real Budget entry that changed from Spending to
+"Transfer between own accounts" between 21:08 and 21:45 on 2 Nov 2026.
+
+**Not committed, not pushed.** Branch `dev`, 5 commits ahead of origin.
+
+
 **How to resume (another account, a new session, or after a token limit):** open this folder in Claude Code and say
 "Read docs/SESSION-STATE.md and continue from the status table." Everything needed is in this file, `CLAUDE.md` and `docs/`.
 This file is updated after each step. The full history is in git (`git log --oneline`).

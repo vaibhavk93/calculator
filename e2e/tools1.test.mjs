@@ -133,7 +133,8 @@ async function choose(page, s, id, label) {
   const pick = field(s, id)
   if ((await pick.count()) && (await pick.evaluate((e) => e.tagName)) === 'BUTTON') {
     await pick.click()
-    await page.locator('.sheet .pick__opt', { has: page.getByText(label, { exact: true }) }).first().click()
+    // options may carry a hint, "5% (merit)", so a label matches itself or itself followed by " (...)"
+    await page.locator('.sheet .pick__opt', { has: page.locator('.pick__label', { hasText: new RegExp('^\\s*' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\s*\\(.*\\))?\\s*$') }) }).first().click()
   } else {
     await s.locator('.field-row', { has: page.locator(`label[for="f-${id}"]`) }).locator('button[role=radio]', { hasText: new RegExp(`^${label}$`) }).click()
   }

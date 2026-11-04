@@ -22,8 +22,8 @@ export function csvCell(text: string): string {
 
 const TYPE: Record<string, string> = { cardBill: 'card bill', transfer: 'transfer' }
 
-/** Live entries in the range, oldest first (same date: stored order), as CSV text with a BOM so Excel reads rupee signs and accents. */
-export function buildExpensesCsv(budget: BudgetData, range: ExportRange, today: Date = new Date()): string {
+/** Live entries in the range, oldest first (same date: stored order). */
+export function exportEntries(budget: BudgetData, range: ExportRange, today: Date = new Date()): BudgetExpense[] {
   const thisMonth = monthKey(today)
   const bounds: Record<ExportRange, [string, string] | null> = {
     month: [thisMonth, thisMonth],
@@ -33,8 +33,12 @@ export function buildExpensesCsv(budget: BudgetData, range: ExportRange, today: 
   }
   const b = bounds[range]
   const inRange = (e: BudgetExpense) => e.deletedAt === null && (b === null || (e.date.slice(0, 7) >= b[0] && e.date.slice(0, 7) <= b[1]))
-  const rows = budget.expenses.filter(inRange).sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0))
+  return budget.expenses.filter(inRange).sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0))
+}
 
+/** The entries in the range as CSV text with a BOM so Excel reads rupee signs and accents. */
+export function buildExpensesCsv(budget: BudgetData, range: ExportRange, today: Date = new Date()): string {
+  const rows = exportEntries(budget, range, today)
   const lines = [CSV_HEADER.join(',')]
   for (const e of rows) {
     const inst = e.instrumentId === null ? undefined : budget.instruments.find((i) => i.id === e.instrumentId)

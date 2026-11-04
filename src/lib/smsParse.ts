@@ -342,6 +342,8 @@ export interface ParseLogEntry {
  * chat: those are the normal case) and messages that were read but lack a merchant or card digits. Null = nothing to log.
  */
 export function logEntryFor(m: InboxMessage, p: ParsedSms | SkippedSms, now: number, salt: string): ParseLogEntry | null {
+  // The plugin only passes letter-style senders; this is the second lock: a number (a person) is never stored (QA-P1).
+  if (!/^[A-Za-z][A-Za-z0-9-]{1,14}$/.test(m.address) || /\d{5,}/.test(m.address)) m = { ...m, address: '<hidden sender>' }
   if (p.ok) {
     if (p.merchant && p.last4) return null
     return { at: now, sender: m.address, outcome: 'partial', template: maskText(m.body, salt), got: { amount: shapeOf(p.amount), merchant: p.merchant ? shapeOf(p.merchant) : undefined, mode: p.mode, last4: !!p.last4, ref: !!p.ref }, count: 1 }

@@ -1,5 +1,6 @@
 import { instrumentFitsMode, MAX_AMOUNT, type BudgetData } from './budget'
 import { D } from '../engine/decimal'
+import { decimalComma } from './decimalComma'
 import { alreadyAdded, fingerprint, guessCategory, modeFor, type Candidate, type ParsedSms, type ScanResult } from './smsParse'
 
 /**
@@ -9,10 +10,10 @@ import { alreadyAdded, fingerprint, guessCategory, modeFor, type Candidate, type
  */
 
 /** Splits CSV text into rows of cells. Handles quotes, escaped quotes, commas or semicolons or tabs, and CRLF. */
-export function parseCsv(text: string): string[][] {
+export function parseCsv(text: string, forceSep?: string): string[][] {
   const t = text.replace(/^﻿/, '')
   const first = t.split(/\r?\n/, 1)[0] ?? ''
-  const sep = [',', ';', '\t'].map((s) => [s, first.split(s).length] as const).sort((a, b) => b[1] - a[1])[0]![0]
+  const sep = forceSep ?? [',', ';', '\t'].map((s) => [s, first.split(s).length] as const).sort((a, b) => b[1] - a[1])[0]![0]
   const rows: string[][] = []
   let row: string[] = []
   let cell = ''
@@ -41,7 +42,7 @@ const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', '
 
 /** "02/11/2026", "02-11-26", "2 Nov 2026", "2026-11-02" -> "2026-11-02". Day first (Indian statements). Null when unclear. */
 export function parseStatementDate(raw: string): string | null {
-  const s = raw.trim().replace(/\s+\d{1,2}:\d{2}.*$/, '')
+  const s = raw.trim().replace(/[\sT]+\d{1,2}:\d{2}.*$/, '')
   const iso = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/.exec(s)
   const dmy = /^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{2}|\d{4})$/.exec(s)
   const named = /^(\d{1,2})[-/. ]([A-Za-z]{3})[a-z]*[-/. ,]*(\d{2}|\d{4})$/.exec(s)
@@ -58,7 +59,8 @@ export function parseStatementDate(raw: string): string | null {
 }
 
 const money = (raw: string): string | null => {
-  const t = raw.replace(/[,₹\s]|rs\.?|inr/gi, '')
+  // "450,00" (comma as the decimal point, as in some semicolon files) is 450.00, never 45000. See decimalComma.
+  const t = decimalComma(raw.replace(/[₹\s]|rs\.?|inr/gi, '')).replace(/,/g, '')
   if (!/^\d{1,9}(\.\d{1,2})?$/.test(t)) return null
   const v = new D(t)
   if (v.isZero() || v.gt(MAX_AMOUNT)) return null
@@ -82,7 +84,11 @@ export function findColumns(rows: string[][]): { at: number; cols: Columns } | n
       drcr: find(head, /^(dr\/cr|cr\/dr|type|debit\/credit)$/),
       ref: find(head, /ref|chq|cheque|utr/),
     }
-    if (cols.date >= 0 && cols.text >= 0 && (cols.debit >= 0 || cols.amount >= 0)) return { at: i, cols }
+    // A single "Debit/Credit" (or "Dr/Cr") marker column also contains the words debit and credit: it is the marker, not an amount.
+    if (cols.drcr >= 0) { if (cols.debit === cols.drcr) cols.debit = -1; if (cols.credit === cols.drcr) cols.credit = -1 }
+    // The date, description and money must be three different columns: one cell holding a whole semicolon-joined header is not a header.
+    const money = cols.debit >= 0 ? cols.debit : cols.amount
+    if (cols.date >= 0 && cols.text >= 0 && money >= 0 && new Set([cols.date, cols.text, money]).size === 3) return { at: i, cols }
   }
   return null
 }
@@ -108,15 +114,23 @@ export function buildStatementCandidates(
   instrumentId: string | null,
   suggest: (note: string) => { categoryId: string | null } | null,
 ): StatementResult {
-  const rows = parseCsv(text)
+  // A quote that never closes would swallow every row after it. Say so instead of showing "nothing found".
+  if ((text.match(/"/g)?.length ?? 0) % 2 === 1) return { ok: false, message: 'The file has a quote mark (") that is never closed, so the rows after it cannot be read. Fix or remove it and try again.' }
+  // The separator is guessed from the first line; when a title line comes first that can be wrong, so try the others if no header is found.
+  let rows = parseCsv(text)
+  let found = findColumns(rows)
+  for (const sep of found ? [] : [',', ';', '\t']) {
+    const alt = parseCsv(text, sep)
+    const f = findColumns(alt)
+    if (f) { rows = alt; found = f; break }
+  }
   if (rows.length < 2) return { ok: false, message: 'That file is empty or is not a CSV statement.' }
-  const found = findColumns(rows)
   if (!found) return { ok: false, message: 'Could not find the Date, Description and Debit (or Amount) columns. Save the statement as CSV from your bank site and try again.' }
   const { at, cols } = found
+  const copies = new Map<string, number>()
   const inst = instrumentId ? budget.instruments.find((i) => i.id === instrumentId && i.deletedAt === null) ?? null : null
   const seen = new Set(budget.smsSeen ?? [])
   const out: Candidate[] = []
-  const inList = new Set<string>()
   const skipped: ScanResult['skipped'] = {}
   let alreadySeen = 0
   let total = 0
@@ -142,10 +156,14 @@ export function buildStatementCandidates(
     const merchant = merchantFromNarration(narration)
     const ref = cols.ref >= 0 ? (r[cols.ref] ?? '').replace(/\D/g, '') : ''
     const p: ParsedSms = { ok: true, source: null, kind: /credit card|cc payment|card bill|billdesk|autopay/i.test(narration) ? 'cardBill' : 'spend', amount, last4: null, merchant, mode: /^upi/i.test(narration) ? 'upi' : null, bank: null, ref: ref.length >= 9 ? ref : null }
-    const id = fingerprint(p, date)
+    // Without a reference number two identical rows (two teas, same shop, same day) are two real payments: the second gets its own
+    // stable id (same every time the same file is read), so adding one never hides the other. With a reference, a repeat is a true duplicate.
+    const base = fingerprint(p, date)
+    const n = (copies.get(base) ?? 0) + 1
+    copies.set(base, n)
+    if (n > 1 && p.ref) continue
+    const id = n > 1 ? fingerprint({ ...p, merchant: `${p.merchant}#${n}` }, date) : base
     if (seen.has(id)) { alreadySeen++; continue }
-    if (inList.has(id)) continue
-    inList.add(id)
     const cand: Candidate = {
       id, date, amount, merchant, kind: p.kind,
       mode: inst ? modeFor(p, inst) : p.mode === 'credit' || p.mode === 'debit' ? null : p.mode,
