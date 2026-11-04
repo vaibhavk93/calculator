@@ -20,6 +20,28 @@ wherever needed. Think critically at each major point."
 
 **Two other Claude sessions are open on this repo** (`calculator-62`, `calculator-0b`). Commit by explicit path only.
 
+## Round 14b (2026-11-05): owner answered B9 and all open questions; UI audit done, critic run, builders started
+
+**Owner's answers (2026-11-04, recorded in `docs/THE-PLAN.md` section 5):** B9 = "all screens except the basic calculator
+page"; hints use `ink-2`; dates Indian-first (done in code, uncommitted); build Phase 7 modules on/off (critic first); build
+Portfolio P1; keep the lock-a-history-row control. Owner also said "take smart calls". Open for the owner: Due vs To-do overlap (e3).
+
+**Audit:** `docs/B9-UI-AUDIT-2026-11-04.md` (10 ranked findings, B10-B21, screenshots listed there). **Critic:** build B10, B18,
+B19, B21; shrink B11-B17, B20; cut B14 parts 1 and 2 (the pin removal would make list/calculation cards un-pinnable; the budget
+row trash is the fast clean-up after an import). Corrections adopted: B11 only drops `.00` on whole money, percent unchanged;
+B12 keeps a round check button plus one "more" sheet (Snooze 1 day / 3 days / 1 week / Remove, Remove keeps its confirm);
+B13 hero uses fit-text so the 9 text-answer tools and long labels do not overflow; B16 only labels Copy/Share and merges the dim line.
+
+| Step | Status |
+|---|---|
+| Notes Block C (agent) | Running, uncommitted; dates change (`src/lib/dateLocale.ts` + 6 files) waits to be committed with it |
+| B10 + B11 (agent) | Running |
+| B21 Tools home as ruled list (agent) | Running |
+| B13, B16, tools part of B20 | Next, after B11 (they share ToolScreen / toolFormat) |
+| B12, B14.3, B15, B17, B18, B19, ink-3 hints | After Notes agent finishes (they share memory/Settings/tools.css files) |
+| D1 income, D5 rules, E snooze + EMI N months, Phase 7 modules, Portfolio P1 | After the UI group |
+| Full QA | Last |
+
 ## Round 13 (2026-11-04): researched a UI redesign ask, found the real scope, shipped B7
 
 **Last prompt:** "UI is very stupidly designed search some of the best skills for UI designs evaluate which
