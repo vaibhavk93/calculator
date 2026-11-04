@@ -1291,7 +1291,7 @@ def('T1-MORE-opens-by-itself', 'UX', 'Home loan tax: a saved card with a changed
     await s.locator('button.link-btn', { hasText: 'Save' }).click()
     await page.locator('.sheet .sheet__foot button.btn--primary').click()
     await tab(page, 'Notes')
-    await page.locator('.sect__body button, .sect__body .navrow, .sect__body [role=button]').first().click()
+    await page.locator('.group button, .group .navrow, .group [role=button]').first().click()
     const s2 = scr(page, t)
     await s2.waitFor()
     const open = await s2.locator('details.more').evaluate((e) => e.open)
@@ -1588,7 +1588,7 @@ def('T1-SAVE-persist', 'RUNTIME', 'Save a card, reload the page, open it from No
     await page.reload()
     await page.waitForSelector('.app')
     await tab(page, 'Notes')
-    await page.locator('.sect__body', { hasText: 'Prepay plan' }).locator('button', { hasText: 'Prepay plan' }).first().click()
+    await page.locator('.group', { hasText: 'Prepay plan' }).locator('button', { hasText: 'Prepay plan' }).first().click()
     const s2 = scr(page, t)
     await s2.waitFor()
     const vals = {
@@ -1623,7 +1623,7 @@ def('T1-SAVE-persist-rows', 'RUNTIME', 'Save a card with row inputs (loan offers
     await page.reload()
     await page.waitForSelector('.app')
     await tab(page, 'Notes')
-    await page.locator('.sect__body button', { hasText: 'Offers' }).first().click()
+    await page.locator('.group button', { hasText: 'Offers' }).first().click()
     const s2 = scr(page, t)
     await s2.waitFor()
     const n = await s2.locator('.rows__row').count()
@@ -1650,7 +1650,7 @@ def('T1-SAVE-persist-all-tools', 'RUNTIME', 'Every one of the 26 calculators can
     await page.waitForSelector('.app')
     await tab(page, 'Notes')
     for (const t of TOOLS.slice(0, 26)) {
-      const row = page.locator('.sect__body button', { hasText: `Card ${t.id}` }).first()
+      const row = page.locator('.group button', { hasText: `Card ${t.id}` }).first()
       if (!(await row.count())) {
         bad.push(`${t.id}: not in Notes after reload`)
         continue

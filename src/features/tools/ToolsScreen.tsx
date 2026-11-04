@@ -17,21 +17,28 @@ const matches = (t: ToolSpec, q: string) =>
 const specsOf = (g: ToolGroup) => g.tools.map((id) => ALL_TOOLS.find((t) => t.id === id)).filter((t): t is ToolSpec => !!t)
 
 /**
- * One group, split into its sections. Each section is its own tinted card with a heading, so you can see where one
- * kind of calculator ends and the next begins. A full screen over the Tools home, so Back returns to it.
+ * One group, split into its sections: a hairline list per section, no card (docs/THE-PLAN.md section 7,
+ * Block B7). Every section inside one group shares the group's own single colour, so a tinted card per
+ * section told nothing apart -- it just repeated the same wash down the page, reading as one long block
+ * rather than separate sections. The group's colour still carries through to the header title (`tint`
+ * below), which is enough to say "this is the Savings and investing page" without washing every row in it.
+ * A full screen over the Tools home, so Back returns to it.
  */
 function GroupPage({ group, onBack, onOpen }: { group: ToolGroup; onBack: () => void; onOpen: (id: string) => void }) {
   return (
+    // tintStyle stays on the screen even though the content below no longer uses it: ScreenHeader's
+    // `tint` prop (a small colour touch on the title only, not a card wash) still needs --tint-ink in
+    // scope. Nothing in the hairline rows below reads --tint, so this cannot bring the wash back.
     <div className="screen" style={tintStyle(group.tint)} role="dialog" aria-modal="true" aria-label={group.name}>
       <ScreenHeader title={group.name} onBack={onBack} tint />
-      <div className="screen__body sections">
+      <div className="screen__body">
         {group.sections.map((sec) => (
-          <section className="sect" key={sec.title} aria-label={sec.title}>
-            <h2 className="sect__head">
+          <div key={sec.title}>
+            <h2 className="group__title">
               <span>{sec.title}</span>
               <span className="sect__count">{sec.tools.length}</span>
             </h2>
-            <div className="sect__body">
+            <div className="group" aria-label={sec.title}>
               {sec.tools
                 .map((id) => ALL_TOOLS.find((t) => t.id === id))
                 .filter((t): t is ToolSpec => !!t)
@@ -45,7 +52,7 @@ function GroupPage({ group, onBack, onOpen }: { group: ToolGroup; onBack: () => 
                   </button>
                 ))}
             </div>
-          </section>
+          </div>
         ))}
       </div>
     </div>
