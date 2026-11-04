@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Icon } from '../../components/Icon'
-import { tintStyle } from '../../components/tint'
 import { PickerSelect, type PickOption } from '../../components/PickerSelect'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useApp, useAppStore } from '../../components/StoreProvider'
@@ -26,10 +25,10 @@ const DECIMAL_CHOICES = ['auto', ...Array.from({ length: 11 }, (_, i) => String(
 
 type Backup = { state: 'idle' } | { state: 'confirm'; data: PersistedData; exportedAt: string | null } | { state: 'done'; text: string } | { state: 'error'; text: string }
 
-/** One titled card of settings. All of them share one calm tint: Settings is one place, not eight sections to tell apart. */
+/** One titled card of settings. A hairline list under a quiet heading, no card. */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="sect sect--settings" style={tintStyle(7)} aria-label={title}>
+    <section className="sect sect--settings" aria-label={title}>
       <h2 className="sect__head">{title}</h2>
       {children}
     </section>

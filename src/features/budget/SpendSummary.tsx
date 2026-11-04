@@ -3,7 +3,6 @@ import type { PickOption } from '../../components/PickerSelect'
 import { Icon } from '../../components/Icon'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useApp } from '../../components/StoreProvider'
-import { tintStyle } from '../../components/tint'
 import { useBackHandler } from '../../components/useBackHandler'
 import { D, type Dec } from '../../engine'
 import {
@@ -150,9 +149,9 @@ export function EntryRow({ e, onEdit, select }: { e: BudgetExpense; onEdit: (id:
   )
 }
 
-function Card({ tint, title, count, children }: { tint: number; title: string; count?: number; children: ReactNode }) {
+function Card({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
   return (
-    <section className="sect" style={tintStyle(tint)} aria-label={title}>
+    <section className="sect" aria-label={title}>
       <h2 className="sect__head">
         <span>{title}</span>
         {count !== undefined && <span className="sect__count">{count}</span>}
@@ -381,7 +380,7 @@ export function SpendSummary({
 
   const summaryCards = (
     <>
-      <section className="sect" style={tintStyle(3)} aria-label="Total">
+      <section className="sect" aria-label="Total">
         <div className="budget__sum">
           <span className="result__label">Spent in {monthWord}</span>
           {s.spent.isNegative() && <span className="budget__note">Refunds are more than what you spent</span>}
@@ -395,12 +394,12 @@ export function SpendSummary({
       </section>
 
       {!cycle && (
-        <Card tint={5} title="Day by day">
+        <Card title="Day by day">
           <Heatmap budget={budget} month={month} filter={scope} selected={day} onPick={pickDay} money={money} today={today} />
         </Card>
       )}
 
-      <Card tint={4} title={cycle ? 'Last 6 cycles' : 'Last 6 months'}>
+      <Card title={cycle ? 'Last 6 cycles' : 'Last 6 months'}>
         {newestFirst.map((t) => (
           <div className="budget__row budget__row--plain" key={t.month} aria-current={t.month === month ? 'true' : undefined}>
             <span className={t.month === month ? 'row__label spend__cur' : 'row__label'}>{cycle ? `Ends ${monthName(t.month, 'strip')}` : monthName(t.month, 'strip')}</span>
@@ -410,7 +409,7 @@ export function SpendSummary({
         ))}
       </Card>
 
-      <Card tint={5} title="By category">
+      <Card title="By category">
         {ranked.map((c) => {
           const kids = c.children.filter((k) => !k.spent.isZero()).sort((a, b) => b.spent.comparedTo(a.spent))
           return (
@@ -435,16 +434,16 @@ export function SpendSummary({
         {ranked.length === 0 && <p className="budget__none">Pick a category when you add an expense, and it shows up here.</p>}
       </Card>
 
-      <Card tint={3} title="Biggest spends">
+      <Card title="Biggest spends">
         {topEntries(s.entries, 5).map((e) => <EntryRow key={e.id} e={e} onEdit={setEditing} />)}
       </Card>
 
-      <Card tint={4} title="Paid with">
+      <Card title="Paid with">
         <PaidWithTree budget={budget} month={month} scope={eff} onPick={({ cycleDay: _cycle, ...f }) => { setScope(f); setCat(null); setDay(null); setTab('entries') }} />
       </Card>
 
       {scope.instrumentId === undefined && s.byInstrument.length > 0 && (
-        <Card tint={5} title="Cards and accounts">
+        <Card title="Cards and accounts">
           {s.byInstrument.map((r) => (
             <div className="budget__row budget__row--plain" key={r.instrument.id}>
               <span className="row__label">{instrumentLabel(r.instrument)}{r.instrument.deletedAt === null ? '' : ' (hidden)'}</span>
@@ -455,7 +454,7 @@ export function SpendSummary({
         </Card>
       )}
 
-      <Card tint={3} title="Limits">
+      <Card title="Limits">
         {all.overall && (
           <div className="budget__row budget__row--plain">
             <span className="row__label">Whole month</span>
@@ -490,7 +489,7 @@ export function SpendSummary({
     ? { month: categoryTotal(budget, cat, range ?? { from: `${month}-01`, to: `${month}-31` }), all: categoryTotal(budget, cat) }
     : null
   const searchResults = found && (
-    <section className="sect" style={tintStyle(5)} aria-label="Search results">
+    <section className="sect" aria-label="Search results">
       <h2 className="sect__head">
         <span>Search results</span>
         <span className="sect__count">{found.length}</span>
@@ -506,7 +505,7 @@ export function SpendSummary({
     </section>
   )
   const entryList = (
-    <section className="sect" style={tintStyle(5)} aria-label="Entries">
+    <section className="sect" aria-label="Entries">
       <h2 className="sect__head">
         <span>Entries</span>
         <span className="sect__count">{entries.length}</span>

@@ -959,16 +959,15 @@ textarea.field {
   color: var(--tint-ink);
 }
 
-/* A section card: a titled wash with its rows inside. Rows are plain rows, so cards never nest. */
+/* A titled section: a small heading over hairline rows, no card and no wash (docs/THE-PLAN.md Block B8, the
+   three tiers in docs/DESIGN-SYSTEM.md). Same look as .group__title + .group, for markup that has a body and
+   non-row content (charts, notes, buttons) inside. */
 .sections {
   padding: var(--s-2) 0 var(--s-6);
 }
 
 .sect {
-  margin: 0 var(--s-4) var(--s-4);
-  background: var(--tint);
-  border-radius: var(--r-md);
-  overflow: hidden;
+  margin: 0 0 var(--s-2);
 }
 
 .sect__head {
@@ -976,19 +975,18 @@ textarea.field {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-3);
-  margin: 0;
-  padding: var(--s-3) var(--s-4) var(--s-2);
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--tint-ink);
+  margin: var(--s-5) 0 var(--s-1);
+  padding: 0 var(--s-4);
+  font-size: 0.8125rem;
+  color: var(--ink-2);
 }
 
-.sect--settings .row {
-  border-top: 1px solid var(--line);
-}
-
-.sect--settings .row:first-of-type {
-  border-top: 0;
+/* Closes a section's list with a bottom hairline, like .group > .row:last-child. */
+.sect > .row:last-child,
+.sect__body > .row:last-child,
+.sect__body > .navrow:last-child,
+.sect__body > div:last-child > .navrow:last-child {
+  border-bottom: 1px solid var(--line);
 }
 
 .sect__count {

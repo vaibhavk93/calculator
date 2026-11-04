@@ -19,12 +19,6 @@
   font-weight: 700;
 }
 
-.sect__head {
-  margin: 0 var(--s-4);
-  padding: var(--s-3) 0 var(--s-2);
-  border-bottom: 1px solid var(--line);
-}
-
 .group__title {
   font-weight: 700;
 }

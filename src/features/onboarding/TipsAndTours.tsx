@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
-import { tintStyle } from '../../components/tint'
 import type { TourId } from '../../store/types'
 import { TourSheet } from './TourSheet'
 import { TOUR_LIST } from './tours'
@@ -12,7 +11,7 @@ export function TipsAndTours() {
   const update = useApp((s) => s.updateSettings)
   const toast = useApp((s) => s.toast)
   return (
-    <section className="sect sect--settings" style={tintStyle(7)} aria-label="Tips and tours">
+    <section className="sect sect--settings" aria-label="Tips and tours">
       <h2 className="sect__head">Tips and tours</h2>
       {TOUR_LIST.map((t) => (
         <button key={t.id} type="button" className="row row--button tap-row" onClick={() => setOpen(t.id)}>

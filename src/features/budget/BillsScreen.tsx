@@ -60,7 +60,7 @@ export function BillsScreen({ onBack }: { onBack: () => void }) {
       <div className="screen__body">
         <div className="sections">
           {totals.count > 0 && (
-            <section className="sect" style={tintStyle(3)} aria-label="What your bills cost">
+            <section className="sect" aria-label="What your bills cost">
               <div className="budget__sum">
                 <span className="result__label">Per year, all running bills</span>
                 <span className="budget__hero">{money(totals.perYear)}</span>
@@ -69,7 +69,7 @@ export function BillsScreen({ onBack }: { onBack: () => void }) {
             </section>
           )}
 
-          <section className="sect" style={tintStyle(5)} aria-label="Bills">
+          <section className="sect" aria-label="Bills">
             <h2 className="sect__head">
               <span>Bills</span>
               <span className="sect__count">{bills.length}</span>
@@ -95,7 +95,7 @@ export function BillsScreen({ onBack }: { onBack: () => void }) {
           </section>
 
           {cardBills.length > 0 && (
-            <section className="sect" style={tintStyle(4)} aria-label="Card bill reminders">
+            <section className="sect" aria-label="Card bill reminders">
               <h2 className="sect__head">
                 <span>Card bill reminders</span>
                 <span className="sect__count">{cardBills.length}</span>

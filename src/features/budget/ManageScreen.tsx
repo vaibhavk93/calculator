@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useApp } from '../../components/StoreProvider'
-import { tintStyle } from '../../components/tint'
 import { useBackHandler } from '../../components/useBackHandler'
 import { D } from '../../engine'
 import {
@@ -72,13 +71,13 @@ export function ManageScreen({ onBack, month = monthKey(new Date()) }: { onBack:
     <div className="screen" role="dialog" aria-modal="true" aria-label="Categories and cards">
       <ScreenHeader title="Categories and cards" onBack={onBack} />
       <div className="screen__body">
-        <section className="sect sect--settings" style={tintStyle(7)} aria-label="Limits">
+        <section className="sect sect--settings" aria-label="Limits">
           <h2 className="sect__head">Limits</h2>
           <div className="sect__body">{row('overall', 'Overall limit', overallHint, () => setTarget({ kind: 'overall' }))}</div>
           <p className="manage__help">Limits shown are for {monthLabel(month)}. Tap one to change it for every month or for {monthShortLabel(month)} only.</p>
         </section>
 
-        <section className="sect sect--settings" style={tintStyle(7)} aria-label="Categories">
+        <section className="sect sect--settings" aria-label="Categories">
           <h2 className="sect__head">Categories</h2>
           <div className="sect__body">
             {tops.map((c) => (
@@ -94,7 +93,7 @@ export function ManageScreen({ onBack, month = monthKey(new Date()) }: { onBack:
           </div>
         </section>
 
-        <section className="sect sect--settings" style={tintStyle(7)} aria-label="Payment methods">
+        <section className="sect sect--settings" aria-label="Payment methods">
           <h2 className="sect__head">Payment methods</h2>
           <div className="sect__body">
             {instruments.length === 0 && <p className="manage__none">No cards or accounts yet. Add the ones you pay with, so an entry can say which one.</p>}

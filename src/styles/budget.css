@@ -494,8 +494,13 @@ button.heat__cell:active {
   border-top: 1px solid var(--line);
 }
 
-.bills__item:first-child {
+/* The row inside already draws its own top hairline; two stacked read as one heavy line. */
+.bills__item > .budget__row {
   border-top: 0;
+}
+
+.bills__item:last-child {
+  border-bottom: 1px solid var(--line);
 }
 
 .bills__actions {

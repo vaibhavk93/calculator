@@ -4,7 +4,6 @@ import { ScreenHeader } from '../../components/ScreenHeader'
 import { PickerSelect } from '../../components/PickerSelect'
 import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
-import { tintStyle } from '../../components/tint'
 import { useBackHandler } from '../../components/useBackHandler'
 import { D } from '../../engine'
 import { INSTRUMENT_KINDS, categoryName, instrumentLabel, modeLabel, suggestFor } from '../../lib/budget'
@@ -154,7 +153,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
     <div className="screen" role="dialog" aria-modal="true" aria-label="Add from messages">
       <ScreenHeader title="Add from messages" onBack={onBack} />
       <div className="screen__body">
-        <section className="sect sect--settings" style={tintStyle(7)} aria-label="Scan">
+        <section className="sect sect--settings" aria-label="Scan">
           <h2 className="sect__head">Find spending in bank messages</h2>
           <div className="sect__body import__intro">
             <p>Calc reads only messages from banks and payment apps, only when you tap Scan, only on this phone. Nothing is sent anywhere. The message text is not saved. You choose what to add.</p>
@@ -164,7 +163,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
           </div>
         </section>
 
-        <section className="sect sect--settings" style={tintStyle(7)} aria-label="Statement file">
+        <section className="sect sect--settings" aria-label="Statement file">
           <h2 className="sect__head">Or pick a statement file</h2>
           <div className="sect__body import__intro">
             <p>Download a statement as CSV from your bank or card site, then pick it here. It is read on this phone and not kept. PDF is not supported yet.</p>
@@ -182,7 +181,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
         </section>
 
         {result && (
-          <section className="sect" style={tintStyle(4)} aria-label="Found">
+          <section className="sect" aria-label="Found">
             <h2 className="sect__head"><span>Found</span><span className="sect__count">{fresh.length}</span></h2>
             <div className="sect__body">
               {newInstruments(fresh).map((n) => (
@@ -209,7 +208,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
           </section>
         )}
 
-        <section className="sect sect--settings" style={tintStyle(7)} aria-label="Reader log">
+        <section className="sect sect--settings" aria-label="Reader log">
           <button type="button" className="navrow tap-row" onClick={() => setLogOpen(true)}>
             <span className="row__text">
               <span className="row__label">Reader log</span>
