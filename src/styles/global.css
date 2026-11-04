@@ -824,6 +824,10 @@ button:disabled {
 }
 
 .group__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
   margin: var(--s-5) var(--s-4) var(--s-1);
   font-size: 0.8125rem;
   color: var(--ink-2);

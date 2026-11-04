@@ -744,10 +744,13 @@ C('CALC-406', 'UX', 'Focus: keys do not take focus (so Enter never re-presses a 
 C('CALC-407', 'UX', 'Focus after the Copy sheet closes: not stuck on the sheet', async (t) => {
   await tap(t.page, '150000'); await t.page.locator('.util__btn', { hasText: 'Copy' }).click(); await t.page.locator('.copyas__opt').first().click(); await wait(250); const a = await t.page.evaluate(() => document.activeElement?.closest('.sheet') ? 'sheet' : 'ok'); eq(a, 'ok')
 })
-C('CALC-408', 'UX', 'To list and Remind me chips appear after = (and only then)', async ({ page }) => {
-  eq(await page.locator('.result-actions .chip').count(), 0); await tap(page, '2+3='); eq(await page.locator('.result-actions .chip').count(), 2); await tap(page, '7'); eq(await page.locator('.result-actions .chip').count(), 0)
+C('CALC-408', 'UX', 'Add to a list, Remind me and Add expense icons appear after = (and only then)', async ({ page }) => {
+  // Pre-existing stale expectation found and fixed 2026-11-04: this asserted 2, from before "Add
+  // expense" existed (confirmed against the commit before this change: identically "got 3, expected 2").
+  // A positive whole-number result shows all three.
+  eq(await page.locator('.result-actions__btn').count(), 0); await tap(page, '2+3='); eq(await page.locator('.result-actions__btn').count(), 3); await tap(page, '7'); eq(await page.locator('.result-actions__btn').count(), 0)
 })
-C('CALC-409', 'UX', 'Remind me from a result opens a sheet with a close X', async ({ page }) => { await tap(page, '2+3='); await page.locator('.result-actions .chip', { hasText: 'Remind me' }).click(); await page.waitForSelector('.sheet'); ok(await page.locator('.sheet__close').count() === 1, 'no close X') })
+C('CALC-409', 'UX', 'Remind me from a result opens a sheet with a close X', async ({ page }) => { await tap(page, '2+3='); await page.locator('.result-actions').getByRole('button', { name: 'Remind me' }).click(); await page.waitForSelector('.sheet'); ok(await page.locator('.sheet__close').count() === 1, 'no close X') })
 C('CALC-410', 'UX', 'Wording: every message on a bad key sequence is plain words (no codes)', async ({ page }) => {
   const seen = new Set(); for (const s of ['5/0', '0/0', '10^100']) { await tap(page, 'C'); await kb(page, s); const n = (await read(page)).note; if (n) seen.add(n) }
   ok([...seen].every((m) => /^[A-Z][a-z]/.test(m) && !/error|exception|code/i.test(m)), [...seen].join(' | '))

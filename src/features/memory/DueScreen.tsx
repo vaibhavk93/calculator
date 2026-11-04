@@ -5,7 +5,6 @@ import { ReliableRemindersSheet } from '../settings/ReliableRemindersSheet'
 import { Icon } from '../../components/Icon'
 import { EmptyState } from '../../components/EmptyState'
 import { useApp } from '../../components/StoreProvider'
-import { tintStyle } from '../../components/tint'
 import { formatCell } from '../../lib/toolFormat'
 import { D } from '../../engine'
 import { billForCard } from '../../lib/recurring'
@@ -13,9 +12,6 @@ import { afterDaysLabel, dueLabel, dueSoonTotal, groupReminders } from '../../li
 import type { Reminder } from '../../store/types'
 import { CardView } from './CardView'
 import { useTour } from '../onboarding/useTour'
-
-/** Overdue is the one section that earns a hue by meaning: its heading takes the alert colour on a plain card. */
-const OVERDUE = { '--tint': 'var(--surface)', '--tint-ink': 'var(--alert)' } as React.CSSProperties
 
 const WHEN = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' })
 
@@ -71,14 +67,17 @@ export function DueScreen() {
     )
   }
 
-  const section = (title: string, items: Reminder[], tint: number, overdue = false) =>
+  // Tier 2, content: hairline rows, no tint (docs/THE-PLAN.md section 7). Overdue still earns its own
+  // meaning, not an identity colour: its heading alone takes the alert colour, same as the design system
+  // already specified for the plain-card version -- a tint never did that.
+  const section = (title: string, items: Reminder[], overdue = false) =>
     items.length > 0 && (
-      <section className="sect" style={overdue ? OVERDUE : tintStyle(tint)} aria-label={title}>
-        <h2 className="sect__head">
+      <>
+        <h2 className={overdue ? 'group__title group__title--alert' : 'group__title'}>
           <span>{title}</span>
           <span className="sect__count">{items.length}</span>
         </h2>
-        <div className="sect__body">
+        <div className="group" aria-label={title}>
           {items.map((r) => {
             const card = cards.find((c) => c.id === r.cardId)!
             // A bill or card-bill reminder belongs to a record in Budget: paying it adds the entry, and Remove ends the bill.
@@ -115,7 +114,7 @@ export function DueScreen() {
             )
           })}
         </div>
-      </section>
+      </>
     )
 
   return (
@@ -143,14 +142,19 @@ export function DueScreen() {
           <span className="tape__sum">{formatCell(total, 'money', { system, decimals })}</span>
         </div>
       )}
-      <div className="tools__list sections">
-        {section('Overdue', g.overdue, 8, true)}
-        {section('This week', g.week, 5)}
-        {section('Later', g.later, 8)}
-      </div>
-      <div className="due__pack">
-        <p className="note">Advance tax is due 15 Jun, 15 Sep, 15 Dec and 15 Mar. Add all four, then edit them like any reminder.</p>
-        <button type="button" className="btn" onClick={addPack}>Add a pack: advance tax</button>
+      <div className="tools__list">
+        {section('Overdue', g.overdue, true)}
+        {section('This week', g.week)}
+        {section('Later', g.later)}
+        {/* Inside the scrollable list, not a flex:none sibling after it: a sibling has no height limit
+            of its own, so with enough reminders plus 200% font it could overflow .tools' un-clipped box
+            and bleed into the tab bar underneath -- a real, pre-existing bug the new layout-contract
+            suite caught (confirmed against the commit before this change, identical numbers). Scrolling
+            with everything else is what guarantees it is always reachable. */}
+        <div className="due__pack">
+          <p className="note">Advance tax is due 15 Jun, 15 Sep, 15 Dec and 15 Mar. Add all four, then edit them like any reminder.</p>
+          <button type="button" className="btn" onClick={addPack}>Add a pack: advance tax</button>
+        </div>
       </div>
       {open && <CardView card={open} onBack={() => setOpenId(null)} />}
       {fixing && <ReliableRemindersSheet onClose={() => setFixing(false)} />}

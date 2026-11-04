@@ -172,7 +172,7 @@ T('N-020', 'POS', 'To-do from zero: empty state words, quick add in Today lands 
   await quickAdd(p, 'Call plumber')
   const t = await text(p, '.todo'); has(t, 'Call plumber'); has(t, 'Today · 2 Nov 2026'); eq(await p.locator('input[aria-label="New task"]').inputValue(), '', 'box cleared')
   const s = await st(p); eq(s.reminders.length, 1, 'reminder'); eq(s.cards[0].kind, 'task', 'kind')
-  await tab(p, 'Due'); has(await text(p, '.sections'), 'Call plumber')
+  await tab(p, 'Due'); has(await text(p, '.tools__list'), 'Call plumber')
   await shot(p, 'N-020-todo-today')
 })
 T('N-021', 'NEG', 'Quick add with an empty or spaces-only title says so in words, nothing is added', async () => {
@@ -218,7 +218,7 @@ T('N-026', 'POS', 'Task sheet: date + monthly; saved task shows "monthly" and th
   await p.locator('.sheet').getByRole('radio', { name: 'Monthly' }).click(); await sheetSave(p)
   const t = await text(p, '.todo'); has(t, 'Pay rent'); has(t, '5 Nov 2026'); has(t, 'monthly')
   const s = await st(p); eq(s.reminders[0].repeat, 'monthly', 'repeat'); eq(s.reminders[0].anchorDay, 5, 'anchor')
-  await tab(p, 'Due'); has(await text(p, '.sections'), 'In 3 days'); has(await text(p, '.sections'), 'monthly')
+  await tab(p, 'Due'); has(await text(p, '.tools__list'), 'In 3 days'); has(await text(p, '.tools__list'), 'monthly')
 })
 T('N-027', 'NEG', 'Task sheet: empty title blocks Save with an error under the field; a repeat without a date says "Pick a date first"', async () => {
   const { page: p } = await open(); await notesTab(p); await modeTodo(p)
@@ -300,7 +300,7 @@ T('N-037', 'CORNER', 'Midnight: a task due 2 Nov is "Today" at 23:59 and "Overdu
   const a = await open(seed({ cards, reminders }), { now: ist('2026-11-02T23:59') }); await notesTab(a.page); await modeTodo(a.page)
   has(await text(a.page, '.todo'), 'Today'); lacks(await text(a.page, '.todo'), 'overdue')
   const b = await open(seed({ cards, reminders }), { now: ist('2026-11-03T00:00') }); await notesTab(b.page); await modeTodo(b.page)
-  has(await text(b.page, '.todo'), '1 day overdue'); has(await text(b.page, '.todo section[aria-label="Overdue"]'), 'Rent')
+  has(await text(b.page, '.todo'), '1 day overdue'); has(await text(b.page, '.todo .group[aria-label="Overdue"]'), 'Rent')
 })
 T('N-038', 'RUNTIME', 'Rapid taps: tick/untick 8 times, double-tap Add, 10 quick adds. No console error, no duplicate, no lost task', async () => {
   const { page: p } = await open(seed({ cards: [task('t', 'Tick me')], reminders: [rem('r', 't', NOW)] })); await notesTab(p); await modeTodo(p)
@@ -377,22 +377,24 @@ T('N-070', 'POS', 'Due list order: Overdue first (alert words), then This week, 
   const cards = ['A', 'B', 'C', 'D', 'E'].map((x) => task('c' + x, 'Rent ' + x))
   const reminders = [rem('rE', 'cE', NOW + 40 * DAY), rem('rD', 'cD', NOW + 2 * DAY), rem('rC', 'cC', NOW + DAY), rem('rB', 'cB', NOW - 3 * DAY), rem('rA', 'cA', NOW - DAY)]
   const { page: p } = await open(seed({ cards, reminders })); await tab(p, 'Due')
-  const secs = await p.locator('.sections section').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') + ':' + [...e.querySelectorAll('.row__label')].map((x) => x.textContent).join(',')))
-  eq(secs.join(' | '), 'Overdue:Rent B,Rent A | This week:Rent C,Rent D | Later:Rent E', 'sections'); has(await text(p, '.sections'), '3 days overdue'); await shot(p, 'N-070-due-order')
+  // Due's groups became plain hairline lists 2026-11-04 (docs/THE-PLAN.md Block B4/B5): no more
+  // <section class="sect">, just a <div class="group" aria-label="...">. Same information, different tag.
+  const secs = await p.locator('.tools__list .group').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') + ':' + [...e.querySelectorAll('.row__label')].map((x) => x.textContent).join(',')))
+  eq(secs.join(' | '), 'Overdue:Rent B,Rent A | This week:Rent C,Rent D | Later:Rent E', 'sections'); has(await text(p, '.tools__list'), '3 days overdue'); await shot(p, 'N-070-due-order')
 })
 T('N-071', 'UX', 'Mark paid on a one-time reminder says what happened and offers Undo; Undo brings it back to Due', async () => {
   const { page: p } = await open(seed({ cards: [emi('a', 'HDFC card')], reminders: [rem('r', 'a', NOW + DAY)] })); await tab(p, 'Due')
   await p.getByRole('button', { name: 'Mark paid' }).click(); has(await snackText(p), 'Marked paid: "HDFC card"'); has(await text(p), 'No reminders yet')
-  await p.locator('.snack').getByRole('button', { name: 'Undo' }).click(); has(await text(p, '.sections'), 'HDFC card')
+  await p.locator('.snack').getByRole('button', { name: 'Undo' }).click(); has(await text(p, '.tools__list'), 'HDFC card')
 })
 T('N-072', 'POS', 'Mark paid on a monthly reminder moves it to next month, keeps the label "monthly"; a task says "Done"', async () => {
   const { page: p } = await open(seed({ cards: [emi('a', 'Rent'), task('t', 'Water filter')], reminders: [rem('r', 'a', ist('2026-11-05'), { repeat: 'monthly' }), rem('r2', 't', NOW)] })); await tab(p, 'Due')
-  await p.locator('.due', { hasText: 'Rent' }).getByRole('button', { name: 'Mark paid' }).click(); has(await text(p, '.sections'), '5 Dec'); has(await text(p, '.sections'), 'monthly')
+  await p.locator('.due', { hasText: 'Rent' }).getByRole('button', { name: 'Mark paid' }).click(); has(await text(p, '.tools__list'), '5 Dec'); has(await text(p, '.tools__list'), 'monthly')
   eq(await p.locator('.due', { hasText: 'Water filter' }).getByRole('button', { name: 'Done' }).count(), 1, 'tasks use "Done"')
 })
 T('N-073', 'POS', 'Snooze 1 day moves the date one day on and says so in the row', async () => {
   const { page: p } = await open(seed({ cards: [emi('a', 'Rent')], reminders: [rem('r', 'a', ist('2026-11-05'))] })); await tab(p, 'Due')
-  await p.getByRole('button', { name: 'Snooze 1 day' }).click(); has(await text(p, '.sections'), '6 Nov'); eq((await st(p)).reminders[0].dueAt, ist('2026-11-06'), 'dueAt')
+  await p.getByRole('button', { name: 'Snooze 1 day' }).click(); has(await text(p, '.tools__list'), '6 Nov'); eq((await st(p)).reminders[0].dueAt, ist('2026-11-06'), 'dueAt')
 })
 T('N-074', 'UX', 'Remove asks first: "Keep it" keeps, "Yes, remove" removes the reminder and keeps the note', async () => {
   const { page: p } = await open(seed({ cards: [emi('a', 'Rent')], reminders: [rem('r', 'a', NOW + DAY)] })); await tab(p, 'Due')
@@ -401,7 +403,7 @@ T('N-074', 'UX', 'Remove asks first: "Keep it" keeps, "Yes, remove" removes the 
 })
 T('N-075', 'POS', 'Advance tax pack from zero: 4 reminders with the right dates (15 Dec 2026, 15 Mar, 15 Jun, 15 Sep 2027) in order; twice adds no more', async () => {
   const { page: p } = await open(); await tab(p, 'Due'); await p.getByRole('button', { name: /Add advance tax reminders/ }).click(); await wait(200)
-  const labels = await p.locator('.sections .due .row__label').allInnerTexts(); eq(labels.length, 4, 'four rows')
+  const labels = await p.locator('.tools__list .due .row__label').allInnerTexts(); eq(labels.length, 4, 'four rows')
   has(labels[0], '(75% due)'); has(labels[1], '(100% due)'); has(labels[2], '(15% due)'); has(labels[3], '(45% due)')
   await p.getByRole('button', { name: /Add a pack/ }).click(); eq((await st(p)).reminders.length, 4, 'still four'); has(await snackText(p), 'already there')
   const s = await stored(p); eq(s.reminders.every((r) => r.repeat === 'yearly' && r.leadDays === 7), true, 'yearly, 7 days')
@@ -432,7 +434,7 @@ T('N-079', 'UX', 'Delivery notice: "A reminder may not have shown", plain words,
 T('N-080', 'POS', 'Due card open: the reminder editor shows lead pills; changing to 3 lead times saves a list; Back returns to Due', async () => {
   const { page: p } = await open(seed({ cards: [emi('a', 'HDFC card')], reminders: [rem('r', 'a', ist('2026-12-20'), { leadDays: 3 })] })); await tab(p, 'Due')
   await p.locator('.due__main').click(); await wait(200); has(await text(p, '.screen'), 'HDFC card'); has(await text(p), 'Remind me')
-  await p.getByRole('button', { name: 'Back' }).first().click(); has(await text(p, '.sections'), 'HDFC card')
+  await p.getByRole('button', { name: 'Back' }).first().click(); has(await text(p, '.tools__list'), 'HDFC card')
 })
 
 // ================================================================== SETTINGS
@@ -446,7 +448,7 @@ T('N-090', 'POS', 'Settings: every row works (theme x3, accent, number system, d
 })
 T('N-091', 'POS', 'Number system and decimals change how a saved amount is drawn in Notes and Due (Indian 12,34,567 vs 1,234,567; 0 vs 4 decimals)', async () => {
   const cards = [emi('a', 'Big', { amount: '1234567.891' })]; const { page: p } = await open(seed({ cards, reminders: [rem('r', 'a', NOW + DAY)] })); await tab(p, 'Due')
-  has(await text(p, '.sections'), '12,34,567.89'); await settings(p); await p.getByRole('radio', { name: 'International' }).click(); await p.getByRole('button', { name: 'Back' }).first().click(); await tab(p, 'Due'); has(await text(p, '.sections'), '1,234,567.89')
+  has(await text(p, '.tools__list'), '12,34,567.89'); await settings(p); await p.getByRole('radio', { name: 'International' }).click(); await p.getByRole('button', { name: 'Back' }).first().click(); await tab(p, 'Due'); has(await text(p, '.tools__list'), '1,234,567.89')
 })
 T('N-092', 'POS', 'Reminder time: set 18:30, survives reload, the task sheet hint says "6:30 pm"; the test reminder says plainly it needs the phone app', async () => {
   const { page: p } = await open(); await settings(p); await p.locator('input[type=time]').fill('18:30'); await p.getByText('Send a test reminder').click()

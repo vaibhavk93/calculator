@@ -106,12 +106,30 @@
 
 .result-actions {
   flex: none;
-  /* Always this tall, chips or not, so the display and keys never move when a result is finished. */
+  /* Always this tall, icons or not, so the display and keys never move when a result is finished. */
   min-height: calc(44px + var(--s-2));
   display: flex;
   justify-content: flex-end;
   gap: var(--s-2);
   padding: 0 var(--s-4) var(--s-2);
+}
+
+/* Same visual as KeepAndShare's .keep__btn (a tool result's Copy/Share row) -- the same quiet,
+   icon-only, tier-3 pattern, not .keep__btn itself, since that class's own margin and background
+   assume it owns a full-width row rather than sitting flush inside .result-actions' fixed height. */
+.result-actions__btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--ink-3);
+  border-radius: var(--r-md);
+  color: var(--accent);
+}
+
+.result-actions__btn:active {
+  background: var(--key-op-pressed);
 }
 
 /* The pin button on a Notes row sits level with the row's text, not at its top. */

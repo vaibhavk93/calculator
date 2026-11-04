@@ -848,6 +848,11 @@ textarea.field {
   border-top: 1px solid var(--line);
 }
 
+/* Closes a Due group's list with a bottom hairline, same as .group > .row:last-child. */
+.group > .due:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
 .due__main {
   display: flex;
   align-items: center;

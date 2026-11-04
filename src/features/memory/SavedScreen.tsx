@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { EmptyState } from '../../components/EmptyState'
 import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
-import { tintStyle } from '../../components/tint'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useBackHandler } from '../../components/useBackHandler'
 import { matchesCard } from '../../lib/cardSearch'
@@ -112,26 +111,28 @@ export function SavedScreen() {
           Press Save on any calculator, or tap New list above for a running total. Add a reminder and the Due tab will keep track.
         </EmptyState>
       ) : (
-        <div className="tools__list sections">
-          {/* Pinned first, then lists, then saved calculations: three cards you can tell apart at a glance. */}
+        <div className="tools__list">
+          {/* Pinned first, then lists, then saved calculations: a hairline list per kind, no card, no
+              tint (docs/THE-PLAN.md section 7) -- this was three equally-weighted tinted cards; the kind
+              is still told apart by its own heading, not by colour. */}
           {[
-            { title: 'Pinned', tint: 4, items: shown.filter((c) => c.pinned) },
-            { title: 'Lists', tint: 5, items: shown.filter((c) => !c.pinned && c.kind === 'tape') },
-            { title: 'Calculations', tint: 3, items: shown.filter((c) => !c.pinned && c.kind !== 'tape') },
+            { title: 'Pinned', items: shown.filter((c) => c.pinned) },
+            { title: 'Lists', items: shown.filter((c) => !c.pinned && c.kind === 'tape') },
+            { title: 'Calculations', items: shown.filter((c) => !c.pinned && c.kind !== 'tape') },
           ]
             .filter((sec) => sec.items.length > 0)
             .map((sec) => (
-              <section className="sect" key={sec.title} style={tintStyle(sec.tint)} aria-label={sec.title}>
-                <h2 className="sect__head">
+              <div key={sec.title}>
+                <h2 className="group__title">
                   <span>{sec.title}</span>
                   <span className="sect__count">{sec.items.length}</span>
                 </h2>
-                <div className="sect__body">
+                <div className="group" aria-label={sec.title}>
                   {sec.items.map((c) => (
                     <CardRow key={c.id} card={c} due={reminders.find((r) => r.cardId === c.id && !r.done)?.dueAt} onOpen={() => setView({ kind: 'card', id: c.id })} onPin={() => togglePin(c.id)} />
                   ))}
                 </div>
-              </section>
+              </div>
             ))}
           {shown.length === 0 && <p className="tools__none">Nothing matches.</p>}
         </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
 import { D } from '../../engine'
 import { ExpenseSheet } from '../budget/sheets'
@@ -9,11 +10,16 @@ import { ToListSheet } from './ToListSheet'
 const PLAIN_NUMBER = /^-?\d+(\.\d+)?$/
 
 /**
- * Two actions for a finished result: "To list" (send it to a list, as one line or as N lines to share out) and
- * "Remind me". `value` is the result as a plain decimal string; `active` is true once "=" has committed it.
+ * What to do with a just-finished result: add it to a list, get reminded, add it as a budget expense.
+ * `value` is the result as a plain decimal string; `active` is true once "=" has committed it.
  *
- * The row is ALWAYS in the layout, at a fixed height, and the chips appear inside it. Before, the row was added
- * after "=" and everything above it jumped up. A layout must not move because a number was finished.
+ * Tier 3, not tier 1: the result itself (the huge number above this row) is the one thing on this screen
+ * that should shout. These are quiet icon buttons, the same weight and pattern as a tool result's
+ * Copy/Share row (KeepAndShare.tsx), not text chips competing with the digits for attention -- changed
+ * 2026-11-04 after the owner said chips here read as loud as the answer itself.
+ *
+ * The row is ALWAYS in the layout, at a fixed height, and the icons appear inside it. Before, the row was
+ * added after "=" and everything above it jumped up. A layout must not move because a number was finished.
  */
 export function ResultActions({ value, active }: { value: string; active: boolean }) {
   const showCard = useApp((s) => s.showCard)
@@ -35,9 +41,17 @@ export function ResultActions({ value, active }: { value: string; active: boolea
       <div className="result-actions" role={show ? 'group' : undefined} aria-label={show ? 'What to do with this result' : undefined}>
         {show && (
           <>
-            <button type="button" className="chip" onClick={() => setOpen('list')}>To list</button>
-            <button type="button" className="chip" onClick={() => setOpen('remind')}>Remind me</button>
-            {canExpense && <button type="button" className="chip" onClick={() => setOpen('expense')}>Add expense</button>}
+            <button type="button" className="result-actions__btn" aria-label="Add to a list" title="Add to a list" onClick={() => setOpen('list')}>
+              <Icon name="list" size={20} />
+            </button>
+            <button type="button" className="result-actions__btn" aria-label="Remind me" title="Remind me" onClick={() => setOpen('remind')}>
+              <Icon name="due" size={20} />
+            </button>
+            {canExpense && (
+              <button type="button" className="result-actions__btn" aria-label="Add expense" title="Add expense" onClick={() => setOpen('expense')}>
+                <Icon name="budget" size={20} />
+              </button>
+            )}
           </>
         )}
       </div>

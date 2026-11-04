@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { EmptyState } from '../../components/EmptyState'
 import { Icon } from '../../components/Icon'
 import { useApp, useAppStore } from '../../components/StoreProvider'
-import { tintStyle } from '../../components/tint'
 import { matchesCard } from '../../lib/cardSearch'
 import { dueLabel } from '../../lib/reminders'
 import { groupTasks, shortDate, taskItems, taskSummary, validateTask, type TaskItem } from '../../lib/tasks'
@@ -10,9 +9,6 @@ import { Segmented } from '../settings/controls'
 import { TaskSheet } from './TaskSheet'
 
 type View = 'today' | 'upcoming' | 'all'
-
-/** Overdue is the one section that earns a hue by meaning, as on the Due tab: a plain card with an alert heading. */
-const OVERDUE = { '--tint': 'var(--surface)', '--tint-ink': 'var(--alert)' } as React.CSSProperties
 
 /** The last view chosen, kept while the app runs and forgotten on restart. */
 let lastView: View = 'today'
@@ -79,19 +75,22 @@ export function TodoScreen({ query, tag, tourLink }: { query: string; tag: strin
     </div>
   )
 
-  const section = (name: string, list: TaskItem[], tint: number, overdue = false) =>
+  // Tier 2, content: hairline rows, no tint -- same change as Due's own Overdue/This week/Later
+  // (docs/THE-PLAN.md section 7). Overdue keeps earning its own meaning, an alert-coloured heading, not
+  // an identity colour.
+  const section = (name: string, list: TaskItem[], overdue = false) =>
     list.length > 0 && (
-      <section className="sect" style={overdue ? OVERDUE : tintStyle(tint)} aria-label={name}>
-        <h2 className="sect__head">
+      <div key={name}>
+        <h2 className={overdue ? 'group__title group__title--alert' : 'group__title'}>
           <span>{name}</span>
           <span className="sect__count">{list.length}</span>
         </h2>
-        <div className="sect__body">{list.map((t) => row(t, overdue))}</div>
-      </section>
+        <div className="group" aria-label={name}>{list.map((t) => row(t, overdue))}</div>
+      </div>
     )
 
   const body =
-    view === 'today' ? [section('Overdue', g.overdue, 8, true), section('Today', g.today, 5)] : view === 'upcoming' ? [section('Upcoming', g.upcoming, 8)] : [section('No date', g.inbox, 4), section('Overdue', g.overdue, 8, true), section('Today', g.today, 5), section('Upcoming', g.upcoming, 8)]
+    view === 'today' ? [section('Overdue', g.overdue, true), section('Today', g.today)] : view === 'upcoming' ? [section('Upcoming', g.upcoming)] : [section('No date', g.inbox), section('Overdue', g.overdue, true), section('Today', g.today), section('Upcoming', g.upcoming)]
   const anyShown = body.some(Boolean)
 
   return (
@@ -128,7 +127,7 @@ export function TodoScreen({ query, tag, tourLink }: { query: string; tag: strin
         />
       </div>
 
-      <div className="tools__list sections">
+      <div className="tools__list">
         {total === 0 ? (
           <EmptyState title="No tasks yet" level="h2" action={tourLink}>Write what needs doing in the box above. Give a task a date and it shows in Today and in the Due tab.</EmptyState>
         ) : (
@@ -140,8 +139,8 @@ export function TodoScreen({ query, tag, tourLink }: { query: string; tag: strin
               </p>
             )}
             {g.done.length > 0 && (
-              <section className="sect todo__done" style={tintStyle(7)} aria-label="Done">
-                <h2 className="sect__head todo__donehead">
+              <div className="todo__done">
+                <h2 className="group__title todo__donehead">
                   <button type="button" className="todo__toggle" aria-expanded={showDone} onClick={() => setShowDone(!showDone)}>
                     <span>Done</span>
                     <span className="sect__count">{g.done.length}</span>
@@ -149,7 +148,7 @@ export function TodoScreen({ query, tag, tourLink }: { query: string; tag: strin
                   </button>
                 </h2>
                 {showDone && (
-                  <div className="sect__body">
+                  <div className="group" aria-label="Done">
                     {g.done.map((t) => row(t))}
                     {confirming ? (
                       <div className="confirm todo__confirm" role="group" aria-label="Clear done tasks">
@@ -166,7 +165,7 @@ export function TodoScreen({ query, tag, tourLink }: { query: string; tag: strin
                     )}
                   </div>
                 )}
-              </section>
+              </div>
             )}
           </>
         )}
