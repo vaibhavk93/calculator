@@ -1,5 +1,49 @@
 # Session state: resume here
 
+## Round 12 (2026-11-04): Block B3/B4/B5 done, built and installed on the real phone, verified live
+
+**Last prompt:** "yes, continue with B3 and B4/B5" then "I connected my phone as well i want you to build
+everything, create the build, install on phone and then test on my phone".
+
+**Built:** B3 (post-"=" chips -> 3 quiet icon buttons, `.result-actions__btn`, same visual language as
+KeepAndShare) and B4/B5 (the three-tier rule applied to Due's Overdue/This week/Later and Notes'
+Pinned/Lists/Calculations and To-do's Overdue/Today/Upcoming/No date/Done -- all tinted cards became
+hairline `.group`/`.group__title` lists). Full reasoning and the exact verification method in commit
+`4d25b3b`.
+
+**One real, pre-existing bug found and fixed while verifying B4/B5:** Due's "Add a pack: advance tax"
+panel sat outside the scrollable list as a flex:none sibling with no height limit, so at 200% font with
+enough reminders it could overflow past the viewport and bleed under the tab bar. Confirmed pre-existing
+against the commit before this change using an isolated `git worktree` (not stash -- see the note below)
+at the SAME commit, byte-identical numbers. Fixed by moving it inside the scrollable list.
+
+**⚠ A stash incident, for next time:** combined `git stash` + a 5-minute-timeout test run + `git stash pop`
+in one shell call. The run hit the timeout and the whole command was killed BEFORE `git stash pop` ran,
+leaving the B4/B5 work sitting in `stash@{0}` with a clean-looking working tree. Caught it immediately
+(`git stash list` still showed it) and restored with a bare `git stash pop`, no data lost. **The fix used
+for the rest of the session: `git worktree add /tmp/calc-baseline <commit>` instead of stashing** --
+tests the old code in a completely separate directory, zero risk to the working tree, no restore step
+needed. Prefer worktree over stash whenever a baseline comparison needs the OLD code to actually run
+(not just be read).
+
+**Verified zero regressions, three ways:** `npm run check` (2529 pass) · `layout-contract` + `answerbar`
+e2e 100% (144/144, 7/7) · `budget.test.mjs` / `qa-notes-due.test.mjs` / `reminders-lists.test.mjs` failure
+lists diffed against the pre-change worktree, byte-identical.
+
+**Then built and installed the REAL app (not Calc QA) on the connected phone**
+(`scripts/build-android.sh install`, phone `fb83a61a`) at the owner's explicit request. The first `adb
+install` in the script's own run failed with a truncated error (likely transient); a direct retry
+succeeded immediately. **Verified live on the device, with the owner's real data, via screenshot** (not
+just "it built"): B3's icon-only row under a finished calculation, B2's bare Budget hero + hairline Recent
++ collapsed "More in Budget", B4/B5's hairline Due groups with the `due__pack` overflow fix confirmed
+(no longer bleeding under the tab bar), Notes' hairline Pinned/Lists groups, To-do's empty state. Zero
+errors in `adb logcat` across the whole session. Per the established safety rule, this was READ-ONLY
+navigation (tab taps, one scroll) on the real app with real data -- no bulk taps, no edits, no deletes.
+
+**Not yet done:** Phase 7-adjacent items not in B1-B5 scope. The `ink-3` contrast decision and date-locale
+decision from Round 10 are still open (`docs/THE-PLAN.md` section 5). `docs/THE-PLAN.md` itself has not
+been updated with B3/B4/B5's "Done" status yet -- do that first on resume.
+
 ## Round 11 (2026-11-04): Block A (trustworthy tests) and Block B1/B2 (Budget home redesign) done
 
 **Last prompt:** "sure lets start" (confirming Block A + B2 from `docs/THE-PLAN.md`).
