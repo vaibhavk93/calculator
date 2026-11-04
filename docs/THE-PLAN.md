@@ -189,8 +189,18 @@ None of these can be proven in a browser.
 
 ## 5. Decisions only the owner can make
 
-| Question | Options |
-|---|---|
+**All six answered by the owner on 2026-11-04.**
+
+| Question | Decision | What follows |
+|---|---|---|
+| **B9: which screen still feels wrong** | **"All of them except the basic calculator page."** The calculator page is the quality bar | Audit every other screen against it: `docs/B9-UI-AUDIT-2026-11-04.md`, then a numbered work list (B10+) |
+| **`ink-3` contrast on tints** | **B**: hints become `ink-2`; `ink-3` stays for borders and fills only | Change every `color: var(--ink-3)` text use to `ink-2` |
+| **Dates** | **Indian first**: force `en-IN` everywhere | One shared `DATE_LOCALE` constant, replace every `Intl.DateTimeFormat(undefined, ...)` and bare `toLocaleDateString()` |
+| **Phase 7 "turn modules on/off"** | **Build it** | The project rule still sends it through one critic first, to shrink it, not to reopen the decision |
+| **Portfolio (P1)** | **Yes, build it** | After the design work, as planned |
+| **Lock-a-history-row control** | **Keep it** | Remove the "remove it when next touched" note |
+
+---|---|
 | **`ink-3` contrast on tints** | **A.** Lighten `ink-3` to `#929292` — passes everywhere, but ink-2 and ink-3 become nearly identical (separation drops 1.56 → 1.25). **B.** Stop using `ink-3` for hint text; hints become `ink-2` — ramp kept, ink-3 becomes a border colour only. **C.** Accept it and write the exception into the design system |
 | **Dates** | Force `en-IN` everywhere, or keep following the phone's locale |
 | **Phase 7 "turn modules on/off"** | 8 items, planned, never critiqued. It changes behaviour for every user, so the project rule says a critic runs first. Worth it only if the app really is too big — which the design reset in §7 may fix more cheaply |
@@ -324,4 +334,4 @@ from ordinary prose).
 net-worth tracking, as Portfolio.
 
 A separate "lock a history row" control was ruled out as redundant with naming — **but it shipped
-anyway** and is still in the Calculation sheet. Remove it when that sheet is next touched.
+anyway, and the owner chose to keep it (2026-11-04).**
