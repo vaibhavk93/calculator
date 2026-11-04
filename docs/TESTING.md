@@ -3,7 +3,22 @@
 What is tested by machine, what must be checked by eye, and the checklist for a real phone.
 **A UI change is not done until you have looked at it.** Unit tests cannot see focus bugs, clipped text or layout.
 
-## 1. By machine: `npm run check` (1086 tests, 49 files)
+## 0. Node version — read this before any e2e run
+
+e2e tests need Node 20+ (Playwright's floor). `.nvmrc` pins 22. **If your shell's default `node` is older,
+Playwright fails or silently skips cases without saying why** — this was the single biggest reason layout and
+scroll bugs went uncaught for a long stretch (see `docs/THE-PLAN.md` §6). `npm run e2e` checks the version
+itself first and prints the fix if it's wrong.
+
+## 1. By machine: `npm run check` (2529 tests, 92 files) + `npm run e2e`
+
+`npm run e2e` runs every `e2e/*.test.mjs` suite in one command (`e2e/run-all.mjs`); `npm run e2e:fast` skips
+the ten slowest suites (tools1, tools2, calculator, shell, budget, notes-todo, qa-budget-new, qa-cross,
+qa-notes-due, qa-tools) for a quick pass. Not folded into `npm run check` — the full suite is well over an
+hour, `tools1` alone is 20+ minutes. Also: `e2e/layout-contract.test.mjs`, a cross-cutting suite that opens
+every tab at 3 widths × 2 font scales with seeded long content and asserts real geometry (no overflow, no
+overlapping controls, every control ≥44px in one direction, no text clipping, every control named) — this
+catches what a per-screen sweep misses.
 
 | Suite | Where | Catches |
 |---|---|---|
@@ -25,7 +40,7 @@ Rules for new tests:
 
 ## 2. By eye: the browser pass (360px, dark and light)
 
-**The audit sweep (use this first).** `e2e/audit-harness.js` opens every calculator (55) and every app page (25) in a 360px
+**The audit sweep (use this first).** `e2e/audit-harness.js` opens every calculator (60, was 55 when this was written) and every app page (25) in a 360px
 iframe and checks each for sideways scrolling, off-screen content, cut-off text, controls under 44px, unnamed controls,
 `NaN` on screen and wrapping money. Run it at normal size **and at 200% font**; the 200% run found most of the bugs. The
 file's header says how. On 2026-11-02 the first sweep found 7 kinds of bug across 30 pages; after fixes it reports none.

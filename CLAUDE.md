@@ -28,7 +28,7 @@ Capacitor for the stores. **Read the docs before writing code.**
 | Budget: what is built, Spend Summary, payment methods, phases | `docs/BUDGET-PLAN.md` |
 | Notes + To-do plan | `docs/NOTES-TODO-PLAN.md` |
 | Add from bank messages (SMS capture), its privacy rules and reader log | `docs/SMS-CAPTURE.md` |
-| **The one list of everything planned, by phase** | `docs/MASTER-ROADMAP.md` |
+| **The one list of everything planned, by phase** | `docs/THE-PLAN.md` |
 
 ## How to work with the owner (rules they set)
 

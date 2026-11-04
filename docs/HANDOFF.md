@@ -1,15 +1,16 @@
 # Handoff: where Calc stands
 
-**Written:** 2026-11-02. **Read this first** if you are a new person or a new AI session picking the project up.
-It says what exists, what was verified and how, what is not done, and how to get going. Everything here was checked
-against the code on this date. Where something was not checked, it says so.
+**Written:** 2026-11-02, counts refreshed 2026-11-04. **Read this first** if you are a new person or a new AI
+session picking the project up. It says what exists and how to get going. **For current status, open/next work,
+and what's broken, `docs/THE-PLAN.md` is now the live source — not this file.** `docs/SESSION-STATE.md` has the
+last session's exact stopping point. The sections below (product, verification method, caveats, toolchain,
+decisions) don't change every session and are still accurate.
 
-**One-line state:** a working React + Capacitor calculator app with 55 calculators, notes and lists, reminders, a
-**Budget tab** and a revamped UI. 1086 unit tests pass (49 files). The **phone has an older build**. The revamp has been seen in a
-browser at 360px but **not yet on the phone**. Version 0.5.0 (commit `bb17c50`, on top of `3910de7`) added cursor editing,
-the Copy setting, the Budget tab and a round of page tidying. See `CHANGELOG.md`.
-
-**Do not assume 0.5.0 works on a phone.** Nothing from it has run on a device, and the Budget screen is the least checked part.
+**One-line state:** a working React + Capacitor calculator app with **60 calculators**, notes/lists/to-dos, a
+**Due tab** (reminders), SMS-based expense capture, and a **Budget tab** — all on a three-tier hairline design
+system that's been applied to Budget, Due, Notes, To-do, the calculator result row and Tools home group pages
+(see `docs/THE-PLAN.md` Block B). **2529 unit tests pass (92 files)** plus 7 e2e suites (`npm run e2e`). Built and
+installed on the real phone (OnePlus, package `com.vaibhavkumawat.vkcalc`) as of this session.
 
 ## 1. What the product is
 
@@ -36,7 +37,8 @@ analytics, nothing leaves the device except (later) currency rates. Visible name
 | **Budget tab** (5th tab): limit per category plus an optional overall limit, expenses by date, month switcher, Uncategorised shown, soft delete with Undo, 10 starter categories | Built 0.5.0, **unproven** | `src/features/budget/`, `src/lib/budget.ts`, `PersistedData.budget` |
 | Settings: theme, accent, number system, decimals, copying numbers, "Opens on" any calculator, reminders status, backup and restore. Sections are tinted cards | Built | `src/features/settings/` |
 
-Counts: **1086 tests in 49 files**, **55 calculators**, 8 Tools groups, 5 tabs, stored data schema **v3** (the budget was added without a bump: old data gets the starter categories).
+Counts: **2529 tests in 92 files**, **60 calculators**, 8 Tools groups, 5 tabs (Calculate · Tools · Notes · Due ·
+Budget), stored data schema **v3** (the budget was added without a bump: old data gets the starter categories).
 
 ## 3. What was verified, and how
 
@@ -58,6 +60,11 @@ Counts: **1086 tests in 49 files**, **55 calculators**, 8 Tools groups, 5 tabs, 
 - The Budget design is based only on the local `Financial Advisor` folder. The GitHub repo `vaibhavk93/financial-planner` returned 404 (private or renamed), so it was not read.
 
 ## 4. What is NOT done (honest list)
+
+**⚠ This table is from 2026-11-02 and several rows are now stale** (the phone has since been rebuilt and
+tested live, SMS capture shipped, the Budget tab has real use). **`docs/THE-PLAN.md` sections 3-4 are the
+current, maintained list of what's broken and what's next — check there first.** Rows below not contradicted
+by `THE-PLAN.md` are still open.
 
 | # | Item | Why | Next step |
 |---|---|---|---|
@@ -101,8 +108,9 @@ npm run build          # architecture gate + typecheck + build to dist/
 npm run preview -- --port 4173
 ```
 
-Then read, in this order: `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/PARALLEL-WORK.md`, `docs/BUILD-ANDROID.md`,
-`docs/TESTING.md`, `docs/BACKLOG.md`, `docs/IMPROVEMENT-PLAN.md`, `docs/VERIFICATION.md`, `docs/UX-AUDIT.md`, `docs/UI-UX-PLAN.md`, `docs/BRAND.md`.
+Then read, in this order: `CLAUDE.md`, `docs/THE-PLAN.md` (current status and what's next), `docs/SESSION-STATE.md`
+(last session's exact stopping point), `docs/ARCHITECTURE.md`, `docs/PARALLEL-WORK.md`, `docs/BUILD-ANDROID.md`,
+`docs/TESTING.md`, `docs/VERIFICATION.md`, `docs/BRAND.md`.
 
 ## 7. The phone and the toolchain (this Mac)
 
