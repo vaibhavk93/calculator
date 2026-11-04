@@ -42,6 +42,14 @@ echo "4/4  gradle debug build (the first one takes about 7 minutes)"
 ( cd android && ./gradlew $TASK --console=plain )
 
 [ -f "$APK" ] || fail "Build finished but $APK is missing."
+# Reminders survive a reboot only because this plugin receiver is in the app (docs/DATA-FRESHNESS.md). Fail if it is lost.
+MANIFEST="$(ls "$ROOT"/android/app/build/intermediates/merged_manifests/$VARIANT/*/AndroidManifest.xml 2>/dev/null | head -1 || true)"
+if [ -z "$MANIFEST" ]; then
+  echo "Note: merged manifest not found for $VARIANT, so the reboot-receiver check was skipped."
+else
+  grep -q LocalNotificationRestoreReceiver "$MANIFEST" || fail "The app is missing LocalNotificationRestoreReceiver, so reminders would vanish when the phone restarts. Check the @capacitor/local-notifications plugin and run: npx cap sync android"
+fi
+
 echo "Built: $APK ($(du -h "$APK" | cut -f1))"
 
 if [ "${1:-}" = "install" ]; then

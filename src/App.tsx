@@ -66,16 +66,22 @@ function useReminderNotifications() {
     return () => document.removeEventListener('visibilitychange', onShow)
   }, [])
 
+  const notifyStore = useAppStore()
   useEffect(() => {
     const money = (plain: string, fmt?: Parameters<typeof formatCell>[1]) => formatCell(new D(plain), fmt ?? 'money', { system, decimals })
     const planned = planNotifications(reminders, cards, Date.now(), money, time)
     void (async () => {
       if (planned.length > 0 && !(await ensurePermission())) return
-      await applyNotifications(planned)
+      const ok = await applyNotifications(planned)
+      if (!ok) {
+        // The old alarms were kept (applyNotifications cancels nothing on failure). Say so, and do not record a plan that never existed.
+        notifyStore.getState().showNotice("Couldn't set your reminders just now. They will be tried again next time you open the app.", 'error')
+        return
+      }
       // Remember what was scheduled, so a later open can tell when one that was due never showed (lib/delivery.ts).
       if (notificationsSupported()) await recordPlan(planned, reminders)
     })()
-  }, [reminders, cards, system, decimals, time, resumed])
+  }, [reminders, cards, system, decimals, time, resumed, notifyStore])
 
   // Delivery check: when the app opens or comes back, see whether a reminder came due while it was away and may not have shown.
   // It waits a moment so a tap on a notification (which opened the app) is counted first.

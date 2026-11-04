@@ -106,34 +106,41 @@ export async function openExactAlarmSettings(): Promise<boolean> {
 }
 
 /**
- * Replaces everything scheduled with exactly `planned`. Exact when the phone allows it, otherwise
- * inexact. Exactness is asked for explicitly: left on by default, the plugin would throw the
- * system settings screen at the user on every reschedule.
+ * Makes what is scheduled match `planned`. Exact when the phone allows it, otherwise inexact. Exactness is asked
+ * for explicitly: left on by default, the plugin would throw the system settings screen at the user on every reschedule.
+ *
+ * Schedules first, then cancels only the leftovers. Scheduling an id that already exists replaces its alarm (the
+ * Android plugin uses the id as the alarm's request code and cancels the old one), so a failure part-way never leaves
+ * the phone with nothing: the old alarms stay. Returns false if anything failed, so the caller can tell the user and
+ * skip recording the plan (nothing in the app shows that message yet: it needs wiring in delivery.ts and App.tsx).
  */
-export async function applyNotifications(planned: Planned[]): Promise<void> {
-  if (!notificationsSupported()) return
+export async function applyNotifications(planned: Planned[]): Promise<boolean> {
+  if (!notificationsSupported()) return true
   try {
-    const exact = (await checkReminderPermissions()).exact
+    if (planned.length > 0) {
+      const exact = (await checkReminderPermissions()).exact
+      await LocalNotifications.registerActionTypes({
+        types: [{ id: ACTION_TYPE, actions: [{ id: 'paid', title: 'Mark paid' }, { id: 'snooze', title: 'Snooze 1 day' }] }],
+      })
+      await LocalNotifications.schedule({
+        notifications: planned.map((p) => ({
+          id: p.id,
+          title: p.title,
+          body: p.body,
+          schedule: { at: new Date(p.at), allowWhileIdle: true },
+          isExactNotification: exact,
+          actionTypeId: ACTION_TYPE,
+          extra: { reminderId: p.reminderId },
+        })),
+      })
+    }
+    const keep = new Set(planned.map((p) => p.id))
     const { notifications } = await LocalNotifications.getPending()
-    const stale = notifications.filter((n) => n.id !== TEST_ID)
+    const stale = notifications.filter((n) => n.id !== TEST_ID && !keep.has(n.id))
     if (stale.length > 0) await LocalNotifications.cancel({ notifications: stale })
-    if (planned.length === 0) return
-    await LocalNotifications.registerActionTypes({
-      types: [{ id: ACTION_TYPE, actions: [{ id: 'paid', title: 'Mark paid' }, { id: 'snooze', title: 'Snooze 1 day' }] }],
-    })
-    await LocalNotifications.schedule({
-      notifications: planned.map((p) => ({
-        id: p.id,
-        title: p.title,
-        body: p.body,
-        schedule: { at: new Date(p.at), allowWhileIdle: true },
-        isExactNotification: exact,
-        actionTypeId: ACTION_TYPE,
-        extra: { reminderId: p.reminderId },
-      })),
-    })
+    return true
   } catch {
-    /* Scheduling failed: the Due tab still shows everything. */
+    return false
   }
 }
 

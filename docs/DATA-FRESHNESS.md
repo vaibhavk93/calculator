@@ -215,7 +215,7 @@ down from ~85% before.
 
 | Issue | Handling |
 |---|---|
-| Device reboot clears scheduled alarms | `RECEIVE_BOOT_COMPLETED` → reschedule everything on boot |
+| Device reboot clears scheduled alarms | The notifications plugin's own `LocalNotificationRestoreReceiver` (merged into our manifest, listens for `BOOT_COMPLETED`) re-arms every saved reminder after the phone is unlocked, and fires any that came due while it was off about 15 seconds after boot (`RESEARCH-D-E-2026-11-04.md`, E(a)). We add no boot code of our own; `scripts/build-android.sh` fails if the receiver is missing from the merged manifest. **Not yet proven on a phone.** Test: set 3 reminders, run `adb shell dumpsys alarm \| grep vkcalc` and note the count, then `adb reboot`, unlock the phone, run the same command and compare (same entries expected; any that were due fire about 15 s after boot). Repeat once with the phone maker's autostart switched off. |
 | Timezone / DST / manual clock change | Store reminders as local wall-clock date-time; recompute on `TIMEZONE_CHANGED` |
 | Recurring on the 31st in February | Clamp to the last day of the month, and say so in the UI |
 | Doze mode | Inexact alarms fire in Doze maintenance windows — by design |
