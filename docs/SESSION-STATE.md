@@ -1,5 +1,43 @@
 # Session state: resume here
 
+## Round 13 (2026-11-04): researched a UI redesign ask, found the real scope, shipped B7
+
+**Last prompt:** "UI is very stupidly designed search some of the best skills for UI designs evaluate which
+one is best for our use case... feel free to redesign entire app if required... update plan or roadmap and
+show it to me" — then, after reviewing the plan, "yes, start on B7".
+
+**Research, not a guess:** checked Material 3 / IBM Carbon / Apple HIG against this app's own rules
+(no shadow/elevation, Android-first) — none fit, verdict was to finish the already-tested bespoke system,
+not import one. Audited every one of the 20 sheet-rendering files for real stacking (not assumed) and found
+exactly one confirmed violation (`HistorySheet` -> `HistoryRowSheet`, B6, not yet fixed). Ran a critic on
+my own conclusion (per the project's own rule on big suggestions) — it correctly pushed back that the
+bigger, unchecked issue was **Tools home**, explicitly left out of the earlier B4/B5 work, still using
+the old tinted-card pattern. Full writeup: `docs/THE-PLAN.md`, "Block B continued."
+
+**B7 shipped:** every Tools-home group page's sections (e.g. "Savings and investing" -> "Grow your money" /
+"Fixed returns" / "Retirement") converted from same-coloured tinted cards to hairline lists. **Confirmed in
+the browser first**, not assumed: all three sections in one group shared the group's single colour, so the
+tint was NOT telling sections apart, it was just colour-washing the whole page uniformly. Deliberately kept
+the tile grid and the small per-row colour dots — checked `DESIGN-SYSTEM.md`'s "where a tint may appear"
+and both are explicitly sanctioned minimal uses, not the "card everywhere" anti-pattern.
+
+**One bug caught before shipping:** removing `tintStyle` from the group-page wrapper also silently broke
+the header title's own colour (ScreenHeader's `tint` prop reads the same CSS var). Caught via computed
+style check (title had fallen back to plain white), fixed by keeping `tintStyle` on the wrapper — verified
+it no longer reaches any content row, only the title.
+
+**Verified, long background e2e run (system was under heavy load, ~20 concurrent chrome/node processes,
+likely from a peer session on the same repo):** `npm run check` (2529 pass) · `layout-contract` 144/144 ·
+`answerbar` 7/7 · `qa-tools` identical before/after (159 cases, 79 failed both runs — all pre-existing
+per-calculator bugs, unrelated to navigation) · `tools1`'s failure-list diff showed only known test
+flakiness (save/reload timing, individual-calculator layout checks unrelated to `GroupPage`) plus the one
+selector fix (4 stale `.sect__body` references on the Notes tab, left over from an earlier session,
+confirmed pre-existing) now passing as intended.
+
+**Still open from B6-B9:** B6 (the History sheet-stacking bug, confirmed, not yet fixed), B8 (sweep the
+other 10 files still using `tintStyle` — case by case, since some of that tint is correct per the design
+system), B9 (ask the owner directly which screen still feels wrong, once B6-B8 ship).
+
 ## Round 12 (2026-11-04): Block B3/B4/B5 done, built and installed on the real phone, verified live
 
 **Last prompt:** "yes, continue with B3 and B4/B5" then "I connected my phone as well i want you to build
