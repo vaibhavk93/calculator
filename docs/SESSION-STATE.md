@@ -1,5 +1,25 @@
 # Session state: resume here
 
+## Round 14 (2026-11-04): B6 and B8 shipped, then "build everything in the plan, one by one, then full QA"
+
+**Last prompt:** "go with option 1, do B8", then: "One by one, create or build whatever is present in the plan, and then
+we will do complete QA, UI/UX, and other runtime checks. Do research where it gives better inputs. Take a smart call
+wherever needed. Think critically at each major point."
+
+| Step | Status |
+|---|---|
+| B6 History row menu + Copy-as no longer stack sheets | **Done** (`642f879`; a peer session committed my edit under its own message) |
+| B8 `.sect` became a bare titled hairline group (Settings, Manage, Import, Bills, Spend Summary, Tips); one CSS change, not ten edits | **Done** (`0897162`). No new failures in check / layout-contract 144 / qa-budget-new / shell vs HEAD; 7 contrast checks now pass |
+| B9 ask the owner which screen still feels wrong | Waiting for the owner, do last |
+| Research for Blocks D and E -> `docs/RESEARCH-D-E-2026-11-04.md` | Running (agent) |
+| Block C Notes (C1 text note, C2 `+`, C3 share/export, C4 body search) | Running (agent), uncommitted until reviewed |
+| Block D Budget (D1 income/net first, then D2-D7; critic first, some may be cut) | Not started, waits on research |
+| Block E Due (boot rescheduling first) | Not started, waits on research |
+| Block F phone truth + research-blocked items in THE-PLAN section 8 | Not started |
+| Full QA: UI/UX, runtime, phone | After the builds |
+
+**Two other Claude sessions are open on this repo** (`calculator-62`, `calculator-0b`). Commit by explicit path only.
+
 ## Round 13 (2026-11-04): researched a UI redesign ask, found the real scope, shipped B7
 
 **Last prompt:** "UI is very stupidly designed search some of the best skills for UI designs evaluate which
