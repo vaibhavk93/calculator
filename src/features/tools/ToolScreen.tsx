@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useFitText } from '../calculator/useFitText'
 import { Icon } from '../../components/Icon'
 import { PickerSelect } from '../../components/PickerSelect'
 import { useApp, useAppStore } from '../../components/StoreProvider'
@@ -13,6 +14,7 @@ import {
   type Field,
   type Fmt,
   type Output,
+  type ResultRow,
   type ResultChart,
   type ResultTable,
   type ToolSpec,
@@ -39,6 +41,9 @@ import { groupOfTool } from './groups'
 import { Segmented } from '../settings/controls'
 import { bumpUse, togglePinned } from '../../lib/toolUse'
 import { addAmount, advancedOpen, caretFor, chipSteps, groupTyped, migrateLegacyTerm, rawNumber, shouldGroup, significantBefore, type Leaf } from './fieldInput'
+
+/** A row's value as text, with its unit after it when it has one ("0.6213711922 Mile"). */
+const rowText = (r: ResultRow, o: Parameters<typeof formatCell>[2]) => formatCell(r.value, r.fmt, o) + (r.unit ? ` ${r.unit}` : '')
 
 const UNIT_LABEL = { rupee: '₹', percent: '%', years: 'years', months: 'months', days: 'days', none: '' } as const
 
@@ -201,7 +206,9 @@ function FieldRow({ field: base, values, set, invalid, chips }: { field: Field; 
   const value = (values[field.id] as string) ?? ''
   const hintId = field.hint ? `h-${field.id}` : undefined
   const describedBy = [hintId, invalid ? ERROR_ID : undefined].filter(Boolean).join(' ') || undefined
+  const swapId = field.swapWith
   return (
+    <>
     <div className="field-row" data-invalid={invalid || undefined}>
       <label className="field-label" htmlFor={`f-${field.id}`}>
         {field.label}
@@ -213,6 +220,12 @@ function FieldRow({ field: base, values, set, invalid, chips }: { field: Field; 
         </span>
       )}
     </div>
+    {swapId && (
+      <button type="button" className="icon-btn swap" aria-label="Swap from and to" title="Swap from and to" onClick={() => { set(field.id, (values[swapId] as string) ?? ''); set(swapId, value) }}>
+        <Icon name="swap" size={20} />
+      </button>
+    )}
+    </>
   )
 }
 
@@ -335,23 +348,53 @@ function Chart({ chart }: { chart: ResultChart }) {
   )
 }
 
+/** The words of a row's value: number text, then its unit (smaller, quieter), then the screen-reader line for good or bad. */
+function valueParts(row: ResultRow, text: string) {
+  const unit = row.unit ? ` ${row.unit}` : ''
+  return (
+    <>
+      {text.slice(0, text.length - unit.length)}
+      {unit && <span className="result__unit">{unit}</span>}
+      {/* Colour is never the only signal: a screen reader, and anyone who cannot
+          separate red from green, gets the meaning in words. */}
+      {row.tone && <span className="sr-only">{row.tone === 'positive' ? ' — in your favour' : ' — against you'}</span>}
+    </>
+  )
+}
+
+/** A numeric headline: one line, shrinking from 2rem to 1rem to fit, the way the calculator's display does. Never wraps mid-number. */
+function HeroNumber({ row, text }: { row: ResultRow; text: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  // The sizes are rem so the headline follows the system font size; the hook works in px.
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+  useFitText(ref, text, undefined, 2 * rem, rem)
+  return (
+    <span ref={ref} className={`hero__value${row.tone ? ` result__value--${row.tone}` : ''}`}>
+      {valueParts(row, text)}
+    </span>
+  )
+}
+
+/** A text headline ("From 7.50% a year", "Offer 2"): a little smaller, and it wraps instead of clipping. */
+function HeroText({ row, text }: { row: ResultRow; text: string }) {
+  return <span className={`hero__value hero__value--text${row.tone ? ` result__value--${row.tone}` : ''}`}>{valueParts(row, text)}</span>
+}
+
 function Result({ out, mainRef, verified, rates, examples }: { out: Output; mainRef: React.RefObject<HTMLDivElement>; verified?: ToolSpec['verified']; rates?: ToolSpec['rates']; examples: string[] }) {
   const system = useApp((s) => s.settings.numberSystem)
   const decimals = useApp((s) => s.settings.decimals)
   const fmt = (c: Parameters<typeof formatCell>[0], f?: Fmt) => formatCell(c, f, { system, decimals })
-  return (
-    <section className="result" aria-labelledby="result-head">
-      <h2 className="section-head" id="result-head">
-        Result
-      </h2>
-      {out.rows.map((r) => (
-        <div key={r.label} ref={r.main ? mainRef : undefined} className={r.main ? 'result__row result__row--main' : 'result__row'}>
+  // Only a result that names a headline row gets a hero. Without one, the card is the whole result as before.
+  const hero = out.rows.find((r) => r.main)
+  const rows = hero ? out.rows.filter((r) => r !== hero) : out.rows
+  const checked = [verified && `Checked against ${verified.source}`, rates && ratesLine(rates, Date.now())].filter(Boolean).join('. ')
+  const body = (
+    <>
+      {rows.map((r) => (
+        <div key={r.label} className="result__row">
           <span className="result__label">{r.label}</span>
           <span className={['result__value', r.tone ? `result__value--${r.tone}` : '', typeof r.value === 'string' ? 'result__value--text' : ''].filter(Boolean).join(' ')}>
-            {fmt(r.value, r.fmt)}
-            {/* Colour is never the only signal: a screen reader, and anyone who cannot
-                separate red from green, gets the meaning in words. */}
-            {r.tone && <span className="sr-only">{r.tone === 'positive' ? ' — in your favour' : ' — against you'}</span>}
+            {valueParts(r, rowText(r, { system, decimals }))}
           </span>
         </div>
       ))}
@@ -366,8 +409,7 @@ function Result({ out, mainRef, verified, rates, examples }: { out: Output; main
           </span>
         </div>
       )}
-      {verified && <p className="result__checked">Checked against {verified.source}</p>}
-      {rates && <p className="result__checked">{ratesLine(rates, Date.now())}</p>}
+      {checked && <p className="result__checked">{checked}</p>}
       {examples.length > 0 && <p className="result__checked">Uses example values for {examples.join(', ').toLowerCase()}. Check them under More options.</p>}
       {out.chart && <Chart chart={out.chart} />}
       {out.table && <Table table={out.table} fmt={fmt} />}
@@ -379,6 +421,23 @@ function Result({ out, mainRef, verified, rates, examples }: { out: Output; main
           ))}
         </details>
       )}
+    </>
+  )
+  const more = rows.length > 0 || out.note || out.span || checked || examples.length > 0 || out.chart || out.table || out.formula
+  const heroText = hero ? rowText(hero, { system, decimals }) : ''
+  return (
+    <section className={hero ? 'result result--hero' : 'result'} aria-labelledby="result-head">
+      <h2 className={hero ? 'sr-only' : 'section-head'} id="result-head">
+        Result
+      </h2>
+      {hero && (
+        <div ref={mainRef} className="result__row result__row--main">
+          <span className="result__label">{hero.label}</span>
+          {/* The hero is the first thing in the page's result, and the floating answer bar appears only once it has scrolled out of view. */}
+          <span className="result__value">{typeof hero.value === 'string' ? <HeroText row={hero} text={heroText} /> : <HeroNumber row={hero} text={heroText} />}</span>
+        </div>
+      )}
+      {hero ? more && <div className="result__card">{body}</div> : body}
     </section>
   )
 }
@@ -457,7 +516,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
     kind: 'tool',
     toolId: spec.id,
     inputs: values,
-    summary: main ? `${main.label}: ${formatCell(main.value, main.fmt, { system, decimals })}` : '',
+    summary: main ? `${main.label}: ${rowText(main, { system, decimals })}` : '',
     amount: main && typeof main.value !== 'string' && main.value.isFinite() ? main.value.toFixed() : null,
     // Carried so the card can draw the number as what it is. Without this a date
     // difference was saved as a bare number and shown as "₹300".
@@ -526,7 +585,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
     ? buildShareText({
         title: saved?.title ?? spec.title,
         inputs: inputLines(spec.fields, values, opts),
-        rows: computed.rows.map((r) => ({ label: r.label, text: formatCell(r.value, r.fmt, opts) })),
+        rows: computed.rows.map((r) => ({ label: r.label, text: rowText(r, opts) })),
         note: computed.note,
       })
     : ''
@@ -644,9 +703,9 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
             over the Copy / Share row. Keeping its space always reserved is what stops that. */}
         <div className="answer-anchor">
           {ok && main && (
-            <button type="button" className={`answer${mainSeen ? ' answer--idle' : ''}`} aria-hidden={mainSeen || undefined} tabIndex={mainSeen ? -1 : undefined} aria-label={`${main.label}: ${formatCell(main.value, main.fmt, opts)}. Show the result.`} onClick={() => mainRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
+            <button type="button" className={`answer${mainSeen ? ' answer--idle' : ''}`} aria-hidden={mainSeen || undefined} tabIndex={mainSeen ? -1 : undefined} aria-label={`${main.label}: ${rowText(main, opts)}. Show the result.`} onClick={() => mainRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
               <span className="answer__label">{main.label}</span>
-              <span className="answer__value">{formatCell(main.value, main.fmt, opts)}</span>
+              <span className="answer__value">{rowText(main, opts)}</span>
               {/* Points at where the answer actually is, so the arrow never sends you the wrong way. */}
               <Icon name={mainAbove ? 'up' : 'down'} size={18} className="answer__icon" />
             </button>

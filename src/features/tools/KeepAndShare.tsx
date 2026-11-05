@@ -4,8 +4,8 @@ import { stripCommas, useCopyAs } from '../../components/CopyAs'
 import { shareText } from '../../lib/share'
 
 /**
- * "Keep and share": everything you can do with a finished answer, as one slim row of icons under the Result.
- * Copy and Share send the whole story (title, what you typed, the answers) as text. To list and Remind me
+ * "Keep and share": everything you can do with a finished answer, as one slim row under the Result.
+ * Copy and Share carry a word beside the icon (they are the two people look for); the rest are icons. Copy and Share send the whole story (title, what you typed, the answers) as text. To list and Remind me
  * keep it in the app. Reset clears the inputs (the snackbar offers Undo). Save lives in the page header, because it is the screen's one main action.
  * A message ("Copied") takes the space beside the icons, so the row never grows. See docs/DESIGN-SYSTEM.md, "Page anatomy".
  */
@@ -45,9 +45,9 @@ export function KeepAndShare({
     else if (r === 'failed') say("Couldn't share here.")
   }
 
-  const items: { icon: IconName; label: string; run: () => void }[] = [
-    { icon: 'copy', label: 'Copy', run: () => void copy(text, stripCommas(text)) },
-    { icon: 'share', label: 'Share', run: () => void share() },
+  const items: { icon: IconName; label: string; run: () => void; word?: boolean }[] = [
+    { icon: 'copy', label: 'Copy', run: () => void copy(text, stripCommas(text)), word: true },
+    { icon: 'share', label: 'Share', run: () => void share(), word: true },
     ...(canList ? [{ icon: 'list' as const, label: 'Add to a list', run: onList }] : []),
     { icon: 'due', label: 'Remind me', run: onRemind },
     ...(onUse ? [{ icon: 'forward' as const, label: 'Use in another tool', run: onUse }] : []),
@@ -57,8 +57,9 @@ export function KeepAndShare({
   return (
     <section className="keep" aria-label="Keep and share">
       {items.map((i) => (
-        <button key={i.label} type="button" className="keep__btn" aria-label={i.label} title={i.label} onClick={i.run}>
+        <button key={i.label} type="button" className={i.word ? 'keep__btn keep__btn--word' : 'keep__btn'} aria-label={i.label} title={i.label} onClick={i.run}>
           <Icon name={i.icon} size={22} />
+          {i.word && i.label}
         </button>
       ))}
       <p className="keep__msg" role="status">
