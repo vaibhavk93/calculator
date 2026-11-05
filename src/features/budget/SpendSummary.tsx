@@ -17,6 +17,7 @@ import {
   entryMatches,
   searchEntries,
   signedAmount,
+  countsAsSpend,
   dailyAverage,
   dayLongLabel,
   instrumentLabel,
@@ -132,12 +133,13 @@ export function EntryRow({ e, onEdit, select }: { e: BudgetExpense; onEdit: (id:
   const money = useMoney()
   const amount = new D(e.amount)
   const refund = e.refund === true
-  const name = e.settlement ? SETTLEMENT_LABEL[e.settlement] : categoryName(budget, e.categoryId)
+  const income = e.income === true
+  const name = e.settlement ? SETTLEMENT_LABEL[e.settlement] : income ? 'Money in' : categoryName(budget, e.categoryId)
   const inst = e.instrumentId === null ? undefined : budget.instruments.find((i) => i.id === e.instrumentId)
   const how = [e.mode ? modeLabel(e.mode) : '', inst ? instrumentLabel(inst) : ''].filter(Boolean).join(' · ')
-  const hint = [refund ? 'Refund' : '', shortDate(e.date), how, e.settlement ? 'Not counted as spending' : '', e.note].filter(Boolean).join(' · ')
+  const hint = [refund ? 'Refund' : '', income ? 'Came in' : '', shortDate(e.date), how, e.settlement ? 'Not counted as spending' : '', e.note].filter(Boolean).join(' · ')
   const spoken = `${refund ? 'refund of ' : ''}${money(amount)} ${name}${e.settlement ? ', not counted as spending' : ''}`
-  if (select && e.settlement) {
+  if (select && (e.settlement || income)) {
     return (
       <div className="budget__entry budget__entry--off">
         <div className="budget__main budget__main--pick">
@@ -252,12 +254,12 @@ export function SpendSummary({
   const found = tab === 'entries' && needle
     ? searchEntries(budget, budget.expenses.filter((e) => e.deletedAt === null && entryMatches(budget, e, scope)).sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? 1 : -1)), needle)
     : null
-  const foundTotal = found ? found.filter((e) => !e.settlement).reduce((t, e) => t.plus(signedAmount(e)), new D(0)) : null
+  const foundTotal = found ? found.filter(countsAsSpend).reduce((t, e) => t.plus(signedAmount(e)), new D(0)) : null
   const SEARCH_SHOWN = 200
 
   const listed = found ?? entries
-  const chosen = listed.filter((e) => sel.has(e.id) && !e.settlement)
-  const tickable = listed.filter((e) => !e.settlement)
+  const chosen = listed.filter((e) => sel.has(e.id) && countsAsSpend(e))
+  const tickable = listed.filter(countsAsSpend)
   const rowSelect = (e: BudgetExpense) => (selecting ? { checked: sel.has(e.id), onToggle: () => { setSelNote(null); setSel((s) => { const n = new Set(s); if (n.has(e.id)) n.delete(e.id); else n.add(e.id); return n }) } } : undefined)
   const categoryChoices = useMemo<PickOption[]>(() => {
     const usable = budget.categories.filter((c) => c.deletedAt === null && categoryUsable(budget, c.id))

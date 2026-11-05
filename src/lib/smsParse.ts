@@ -246,6 +246,7 @@ export function alreadyAdded(budget: Pick<BudgetData, 'expenses'>, c: Pick<Candi
   return budget.expenses.some(
     (e) =>
       e.deletedAt === null &&
+      e.income !== true &&
       new D(e.amount).eq(amount) &&
       Math.abs(dayNum(e.date) - dayNum(c.date)) <= 1 &&
       ((c.instrumentId !== null && e.instrumentId === c.instrumentId) || (c.merchant !== '' && e.note.toLowerCase().includes(c.merchant.toLowerCase()))),

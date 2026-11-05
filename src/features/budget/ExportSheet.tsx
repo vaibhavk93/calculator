@@ -66,7 +66,7 @@ export function ExportSheet({ onClose }: { onClose: () => void }) {
       footer={<button type="button" className="btn btn--primary" onClick={() => void exportNow()}>Export</button>}
     >
       <div className="save">
-        <p className="save__sum">One spreadsheet file (CSV) with a row for each entry: date, amount, category, how you paid, note. Card bill payments and transfers are included and marked. A refund has a minus sign and the type "refund".</p>
+        <p className="save__sum">One spreadsheet file (CSV) with a row for each entry: date, amount, category, how you paid, note. Card bill payments and transfers are included and marked. A refund and money that came in have a minus sign and the type "refund" or "income", so adding up the amount column never counts income as spending.</p>
         {error && <p className="ffield__error" role="alert">{error}</p>}
         <div className="save__card" style={tintStyle(7)}>
           <div className="ffield">

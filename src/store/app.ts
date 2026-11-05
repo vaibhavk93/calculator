@@ -20,6 +20,7 @@ import {
   categoryActiveIn,
   categoryUsable,
   cleanInstrument,
+  countsAsSpend,
   expenseChanges,
   withEdits,
   type BudgetExpense,
@@ -362,16 +363,18 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       const { budget } = get()
       const settlement = d.settlement === 'cardBill' || d.settlement === 'transfer' ? d.settlement : undefined
       // A bill payment or own-account transfer is not spending: no category, no payment mode, and only a card bill keeps a card.
-      const mode = settlement ? null : isPaymentMode(d.mode) ? d.mode : null
-      const instrumentId = settlement === 'transfer' ? null : (d.instrumentId ?? null)
+      // Money that came in is the third kind of not-spending: it has no category, mode or card either. A settlement or a refund wins over it.
+      const income = !settlement && d.refund !== true && d.income === true
+      const mode = settlement || income ? null : isPaymentMode(d.mode) ? d.mode : null
+      const instrumentId = settlement === 'transfer' || income ? null : (d.instrumentId ?? null)
       // A category that no longer exists falls back to Uncategorised here; the sheet already told the person.
-      const categoryId = !settlement && d.categoryId !== null && categoryUsable(budget, d.categoryId) ? d.categoryId : null
-      const bad = validateExpense({ amount: d.amount, date: d.date, categoryId, mode, instrumentId, settlement }, budget, new Date(), keepCategoryId)
+      const categoryId = !settlement && !income && d.categoryId !== null && categoryUsable(budget, d.categoryId) ? d.categoryId : null
+      const bad = validateExpense({ amount: d.amount, date: d.date, categoryId, mode, instrumentId, settlement, income }, budget, new Date(), keepCategoryId)
       const first = bad.amount ?? bad.date ?? bad.category ?? bad.paidWith
       if (first) return first
       // A refund is spending turned round, so it only exists for ordinary spending.
       const refund = !settlement && d.refund === true
-      return { amount: toPlain(parseNum(d.amount)!), categoryId, mode, instrumentId, date: d.date, note: d.note.trim().slice(0, 200), settlement, refund }
+      return { amount: toPlain(parseNum(d.amount)!), categoryId, mode, instrumentId, date: d.date, note: d.note.trim().slice(0, 200), settlement, refund, income }
     }
 
     /** A snackbar whose Undo runs `run`. Only valid while that snackbar is showing. */
@@ -673,11 +676,11 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const e = checkedExpense(draft)
         if (typeof e === 'string') return fail(e)
         if (get().budget.expenses.length >= MAX_EXPENSES) return fail(`You can keep up to ${MAX_EXPENSES} entries.`)
-        const { settlement, refund, ...rest } = e
-        const recurringId = repeat && !settlement && !refund ? startBill(e, repeat) : undefined
+        const { settlement, refund, income, ...rest } = e
+        const recurringId = repeat && !settlement && !refund && !income ? startBill(e, repeat) : undefined
         if (recurringId === null) return false
         const { budget } = get()
-        set({ budget: { ...budget, expenses: [{ id: deps.newId(), ...rest, deletedAt: null, ...(settlement ? { settlement } : {}), ...(refund ? { refund: true } : {}), ...(recurringId ? { recurringId } : {}) }, ...budget.expenses] }, notice: null })
+        set({ budget: { ...budget, expenses: [{ id: deps.newId(), ...rest, deletedAt: null, ...(settlement ? { settlement } : {}), ...(refund ? { refund: true } : {}), ...(income ? { income: true as const } : {}), ...(recurringId ? { recurringId } : {}) }, ...budget.expenses] }, notice: null })
         return true
       },
 
@@ -685,17 +688,17 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const old = get().budget.expenses.find((x) => x.id === id)
         const e = checkedExpense(draft, old?.categoryId ?? null)
         if (typeof e === 'string') return fail(e)
-        const { settlement, refund, ...rest } = e
-        const recurringId = repeat && old && !old.recurringId && !settlement && !refund ? startBill(e, repeat) : undefined
+        const { settlement, refund, income, ...rest } = e
+        const recurringId = repeat && old && !old.recurringId && !settlement && !refund && !income ? startBill(e, repeat) : undefined
         if (recurringId === null) return false
         const { budget } = get()
         const at = deps.now()
         set({ budget: { ...budget, expenses: budget.expenses.map((x) => {
           if (x.id !== id) return x
-          const { settlement: _s, refund: _r, edits: _e, ...keep } = x
+          const { settlement: _s, refund: _r, income: _i, edits: _e, ...keep } = x
           // A trail of what changed (amount, date, category). It is only a note: it can never stop the save.
           const edits = withEdits(x.edits, expenseChanges(x, rest, at))
-          return { ...keep, ...rest, ...(settlement ? { settlement } : {}), ...(refund ? { refund: true } : {}), ...(recurringId ? { recurringId } : {}), ...(edits ? { edits } : {}) }
+          return { ...keep, ...rest, ...(settlement ? { settlement } : {}), ...(refund ? { refund: true } : {}), ...(income ? { income: true as const } : {}), ...(recurringId ? { recurringId } : {}), ...(edits ? { edits } : {}) }
         }) } })
         return true
       },
@@ -808,7 +811,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const before = new Map<string, BudgetExpense>()
         let wrongMonth = 0
         const expenses = budget.expenses.map((x) => {
-          if (!want.has(x.id) || x.deletedAt !== null || x.settlement || x.categoryId === categoryId) return x
+          if (!want.has(x.id) || x.deletedAt !== null || !countsAsSpend(x) || x.categoryId === categoryId) return x
           if (categoryId !== null && !categoryActiveIn(budget, categoryId, x.date.slice(0, 7))) return (wrongMonth++, x)
           before.set(x.id, x)
           const edits = withEdits(x.edits, expenseChanges(x, { ...x, categoryId }, at))
@@ -961,7 +964,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
             // A settlement (card bill, transfer) has no mode at all by design, so `mode === null` must
             // never detach one -- that check is only for an ordinary spend whose mode no longer fits.
             expenses: budget.expenses.map((x) =>
-              x.instrumentId === id && !x.settlement && (x.mode === null || !instrumentFitsMode(x.mode, next)) ? { ...x, instrumentId: null } : x,
+              x.instrumentId === id && countsAsSpend(x) && (x.mode === null || !instrumentFitsMode(x.mode, next)) ? { ...x, instrumentId: null } : x,
             ),
           },
           notice: null,
