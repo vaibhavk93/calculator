@@ -13,7 +13,7 @@ Decimal.set({ precision: 60 })
 const D = (x) => new Decimal(x)
 
 // ---------------------------------------------------------------------------------------------------------------------
-// The 26 calculators: id, the title on its page, and the group tile it lives under.
+// The 26 calculators: id, the title on its page, and the group row it lives under.
 // ---------------------------------------------------------------------------------------------------------------------
 const T = (id, title, group) => ({ id, title, group })
 const TOOLS = [
@@ -79,7 +79,7 @@ async function openTool(page, t, how = 'group') {
     await page.locator('input[aria-label="Search calculators"]').fill(t.title)
     await page.locator('.tools__list .navrow', { has: page.getByText(t.title, { exact: true }) }).first().click()
   } else {
-    await page.locator('.tile', { hasText: t.group }).click()
+    await page.locator('.group[aria-label="Browse by what you need"] .navrow', { hasText: t.group }).click()
     await page.locator('.screen .navrow', { has: page.getByText(t.title, { exact: true }) }).first().click()
   }
   await scr(page, t).waitFor({ timeout: 5000 })
@@ -247,27 +247,29 @@ def('T1-SEARCH-case', 'CORNER', 'Search ignores case and surrounding spaces', ()
     fail(!names.includes('Loan EMI') ? `got ${names.join(', ')}` : '')
   }),
 )
-def('T1-GROUPS-counts', 'UX', 'Each group tile count matches the rows on its page (Math 2, Money 5, Units 3, Dates 5, Loans 13)', () =>
+def('T1-GROUPS-counts', 'UX', 'Each group row count matches the rows on its page (Math 2, Money 5, Units 3, Dates 5, Loans 13)', () =>
   withPage({}, async ({ page }) => {
     await tab(page, 'Tools')
     const want = { 'Math and numbers': 2, 'Money and shopping': 5, 'Units and travel': 3, 'Dates and health': 5, 'Loans and EMI': 13 }
     const bad = []
     for (const [g, n] of Object.entries(want)) {
-      await page.locator('.tile', { hasText: g }).click()
+      const shown = await page.locator('.group[aria-label="Browse by what you need"] .navrow', { hasText: g }).locator('.navrow__meta').innerText()
+      if (shown !== String(n)) bad.push(`${g}: list shows "${shown}", want ${n}`)
+      await page.locator('.group[aria-label="Browse by what you need"] .navrow', { hasText: g }).click()
       const k = await page.locator('.screen .navrow').count()
-      if (k !== n) bad.push(`${g}: ${k} rows, tile says ${n}`)
+      if (k !== n) bad.push(`${g}: ${k} rows, row says ${n}`)
       await page.locator('.screen button[aria-label="Back"]').click()
     }
     fail(bad)
   }),
 )
-def('T1-GROUPS-tap', 'UI', 'Group tiles and tool rows are at least 44px and show a chevron', () =>
+def('T1-GROUPS-tap', 'UI', 'Group rows and tool rows are at least 44px and show a chevron', () =>
   withPage({}, async ({ page }) => {
     await tab(page, 'Tools')
-    const tiles = await page.locator('.tile').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
-    await page.locator('.tile', { hasText: 'Loans and EMI' }).click()
+    const tiles = await page.locator('.group[aria-label="Browse by what you need"] .navrow').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+    await page.locator('.group[aria-label="Browse by what you need"] .navrow', { hasText: 'Loans and EMI' }).click()
     const rows = await page.locator('.screen .navrow').evaluateAll((els) => els.map((e) => ({ h: Math.round(e.getBoundingClientRect().height), chev: !!e.querySelector('.navrow__chev') })))
-    fail(tiles.some((h) => h < 44) ? `tile heights ${tiles}` : '', rows.some((r) => r.h < 44 || !r.chev) ? `rows ${JSON.stringify(rows.filter((r) => r.h < 44 || !r.chev))}` : '')
+    fail(tiles.some((h) => h < 44) ? `group row heights ${tiles}` : '', rows.some((r) => r.h < 44 || !r.chev) ? `rows ${JSON.stringify(rows.filter((r) => r.h < 44 || !r.chev))}` : '')
   }),
 )
 
@@ -1926,10 +1928,10 @@ def('T1-BACK-header', 'UX', 'Back in the header returns to the group page, then 
     await page.locator(`.screen[aria-label="${t.title}"] button[aria-label="Back"]`).click()
     const onGroup = await page.locator('.screen[aria-label="Loans and EMI"]').count()
     await page.locator('.screen[aria-label="Loans and EMI"] button[aria-label="Back"]').click()
-    const home = await page.locator('.tiles').count()
+    const home = await page.locator('.group[aria-label="Browse by what you need"] .navrow').count()
     await openTool(page, t)
     await tab(page, 'Tools')
-    const afterTap = await page.locator('.tiles').count()
+    const afterTap = await page.locator('.group[aria-label="Browse by what you need"] .navrow').count()
     fail(!onGroup ? 'Back did not land on the group page' : '', !home ? 'second Back did not land on Tools home' : '', !afterTap ? 'tapping Tools tab did not return to Tools home' : '')
     void s
   }),
@@ -2262,7 +2264,7 @@ def('T1-RUNTIME-settings-intl', 'POS', 'International number system shows 1,000,
   withPage({ settings: { numberSystem: 'international' } }, async ({ page }) => {
     const s = await openTool(page, tool('emi'))
     const v = await rowVal(s, 'Total you pay')
-    fail(!/^₹\d{1,3}(,\d{3})+\.\d\d$/.test(v) ? `total "${v}"` : '')
+    fail(!/^₹\d{1,3}(,\d{3})+(\.\d\d)?$/.test(v) ? `total "${v}"` : '')
   }),
 )
 

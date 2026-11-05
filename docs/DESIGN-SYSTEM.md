@@ -181,14 +181,15 @@ The app now has **four colour meanings, and a colour never carries two**:
 | You can act on this | `accent` | `=`, selected chips, focus, pinned pin |
 | Good or bad for you | `positive`, `negative` | A result value, with a sign or a word |
 | Overdue, act now | `alert` | The Overdue heading, an error |
-| **Which section this is** | **`--tint-1` to `--tint-8`** | Tiles, section cards, an input card, headings |
+| **Which section this is** | **`--tint-1` to `--tint-8`** | An input card, headings, the small dot on a row |
 
 A tint is **identity, never state**. It never means good, bad, tappable or
 selected.
 
-**Where a tint may appear:** the Tools home tiles; a group page's section
-cards; a calculator's *input* card and its heading; the Notes and Due section
-cards; the small dot in a search result.
+**Where a tint may appear:** the small dot on a Tools home row (a group, a
+recently used tool, a search result); a group page's header title; a
+calculator's *input* card and its heading; the Notes and Due section cards.
+Tools home no longer uses tinted tiles: its eight groups are one hairline list.
 
 **Where it may not:** the **Result card**, the sticky answer bar, any button,
 or behind or beside a number that carries `positive` or `negative`. The Result
@@ -232,12 +233,13 @@ A screen's content is one of three tiers. Decide the tier before deciding the co
 | **2 — Content** | Entries, rows, results that belong to this screen right now (a list of expenses, "Needs attention") | Hairline-separated rows (`.group` / `.row`, or a content-specific row class). **No tint** |
 | **3 — Actions and navigation** | Links to somewhere else, or quiet post-result actions (Copy, Share, "see all") | Quiet: icon with a word, or a single collapsed `.navrow` list. Never the same weight as tier 1 |
 
-**This refines, it does not replace, "Where a tint may appear" above.** A tint still marks a *group page's*
-own section cards (Tools home tiles, a calculator's input card) — those are a single destination you
-chose to open, so one tinted card for it is correct. What changes is a **root tab's home screen**
-(Budget, and — not yet done, see `docs/THE-PLAN.md` Block B5 — Notes, Due, Tools): several *navigation
-links to other screens*, stacked as separate tinted cards, read as equally important destinations when
-they are not. Collapse them into one tier-3 list instead.
+**This refines, it does not replace, "Where a tint may appear" above.** A tint still marks a calculator's
+input card, which is a single destination you chose to open, so one tinted card for it is correct. What
+changes is a **root tab's home screen** (Budget, Tools, and Notes and Due, see `docs/THE-PLAN.md`): several
+*navigation links to other screens*, stacked as separate tinted cards or tiles, read as equally important
+destinations when they are not. Collapse them into one tier-3 list instead. Tools home does this: the eight
+groups are `.group` + `.navrow` rows (small tint `.dot`, name, count in mono, chevron), the same pattern as
+Budget's "More in Budget". A group page keeps its tinted header title and its dot, nothing more.
 
 **Worked example — Budget home**, the reference screen this was first applied to:
 

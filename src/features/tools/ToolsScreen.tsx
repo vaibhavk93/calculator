@@ -150,14 +150,22 @@ export function ToolsScreen() {
               </>
             )}
             <h2 className="section-head">Browse by what you need</h2>
-            <div className="tiles">
+            {/* One hairline list, same .group / .navrow pattern as Budget's "More in Budget": the eight groups are
+                links to other screens (tier 3), so no tinted card each. The colour is only the small .dot. */}
+            <div className="group" aria-label="Browse by what you need">
               {GROUPS.map((g) => (
-                <button key={g.id} type="button" className="tile" style={tintStyle(g.tint)} onClick={() => setNav({ category: g.id })}>
-                  <span className="tile__name">{g.name}</span>
-                  <span className="tile__foot">
-                    <span className="tile__meta">{g.tools.length} calculators</span>
-                    <Icon name="chevron" size={18} className="tap-row__chev" />
-                  </span>
+                <button
+                  key={g.id}
+                  type="button"
+                  className="navrow tap-row"
+                  style={tintStyle(g.tint)}
+                  aria-label={`${g.name}, ${g.tools.length} calculators`}
+                  onClick={() => setNav({ category: g.id })}
+                >
+                  <span className="dot" aria-hidden="true" />
+                  <span className="navrow__label">{g.name}</span>
+                  <span className="navrow__meta sect__count" aria-hidden="true">{g.tools.length}</span>
+                  <Icon name="chevron" size={18} className="navrow__chev" />
                 </button>
               ))}
             </div>

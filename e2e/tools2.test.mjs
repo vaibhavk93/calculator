@@ -49,11 +49,11 @@ const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 export const exact = (s) => new RegExp('^\\s*' + esc(s) + '\\s*$')
 export const settle = (page) => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
 
-/** Opens a calculator the way a person does: Tools tab, group tile, row. */
+/** Opens a calculator the way a person does: Tools tab, group row, row. */
 export async function openTool(page, id) {
   const s = SPEC[id]
   await tab(page, 'Tools')
-  await page.locator('.tile', { hasText: s.g }).click()
+  await page.locator('.group[aria-label="Browse by what you need"] .navrow', { hasText: s.g }).click()
   await page.locator('.navrow .row__label').filter({ hasText: exact(s.t) }).click()
   await page.waitForSelector('.tool')
   await settle(page)
