@@ -20,6 +20,15 @@ wherever needed. Think critically at each major point."
 
 **Two other Claude sessions are open on this repo** (`calculator-62`, `calculator-0b`). Commit by explicit path only.
 
+## Round 14c (2026-11-05): B13/B16 merged, calculator unit plan critic-checked, four builders running
+
+Merged: B13 (tool answer as a bare hero, shrink-to-fit numbers, text answers wrap), B16 (labelled Copy/Share, one dim "checked" line),
+unit-converter swap. Earlier today: B10, B11, B21, Block C, dates. In flight (all in separate worktrees under `.claude/worktrees/`):
+Due/To-do/empty states/tags (B12, B15, B18, B19), Settings/History/Budget (B17, History rows, B20 budget bits, two bug fixes),
+unit-control foundation (Block G step 1). Next: savings-tool units, loan/simple-compound units, small tool fixes, hint colour (last:
+touches many CSS lines), then D1, D5, EMI-for-N-months + snooze choices, Phase 7, Portfolio, then THE PHONE BUILD (owner installs and
+tests), then full QA. Open for the owner: Due vs To-do overlap; goal-sip growth rule.
+
 ## Round 14b (2026-11-05): owner answered B9 and all open questions; UI audit done, critic run, builders started
 
 **Owner's answers (2026-11-04, recorded in `docs/THE-PLAN.md` section 5):** B9 = "all screens except the basic calculator

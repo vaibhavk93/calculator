@@ -188,6 +188,15 @@ work list C-U1...). Rules that stay: **field and tool ids never change** (saved 
 must keep its old meaning (default unit = what the field means today); where a rule needs a primary source we lack, it stays BLOCKED.
 Then build in batches, each owning separate files, in separate worktrees.
 
+**Block G, after the critic (2026-11-05): the shrunk plan that is being built.** (1) Foundation (`units`, `<id>__unit`, `unitOf`, `toYears`,
+`toWholeMonths`, the Segmented switch, share text, the Use-in fix, and a visible months/years switch on the loan term box).
+**`defaultUnit` was dropped:** the form builder merges defaults under an old saved card, so a "months" default would have made a saved
+"10 years" reopen as 10 months. (2) Savings tools in one batch (one builder, same file): sip, step-up-sip, lumpsum, swp wait, fd, rd,
+inflation (units); cagr gets months only (days annualise to nonsense); rate 0-100 and years caps on all of them; SIP "whole years only"
+hint changed; a one-line note on goal-sip. (3) balance-transfer and simple-compound units. (4) unit-converter month, capital-gains
+"3 years 2 months". **Deferred:** `ratePer`, dates modes, extra EMI, goal-sip by date, FD maturity date, pay-rate (month/30 and month/26 have
+no primary source), break-even. **Open:** goal-sip grows "already saved" yearly but the SIP monthly (yearly is the cautious one); left as is.
+
 ### Owner's order of work (2026-11-05)
 
 1. Finish the UI group (B12-B20, hints) and Block G (calculator units and improvements).
