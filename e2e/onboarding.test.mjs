@@ -167,6 +167,7 @@ await T('settings: replay a tour, then bring the tips back', async (page) => {
   ok((await tours(page)).budget === 'done', 'a finished tour stays done when closed early on replay')
   await sect.getByRole('button', { name: /Show first-visit tips again/ }).click()
   ok(Object.keys(await tours(page)).length === 0, 'tips reset')
+  await page.locator('[aria-label="Back"]').last().click() // out of Tips and tours, back to Settings
   await page.locator('[aria-label="Back"]').first().click()
   await tab(page, 'Due')
   ok((await row(page).count()) === 1, 'row is back on Due')

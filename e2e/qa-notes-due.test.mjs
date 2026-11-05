@@ -147,15 +147,15 @@ T('N-008', 'NEG', 'An old backup (no tours, no reminder time) restores cleanly a
   has(await text(p, BK), 'Replace everything with the backup'.replace('Replace everything with the backup', 'Replace'))
   await p.getByRole('button', { name: 'Replace everything' }).click()
   has(await text(p, BK), 'Restored 0 calculations, 1 notes and lists')
-  await p.getByRole('button', { name: 'Back' }).first().click(); await notesTab(p)
+  await p.getByRole('button', { name: 'Back', exact: true }).last().click(); await p.getByRole('button', { name: 'Back', exact: true }).first().click(); await notesTab(p)
   eq(await p.locator('.tourrow').count(), 1, 'row after restoring an old backup'); has(await text(p, '.tools__list'), 'Home EMI')
 })
 T('N-009', 'NEG', 'Restoring junk is refused in words and changes nothing (empty file, text, wrong JSON, huge array)', async () => {
-  const { page: p } = await open(seed({ cards: [emi('a')] })); await settings(p)
+  const { page: p } = await open(seed({ cards: [emi('a')] })); await settings(p); await backupScreen(p)
   const f = join(tmpdir(), 'qa-bad.json')
   for (const content of ['', 'hello world', '{"a":1}', '[1,2,3]', '{"kind":"vkcalc-backup","data":5}']) {
     writeFileSync(f, content); await p.locator('input[type=file]').setInputFiles(f)
-    const t = await text(p, '.screen__body'); ok(/isn't a Calc backup|damaged/.test(t), `message for ${JSON.stringify(content.slice(0, 12))}: ${t.slice(0, 120)}`)
+    const t = await text(p, BK); ok(/isn't a Calc backup|damaged/.test(t), `message for ${JSON.stringify(content.slice(0, 12))}: ${t.slice(0, 120)}`)
     await noBadText(p, 'after junk restore')
   }
   eq((await st(p)).cards.length, 1, 'cards unchanged')
@@ -478,7 +478,7 @@ T('N-096', 'POS', 'Export a backup downloads a file, records the time (nudge sto
   const [dl] = await Promise.all([p.waitForEvent('download'), p.getByText('Export a backup').click()]); const file = join(tmpdir(), 'qa-export.json'); await dl.saveAs(file)
   ok(/^vkcalc-backup-2026-11-02\.json$/.test(dl.suggestedFilename()), 'file name ' + dl.suggestedFilename()); await wait(400)
   const before = JSON.parse(readFileSync(file, 'utf8')).data; ok((await stored(p)).settings.lastBackupAt > 0, 'lastBackupAt recorded')
-  await p.getByRole('button', { name: /Back/ }).first().click(); await notesTab(p); await modeTodo(p); await view(p, 'All'); await p.getByText('Service car').first().click(); await p.getByRole('button', { name: 'Delete task' }).click()
+  await p.getByRole('button', { name: 'Back', exact: true }).last().click(); await p.getByRole('button', { name: 'Back', exact: true }).first().click(); await notesTab(p); await modeTodo(p); await view(p, 'All'); await p.getByText('Service car').first().click(); await p.getByRole('button', { name: 'Delete task' }).click()
   await settings(p); await backupScreen(p); await p.locator('input[type=file]').setInputFiles(file); await p.getByRole('button', { name: 'Replace everything' }).click(); await wait(500)
   const after = await stored(p); eq(JSON.stringify(after.cards), JSON.stringify(before.cards), 'cards'); eq(JSON.stringify(after.reminders), JSON.stringify(before.reminders), 'reminders'); eq(after.settings.reminderTime, '18:30', 'time')
 })

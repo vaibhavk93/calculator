@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { PickOption } from '../../components/PickerSelect'
 import { Icon } from '../../components/Icon'
 import { ScreenHeader } from '../../components/ScreenHeader'
@@ -61,8 +61,21 @@ export function useMoney() {
  */
 export function FitHero({ text }: { text: string }) {
   const ref = useRef<HTMLSpanElement>(null)
-  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
-  useFitText(ref, text, undefined, rem * 2, rem)
+  const readRem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+  const [rem, setRem] = useState(readRem)
+  const [width, setWidth] = useState(0)
+  // Budget tabs stay mounted while hidden, and the root size is set just after load: when the room (or the root size) changes, fit again.
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(() => {
+      setRem(readRem())
+      setWidth(el.clientWidth)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  useFitText(ref, `${text}|${width}`, undefined, rem * 2, rem)
   return <span ref={ref} className="budget__hero">{text}</span>
 }
 

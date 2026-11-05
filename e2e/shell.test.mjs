@@ -84,6 +84,8 @@ const dataTheme = (page) => page.evaluate(() => document.documentElement.dataset
 const cssVar = (page, v) => page.evaluate((n) => document.documentElement.style.getPropertyValue(n).trim(), v)
 // Backup, restore and export live on the Settings sub-screen "Backup and export" (B17). Open it if it is not open yet.
 const inBackup = async (page) => { if ((await page.locator('.screen[aria-label="Backup and export"]').count()) === 0) { await page.click('text=Backup and export'); await settle(page, 150) } }
+// Leaving Settings from inside "Backup and export": close the sub-screen first, then Settings.
+const leaveSettings = async (page) => { if (await page.locator('.screen[aria-label="Backup and export"]').count()) { await page.locator('[aria-label=Back]').last().click(); await settle(page, 150) } await page.click('[aria-label=Back]') }
 const download = async (page, clickSel) => {
   await inBackup(page)
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.click(clickSel)])
@@ -262,7 +264,7 @@ T('A08', 'ERR', 'known B-17: a failed save shows a warning', async (app) => {
   await page.evaluate(() => { window.__failSave = true })
   await openSettings(page); await page.click('[role=radio]:text-is("Light")'); await settle(page, 600)
   const t = await body(page)
-  ok(/could(n't| not)|can't|not saved|failed|full|backup/i.test(t.replace(/Export a backup|Restore from a backup/g, '')), KNOWN('B-17', 'storage refused the save and the screen says nothing'))
+  ok(/could(n't| not)|can't|not saved|failed|full|backup/i.test(t.replace(/Export a backup|Restore from a backup|Backup and export|Save a backup, restore one, or export expenses/g, '')), KNOWN('B-17', 'storage refused the save and the screen says nothing'))
 })
 T('A09', 'NEG', 'wrong-typed top-level fields fall back to defaults', async (app) => {
   const raw = JSON.stringify({ schemaVersion: 3, settings: { theme: 5, accent: {}, decimals: 'x', startupTab: 7, numberSystem: [], haptics: 'yes' }, history: 'abc', cards: {}, reminders: 5, memory: [], input: 9, budget: [] })
@@ -721,7 +723,7 @@ T('K07', 'POS', 'restore: a valid backup into a fresh app, confirm text, Replace
   ok(/everything/i.test(c) && /calculations \(8\)/.test(c) && /notes and lists \(3\)/.test(c) && /reminders \(1\)/.test(c) && /budget entries \(2\)/.test(c) && /settings/.test(c), 'confirm text: ' + c.replace(/\n/g, ' '))
   await page.click('.confirm .btn--primary'); await settle(page, 300)
   ok(/Restored 8 calculations, 3 notes and lists, 1 reminders and 2 budget entries/.test(await body(page)), 'done note: ' + (await page.locator('.note[role=status]').innerText().catch(() => 'none')))
-  await page.click('[aria-label=Back]'); await tab(page, 'Budget'); ok(/Left this month/.test(await body(page)), 'budget not restored')
+  await leaveSettings(page); await tab(page, 'Budget'); ok(/Left this month/.test(await body(page)), 'budget not restored')
 })
 T('K08', 'UX', 'restore: confirm text lists what is replaced and says it is lost, and offers Cancel', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page); await upload(page, 'b.json', backupOf(seed()))
@@ -737,7 +739,7 @@ T('K09', 'POS', 'restore: "Save a backup of this phone first" downloads the curr
 T('K10', 'POS', 'restore: Cancel changes nothing', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page); await upload(page, 'b.json', backupOf(seed({ history: [] })))
   await settle(page, 300); await page.click('.confirm >> text=Cancel'); await settle(page, 200); ok(await page.locator('.confirm').count() === 0, 'confirm still shown')
-  await page.click('[aria-label=Back]'); await openHistory(page); ok(await page.locator('.hrow').count() === 8, 'history changed')
+  await leaveSettings(page); await openHistory(page); ok(await page.locator('.hrow').count() === 8, 'history changed')
 })
 T('K11', 'ERR', 'restore: a file that is not JSON gives a plain error and changes nothing', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page); await upload(page, 'x.json', 'hello this is not json'); await settle(page, 300)
@@ -793,14 +795,14 @@ T('K20', 'ERR', 'known B-03: a backup the app wrote with 20,000 budget entries c
 })
 T('K21', 'ERR', 'known B-16 via restore: backup whose calculator line is "sin(" fresh=true does not blank the app', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page); await upload(page, 'r.json', backupOf(seed({ input: { expr: 'sin(', fresh: true } }))); await settle(page, 300)
-  await page.click('.confirm .btn--primary'); await settle(page, 400); await page.click('[aria-label=Back]').catch(() => {}); await settle(page, 300)
+  await page.click('.confirm .btn--primary'); await settle(page, 400); await leaveSettings(page).catch(() => {}); await settle(page, 300)
   ok(await page.locator('.app').count() === 1 && await page.locator('.keypad').count() > 0, KNOWN('B-16', 'the app went blank after restore'))
 })
 T('K22', 'NEG', 'restore: HTML and script text in names is shown as plain text and never runs', async (app) => {
   const evil = '<img src=x onerror="window.__xss=1"><script>window.__xss=2</script>'
   const d = seed(); d.cards[0].title = evil; d.history[0].memo = evil; d.budget.categories[0].name = evil
   const { page } = await open(app, { empty: true }); await openSettings(page); await upload(page, 'e.json', backupOf(d)); await settle(page, 300)
-  await page.click('.confirm .btn--primary'); await settle(page, 300); await page.click('[aria-label=Back]'); await tab(page, 'Notes'); await settle(page, 400)
+  await page.click('.confirm .btn--primary'); await settle(page, 300); await leaveSettings(page); await tab(page, 'Notes'); await settle(page, 400)
   ok(await page.evaluate(() => window.__xss) === undefined, 'script ran'); ok((await body(page)).includes('<img src=x'), 'text not shown literally')
 })
 T('K23', 'CORNER', 'restore: 10,000 history rows in a file are cut to the 200 cap, locked/named kept', async (app) => {
@@ -827,7 +829,17 @@ T('K26', 'RUNTIME', 'backup round trip: restore of an export is lossless for eve
 })
 
 // ================================================================== T. TOASTS AND SNACKBARS
-const delRow = async (page, i = 0) => { await page.locator('[aria-label^="Delete "]:not([disabled])').nth(i).click(); await settle(page, 150) }
+// A history row's Delete now lives in its More sheet (B14): open the nth row's More, tap Delete. Locked rows have Delete disabled there.
+const delRow = async (page, i = 0) => {
+  const rows = page.locator('.hrow'); let seen = 0
+  for (let r = 0, n = await rows.count(); r < n; r++) {
+    await rows.nth(r).locator('[aria-label^="More for"]').click(); await settle(page, 100)
+    const del = page.locator('.hmenu__item', { hasText: 'Delete' })
+    if (await del.isEnabled()) { if (seen++ === i) { await del.click(); return settle(page, 150) } }
+    await page.click('[aria-label="Close Calculation"]'); await settle(page, 100)
+  }
+  throw new Error('no deletable history row #' + i)
+}
 T('T01', 'POS', 'delete a history row: snackbar with text and Undo appears above the tab bar', async (app) => {
   const { page } = await open(app, { data: seed() }); await openHistory(page); await delRow(page)
   const s = page.locator('.snack'); ok(await s.count() === 1, 'no snack'); ok(/Removed from history/.test(await s.innerText()) && /Undo/.test(await s.innerText()), await s.innerText())

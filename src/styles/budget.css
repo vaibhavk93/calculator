@@ -30,6 +30,8 @@
   overflow-x: auto;
   scrollbar-width: none;
   white-space: nowrap;
+  /* FitHero measures right after it changes the size. With "reduce motion" on, global.css gives every property a 1ms transition, and a read mid-transition returns the old size. */
+  transition: none;
   line-height: 1.2;
   padding-block: 0.1em;
   margin-block: -0.1em;
