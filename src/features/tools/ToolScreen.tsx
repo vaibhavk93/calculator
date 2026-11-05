@@ -11,15 +11,19 @@ import {
   isError,
   labelOf,
   parseNum,
+  unitKey,
+  unitOf,
   type Field,
   type Fmt,
   type Output,
   type ResultRow,
   type ResultChart,
   type ResultTable,
+  type TimeUnit,
   type ToolSpec,
   type Values,
 } from '../../lib/tool'
+import { typedUnit, withoutUnit } from '../../engine/duration'
 import { formatCell } from '../../lib/toolFormat'
 import { ratesLine } from '../../lib/ratesFresh'
 import { invalidFieldIds } from '../../lib/toolInvalid'
@@ -45,6 +49,8 @@ import { addAmount, advancedOpen, caretFor, chipSteps, groupTyped, migrateLegacy
 /** A row's value as text, with its unit after it when it has one ("0.6213711922 Mile"). */
 const rowText = (r: ResultRow, o: Parameters<typeof formatCell>[2]) => formatCell(r.value, r.fmt, o) + (r.unit ? ` ${r.unit}` : '')
 
+const hasSwitch = (f: { units?: TimeUnit[] }) => (f.units?.length ?? 0) > 1
+
 const UNIT_LABEL = { rupee: '₹', percent: '%', years: 'years', months: 'months', days: 'days', none: '' } as const
 
 /** A number box. Money and counts show grouping as you type (50,00,000); the stored text stays plain digits. */
@@ -64,7 +70,8 @@ function NumberInput({ field, id, value, onChange, describedBy, invalid, words, 
   const ref = useRef<HTMLInputElement>(null)
   const caret = useRef<number | null>(null)
   const shown = group ? groupTyped(rawNumber(value), system) : value
-  const unit = field.unit && field.unit !== 'none' ? UNIT_LABEL[field.unit] : ''
+  // A box with a years/months/days switch drops its fixed unit label: the switch says it.
+  const unit = field.unit && field.unit !== 'none' && !hasSwitch(field) ? UNIT_LABEL[field.unit] : ''
   const echo = words && field.unit === 'rupee' ? wordsFor(value, system) : null
 
   // Put the caret back after the same digit once the commas have moved.
@@ -152,7 +159,7 @@ function Input({ field, value, onChange, describedBy, invalid, words, chips }: {
   }
   if (field.kind === 'text') {
     const box = <input id={id} className="field" type="text" aria-describedby={describedBy} aria-invalid={invalid || undefined} value={value} onChange={(e) => onChange(e.target.value)} />
-    const chip = field.chip?.(value)
+    const chip = hasSwitch(field) ? '' : field.chip?.(value)
     return chip ? (
       <span className="field-wrap">
         {box}
@@ -164,6 +171,29 @@ function Input({ field, value, onChange, describedBy, invalid, words, chips }: {
 }
 
 type SetValue = (id: string, v: string | string[][]) => void
+
+const UNIT_CHOICE: Record<TimeUnit, string> = { years: 'Years', months: 'Months', days: 'Days' }
+
+/**
+ * The years / months / days switch under a duration box. Writes `<id>__unit` and never touches the number.
+ * One exception, the loan term text box: it also takes a unit word ("18 months"). That word wins while it is there, so the
+ * switch shows it, and tapping the switch swaps the word for the digits ("18") and sets the unit, so the two never disagree.
+ */
+function UnitSwitch({ field, values, set }: { field: Extract<Leaf, { kind: 'number' | 'text' }>; values: Values; set: SetValue }) {
+  const raw = (values[field.id] as string) ?? ''
+  const typed = field.kind === 'text' ? typedUnit(raw) : null
+  return (
+    <Segmented
+      label={`Unit of ${field.label}`}
+      value={typed ?? unitOf(field, values)}
+      options={field.units!.map((u) => ({ value: u, label: UNIT_CHOICE[u] }))}
+      onChange={(u) => {
+        if (typed) set(field.id, withoutUnit(raw))
+        set(unitKey(field.id), u)
+      }}
+    />
+  )
+}
 
 /** The id of the message under the form: every marked box points at it, so a screen reader reads why. */
 const ERROR_ID = 'tool-error'
@@ -214,6 +244,7 @@ function FieldRow({ field: base, values, set, invalid, chips }: { field: Field; 
         {field.label}
       </label>
       <Input field={field} value={value} onChange={(v) => set(field.id, v)} describedBy={describedBy} invalid={invalid} words chips={chips && field.kind === 'number' && field.unit === 'rupee'} />
+      {(field.kind === 'number' || field.kind === 'text') && hasSwitch(field) && <UnitSwitch field={field} values={values} set={set} />}
       {field.hint && (
         <span id={hintId} className="field-hint">
           {field.hint}
@@ -448,8 +479,11 @@ function Result({ out, mainRef, verified, rates, examples }: { out: Output; main
  */
 
 /** Puts one value into one box of a calculator before it opens ("Use in another tool"). Every other box stays as it was. */
-export function prefillDraft(store: AppStore, spec: ToolSpec, fieldId: string, value: string) {
-  store.getState().setDraft(spec.id, { ...defaultValues(spec), ...store.getState().drafts[spec.id], [fieldId]: value })
+export function prefillDraft(store: AppStore, spec: ToolSpec, fieldId: string, value: string, unit?: TimeUnit) {
+  const target = spec.fields.find((f) => f.id === fieldId)
+  // A duration goes in with its unit, but only into a box that has the switch; a one-unit box needs no key.
+  const unitPart = unit && target && (target.kind === 'number' || target.kind === 'text') && hasSwitch(target) ? { [unitKey(fieldId)]: unit } : {}
+  store.getState().setDraft(spec.id, { ...defaultValues(spec), ...store.getState().drafts[spec.id], [fieldId]: value, ...unitPart })
 }
 
 export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; onBack: () => void; initial?: Values; card?: SavedCard }) {
@@ -529,7 +563,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
   const listableAmount = draft.amountFmt === 'money' ? draft.amount : null
   // "Use in another tool" only for a plain number that some other calculator has a box for.
   const link = ok ? linkable(computed) : null
-  const canUse = link !== null && linkTargets(ALL_TOOLS, spec.id, link.fmt).length > 0
+  const canUse = link !== null && linkTargets(ALL_TOOLS, spec.id, link.fmt, link.unit).length > 0
 
   // One "next step" chip under the result. Used or dismissed once, it never comes back. Not offered when this EMI already has a reminder.
   const tip = ok && !(reminder && spec.id === 'emi') ? suggestionFor(spec.id, dismissedTips) : null
@@ -713,7 +747,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
         </div>
       </div>
       {expensing && ok && computed.expense && <ExpenseSheet prefill={{ amount: computed.expense.amount.toDecimalPlaces(2).toFixed(), note: computed.expense.note }} onClose={() => setExpensing(false)} />}
-      {using && link && <UseInSheet fromToolId={spec.id} value={link.value} text={linkText(link.value, link.fmt)} fmt={link.fmt} label={link.label} onClose={() => setUsing(false)} />}
+      {using && link && <UseInSheet fromToolId={spec.id} value={link.value} text={linkText(link.value, link.fmt)} fmt={link.fmt} unit={link.unit} label={link.label} onClose={() => setUsing(false)} />}
       {listing && listableAmount !== null && <ToListSheet value={listableAmount} onClose={() => setListing(false)} onDone={showCard} />}
       {(saving || reminding) && (
         <SaveSheet

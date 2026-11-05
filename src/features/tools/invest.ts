@@ -218,7 +218,7 @@ const swpSpec: ToolSpec = {
     end.setMonth(end.getMonth() + wait.toNumber() * 12 + out.months)
     return {
       rows: [
-        { label: 'Months it lasts', value: new D(out.months), fmt: 'int', main: true },
+        { label: 'Months it lasts', value: new D(out.months), fmt: 'int', timeUnit: 'months', main: true },
         { label: 'In years and months', value: `${Math.floor(out.months / 12)} years ${out.months % 12} months`, fmt: 'text' },
         { label: 'Runs out around', value: end.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }), fmt: 'text' },
         { label: 'Total withdrawn', value: out.totalWithdrawn, fmt: 'money' },

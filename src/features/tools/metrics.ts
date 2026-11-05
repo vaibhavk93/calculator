@@ -125,7 +125,7 @@ const paybackSpec: ToolSpec = {
     const profit = arpu!.times(margin!.div(100))
     return {
       rows: [
-        { label: 'Payback period (months)', value: months, fmt: 'number', main: true },
+        { label: 'Payback period (months)', value: months, fmt: 'number', timeUnit: 'months', main: true },
         { label: 'Profit per customer a month', value: profit, fmt: 'money' },
       ],
       formula: ['CAC payback = CAC ÷ (ARPU × gross margin)', `${f(cac!)} ÷ (${f(arpu!)} × ${f(margin!)}%) = ${f2(months)} months`],

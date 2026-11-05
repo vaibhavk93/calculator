@@ -279,11 +279,14 @@ C('T-061', 'ERR', 'Loan term box: junk, zero, huge, fractional months, negative 
   }
   await fill(page, 'tenure', '20 years'); eq(await marked(page), 0, 'marking should clear')
 })
-C('T-062', 'UX', 'Loan term chip says "years" for a bare number and disappears once a unit is typed', async ({ page }) => {
+C('T-062', 'UX', 'Loan term has a Years / Months switch: Years for a bare number, follows a typed unit, and tapping it keeps the digits', async ({ page }) => {
   await open(page, 'emi')
-  const chip = () => page.locator('.field-row', { has: page.locator('label[for="f-tenure"]') }).locator('.field-unit').allInnerTexts()
-  eq((await chip()).join(''), 'years', 'bare'); await fill(page, 'tenure', '18 months'); eq((await chip()).join(''), '', 'with unit')
-  await fill(page, 'tenure', ''); eq((await chip()).join(''), 'years', 'blank')
+  const seg = page.getByRole('radiogroup', { name: 'Unit of Loan term' })
+  const on = async () => (await seg.getByRole('radio', { checked: true }).allInnerTexts()).join('')
+  eq(await on(), 'Years', 'bare'); await fill(page, 'tenure', '18 months'); eq(await on(), 'Months', 'with unit')
+  await seg.getByRole('radio', { name: 'Years' }).click(); eq(await f(page, 'tenure').inputValue(), '18', 'digits kept'); eq(await on(), 'Years', 'after tap')
+  await seg.getByRole('radio', { name: 'Months' }).click(); eq(await f(page, 'tenure').inputValue(), '18', 'digits kept (months)'); eq(await on(), 'Months', 'months')
+  await fill(page, 'tenure', ''); eq(await on(), 'Months', 'blank keeps the choice')
 })
 C('T-063', 'POS', 'Every loan tool with a term box agrees on "18 months" (EMI, repayment schedule, affordable loan, compare offers)', async ({ page }) => {
   await open(page, 'amortisation'); await fill(page, 'principal', '100000'); await fill(page, 'rate', '12'); await fill(page, 'tenure', '18 months')

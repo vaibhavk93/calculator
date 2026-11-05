@@ -23,7 +23,7 @@ import { asScheduled, neverEnds, partPay, partPayTarget, payoffPlan, runway, typ
 import { CARD_GST_PCT, HOME_LOAN_TAX, LOAN_RULES_AS_OF, PRESETS, RATES_AS_OF as LOAN_RATES, type LoanType } from '../../engine/loans/rules'
 import { RATES_AS_OF as GST_RATES } from '../../engine/convert/gstRates'
 import { RATES_AS_OF as TAX_RATES } from '../../engine/tax/rules.FY2026-27'
-import { junkOptional, need, parseNum, type Computed, type Field, type Output, type ResultTable, type ToolSpec, type Values } from '../../lib/tool'
+import { junkOptional, need, parseNum, unitKey, type Computed, type Field, type Output, type ResultTable, type ToolSpec, type Values } from '../../lib/tool'
 
 // ---- shared fields and helpers ------------------------------------------------
 
@@ -38,14 +38,15 @@ const rateField = (d = '8.5', id = 'rate', label = 'Yearly interest rate'): Fiel
   default: d,
   hint: 'Example rate. Enter your own.',
 })
-/** One loan-term box: "18 months", "20 years", "1.5 years", "18m". A bare number means years, and the chip says so. */
+/** One loan-term box: "18 months", "20 years", "1.5 years", "18m". A bare number takes the Years / Months switch under the box (Years until changed). */
 const termField: Field = {
   id: 'tenure',
   label: 'Loan term',
   kind: 'text',
   default: '20',
-  hint: 'Type 20 years or 18 months. A plain number means years.',
+  hint: 'Type a number and pick Years or Months. Typing 18 months works too.',
   chip: termChip,
+  units: ['years', 'months'],
 }
 
 /** Term text to whole months. Inputs saved before the single box may still carry a years/months pick; it is honoured. */
@@ -70,7 +71,7 @@ function readLoan(v: Values): Loan | { error: string } {
   if (p!.lte(0)) return { error: 'Loan amount must be more than zero' }
   if (rate!.lt(0)) return { error: "Interest rate can't be negative" }
   if (rate!.gt(100)) return { error: 'Interest rate looks too high. Enter a yearly rate in percent' }
-  const n = termOf(v.tenure, v.tenureUnit)
+  const n = termOf(v.tenure, v.tenureUnit ?? v[unitKey('tenure')])
   if (typeof n !== 'number') return n
   return { p: p!, rate: rate!, n }
 }
@@ -260,7 +261,7 @@ const reverseSpec: ToolSpec = {
     const { emi: pay, rate } = r.n as Record<string, Dec>
     if (pay!.lte(0)) return { error: 'EMI must be more than zero' }
     if (rate!.lt(0) || rate!.gt(100)) return { error: 'Enter a yearly rate from 0 to 100%' }
-    const n = termOf(v.tenure, v.tenureUnit)
+    const n = termOf(v.tenure, v.tenureUnit ?? v[unitKey('tenure')])
     if (typeof n !== 'number') return n
     const p = maxLoan(pay!, rate!, n)
     const total = pay!.times(n)

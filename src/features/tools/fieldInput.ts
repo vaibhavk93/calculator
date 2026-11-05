@@ -1,7 +1,7 @@
 import { D } from '../../engine/decimal'
 import { legacyTermText } from '../../engine/loans/term'
 import { groupInteger, type NumberSystem } from '../../lib/format'
-import { parseNum, type Field, type Values } from '../../lib/tool'
+import { parseNum, unitOf, type Field, type Values } from '../../lib/tool'
 
 /** A field that is one input (not a list of rows). */
 export type Leaf = Exclude<Field, { kind: 'rows' }>
@@ -46,6 +46,8 @@ const sameAsDefault = (f: Field, v: Values): boolean => {
   const now = v[f.id]
   if (f.kind === 'rows') return JSON.stringify(now ?? null) === JSON.stringify(f.defaultRows)
   const def = 'default' in f && f.default !== undefined ? f.default : ''
+  // A changed unit counts as a change too, or a saved card would hide the unit it used under a closed "More options".
+  if ((f.kind === 'number' || f.kind === 'text') && f.units && unitOf(f, v) !== f.units[0]) return false
   return (now ?? '') === def
 }
 
