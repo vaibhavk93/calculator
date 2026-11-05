@@ -82,11 +82,14 @@ const pickFrom = async (page, labelStart, optionText) => {
 const bgOf = (page) => page.evaluate(() => getComputedStyle(document.body).backgroundColor)
 const dataTheme = (page) => page.evaluate(() => document.documentElement.dataset.theme)
 const cssVar = (page, v) => page.evaluate((n) => document.documentElement.style.getPropertyValue(n).trim(), v)
+// Backup, restore and export live on the Settings sub-screen "Backup and export" (B17). Open it if it is not open yet.
+const inBackup = async (page) => { if ((await page.locator('.screen[aria-label="Backup and export"]').count()) === 0) { await page.click('text=Backup and export'); await settle(page, 150) } }
 const download = async (page, clickSel) => {
+  await inBackup(page)
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.click(clickSel)])
   return { name: dl.suggestedFilename(), text: readFileSync(await dl.path(), 'utf8') }
 }
-const upload = (page, name, text) => page.setInputFiles('input[type=file]', { name, mimeType: 'application/json', buffer: Buffer.from(text) })
+const upload = async (page, name, text) => { await inBackup(page); await page.setInputFiles('input[type=file]', { name, mimeType: 'application/json', buffer: Buffer.from(text) }) }
 const backupOf = (data, over = {}) => JSON.stringify({ kind: 'vkcalc-backup', schemaVersion: 3, exportedAt: '2026-10-01T10:00:00.000Z', app: 'Calc', data, ...over }, null, 2)
 
 // ------------------------------------------------------------------ navigation to each screen (used by the sweeps)
@@ -640,11 +643,14 @@ T('S23', 'POS', 'Settings > Reminders section is native only: hidden in the brow
   ok(!heads.includes('Reminders'), 'Reminders section visible: ' + heads.join(','))
   ok(!/Notifications: |Alarms and reminders:/.test(await body(page)), 'permission rows visible')
 })
-T('S24', 'POS', 'Categories and cards row opens Manage and Back returns to Settings', async (app) => {
+T('S24', 'POS', 'Categories and cards row (in Budget) opens Manage and Back returns to Budget; Settings no longer carries that row (B17)', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page)
+  ok((await page.locator('.screen[aria-label=Settings] >> text=Categories and cards').count()) === 0, 'Settings still has the Categories and cards row')
+  await page.click('[aria-label=Back]'); await settle(page, 200)
+  await tab(page, 'Budget'); await settle(page, 150)
   await page.click('text=Categories and cards'); await settle(page, 200); ok(/Categories|Manage|limit/i.test(await body(page)), 'manage not shown')
   const backs = page.locator('[aria-label=Back]'); await backs.last().click(); await settle(page, 200)
-  ok(await page.locator('.screen[aria-label=Settings]').count() === 1 && /Export a backup/.test(await body(page)), 'not back on Settings')
+  ok(await page.locator('.screen[aria-label="Categories and cards"]').count() === 0 && /Add expense/.test(await body(page)), 'not back on Budget')
 })
 T('S25', 'POS', 'About shows version 0.1.0-P1 and the privacy line', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page)
@@ -1229,7 +1235,7 @@ T('R08', 'UX', 'tab labels are not truncated at 320 px width and 200% font', asy
 })
 T('R09', 'UI', 'Settings headings, section order and the Reminders-free layout read naturally (observation of heading list)', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page)
-  const h = await page.locator('.screen h1, .screen h2').allInnerTexts(); ok(h.join('|') === 'Settings|Appearance|Numbers|Behaviour|Your data|About', h.join('|'))
+  const h = await page.locator('.screen h1, .screen h2').allInnerTexts(); ok(h.join('|') === 'Settings|Appearance|Numbers|Behaviour|Reminders|More', h.join('|'))
 })
 T('R10', 'RUNTIME', 'document title, theme-color meta and html lang stay valid after a theme change', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page); await page.click('[role=radio]:text-is("Light")')

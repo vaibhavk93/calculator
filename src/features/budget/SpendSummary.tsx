@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import type { PickOption } from '../../components/PickerSelect'
 import { Icon } from '../../components/Icon'
 import { ScreenHeader } from '../../components/ScreenHeader'
@@ -37,6 +37,7 @@ import {
 } from '../../lib/budget'
 import { cardBillFor } from '../../lib/recurring'
 import { formatCell } from '../../lib/toolFormat'
+import { useFitText } from '../calculator/useFitText'
 import { Segmented } from '../settings/controls'
 import { FilterSheet, scopeKey, scopeLabel, type Scope } from './FilterSheet'
 import { PaidWithTree } from './PaidWithTree'
@@ -52,6 +53,17 @@ export function useMoney() {
   const system = useApp((s) => s.settings.numberSystem)
   const decimals = useApp((s) => s.settings.decimals)
   return (v: Dec) => formatCell(v, 'money', { system, decimals })
+}
+
+/**
+ * The big figure at the top of a Budget page. It shrinks to fit its line, like the calculator's answer, so a money
+ * number is never broken across two lines at a large system font. 2rem down to 1rem; below that it scrolls sideways.
+ */
+export function FitHero({ text }: { text: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+  useFitText(ref, text, undefined, rem * 2, rem)
+  return <span ref={ref} className="budget__hero">{text}</span>
 }
 
 const SHORT = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' })
@@ -343,7 +355,8 @@ export function SpendSummary({
         : `${money(cmp.diff.abs())} ${cmp.diff.gt(0) ? 'more' : 'less'} than ${cmpRange}${cmp.pct === null ? '' : ` (${cmp.pct > 0 ? '+' : cmp.pct < 0 ? '-' : ''}${Math.abs(cmp.pct)}%)`}`
 
   const months = trend(budget, month, 6, eff)
-  const newestFirst = [...months].reverse()
+  // A month with no spending is noise in a six-month list, unless it is the one being looked at.
+  const newestFirst = [...months].reverse().filter((t) => !t.spent.isZero() || t.month === month)
   const peak = months.reduce((m, t) => (t.spent.gt(m) ? t.spent : m), new D(0))
   const thisMonth = monthKey(today)
 
@@ -385,7 +398,7 @@ export function SpendSummary({
         <div className="budget__sum">
           <span className="result__label">Spent in {monthWord}</span>
           {s.spent.isNegative() && <span className="budget__note">Refunds are more than what you spent</span>}
-          <span className="budget__hero">{money(s.spent)}</span>
+          <FitHero text={money(s.spent)} />
           <span className="budget__note">
             {avg ? `${money(avg.perDay)} a day (${avg.days} ${avg.days === 1 ? 'day' : 'days'}) · ` : ''}
             {entriesWord(s.entries.length)}

@@ -1,9 +1,9 @@
 /* History: one card per calculation.
      name (optional)
-     what you typed                    [edit] [delete]
+     what you typed                    [more]
      = the answer
-   Tapping what you typed reuses the expression, tapping the answer reuses the answer. Nothing wraps into a
-   second row of icons, at any font size: the icons live in their own column. */
+   Tapping what you typed reuses the expression, tapping the answer reuses the answer. The one trailing More button opens
+   the row's sheet (name, edit, lock, share, copy, delete). It lives in its own column, so it never wraps at any font size. */
 
 .hlist {
   display: flex;
@@ -78,22 +78,8 @@
 }
 
 .hrow__acts .icon-btn {
-  width: 38px;
+  width: 44px;
   color: var(--ink-2);
-}
-
-.hrow__edit {
-  display: flex;
-  flex-wrap: wrap;
-  grid-column: 1 / -1;
-  align-items: center;
-  gap: var(--s-2);
-  padding: var(--s-2) var(--s-2) var(--s-2) 0;
-}
-
-.hrow__edit .field {
-  flex: 1 1 10rem;
-  min-width: 0;
 }
 
 /* ------------------------------------------------ row menu, lock, filter */

@@ -82,12 +82,14 @@ const chooseCat = async (page, name) => {
   await S(page).locator('#exp-cat .pill--more').click()
   await page.locator('.pick__opt').filter({ has: page.locator('.pick__label', { hasText: new RegExp('^' + name + '$') }) }).first().click()
 }
+// "Repeats" sits under "More options" (B20): open it unless it is already open.
+const openMore = async (page) => { const d = S(page).locator('details.more'); if (!(await d.evaluate((e) => e.open))) await d.locator('summary').click() }
 const fill = async (page, f = {}) => {
   const s = S(page)
   if (f.amount !== undefined) await s.locator('#exp-amount').fill(f.amount)
   if (f.date !== undefined) await s.locator('#exp-date').fill(f.date)
   if (f.kind) { await settle(page); await s.getByRole('radio', { name: f.kind, exact: true }).click() }
-  if (f.repeat) { await settle(page); await s.getByRole('radio', { name: f.repeat, exact: true }).click() }
+  if (f.repeat) { await settle(page); await openMore(page); await s.getByRole('radio', { name: f.repeat, exact: true }).click() }
   if (f.cat !== undefined) await chooseCat(page, f.cat)
   if (f.mode !== undefined) { await settle(page); await s.locator('#exp-mode .chip', { hasText: new RegExp('^' + f.mode + '$') }).click() }
   if (f.note !== undefined) await s.locator('#exp-note').fill(f.note)

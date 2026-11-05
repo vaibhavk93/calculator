@@ -90,8 +90,10 @@ const hide = (page) => page.evaluate(() => { Object.defineProperty(document, 'vi
 const readData = async (page) => { await hide(page); await settle(page, 400); return stored(page) }
 const body = (page) => page.evaluate(() => document.body.innerText)
 const openSettings = async (page) => { await page.click('[aria-label=Settings]'); await settle(page, 150) }
-const download = async (page, sel) => { const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), page.click(sel)]); const { readFileSync } = await import('node:fs'); return { name: dl.suggestedFilename(), text: readFileSync(await dl.path(), 'utf8') } }
-const upload = (page, name, text) => page.setInputFiles('input[type=file]', { name, mimeType: 'application/json', buffer: Buffer.from(text) })
+// Backup, restore and export live on the Settings sub-screen "Backup and export" (B17). Open it if it is not open yet.
+const inBackup = async (page) => { if ((await page.locator('.screen[aria-label="Backup and export"]').count()) === 0) { await page.click('text=Backup and export'); await settle(page, 150) } }
+const download = async (page, sel) => { await inBackup(page); const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), page.click(sel)]); const { readFileSync } = await import('node:fs'); return { name: dl.suggestedFilename(), text: readFileSync(await dl.path(), 'utf8') } }
+const upload = async (page, name, text) => { await inBackup(page); await page.setInputFiles('input[type=file]', { name, mimeType: 'application/json', buffer: Buffer.from(text) }) }
 const realErrors = (errors) => errors.filter((e) => !/Failed to load resource|net::ERR|frankfurter/i.test(e))
 
 // ================================================================== D. DATA INTEGRITY (UI level; the sanitizer fuzz is in src/store/qa-fuzz.test.ts)

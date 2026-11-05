@@ -23,7 +23,20 @@
   font-size: 2rem;
   font-weight: 500;
   color: var(--ink);
-  overflow-wrap: anywhere;
+  /* One line, always. FitHero shrinks the size to fit; if even the smallest size is too wide it scrolls, it never wraps mid-number. */
+  display: block;
+  align-self: stretch;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+  line-height: 1.2;
+  padding-block: 0.1em;
+  margin-block: -0.1em;
+}
+
+.budget__hero::-webkit-scrollbar {
+  display: none;
 }
 
 .budget__track {

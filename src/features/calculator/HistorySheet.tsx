@@ -3,7 +3,7 @@ import { Icon } from '../../components/Icon'
 import { Sheet } from '../../components/Sheet'
 import { useApp } from '../../components/StoreProvider'
 import { formatExpression, formatPlain } from '../../lib/format'
-import { MAX_MEMO, isKept } from '../../store/types'
+import { isKept } from '../../store/types'
 import { HistoryRowSheet } from './HistoryRowSheet'
 
 export function HistorySheet() {
@@ -13,14 +13,10 @@ export function HistorySheet() {
   const setOverlay = useApp((s) => s.setOverlay)
   const reuseExpression = useApp((s) => s.reuseExpression)
   const reuseResult = useApp((s) => s.reuseResult)
-  const renameHistory = useApp((s) => s.renameHistory)
-  const deleteHistory = useApp((s) => s.deleteHistory)
   const clearHistory = useApp((s) => s.clearHistory)
 
   const [confirming, setConfirming] = useState(false)
   const [typed, setTyped] = useState('')
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [draft, setDraft] = useState('')
   const [rowId, setRowId] = useState<string | null>(null)
   const [lockedOnly, setLockedOnly] = useState(false)
 
@@ -35,15 +31,6 @@ export function HistorySheet() {
   const cancelClear = () => {
     setConfirming(false)
     setTyped('')
-  }
-  const startEdit = (id: string, current: string | undefined) => {
-    setEditingId(id)
-    setDraft(current ?? '')
-  }
-  const saveEdit = () => {
-    if (editingId) renameHistory(editingId, draft)
-    setEditingId(null)
-    setDraft('')
   }
 
   // One sheet at a time (docs/FORMS-AND-SHEETS.md): the row menu takes this sheet's place, X returns here.
@@ -116,79 +103,32 @@ export function HistorySheet() {
           {shown.map((h) => {
             const expression = formatExpression(h.expression, system)
             const result = formatPlain(h.result, fmt)
-            const editing = editingId === h.id
             return (
               <li key={h.id} className="hrow">
-                {editing ? (
-                  <form
-                    className="hrow__edit"
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      saveEdit()
-                    }}
+                {h.memo || h.locked ? (
+                  <span className="hrow__memo">
+                    {h.locked ? <Icon name="lock" size={14} className="hrow__lock" /> : null}
+                    {h.locked ? <span className="sr-only">Locked. </span> : null}
+                    {h.memo}
+                  </span>
+                ) : null}
+                <button type="button" className="hrow__expr" aria-label={`Use expression ${expression}`} onClick={() => reuseExpression(h.id)}>
+                  {expression}
+                </button>
+                <button type="button" className="hrow__result" aria-label={`Use result ${result}`} onClick={() => reuseResult(h.id)}>
+                  {result}
+                </button>
+                <span className="hrow__acts">
+                  <button
+                    type="button"
+                    className="icon-btn hrow__more"
+                    aria-label={`More for ${expression}`}
+                    title="More"
+                    onClick={() => setRowId(h.id)}
                   >
-                    <input
-                      className="field"
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value.slice(0, MAX_MEMO))}
-                      aria-label={`Name for ${expression}`}
-                      placeholder="Name this calculation"
-                      autoFocus
-                    />
-                    <button type="button" className="btn" onClick={() => setEditingId(null)}>
-                      Cancel
-                    </button>
-                    <button type="submit" className="btn">
-                      Save
-                    </button>
-                  </form>
-                ) : (
-                  <>
-                    {h.memo || h.locked ? (
-                      <span className="hrow__memo">
-                        {h.locked ? <Icon name="lock" size={14} className="hrow__lock" /> : null}
-                        {h.locked ? <span className="sr-only">Locked. </span> : null}
-                        {h.memo}
-                      </span>
-                    ) : null}
-                    <button type="button" className="hrow__expr" aria-label={`Use expression ${expression}`} onClick={() => reuseExpression(h.id)}>
-                      {expression}
-                    </button>
-                    <button type="button" className="hrow__result" aria-label={`Use result ${result}`} onClick={() => reuseResult(h.id)}>
-                      {result}
-                    </button>
-                    <span className="hrow__acts">
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        aria-label={h.memo ? `Rename ${expression}` : `Name ${expression}`}
-                        title={h.memo ? 'Rename' : 'Name'}
-                        onClick={() => startEdit(h.id, h.memo)}
-                      >
-                        <Icon name="edit" size={18} />
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        aria-label={h.locked ? `Delete ${expression} (unlock it first)` : `Delete ${expression}`}
-                        title={h.locked ? 'Unlock to delete' : 'Delete'}
-                        disabled={h.locked}
-                        onClick={() => deleteHistory(h.id)}
-                      >
-                        <Icon name="trash" size={18} />
-                      </button>
-                      <button
-                        type="button"
-                        className="icon-btn hrow__more"
-                        aria-label={`More for ${expression}`}
-                        title="More"
-                        onClick={() => setRowId(h.id)}
-                      >
-                        <Icon name="more" size={18} />
-                      </button>
-                    </span>
-                  </>
-                )}
+                    <Icon name="more" size={18} />
+                  </button>
+                </span>
               </li>
             )
           })}

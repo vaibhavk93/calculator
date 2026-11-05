@@ -47,6 +47,8 @@ const view = (p, name) => p.getByRole('radio', { name, exact: true }).click()
 const quickAdd = async (p, t) => { await p.locator('input[aria-label="New task"]').fill(t); await p.locator('.todo__add button[type=submit]').click() }
 const sheetSave = (p) => p.locator('.sheet .sheet__foot .btn--primary').click()
 const settings = (p) => p.locator('[aria-label="Settings"]').click()
+const backupScreen = (p) => p.getByRole('button', { name: /^Backup and export/ }).click() // B17: backup, restore and export moved to this Settings sub-screen
+const BK = '.screen[aria-label="Backup and export"] .screen__body'
 const tourNext = (p) => p.locator('.sheet__foot .btn--primary')
 /** Every interactive thing on screen is at least 44px in one direction. Lists the ones that are not. */
 const smallTargets = (p, scope = '.app') => p.evaluate((sc) => {
@@ -128,7 +130,7 @@ T('N-006', 'UX', 'Escape closes a tour too; dismissing the row (X) hides it and 
   await p.reload(); await p.waitForSelector('.app'); await notesTab(p); eq(await p.locator('.tourrow').count(), 0, 'still gone')
 })
 T('N-007', 'UX', 'Settings "Tips and tours": each tour replays with no Try links; a finished tour stays done if closed early; "Show first-visit tips again" brings the rows back', async () => {
-  const { page: p } = await open(); await settings(p)
+  const { page: p } = await open(); await settings(p); await p.getByRole('button', { name: /^Tips and tours/ }).click()
   const sect = p.locator('section[aria-label="Tips and tours"]')
   await sect.getByRole('button', { name: /^Notes/ }).click()
   eq(await p.locator('.sheet').getByRole('button', { name: /Try it/ }).count(), 0, 'Try links from Settings')
@@ -138,13 +140,13 @@ T('N-007', 'UX', 'Settings "Tips and tours": each tour replays with no Try links
   has(await snackText(p), 'tips will show again'); eq(Object.keys((await st(p)).settings.tours).length, 0, 'tours cleared')
 })
 T('N-008', 'NEG', 'An old backup (no tours, no reminder time) restores cleanly and the tip rows show again', async () => {
-  const { page: p } = await open(); await settings(p)
+  const { page: p } = await open(); await settings(p); await backupScreen(p)
   const old = { kind: 'vkcalc-backup', schemaVersion: 3, exportedAt: '2026-01-01T00:00:00Z', data: { schemaVersion: 3, settings: { theme: 'dark' }, history: [], cards: [emi('a')], reminders: [], memory: null, input: { expr: '', fresh: false } } }
   const f = join(tmpdir(), 'qa-old-backup.json'); writeFileSync(f, JSON.stringify(old))
   await p.locator('input[type=file]').setInputFiles(f)
-  has(await text(p, '.screen__body'), 'Replace everything with the backup'.replace('Replace everything with the backup', 'Replace'))
+  has(await text(p, BK), 'Replace everything with the backup'.replace('Replace everything with the backup', 'Replace'))
   await p.getByRole('button', { name: 'Replace everything' }).click()
-  has(await text(p, '.screen__body'), 'Restored 0 calculations, 1 notes and lists')
+  has(await text(p, BK), 'Restored 0 calculations, 1 notes and lists')
   await p.getByRole('button', { name: 'Back' }).first().click(); await notesTab(p)
   eq(await p.locator('.tourrow').count(), 1, 'row after restoring an old backup'); has(await text(p, '.tools__list'), 'Home EMI')
 })
@@ -472,16 +474,16 @@ T('N-095', 'UX', 'Backup nudge: 25 items and no backup says so once on the Setti
 T('N-096', 'POS', 'Export a backup downloads a file, records the time (nudge stops); restoring that same file gives back every new field exactly', async () => {
   const cards = [task('t', 'Service car', { tags: ['Car'], pinned: true }), task('d', 'Done thing', { done: true, doneAt: NOW }), tape('L', 'Split', [{ label: 'R', value: '10', done: true }, { label: 'S', value: '5', skip: true }], { checklist: true }), emi('e', 'EMI', { tags: ['Loan'], note: 'a note' }), task('x', 'Trashed', { deletedAt: NOW - DAY })]
   const reminders = [rem('r', 't', ist('2026-12-01'), { afterDays: 180, leads: [14, 7, 0], leadDays: 14 }), rem('r2', 'e', ist('2026-12-05'), { repeat: 'quarterly' })]
-  const { page: p } = await open(seed({ cards, reminders, settings: { reminderTime: '18:30', tours: { budget: 'done' } } })); await settings(p)
+  const { page: p } = await open(seed({ cards, reminders, settings: { reminderTime: '18:30', tours: { budget: 'done' } } })); await settings(p); await backupScreen(p)
   const [dl] = await Promise.all([p.waitForEvent('download'), p.getByText('Export a backup').click()]); const file = join(tmpdir(), 'qa-export.json'); await dl.saveAs(file)
   ok(/^vkcalc-backup-2026-11-02\.json$/.test(dl.suggestedFilename()), 'file name ' + dl.suggestedFilename()); await wait(400)
   const before = JSON.parse(readFileSync(file, 'utf8')).data; ok((await stored(p)).settings.lastBackupAt > 0, 'lastBackupAt recorded')
   await p.getByRole('button', { name: /Back/ }).first().click(); await notesTab(p); await modeTodo(p); await view(p, 'All'); await p.getByText('Service car').first().click(); await p.getByRole('button', { name: 'Delete task' }).click()
-  await settings(p); await p.locator('input[type=file]').setInputFiles(file); await p.getByRole('button', { name: 'Replace everything' }).click(); await wait(500)
+  await settings(p); await backupScreen(p); await p.locator('input[type=file]').setInputFiles(file); await p.getByRole('button', { name: 'Replace everything' }).click(); await wait(500)
   const after = await stored(p); eq(JSON.stringify(after.cards), JSON.stringify(before.cards), 'cards'); eq(JSON.stringify(after.reminders), JSON.stringify(before.reminders), 'reminders'); eq(after.settings.reminderTime, '18:30', 'time')
 })
 T('N-097', 'UX', 'Restore asks first with counts in words; Cancel changes nothing', async () => {
-  const { page: p } = await open(seed({ cards: [emi('a')] })); await settings(p); const f = join(tmpdir(), 'qa-r.json')
+  const { page: p } = await open(seed({ cards: [emi('a')] })); await settings(p); await backupScreen(p); const f = join(tmpdir(), 'qa-r.json')
   writeFileSync(f, JSON.stringify({ kind: 'vkcalc-backup', schemaVersion: 3, data: { schemaVersion: 3, settings: {}, history: [], cards: [], reminders: [], memory: null, input: { expr: '', fresh: false } } })); await p.locator('input[type=file]').setInputFiles(f)
   has(await text(p, '.confirm'), 'Replace everything on this phone'); await p.locator('.confirm').getByRole('button', { name: 'Cancel' }).click(); eq((await st(p)).cards.length, 1, 'unchanged')
 })

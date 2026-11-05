@@ -123,6 +123,7 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
   const [submitted, setSubmitted] = useState(false)
   const [storeError, setStoreError] = useState<string | null>(null)
   const [hintGone, setHintGone] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const system = useApp((s) => s.settings.numberSystem)
   const decimals = useApp((s) => s.settings.decimals)
 
@@ -304,51 +305,7 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
           <FormField label="Date" htmlFor="exp-date" required error={shown('date')}>
             <input id="exp-date" className="field field--mono field--date" type="date" aria-required="true" value={date} onChange={(e) => setDate(e.target.value)} onBlur={touch('date')} {...aria('date')} />
           </FormField>
-          <div className="ffield">
-            <span className="ffield__label" id="exp-kind-label">What is this</span>
-            <Segmented<'spend' | 'refund' | Settlement>
-              label="What is this"
-              value={settlement ?? (refund ? 'refund' : 'spend')}
-              onChange={chooseKind}
-              options={[{ value: 'spend', label: 'Spending' }, { value: 'refund', label: 'Refund' }, { value: 'cardBill', label: 'Card bill' }, { value: 'transfer', label: 'Transfer' }]}
-            />
-            {refund && settlement === null && <p className="ffield__hint">Money that came back, such as a returned item. It lowers your spending.</p>}
-            {settlement === 'cardBill' && <p className="ffield__hint">Paying off a credit card. Not counted as spending.</p>}
-            {settlement === 'transfer' && <p className="ffield__hint">Moving money between your own accounts. Not counted as spending.</p>}
-          </div>
         </div>
-
-        {settlement === null && !refund && (
-          <div className="save__card" style={tintStyle(7)}>
-            {linked ? (
-              <p className="ffield__hint">This entry is part of a bill that repeats {repeatWord(linked.repeat)}. Change or stop it in Bills.</p>
-            ) : (
-              <div className="ffield">
-                <span className="ffield__label" id="exp-repeat-label">Repeats</span>
-                <Segmented<BillRepeat | 'none'>
-                  label="Repeats"
-                  value={repeat}
-                  onChange={setRepeat}
-                  options={[{ value: 'none', label: 'Never' }, ...BILL_REPEATS.map((r) => ({ value: r.id, label: r.label }))]}
-                />
-                <p className="ffield__hint" role="status">
-                  {repeat === 'none' || nextDue === null
-                    ? 'For a bill or subscription, such as rent or Netflix.'
-                    : `This entry counts as the first payment. Next due ${shortDate(nextDue)}: it shows in Due, and marking it paid adds the entry.`}
-                </p>
-                {guess && (
-                  <>
-                    <p className="ffield__hint" role="status">Looks like a monthly bill. Make it a bill?</p>
-                    <div className="expense__guess">
-                      <button type="button" className="link-btn" onClick={() => setRepeat('monthly')}>Make it a bill</button>
-                      <button type="button" className="link-btn" onClick={() => { dismissedHints.add(hintKey); setHintGone(true) }}>Not now</button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        )}
 
         {settlement === null && (
           <div className="save__card" style={tintStyle(7)}>
@@ -416,10 +373,62 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
         {instError && payMode === null && settlement === null && <p className="ffield__error" id="exp-inst-msg" role="alert">{instError}</p>}
 
         <div className="save__card" style={tintStyle(7)}>
+          <div className="ffield">
+            <span className="ffield__label" id="exp-kind-label">What is this</span>
+            <Segmented<'spend' | 'refund' | Settlement>
+              label="What is this"
+              value={settlement ?? (refund ? 'refund' : 'spend')}
+              onChange={chooseKind}
+              options={[{ value: 'spend', label: 'Spending' }, { value: 'refund', label: 'Refund' }, { value: 'cardBill', label: 'Card bill' }, { value: 'transfer', label: 'Transfer' }]}
+            />
+            {refund && settlement === null && <p className="ffield__hint">Money that came back, such as a returned item. It lowers your spending.</p>}
+            {settlement === 'cardBill' && <p className="ffield__hint">Paying off a credit card. Not counted as spending.</p>}
+            {settlement === 'transfer' && <p className="ffield__hint">Moving money between your own accounts. Not counted as spending.</p>}
+          </div>
+        </div>
+
+        <div className="save__card" style={tintStyle(7)}>
           <FormField label="Note" htmlFor="exp-note">
             <input id="exp-note" className="field" value={note} maxLength={200} autoComplete="off" onChange={(e) => changeNote(e.target.value)} />
           </FormField>
         </div>
+
+        {settlement === null && !refund && (
+          <>
+            {guess && (
+              <div className="ffield">
+                <p className="ffield__hint" role="status">Looks like a monthly bill. Make it a bill?</p>
+                <div className="expense__guess">
+                  <button type="button" className="link-btn" onClick={() => { setRepeat('monthly'); setMoreOpen(true) }}>Make it a bill</button>
+                  <button type="button" className="link-btn" onClick={() => { dismissedHints.add(hintKey); setHintGone(true) }}>Not now</button>
+                </div>
+              </div>
+            )}
+            <details className="more" open={moreOpen || repeat !== 'none' || linked !== undefined} onToggle={(e) => setMoreOpen(e.currentTarget.open)}>
+              <summary>More options</summary>
+              <div className="more__body">
+                {linked ? (
+                  <p className="ffield__hint">This entry is part of a bill that repeats {repeatWord(linked.repeat)}. Change or stop it in Bills.</p>
+                ) : (
+                  <div className="ffield">
+                    <span className="ffield__label" id="exp-repeat-label">Repeats</span>
+                    <Segmented<BillRepeat | 'none'>
+                      label="Repeats"
+                      value={repeat}
+                      onChange={setRepeat}
+                      options={[{ value: 'none', label: 'Never' }, ...BILL_REPEATS.map((r) => ({ value: r.id, label: r.label }))]}
+                    />
+                    <p className="ffield__hint" role="status">
+                      {repeat === 'none' || nextDue === null
+                        ? 'For a bill or subscription, such as rent or Netflix.'
+                        : `This entry counts as the first payment. Next due ${shortDate(nextDue)}: it shows in Due, and marking it paid adds the entry.`}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </details>
+          </>
+        )}
 
         {trail.length > 0 && (
           <div className="expense__trail" role="group" aria-label="Changes to this entry">

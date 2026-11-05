@@ -151,6 +151,7 @@ await T('due: row, 5 steps, last Try it opens Make reminders reliable', async (p
 // ---------------------------------------------------------------- Settings replay
 await T('settings: replay a tour, then bring the tips back', async (page) => {
   await page.locator('[aria-label="Settings"]').click()
+  await page.getByRole('button', { name: /^Tips and tours/ }).click()
   const sect = page.locator('section[aria-label="Tips and tours"]')
   ok((await sect.count()) === 1, 'Tips and tours section')
   ok((await sect.locator('.row--button').count()) === 4, 'three tours and the reset row')
