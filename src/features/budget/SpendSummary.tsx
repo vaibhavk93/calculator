@@ -43,6 +43,7 @@ import { Heatmap } from './Heatmap'
 import { ExportSheet } from './ExportSheet'
 import { ExpenseSheet } from './sheets'
 import { PickView } from './pick'
+import { DATE_LOCALE } from '../../lib/dateLocale'
 
 export type SummaryTab = 'summary' | 'entries'
 
@@ -53,7 +54,7 @@ export function useMoney() {
   return (v: Dec) => formatCell(v, 'money', { system, decimals })
 }
 
-const SHORT = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' })
+const SHORT = new Intl.DateTimeFormat(DATE_LOCALE, { day: 'numeric', month: 'short' })
 export const shortDate = (key: string) => {
   const [y = 1970, m = 1, d = 1] = key.split('-').map(Number)
   return SHORT.format(new Date(y, m - 1, d))
@@ -62,7 +63,7 @@ export const shortDate = (key: string) => {
 const monthName = (key: string, style: 'long' | 'short' | 'strip') => {
   const [y = 1970, m = 1] = key.split('-').map(Number)
   const opts: Intl.DateTimeFormatOptions = style === 'strip' ? { month: 'short', year: '2-digit' } : { month: style }
-  return new Intl.DateTimeFormat(undefined, opts).format(new Date(y, m - 1, 1))
+  return new Intl.DateTimeFormat(DATE_LOCALE, opts).format(new Date(y, m - 1, 1))
 }
 
 /** A thin bar. Colour is never the only signal: the words beside it carry the same numbers. */

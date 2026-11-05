@@ -7,6 +7,7 @@ import { leadFields, leadsOf, timeLabel } from '../../lib/reminders'
 import { dayText, hasErrors, taskSummary, validateTask } from '../../lib/tasks'
 import { Segmented, Toggle } from '../settings/controls'
 import { AfterDone, LeadPills } from './ReminderOptions'
+import { TagPicker } from './TagPicker'
 
 /**
  * Add a task, or change one. A task is a saved card; its date is an ordinary reminder, so the Due tab and
@@ -30,7 +31,6 @@ export function TaskSheet({ card, onClose }: { card?: SavedCard; onClose: () => 
   const [leads, setLeads] = useState<number[]>(reminder ? leadsOf(reminder) : [0])
   const [tags, setTags] = useState<string[]>(card?.tags ?? [])
   const [pinned, setPinned] = useState(card?.pinned ?? false)
-  const [custom, setCustom] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [storeError, setStoreError] = useState<string | null>(null)
   const store = useAppStore()
@@ -38,13 +38,6 @@ export function TaskSheet({ card, onClose }: { card?: SavedCard; onClose: () => 
   const known = [...new Set([...cards.flatMap((c) => c.tags), ...tags])].sort()
   const checked = validateTask({ title, date, repeat, afterDays: after, tags }, Date.now())
   const err = submitted ? checked.errors : {}
-
-  const toggleTag = (t: string) => setTags((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]))
-  const addCustom = () => {
-    const t = custom.trim().slice(0, 30)
-    if (t && !tags.some((x) => x.toLowerCase() === t.toLowerCase())) setTags([...tags, t])
-    setCustom('')
-  }
 
   const save = () => {
     setSubmitted(true)
@@ -134,19 +127,7 @@ export function TaskSheet({ card, onClose }: { card?: SavedCard; onClose: () => 
         </div>
 
         <div className="save__card">
-          <span className="field-label" id="task-tags">Tags</span>
-          <div className="chips" role="group" aria-labelledby="task-tags">
-            {known.map((t) => (
-              <button key={t} type="button" className="chip" aria-pressed={tags.includes(t)} onClick={() => toggleTag(t)}>
-                {t}
-              </button>
-            ))}
-          </div>
-          <div className="save__add">
-            <input className="field" placeholder="Your own tag" aria-label="Add your own tag" value={custom} maxLength={30} onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCustom()} />
-            <button type="button" className="btn" onClick={addCustom}>Add tag</button>
-          </div>
-          <p className={err.tags ? 'ffield__error' : 'ffield__hint'} role={err.tags ? 'alert' : undefined}>{err.tags ?? `Up to ${MAX_TASK_TAGS} tags.`}</p>
+          <TagPicker known={known} tags={tags} onChange={setTags} limit={MAX_TASK_TAGS} error={err.tags} idPrefix="task" />
           <div className="save__switch">
             <span className="field-label">Pin to the top</span>
             <Toggle label="Pin to the top" checked={pinned} onChange={(on) => { setPinned(on); setStoreError(null) }} />

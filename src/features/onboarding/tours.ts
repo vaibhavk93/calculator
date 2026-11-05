@@ -89,7 +89,7 @@ export const TOURS: Record<TourId, Tour> = {
       {
         id: 'lists',
         heading: 'Lists with a running total',
-        text: 'Tap New list and add lines with amounts. Calc keeps the total. Show checkboxes to make it a checklist, then tap a line to mark it Paid or Skipped. Skipped lines are left out of the total.',
+        text: 'Tap New, then New list, and add lines with amounts. Calc keeps the total. Show checkboxes to make it a checklist, then tap a line to mark it Paid or Skipped. Skipped lines are left out of the total.',
         try: { label: 'Try it: New list', action: 'new-list' },
       },
       {

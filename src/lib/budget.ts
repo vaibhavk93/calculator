@@ -1,5 +1,6 @@
 import { D, type Dec } from '../engine'
 import { decimalComma } from './decimalComma'
+import { DATE_LOCALE } from './dateLocale'
 
 /**
  * A budget bucket. `limit` is a plain decimal string for every month, or null for "no limit".
@@ -295,7 +296,7 @@ export const activeCategories = (budget: Pick<BudgetData, 'categories'>, month: 
 
 /** "only for Nov 2026" / "only for Nov 2026, Dec 2026" */
 export function onlyForLabel(months: string[]): string {
-  const short = (k: string) => { const [y = 1970, m = 1] = k.split('-').map(Number); return new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' }).format(new Date(y, m - 1, 1)) }
+  const short = (k: string) => { const [y = 1970, m = 1] = k.split('-').map(Number); return new Intl.DateTimeFormat(DATE_LOCALE, { month: 'short', year: 'numeric' }).format(new Date(y, m - 1, 1)) }
   return `only for ${months.map(short).join(', ')}`
 }
 
@@ -544,7 +545,7 @@ export function sanitizeEdits(raw: unknown): ExpenseEdit[] | undefined {
   return out.length > 0 ? out.slice(-MAX_EDITS) : undefined
 }
 
-const SHORT_DAY = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' })
+const SHORT_DAY = new Intl.DateTimeFormat(DATE_LOCALE, { day: 'numeric', month: 'short' })
 const dayWords = (key: string | null): string => {
   const [y = 1970, m = 1, d = 1] = (key ?? '').split('-').map(Number)
   return SHORT_DAY.format(new Date(y, m - 1, d))
@@ -655,7 +656,7 @@ export function shiftMonth(key: string, delta: number): string {
 
 export function monthLabel(key: string): string {
   const [y = 1970, m = 1] = key.split('-').map(Number)
-  return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(new Date(y, m - 1, 1))
+  return new Intl.DateTimeFormat(DATE_LOCALE, { month: 'long', year: 'numeric' }).format(new Date(y, m - 1, 1))
 }
 
 export interface CategoryLine {
@@ -1034,7 +1035,7 @@ export function paceLeft(left: Dec, month: string, today: Date): { perDay: Dec; 
 /** "Nov 2026". */
 export function monthShortLabel(key: string): string {
   const [y = 1970, m = 1] = key.split('-').map(Number)
-  return new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' }).format(new Date(y, m - 1, 1))
+  return new Intl.DateTimeFormat(DATE_LOCALE, { month: 'short', year: 'numeric' }).format(new Date(y, m - 1, 1))
 }
 
 /** `count` months around `centre`, oldest first, with `centre` in the middle (for 12: five before it, six after). */
@@ -1067,7 +1068,7 @@ export function recentCategoryIds(budget: BudgetData, n: number, month: string):
 export function dayLongLabel(key: string): string {
   const [y = 1970, m = 1, d = 1] = key.split('-').map(Number)
   const date = new Date(y, m - 1, d)
-  const part = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(undefined, o).format(date)
+  const part = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(DATE_LOCALE, o).format(date)
   return `${part({ weekday: 'short' })} ${d} ${part({ month: 'short' })}`
 }
 

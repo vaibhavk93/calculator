@@ -213,17 +213,19 @@ export function sanitizeCards(raw: unknown): SavedCard[] {
   let pinned = 0
   for (const c of raw) {
     if (!isObject(c) || !goodId(c.id) || seen.has(c.id)) continue
-    const kind = oneOf(c.kind, ['tool', 'tape', 'task'] as const, 'tool')
+    const kind = oneOf(c.kind, ['tool', 'tape', 'task', 'text'] as const, 'tool')
     const toolId = typeof c.toolId === 'string' ? c.toolId.slice(0, 64) : null
     if (kind === 'tool' && !toolId) continue
     // A task with no name has nothing to show: drop it, as a calculation with no calculator is dropped.
     if (kind === 'task' && (typeof c.title !== 'string' || !c.title.trim())) continue
+    // A note with no title and no text is empty: drop it. (A note with only a body keeps it and gets a title below.)
+    if (kind === 'text' && !(typeof c.title === 'string' && c.title.trim()) && !(typeof c.note === 'string' && c.note.trim())) continue
     seen.add(c.id)
     const wantsPin = c.pinned === true && c.deletedAt == null && pinned < MAX_PINNED
     if (wantsPin) pinned++
     out.push({
       id: c.id,
-      title: str(c.title, 120, 'Untitled'),
+      title: kind === 'text' ? str(c.title, 120).trim() || 'Untitled note' : str(c.title, 120, 'Untitled'),
       kind,
       toolId,
       inputs: kind === 'tool' ? sanitizeValues(c.inputs) : null,

@@ -5,6 +5,8 @@ import { ScreenHeader } from '../../components/ScreenHeader'
 import { useBackHandler } from '../../components/useBackHandler'
 import { D, toPlain } from '../../engine'
 import { copyText } from '../../lib/device'
+import { listShareText } from '../../lib/notes'
+import { shareText } from '../../lib/share'
 import { formatDecimal } from '../../lib/format'
 import { LINE_STATE_WORD, lineState, listProgress, listSummary, MAX_PASTE_LINES, nextLineState, parsePastedList, parseTapeLine, tapeTotal, type PastedList } from '../../lib/tape'
 import { formatCell } from '../../lib/toolFormat'
@@ -21,7 +23,7 @@ export function TapeScreen({ card, onBack }: { card?: SavedCard; onBack: () => v
   const saveCard = useApp((s) => s.saveCard)
   const updateCard = useApp((s) => s.updateCard)
   const deleteCard = useApp((s) => s.deleteCard)
-  const showNotice = useApp((s) => s.showNotice)
+  const toast = useApp((s) => s.toast)
   const toggleLine = useApp((s) => s.toggleLine)
   const removeLine = useApp((s) => s.removeLine)
   const setChecklist = useApp((s) => s.setChecklist)
@@ -94,18 +96,15 @@ export function TapeScreen({ card, onBack }: { card?: SavedCard; onBack: () => v
   }
 
   const copy = async () => {
-    // For a checklist the text says who has paid, so it can go straight into a group chat.
-    const mark = (l: TapeLine) => (checklist ? (l.done ? '✔ ' : l.skip ? '✖ ' : '☐ ') : '')
-    const body = lines.map((l) => `${mark(l)}${l.label || '—'}  ${money(l.value)}${checklist && l.skip && !l.done ? '  (skipped)' : ''}`)
-    const foot = checklist
-      ? [
-          `Collected ${formatCell(progress.doneAmount, 'money', opts)} of ${formatCell(total, 'money', opts)}`,
-          `Left ${formatCell(progress.leftAmount, 'money', opts)}`,
-          ...(progress.skipped > 0 ? [`Skipped ${progress.skipped}, not counted`] : []),
-        ]
-      : [`Total  ${formatCell(total, 'money', opts)}`]
-    const ok = await copyText([`${title}`, ...body, ...foot].join('\n'))
-    showNotice(ok ? 'Copied as text' : "Couldn't copy", ok ? 'info' : 'error')
+    const ok = await copyText(listShareText(title, lines, checklist, opts))
+    toast(ok ? 'Copied as text' : "Couldn't copy")
+  }
+
+  // The phone's own share sheet; a browser without one copies the text instead and says so.
+  const share = async () => {
+    const r = await shareText(title, listShareText(title, lines, checklist, opts))
+    if (r === 'copied') toast('Copied as text')
+    else if (r === 'failed') toast("Couldn't share")
   }
 
   return (
@@ -125,9 +124,14 @@ export function TapeScreen({ card, onBack }: { card?: SavedCard; onBack: () => v
         }
         icons={
           stored && (
-            <button type="button" className="icon-btn" aria-label={`Delete ${stored.title}`} onClick={() => { deleteCard(stored.id); onBack() }}>
-              <Icon name="trash" size={20} />
-            </button>
+            <>
+              <button type="button" className="icon-btn" aria-label="Share" title="Share" onClick={() => void share()}>
+                <Icon name="share" size={20} />
+              </button>
+              <button type="button" className="icon-btn" aria-label={`Delete ${stored.title}`} onClick={() => { deleteCard(stored.id); onBack() }}>
+                <Icon name="trash" size={20} />
+              </button>
+            </>
           )
         }
       />

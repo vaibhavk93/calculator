@@ -683,6 +683,12 @@
   align-items: flex-end;
 }
 
+/* "Add tag" stays on one line; the box beside it gives way. */
+.save__add .btn {
+  flex: none;
+  white-space: nowrap;
+}
+
 .save__when > * {
   flex: 1 1 0;
 }
@@ -738,6 +744,34 @@ textarea.field {
 .saved__actions {
   display: flex;
   gap: var(--s-4);
+}
+
+/* Search and the one Add control share a line. Add keeps its size. When the font is large and the search would be
+   cut ("Search not"), Add drops to its own line, at the right, instead of squeezing it. */
+.saved__find {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-3);
+}
+
+.saved__find .field {
+  flex: 1 1 9rem;
+  min-width: 0;
+}
+
+.saved__add {
+  flex: none;
+  gap: var(--s-2);
+  margin-left: auto;
+}
+
+/* A plain note's actions under its form: Share on the left, Delete on the right, each at least 44px. */
+.note__acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--s-2) var(--s-4);
 }
 
 .row--split {

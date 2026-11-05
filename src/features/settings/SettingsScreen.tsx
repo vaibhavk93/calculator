@@ -9,6 +9,7 @@ import { backupNudge, countItems } from '../../lib/backupNudge'
 import { checkReminderPermissions, ensurePermission, notificationsSupported, openExactAlarmSettings, scheduleTestReminder, type ReminderPermissions } from '../../lib/notifications'
 import { timeLabel } from '../../lib/reminders'
 import { ACCENT_NAMES, ACCENTS } from '../../lib/theme'
+import { notesExportText, exportableCards } from '../../lib/notes'
 import { backupFilename, buildBackup, parseBackup } from '../../store/backup'
 import { TABS, type CopyFormat, type PersistedData, type Tab } from '../../store/types'
 import pkg from '../../../package.json'
@@ -19,6 +20,7 @@ import { GROUPS } from '../tools/groups'
 import { OptionRow, Row, Segmented, Toggle } from './controls'
 import { ReliableRemindersSheet } from './ReliableRemindersSheet'
 import { TipsAndTours } from '../onboarding/TipsAndTours'
+import { DATE_LOCALE } from '../../lib/dateLocale'
 
 const TAB_LABEL: Record<Tab, string> = { calculate: 'Calculate', tools: 'Tools', saved: 'Notes', due: 'Due', budget: 'Budget' }
 const DECIMAL_CHOICES = ['auto', ...Array.from({ length: 11 }, (_, i) => String(i))]
@@ -148,6 +150,7 @@ export function SettingsScreen() {
   const [folderAsk, setFolderAsk] = useState<((ok: boolean) => void) | null>(null)
   const showLinkSnack = useApp((x) => x.showLinkSnack)
   const showNotice = useApp((x) => x.showNotice)
+  const toast = useApp((x) => x.toast)
   const items = useApp((x) => countItems(x))
   const nudge = backupNudge(items, s.lastBackupAt, s.backupDismissedAt, Date.now())
 
@@ -159,6 +162,21 @@ export function SettingsScreen() {
     else if (r.ok) showNotice(`Backup saved to ${r.where}`, 'info')
     else if (r.reason === 'failed') showNotice(r.message, 'error')
     else showNotice('No backup was made', 'info')
+  }
+
+  // All notes, lists and saved calculations as one plain text file, the same way a backup is saved.
+  const exportNotes = async () => {
+    const { cards, settings } = store.getState()
+    if (exportableCards(cards).length === 0) return toast('There are no notes to export yet')
+    const now = new Date()
+    const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const text = notesExportText(cards, { system: settings.numberSystem, decimals: settings.decimals }, now.getTime())
+    const r = await saveBackupFile(`calc-notes-${day}.txt`, text, () => new Promise<boolean>((resolve) => setFolderAsk(() => resolve)), 'text/plain')
+    setFolderAsk(null)
+    if (r.ok && r.open) showLinkSnack(`Notes saved to ${r.where}`, { label: 'Open folder', run: () => void r.open!() })
+    else if (r.ok) toast(`Notes saved to ${r.where}`)
+    else if (r.reason === 'failed') toast(r.message)
+    else toast('No file was made')
   }
 
   const chooseFile = async (file: File | undefined) => {
@@ -223,7 +241,7 @@ export function SettingsScreen() {
           <OptionRow label="Indian" sample="12,34,567.89" checked={s.numberSystem === 'indian'} onSelect={() => update({ numberSystem: 'indian' })} />
           <OptionRow label="International" sample="1,234,567.89" checked={s.numberSystem === 'international'} onSelect={() => update({ numberSystem: 'international' })} />
         </div>
-          <Row label="Decimal places" hint="Auto trims the zeros">
+          <Row label="Decimal places" hint="Auto drops .00 on whole money amounts">
             <PickerSelect
               label="Decimal places"
               align="end"
@@ -290,6 +308,13 @@ export function SettingsScreen() {
             </span>
             <Icon name="chevron" size={18} className="tap-row__chev" />
           </button>
+          <button type="button" className="row row--button tap-row" onClick={() => void exportNotes()}>
+            <span className="row__text">
+              <span className="row__label">Export notes</span>
+              <span className="row__hint">Notes, lists and saved calculations as a text file. To-dos are in the full backup</span>
+            </span>
+            <Icon name="chevron" size={18} className="tap-row__chev" />
+          </button>
           <button type="button" className="row row--button tap-row" onClick={() => setExportCsv(true)}>
             <span className="row__text">
               <span className="row__label">Export expenses</span>
@@ -311,7 +336,7 @@ export function SettingsScreen() {
           <div className="confirm" style={{ margin: '16px 16px 0' }}>
             <p>
               Replace <strong>everything</strong> on this phone with the backup
-              {backup.exportedAt ? ` from ${new Date(backup.exportedAt).toLocaleDateString()}` : ''}? That means your calculations ({backup.data.history.length}), notes and lists ({backup.data.cards.length}), reminders ({backup.data.reminders.length}),
+              {backup.exportedAt ? ` from ${new Date(backup.exportedAt).toLocaleDateString(DATE_LOCALE)}` : ''}? That means your calculations ({backup.data.history.length}), notes and lists ({backup.data.cards.length}), reminders ({backup.data.reminders.length}),
               budget entries ({backup.data.budget.expenses.length}) and settings. What is on this phone now is lost. Save a backup of it first if you want to keep it.
             </p>
             <div className="confirm__actions">

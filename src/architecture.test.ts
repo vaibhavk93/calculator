@@ -120,6 +120,12 @@ describe('design system (docs/DESIGN-SYSTEM.md)', () => {
     expect(offenders).toEqual([])
   })
 
+  it('dates are formatted for India (DATE_LOCALE), never with the phone locale', () => {
+    // Owner decision 2026-11-04: Indian first. See src/lib/dateLocale.ts.
+    const bad = ALL.filter((f) => /\.tsx?$/.test(f) && !isTest(f)).filter((f) => /DateTimeFormat\(undefined|toLocale(Date|Time)?String\(\s*\)/.test(stripComments(read(f))))
+    expect(bad.map(rel)).toEqual([])
+  })
+
   it('border-radius is only 0 or one of the three tokens (4 / 10 / 20)', () => {
     const bad: string[] = []
     const token = /^(0|var\(--r-(?:sm|md|lg)\))$/

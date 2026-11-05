@@ -24,7 +24,7 @@ export interface TapeLine {
 export interface SavedCard {
   id: string
   title: string
-  kind: 'tool' | 'tape' | 'task'
+  kind: 'tool' | 'tape' | 'task' | 'text'
   /** For kind 'tool': which calculator, and the form exactly as it was. */
   toolId: string | null
   inputs: Values | null
@@ -45,6 +45,7 @@ export interface SavedCard {
   /** For kind 'task': ticked off. Its date, if any, is an ordinary Reminder on this card. */
   done?: boolean
   doneAt?: number
+  /** For kind 'text' this is the body of the note (plain text, no maths). On every other kind it is the optional note. */
   note: string
   tags: string[]
   pinned: boolean
@@ -83,4 +84,7 @@ export const MAX_CARDS = 500
 /** A task title is at most this long, like every card title. */
 export const MAX_TASK_TITLE = 120
 export const MAX_TASK_TAGS = 5
+/** A plain note's body is the card's `note` field, so it shares that field's limit. */
+export const MAX_NOTE_BODY = 5000
+export const MAX_NOTE_TAGS = 10
 export const DEFAULT_TAGS = ['Credit Card', 'Loan', 'Rent', 'Investment', 'Tax', 'Travel', 'Work', 'Shopping'] as const

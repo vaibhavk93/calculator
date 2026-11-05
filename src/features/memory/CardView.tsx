@@ -1,12 +1,14 @@
 import type { SavedCard } from '../../store/types'
 import { ALL_TOOLS } from '../tools/registry'
 import { ToolScreen } from '../tools/ToolScreen'
+import { NoteSheet } from './NoteSheet'
 import { TapeScreen } from './TapeScreen'
 import { TaskSheet } from './TaskSheet'
 
-/** Opens a saved card as what it is: a calculator with its inputs restored, a tape, or a task in its sheet. */
+/** Opens a saved card as what it is: a calculator with its inputs restored, a tape, or a note or task in its sheet. */
 export function CardView({ card, onBack }: { card: SavedCard; onBack: () => void }) {
   if (card.kind === 'task') return <TaskSheet card={card} onClose={onBack} />
+  if (card.kind === 'text') return <NoteSheet card={card} onClose={onBack} />
   if (card.kind === 'tape') return <TapeScreen card={card} onBack={onBack} />
   const spec = ALL_TOOLS.find((t) => t.id === card.toolId)
   if (!spec) return null

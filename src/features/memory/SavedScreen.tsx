@@ -4,11 +4,14 @@ import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useBackHandler } from '../../components/useBackHandler'
-import { matchesCard } from '../../lib/cardSearch'
+import { matchesCard, matchSnippet } from '../../lib/cardSearch'
 import { dueLabel } from '../../lib/reminders'
 import { groupTasks, taskItems, todayCount } from '../../lib/tasks'
 import type { SavedCard } from '../../store/types'
+import { AddSheet, type AddChoice } from './AddSheet'
 import { CardView } from './CardView'
+import { NoteSheet } from './NoteSheet'
+import { TaskSheet } from './TaskSheet'
 import { Segmented } from '../settings/controls'
 import { TapeScreen } from './TapeScreen'
 import { TodoScreen } from './TodoScreen'
@@ -17,13 +20,14 @@ import { useTour } from '../onboarding/useTour'
 /** Which side of the Notes tab was last open. Kept while the app runs, forgotten on restart. */
 let lastMode: 'notes' | 'todo' = 'notes'
 
-type View = { kind: 'list' } | { kind: 'card'; id: string } | { kind: 'newTape' } | { kind: 'trash' }
+type View = { kind: 'list' } | { kind: 'card'; id: string } | { kind: 'newTape' } | { kind: 'newNote' } | { kind: 'newTask' } | { kind: 'trash' }
 
 export function SavedScreen() {
   const cards = useApp((s) => s.cards)
   const reminders = useApp((s) => s.reminders)
   const togglePin = useApp((s) => s.togglePin)
   const [view, setView] = useState<View>({ kind: 'list' })
+  const [adding, setAdding] = useState(false)
   const [mode, setModeState] = useState(lastMode)
   const setMode = (m: 'notes' | 'todo') => {
     lastMode = m
@@ -45,6 +49,7 @@ export function SavedScreen() {
   // Tapping the Saved tab while on it closes whatever is open and clears the search.
   useEffect(() => {
     setView({ kind: 'list' })
+    setAdding(false)
     setQuery('')
     setTag(null)
   }, [tabTap])
@@ -68,6 +73,13 @@ export function SavedScreen() {
 
   const open = view.kind === 'card' ? live.find((c) => c.id === view.id) : undefined
   const back = () => setView({ kind: 'list' })
+  // The Add sheet closes before the next screen opens, so two sheets are never open together.
+  const choose = (c: AddChoice) => {
+    setAdding(false)
+    if (c === 'task') setMode('todo')
+    else setMode('notes')
+    setView({ kind: c === 'note' ? 'newNote' : c === 'list' ? 'newTape' : 'newTask' })
+  }
 
   return (
     <div className="tools">
@@ -86,13 +98,18 @@ export function SavedScreen() {
             { value: 'todo', label: openToday > 0 ? `To-do (${openToday})` : 'To-do' },
           ]}
         />
-        <input className="field" type="search" placeholder={mode === 'todo' ? 'Search tasks' : 'Search notes'} aria-label={mode === 'todo' ? 'Search tasks' : 'Search notes'} value={query} onChange={(e) => setQuery(e.target.value)} />
-        <div className="saved__actions">
-          {mode === 'notes' && <button type="button" className="link-btn" onClick={() => setView({ kind: 'newTape' })}>New list</button>}
-          {trashed.length > 0 && (
-            <button type="button" className="link-btn" onClick={() => setView({ kind: 'trash' })}>Trash ({trashed.length})</button>
-          )}
+        <div className="saved__find">
+          <input className="field" type="search" placeholder={mode === 'todo' ? 'Search tasks' : 'Search notes'} aria-label={mode === 'todo' ? 'Search tasks' : 'Search notes'} value={query} onChange={(e) => setQuery(e.target.value)} />
+          <button type="button" className="btn btn--primary saved__add" onClick={() => setAdding(true)}>
+            <Icon name="plus" size={20} />
+            <span>New</span>
+          </button>
         </div>
+        {trashed.length > 0 && (
+          <div className="saved__actions">
+            <button type="button" className="link-btn" onClick={() => setView({ kind: 'trash' })}>Trash ({trashed.length})</button>
+          </div>
+        )}
         {tags.length > 0 && (
           <div className="chips" role="group" aria-label="Filter by tag">
             {tags.map((t) => (
@@ -108,7 +125,7 @@ export function SavedScreen() {
         <TodoScreen query={query} tag={tag} tourLink={tour.link} />
       ) : live.length === 0 ? (
         <EmptyState title="No notes yet" level="h2" action={tour.link}>
-          Press Save on any calculator, or tap New list above for a running total. Add a reminder and the Due tab will keep track.
+          Tap New to write a note or start a list. Press Save on any calculator to keep it here. Add a reminder and the Due tab will keep track.
         </EmptyState>
       ) : (
         <div className="tools__list">
@@ -117,8 +134,9 @@ export function SavedScreen() {
               is still told apart by its own heading, not by colour. */}
           {[
             { title: 'Pinned', items: shown.filter((c) => c.pinned) },
+            { title: 'Notes', items: shown.filter((c) => !c.pinned && c.kind === 'text') },
             { title: 'Lists', items: shown.filter((c) => !c.pinned && c.kind === 'tape') },
-            { title: 'Calculations', items: shown.filter((c) => !c.pinned && c.kind !== 'tape') },
+            { title: 'Calculations', items: shown.filter((c) => !c.pinned && c.kind === 'tool') },
           ]
             .filter((sec) => sec.items.length > 0)
             .map((sec) => (
@@ -129,7 +147,7 @@ export function SavedScreen() {
                 </h2>
                 <div className="group" aria-label={sec.title}>
                   {sec.items.map((c) => (
-                    <CardRow key={c.id} card={c} due={reminders.find((r) => r.cardId === c.id && !r.done)?.dueAt} onOpen={() => setView({ kind: 'card', id: c.id })} onPin={() => togglePin(c.id)} />
+                    <CardRow key={c.id} card={c} found={matchSnippet(c, query)} due={reminders.find((r) => r.cardId === c.id && !r.done)?.dueAt} onOpen={() => setView({ kind: 'card', id: c.id })} onPin={() => togglePin(c.id)} />
                   ))}
                 </div>
               </div>
@@ -140,18 +158,22 @@ export function SavedScreen() {
 
       {open && <CardView card={open} onBack={back} />}
       {view.kind === 'newTape' && <TapeScreen onBack={back} />}
+      {view.kind === 'newNote' && <NoteSheet onClose={back} />}
+      {view.kind === 'newTask' && <TaskSheet onClose={back} />}
+      {adding && <AddSheet onChoose={choose} onClose={() => setAdding(false)} />}
       {view.kind === 'trash' && <TrashScreen onBack={back} />}
       {tour.sheet}
     </div>
   )
 }
 
-function CardRow({ card, due, onOpen, onPin }: { card: SavedCard; due: number | undefined; onOpen: () => void; onPin: () => void }) {
+function CardRow({ card, due, found, onOpen, onPin }: { card: SavedCard; due: number | undefined; found: string | null; onOpen: () => void; onPin: () => void }) {
   return (
     <div className="row row--split">
       <button type="button" className="row__main" onClick={onOpen}>
         <span className="row__label">{card.title}</span>
         <span className="row__hint">{card.summary || (card.kind === 'tape' ? 'Empty list' : '')}</span>
+        {found && <span className="row__hint row__found">{found}</span>}
         {(card.tags.length > 0 || due !== undefined) && (
           <span className="row__hint">
             {[...card.tags, due !== undefined ? `Due ${dueLabel(due, Date.now()).toLowerCase()}` : ''].filter(Boolean).join(' · ')}

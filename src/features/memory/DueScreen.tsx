@@ -12,8 +12,9 @@ import { afterDaysLabel, dueLabel, dueSoonTotal, groupReminders } from '../../li
 import type { Reminder } from '../../store/types'
 import { CardView } from './CardView'
 import { useTour } from '../onboarding/useTour'
+import { DATE_LOCALE } from '../../lib/dateLocale'
 
-const WHEN = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' })
+const WHEN = new Intl.DateTimeFormat(DATE_LOCALE, { day: 'numeric', month: 'short' })
 
 export function DueScreen() {
   const cards = useApp((s) => s.cards)

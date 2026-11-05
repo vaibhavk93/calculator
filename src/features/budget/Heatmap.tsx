@@ -1,12 +1,13 @@
 import { useMemo } from 'react'
 import { dailyTotals, dayKey, dayLongLabel, monthWeeks, type BudgetData, type DayTotal, type Filter } from '../../lib/budget'
 import type { Dec } from '../../engine'
+import { DATE_LOCALE } from '../../lib/dateLocale'
 
 const LEVELS: DayTotal['level'][] = [0, 1, 2, 3, 4]
 const entriesWord = (n: number) => `${n} ${n === 1 ? 'entry' : 'entries'}`
 
 /** Mon to Sun in the phone's language, from a Monday in 2026. */
-const WEEKDAYS = Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(new Date(2026, 5, 1 + i)))
+const WEEKDAYS = Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat(DATE_LOCALE, { weekday: 'short' }).format(new Date(2026, 5, 1 + i)))
 
 /**
  * A grid of the month, one cell for each day, Monday first. The shade says how much was spent that day compared with the

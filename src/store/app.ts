@@ -996,7 +996,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       saveCard: (draft, reminder) => {
         const { cards } = get()
         if (cards.filter((c) => c.deletedAt === null).length >= MAX_CARDS) {
-          const text = draft.kind === 'task' ? `You can keep up to ${MAX_CARDS} notes and tasks. Delete some first.` : `You can keep up to ${MAX_CARDS} saved items. Delete some first.`
+          const text = draft.kind === 'task' || draft.kind === 'text' ? `You can keep up to ${MAX_CARDS} notes and tasks. Delete some first.` : `You can keep up to ${MAX_CARDS} saved items. Delete some first.`
           // `notice` is only drawn on Calculate, so also say it in the snackbar every screen has.
           set({ notice: { id: nextId(), text, tone: 'error' }, snack: { id: nextId(), text, canUndo: false } })
           return null

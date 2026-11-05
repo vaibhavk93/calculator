@@ -42,6 +42,8 @@ const noBadText = async (p, where) => { const t = await text(p); ok(!bad.test(t)
 const noOverflow = async (p, where) => { const o = await overflowing(p); eq(o.length, 0, `${where}: sideways overflow ${JSON.stringify(o)}`) }
 const shot = (p, n) => p.screenshot({ path: join(OUT, `${n}.png`) })
 const notesTab = (p) => tab(p, 'Notes')
+/** The one Add control on the Notes tab opens a choice sheet; New list is a row in it. */
+const newList = async (p) => { await p.getByRole('button', { name: 'New', exact: true }).click(); await p.getByRole('button', { name: /^New list/ }).click() }
 const modeTodo = (p) => p.getByRole('radio', { name: /^To-do/ }).click()
 const view = (p, name) => p.getByRole('radio', { name, exact: true }).click()
 const quickAdd = async (p, t) => { await p.locator('input[aria-label="New task"]').fill(t); await p.locator('.todo__add button[type=submit]').click() }
@@ -319,13 +321,13 @@ T('N-039', 'RUNTIME', 'Reload keeps tasks, ticks, tags, pin, afterDays, leads an
 
 // ================================================================== LISTS, TAPES, SAVE A CALCULATION
 T('N-050', 'POS', 'New list from zero: add "Milk 50" and "Eggs 60", total is exact; list shows in Notes under Lists', async () => {
-  const { page: p } = await open(); await notesTab(p); await p.getByRole('button', { name: 'New list' }).click()
+  const { page: p } = await open(); await notesTab(p); await newList(p)
   const box = p.locator('input[aria-label="Label and amount"]')
   for (const t of ['Milk 50', 'Eggs 60.5']) { await box.fill(t); await p.locator('.screen form button[type=submit], .screen .btn--primary').last().click() }
   has(await text(p, '.screen'), '110.50'); await p.getByRole('button', { name: 'Back' }).click(); has(await text(p, '.tools__list'), 'Lists')
 })
 T('N-051', 'NEG', 'List line: no amount, letters only, divide by zero and 40-digit numbers give plain words, never NaN', async () => {
-  const { page: p } = await open(); await notesTab(p); await p.getByRole('button', { name: 'New list' }).click()
+  const { page: p } = await open(); await notesTab(p); await newList(p)
   const box = p.locator('input[aria-label="Label and amount"]'); const add = p.locator('.screen form .btn--primary').last()
   for (const t of ['Milk', 'abc', 'x 1/0', 'big ' + '9'.repeat(40)]) { await box.fill(t); await add.click(); await noBadText(p, `after "${t}"`) }
   has(await text(p, '.screen'), 'Add an amount, like "Flights 24000"')
@@ -343,13 +345,13 @@ T('N-053', 'POS', 'Three-state lines: Pending -> Paid -> Skipped -> Pending; ski
   await p.getByRole('button', { name: 'Back' }).click(); has(await text(p, '.tools__list'), 'Split')
 })
 T('N-054', 'POS', 'Paste a messy list (bullets, numbers, ticks, ₹, CRLF, blank lines) offers a checklist; Add keeps amounts and ticks', async () => {
-  const { page: p } = await open(); await notesTab(p); await p.getByRole('button', { name: 'New list' }).click()
+  const { page: p } = await open(); await notesTab(p); await newList(p)
   await p.locator('input[aria-label="Label and amount"]').evaluate((el) => { const dt = new DataTransfer(); dt.setData('text/plain', '• Milk\r\n\r\n2) Eggs ₹60\n[x] Bread\n☐ Rice 1,200'); el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })) })
   await p.getByRole('button', { name: /Add 4 lines as checklist items/ }).click(); await wait(400)
   const c = (await stored(p)).cards[0]; eq(c.lines.length, 4, 'lines'); eq(c.checklist, true, 'checklist'); eq(c.lines[1].value, '60', 'amount'); eq(c.lines[2].done, true, 'ticked'); eq(c.lines[3].value, '1200', 'comma amount')
 })
 T('N-055', 'CORNER', 'Paste of 250 lines is cut to 200 and the screen says how many were left out', async () => {
-  const { page: p } = await open(); await notesTab(p); await p.getByRole('button', { name: 'New list' }).click()
+  const { page: p } = await open(); await notesTab(p); await newList(p)
   await p.locator('input[aria-label="Label and amount"]').evaluate((el) => { const dt = new DataTransfer(); dt.setData('text/plain', Array.from({ length: 250 }, (_, i) => 'Item ' + i).join('\n')); el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })) })
   has(await p.locator('.tape__offer').innerText(), '200'); has(await p.locator('.tape__offer').innerText(), '50')
 })
@@ -361,7 +363,7 @@ T('N-056', 'POS', 'Inline rename: Enter saves, Escape cancels, empty name keeps 
 })
 T('N-057', 'POS', 'Save a calculation from a calculator, rename it in the sheet, add a note, find it by search, open it again', async () => {
   const { page: p } = await open()
-  await tab(p, 'Tools'); await p.locator('.tile', { hasText: 'Loans and EMI' }).click(); await p.locator('.navrow .row__label').filter({ hasText: 'Loan EMI' }).first().click(); await p.waitForSelector('.tool')
+  await tab(p, 'Tools'); await p.locator('.group[aria-label="Browse by what you need"] .navrow', { hasText: 'Loans and EMI' }).click(); await p.locator('.navrow .row__label').filter({ hasText: 'Loan EMI' }).first().click(); await p.waitForSelector('.tool')
   await p.locator('.screen__bar .link-btn').click(); await p.locator('#save-title').fill('Car loan'); await p.locator('#save-note').fill('bank visit friday'); await sheetSave(p)
   has(await snackText(p), 'Saved to Notes'); await notesTab(p); await p.getByLabel('Search notes').fill('car')
   has(await text(p, '.tools__list'), 'Car loan'); await p.locator('.row__main').first().click(); has(await text(p, '.screen'), 'Car loan')
@@ -520,13 +522,13 @@ T('N-105', 'UI', 'Landscape 800x360: Notes, To-do, Due and the task sheet fit an
 T('N-106', 'UX', 'Back-navigation without the system button: every sheet has X, every screen has Back (task sheet, tour, reliable sheet, trash, list, a calculation)', async () => {
   const { page: p } = await open(BUSY()); await notesTab(p); await modeTodo(p); await view(p, 'All')
   await p.getByText('Call the plumber', { exact: false }).first().click(); await p.locator('.sheet').getByRole('button', { name: /^Close/ }).click(); eq(await p.locator('.sheet').count(), 0, 'task sheet X')
-  await p.getByRole('radio', { name: /^Notes/ }).click(); await p.getByText('Trip split').first().click(); await p.getByRole('button', { name: 'Back' }).click(); await p.getByRole('button', { name: 'New list' }).click(); await p.getByRole('button', { name: 'Back' }).click()
+  await p.getByRole('radio', { name: /^Notes/ }).click(); await p.getByText('Trip split').first().click(); await p.getByRole('button', { name: 'Back' }).click(); await newList(p); await p.getByRole('button', { name: 'Back' }).click()
   await p.locator('.row__main', { hasText: 'Home loan EMI' }).click(); await p.getByRole('button', { name: 'Back' }).click(); has(await text(p, '.tools__list'), 'Home loan EMI')
 })
 T('N-107', 'UX', 'Can a new person finish each job unaided? Add task, tick it, save a list, add a reminder date, find it in Due: every step has a visible control with words', async () => {
   const { page: p } = await open(fresh()); await notesTab(p)
   const names = await p.evaluate(() => [...document.querySelectorAll('.tools button, .tools input, .tools [role=radio]')].map((e) => (e.getAttribute('aria-label') || e.textContent || e.getAttribute('placeholder') || '').trim()).filter(Boolean))
-  for (const need of ['New list', 'Search notes']) ok(names.some((n) => n.includes(need)), `Notes shows "${need}": ${names.join(' | ')}`)
+  for (const need of ['New', 'Search notes']) ok(names.some((n) => n.includes(need)), `Notes shows "${need}": ${names.join(' | ')}`)
   await modeTodo(p); const t2 = await p.evaluate(() => [...document.querySelectorAll('.todo button, .todo input')].map((e) => (e.getAttribute('aria-label') || e.textContent || '').trim()))
   for (const need of ['New task', 'Add', 'Add with a date, repeat or note']) ok(t2.some((n) => n === need), `To-do shows "${need}": ${t2.join(' | ')}`)
 })
