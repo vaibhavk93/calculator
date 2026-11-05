@@ -27,6 +27,7 @@ export function BudgetScreen() {
   const money = useMoney()
   const [month, setMonth] = useState(() => monthKey(new Date()))
   const [page, setPage] = useState<Page>('home')
+  const [showPace, setShowPace] = useState(false)
   const [open, setOpen] = useState<{ tab: SummaryTab; categoryId: string | null }>({ tab: 'summary', categoryId: null })
   const [sheet, setSheet] = useState<SheetState>(null)
 
@@ -35,6 +36,7 @@ export function BudgetScreen() {
     setMonth(monthKey(new Date()))
     setPage('home')
     setSheet(null)
+    setShowPace(false)
   }, [tabTap])
 
   useBackHandler(page !== 'home', () => setPage('home'))
@@ -123,8 +125,13 @@ export function BudgetScreen() {
             <>
               <Bar pct={s.overall.pct} />
               {!over && <span className="budget__note">{`${money(s.spent)} spent of ${money(s.overall.limit)}`}</span>}
-              {s.overall.scope === 'month' && <span className="budget__note">Limit for {monthShortLabel(month)} only</span>}
-              {pace && paceDay && <span className="budget__note">About {money(paceDay.gt(0) ? paceDay : pace.perDay)} a day for the next {pace.days} {pace.days === 1 ? 'day' : 'days'}</span>}
+              {pace && paceDay && (
+                showPace ? (
+                  <span className="budget__note">About {money(paceDay.gt(0) ? paceDay : pace.perDay)} a day for the next {pace.days} {pace.days === 1 ? 'day' : 'days'}{s.overall.scope === 'month' ? ` · limit for ${monthShortLabel(month)} only` : ''}</span>
+                ) : (
+                  <button type="button" className="link-btn budget__link" onClick={() => setShowPace(true)}>Pace for the rest of the month</button>
+                )
+              )}
             </>
           ) : null}
           <button type="button" className="link-btn budget__link" onClick={() => setPage('manage')}>{s.overall ? 'Change limits' : 'Set a monthly limit'}</button>
@@ -181,25 +188,19 @@ export function BudgetScreen() {
           <button type="button" className="navrow tap-row" onClick={() => setPage('bills')}>
             <span className="row__text">
               <span className="row__label">Bills and subscriptions</span>
-              <span className="row__hint">
-                {bills.count > 0
-                  ? `${bills.count} running · about ${money(bills.perMonth)} a month = ${money(bills.perYear)} a year`
-                  : 'Rent, Netflix, insurance. See what they cost a year and get reminded.'}
-              </span>
+              {bills.count > 0 && <span className="row__hint">{`${bills.count} running · about ${money(bills.perMonth)} a month = ${money(bills.perYear)} a year`}</span>}
             </span>
             <Icon name="chevron" size={18} className="navrow__chev" />
           </button>
           <button type="button" className="navrow tap-row" onClick={() => setPage('import')}>
             <span className="row__text">
               <span className="row__label">Add from bank messages</span>
-              <span className="row__hint">Finds payments in your bank texts, on this phone. You pick what to add.</span>
             </span>
             <Icon name="chevron" size={18} className="navrow__chev" />
           </button>
           <button type="button" className="navrow tap-row" onClick={() => setPage('manage')}>
             <span className="row__text">
               <span className="row__label">Categories and cards</span>
-              <span className="row__hint">Limits, subcategories, months, cards and accounts</span>
             </span>
             <Icon name="chevron" size={18} className="navrow__chev" />
           </button>
