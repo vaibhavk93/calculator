@@ -180,6 +180,15 @@ calendar view (M) · quiet hours and a daily digest (S-M) · **boot & timezone r
 **⚠ Boot rescheduling is small and was filed under "Later", but today one reboot silently cancels every
 reminder with no sign anything is wrong.** It belongs here, not in Later.
 
+### Phase 7 — modules on/off (owner: build it; critic shrank it, 2026-11-05)
+
+**Two switches only: "Budget" and "Notes and reminders" (Notes + Due together). Tools is always on.** One `modules: { budget, notes }`
+in settings, default on, sanitised so old backups load as everything on; one `tabOn(settings, tab)` helper read in six places
+(TabBar, setTab and showCard, the initial tab, the "Opens on" list, `updateSettings` when the current tab turns off, the notification tap).
+Hide, never delete; a hidden tab falls back to Calculate when read, stored `startupTab` is never rewritten. Hides the matching calculator
+result icons and the bank-message reader. Reminders keep ringing with the Due tab hidden (hint line says so). Cut: presets, first-run
+question, inner switches, "pause reminders". To verify first: whether Budget bills schedule notifications. Size M, after the UI group.
+
 ### Block F — Phone truth
 
 Reminders really firing · backup/restore round-trip · TalkBack · rotation · the SMS scan window fix.
