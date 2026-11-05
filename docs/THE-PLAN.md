@@ -204,6 +204,18 @@ no primary source), break-even. **Open:** goal-sip grows "already saved" yearly 
 3. **Then make the Android build; the owner installs it and tests on the phone** (`scripts/build-android.sh install`, `docs/BUILD-ANDROID.md`).
 4. Full QA after the phone test.
 
+### Portfolio P1 — smallest honest version (owner: build it; critic shrank it ~3x, 2026-11-05)
+
+**A list of things you own or owe: each has ONE current value and a date, plus an append-only history of past values.** Net worth, split and
+trend are all derived from that. `Holding { id, name, kind, deletedAt, values: { date, amount }[] }`, `amount` a positive Decimal string, sign from
+`kind` (bank, fd_rd, stocks_mf, gold, property, retirement, other | loan, card_debt); caps 100 holdings, 120 values each. **Lives as a page inside
+Budget** (like Bills; the 5-tab bar is full; hidden if Budget is switched off in Phase 7, data stays in the backup). One-glance: net worth as a bare
+big number, "N of M values older than 30 days", split as a hairline list with thin bars, last 6 month totals as bars (never interpolated; a holding
+with no value yet is excluded and flagged), update = tap row + number (pre-filled, date today, same-day edit replaces), staleness in words on every
+row. Hide-amounts flag (local). Cut: categories/platform/folio/note, units and gold price, maturity/rate, CSV export (backup already holds it),
+XIRR/invested (P2), reminders (P2). Files: `src/engine/investments/portfolio.ts`, `src/lib/portfolio.ts`, store types/persistence/app, one
+screen + sheet inside `features/budget`. Additive, schema stays 3. Waits for D1 (same store files) and for the card/list design decision.
+
 ### Phase 7 — modules on/off (owner: build it; critic shrank it, 2026-11-05)
 
 **Two switches only: "Budget" and "Notes and reminders" (Notes + Due together). Tools is always on.** One `modules: { budget, notes }`
