@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { D } from './decimal'
 import { parseTerm } from './loans/term'
-import { toWholeMonths, toYears, typedUnit, unitText, withoutUnit } from './duration'
+import { toWholeMonths, toYears, typedUnit, unitText, withoutUnit, yearsMonthsText } from './duration'
+
+describe('yearsMonthsText', () => {
+  it('reads whole months as years and months, with singulars', () => {
+    expect(yearsMonthsText(38)).toBe('3 years 2 months')
+    expect(yearsMonthsText(36)).toBe('3 years')
+    expect(yearsMonthsText(13)).toBe('1 year 1 month')
+    expect(yearsMonthsText(12)).toBe('1 year')
+    expect(yearsMonthsText(1)).toBe('1 month')
+    expect(yearsMonthsText(11)).toBe('11 months')
+    expect(yearsMonthsText(0)).toBe('0 months')
+  })
+})
 
 describe('toYears', () => {
   it('keeps years, turns months into n/12 and days into n/365', () => {

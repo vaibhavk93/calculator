@@ -23,6 +23,11 @@ describe('convertUnit', () => {
     expect(c('speed', 'kmh', 'ms', '36')).toBe('10')
     expect(c('speed', 'kn', 'kmh', '1')).toBe('1.852')
     expect(c('time', 'd', 'h', '1')).toBe('24')
+    // month = 1/12 of a 365-day year; the other time units keep their ids and sizes
+    expect(c('time', 'yr', 'mo', '1')).toBe('12')
+    expect(c('time', 'mo', 'd', '1')).toBe('30.4166666667')
+    expect(c('time', 'yr', 'd', '1')).toBe('365')
+    expect(c('time', 'wk', 'd', '1')).toBe('7')
     expect(c('data', 'GiB', 'MiB', '1')).toBe('1024')
     expect(c('data', 'GB', 'MB', '1')).toBe('1000')
     expect(c('data', 'B', 'bit', '1')).toBe('8')

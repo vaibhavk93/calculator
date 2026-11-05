@@ -5,6 +5,7 @@ import { capitalGains, type Asset } from '../../engine/tax/capitalGains'
 import { gratuity } from '../../engine/tax/gratuity'
 import { compareRegimes, inHandSalary, presumptive, type Regime, type TaxResult } from '../../engine/tax/incomeTax'
 import { RATES_AS_OF, RULES_FY2026_27 as R, taxNote, type AgeBand } from '../../engine/tax/rules.FY2026-27'
+import { yearsMonthsText } from '../../engine/duration'
 import { junkOptional, need, parseNum, type Field, type ResultRow, type ResultTable, type ToolSpec, type Values } from '../../lib/tool'
 
 // ---- shared ---------------------------------------------------------------------
@@ -274,7 +275,7 @@ const cgSpec: ToolSpec = {
     const term = out.term === 'long' ? 'Long-term' : 'Short-term'
     const rows: ResultRow[] = [
       { label: 'Tax on this gain, with cess', value: out.total, fmt: 'money', main: true },
-      { label: 'Holding type', value: `${term} (held ${out.monthsHeld} months)` },
+      { label: 'Holding type', value: `${term} (held ${out.monthsHeld === 1 ? '1 month' : `${out.monthsHeld} months`}${out.monthsHeld >= 12 ? `, ${yearsMonthsText(out.monthsHeld)}` : ''})` },
       { label: out.gain.isNegative() ? 'Loss' : 'Gain', value: out.gain.abs(), fmt: 'money' },
       { label: 'Taxable gain', value: out.taxableGain, fmt: 'money' },
       { label: out.rateKind === 'slab' ? 'Rate (your slab)' : 'Rate', value: out.ratePct, fmt: 'percent' },

@@ -30,3 +30,11 @@ export const withoutUnit = (text: string): string => (typedUnit(text) ? text.rep
 
 /** "1 month", "18 months": the singular when the number is exactly 1. */
 export const unitText = (n: Dec, unit: TimeUnit): string => (n.eq(1) ? unit.slice(0, -1) : unit)
+
+/** "3 years 2 months", "3 years", "1 month", "11 months": whole months as years and months, singular at exactly 1. */
+export function yearsMonthsText(months: number): string {
+  const y = Math.floor(months / 12)
+  const m = months % 12
+  const part = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`
+  return [y > 0 ? part(y, 'year') : '', m > 0 || y === 0 ? part(m, 'month') : ''].filter(Boolean).join(' ')
+}
