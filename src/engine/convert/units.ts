@@ -49,7 +49,7 @@ export const UNIT_CATEGORIES: UnitCategory[] = [
   {
     id: 'time', label: 'Time',
     units: [f('msec', 'Millisecond', '0.001'), f('s', 'Second', '1'), f('min', 'Minute', '60'), f('h', 'Hour', '3600'),
-      f('d', 'Day', '86400'), f('wk', 'Week', '604800'), f('yr', 'Year (365 days)', '31536000')],
+      f('d', 'Day', '86400'), f('wk', 'Week', '604800'), f('mo', 'Month (1/12 of a 365-day year)', '2628000'), f('yr', 'Year (365 days)', '31536000')],
   },
   {
     id: 'data', label: 'Data',

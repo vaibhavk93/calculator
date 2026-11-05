@@ -23,7 +23,8 @@ import { asScheduled, neverEnds, partPay, partPayTarget, payoffPlan, runway, typ
 import { CARD_GST_PCT, HOME_LOAN_TAX, LOAN_RULES_AS_OF, PRESETS, RATES_AS_OF as LOAN_RATES, type LoanType } from '../../engine/loans/rules'
 import { RATES_AS_OF as GST_RATES } from '../../engine/convert/gstRates'
 import { RATES_AS_OF as TAX_RATES } from '../../engine/tax/rules.FY2026-27'
-import { junkOptional, need, parseNum, unitKey, type Computed, type Field, type Output, type ResultTable, type ToolSpec, type Values } from '../../lib/tool'
+import { toWholeMonths, toYears, unitText } from '../../engine/duration'
+import { junkOptional, need, parseNum, unitKey, unitOf, type Computed, type Field, type Output, type ResultTable, type TimeUnit, type ToolSpec, type Values } from '../../lib/tool'
 
 // ---- shared fields and helpers ------------------------------------------------
 
@@ -532,6 +533,9 @@ const homeTaxSpec: ToolSpec = {
 
 // ---- C8 Balance transfer --------------------------------------------------------------------------
 
+/** The "Months left" box: months until the switch is typed, years can be picked instead. */
+const MONTHS_LEFT = { id: 'months', unit: 'months' as const, units: ['months', 'years'] as TimeUnit[] }
+
 const transferSpec: ToolSpec = {
   id: 'balance-transfer',
   title: 'Loan balance transfer',
@@ -542,7 +546,7 @@ const transferSpec: ToolSpec = {
     { id: 'balance', label: 'Loan balance left', kind: 'number', unit: 'rupee', default: '4000000' },
     rateField('9.5', 'oldRate', 'Current yearly rate'),
     rateField('8.5', 'newRate', 'New yearly rate'),
-    { id: 'months', label: 'Months left', kind: 'number', unit: 'months', default: '180' },
+    { ...MONTHS_LEFT, label: 'Months left', kind: 'number', default: '180' },
     { id: 'fees', label: 'Switching costs', hint: 'Fee, legal and stamp duty', kind: 'number', unit: 'rupee', default: '20000' },
   ],
   compute: (v) => {
@@ -559,9 +563,9 @@ const transferSpec: ToolSpec = {
     const fees = parseNum(v.fees) ?? new D(0)
     if (balance!.lte(0)) return { error: 'Balance must be more than zero' }
     if (oldRate!.lt(0) || newRate!.lt(0) || oldRate!.gt(100) || newRate!.gt(100)) return { error: 'Enter yearly rates from 0 to 100%' }
-    if (!months!.isInteger() || months!.lt(1) || months!.gt(600)) return { error: 'Months left must be a whole number from 1 to 600' }
+    const n = toWholeMonths(months!, unitOf(MONTHS_LEFT, v) as 'months' | 'years')
+    if (n === null || n > 600) return { error: 'Time left must come to whole months, 1 to 600' }
     if (fees.lt(0)) return { error: "Switching costs can't be negative" }
-    const n = months!.toNumber()
     const out = balanceTransfer(balance!, oldRate!, n, newRate!, fees)
     const worth = out.netSaving.gt(0)
     return {
@@ -586,6 +590,9 @@ const transferSpec: ToolSpec = {
 
 const FREQ: Record<string, number> = { yearly: 1, halfYearly: 2, quarterly: 4, monthly: 12, daily: 365 }
 
+/** The "Duration" box of simple vs compound: years until changed; months or days can be picked. */
+const DURATION = { id: 'years', unit: 'years' as const, units: ['years', 'months', 'days'] as TimeUnit[] }
+
 const interestSpec: ToolSpec = {
   id: 'simple-compound',
   title: 'Simple vs compound interest',
@@ -595,7 +602,7 @@ const interestSpec: ToolSpec = {
   fields: [
     { id: 'principal', label: 'Principal amount', kind: 'number', unit: 'rupee', default: '100000' },
     { id: 'rate', label: 'Yearly interest rate', kind: 'number', unit: 'percent', default: '10' },
-    { id: 'years', label: 'Duration', kind: 'number', unit: 'years', default: '5' },
+    { ...DURATION, label: 'Duration', kind: 'number', default: '5' },
     {
       id: 'freq',
       label: 'Compounded',
@@ -618,36 +625,49 @@ const interestSpec: ToolSpec = {
       { id: 'years', label: 'Time' },
     ])
     if (!r.ok) return r
-    const { principal: p, rate, years: t } = r.n as Record<string, Dec>
+    const { principal: p, rate, years: dur } = r.n as Record<string, Dec>
+    const unit = unitOf(DURATION, v)
+    const t = toYears(dur!, unit)
     if (p!.lte(0)) return { error: 'Principal must be more than zero' }
     if (rate!.lt(0) || rate!.gt(1000)) return { error: 'Enter a yearly rate from 0 to 1000%' }
-    if (t!.lte(0) || t!.gt(100)) return { error: 'Time must be more than 0 and at most 100 years' }
+    if (t.lte(0) || t.gt(100)) return { error: 'Time must be more than 0 and at most 100 years' }
     const m = FREQ[v.freq as string] ?? 1
-    const si = simpleInterest(p!, rate!, t!)
-    const ci = compoundInterest(p!, rate!, t!, m)
-    const marks = Array.from({ length: Math.floor(t!.toNumber()) }, (_, i) => new D(i + 1))
-    if (!t!.isInteger()) marks.push(t!)
+    const si = simpleInterest(p!, rate!, t)
+    const ci = compoundInterest(p!, rate!, t, m)
+    // Under 2 years: a row for each whole month (at most 24), then the exact end. Otherwise a row for each year.
+    const short = t.lt(2)
+    // 7 months is 7/12 of a year, so months x 12 can land a hair under 7: round to 9 places before asking "whole?"
+    const whole = (x: Dec) => x.toDecimalPlaces(9).isInteger()
+    const steps = (short ? t.times(12) : t).toDecimalPlaces(9)
+    const marks = Array.from({ length: steps.floor().toNumber() }, (_, i) => new D(i + 1).div(short ? 12 : 1))
+    if (!whole(steps)) marks.push(t)
+    const partPeriod = !whole(t.times(m))
     return {
       rows: [
         { label: 'Compound interest', value: ci, fmt: 'money', main: true },
         { label: 'Simple interest', value: si, fmt: 'money' },
         { label: 'Difference', value: ci.minus(si), fmt: 'money' },
         { label: 'Total with compound interest', value: p!.plus(ci), fmt: 'money' },
+        { label: 'Total with simple interest', value: p!.plus(si), fmt: 'money' },
+        { label: 'Days', value: unit === 'days' ? dur! : t.times(365).toDecimalPlaces(6), fmt: 'number' },
       ],
       table: {
-        title: 'Growth by year',
-        columns: ['Year', 'Simple', 'Compound', 'Gap'],
+        title: short ? 'Growth by month' : 'Growth by year',
+        columns: [short ? 'Month' : 'Year', 'Simple', 'Compound', 'Gap'],
         fmts: ['number', 'money', 'money', 'money'],
         rows: marks.map((y) => {
           const s = simpleInterest(p!, rate!, y)
           const c = compoundInterest(p!, rate!, y, m)
-          return [y, p!.plus(s), p!.plus(c), c.minus(s)]
+          return [short ? y.times(12).toDecimalPlaces(2) : y, p!.plus(s), p!.plus(c), c.minus(s)]
         }),
       },
       formula: [
         'SI = P × R × T ÷ 100;  CI = P × (1 + R ÷ 100 ÷ m)^(m × T) − P',
-        `P = ${p!.toFixed()}, R = ${rate!.toFixed()}, T = ${t!.toFixed()}, m = ${m}`,
+        `P = ${p!.toFixed()}, R = ${rate!.toFixed()}, T = ${unit === 'years' ? t.toFixed() : `${dur!.toFixed()} ${unitText(dur!, unit)} ÷ ${unit === 'months' ? 12 : 365} = ${t.toDecimalPlaces(4).toFixed()} ${unitText(t.toDecimalPlaces(4), 'years')}`}, m = ${m}`,
       ],
+      note: partPeriod
+        ? 'A part of a compounding period is compounded fractionally here. A lender may charge plain simple interest for that part instead (unproven), so ask yours.'
+        : undefined,
     }
   },
 }
