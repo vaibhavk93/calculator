@@ -152,10 +152,10 @@ critic (per the project's own rule on big suggestions) pushed back once and the 
 
 | # | Item | Size |
 |---|---|---|
-| C1 | `kind: 'text'` — a plain note. **Critic verdict: plain note only, no auto-maths** | S |
-| C2 | One prominent `+` replacing the "New list" text link | S |
-| C3 | Share a note or list as text; export all notes | S |
-| C4 | Search inside note bodies and list lines | S |
+| C1 | **Done 2026-11-05** `kind: 'text'` — a plain note. **Critic verdict: plain note only, no auto-maths** | S |
+| C2 | **Done** One prominent `+` replacing the "New list" text link | S |
+| C3 | **Done** Share a note or list as text; export all notes | S |
+| C4 | **Done** Search inside note bodies and list lines | S |
 
 ### Block D — Budget answers "did I save?"
 
