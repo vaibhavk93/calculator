@@ -28,6 +28,7 @@ export type IconName =
   | 'forward'
   | 'plus'
   | 'swap'
+  | 'filter'
 
 const PATHS: Record<IconName, ReactNode> = {
   down: <path d="M6 9.5l6 6 6-6" />,
@@ -128,6 +129,7 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M8 11V8a4 4 0 0 1 8 0v3" />
     </>
   ),
+  filter: <path d="M4 5h16l-6 7v6.5l-4 2V12z" />,
 }
 
 export function Icon({ name, size = 20, className = '' }: { name: IconName; size?: number; className?: string }) {

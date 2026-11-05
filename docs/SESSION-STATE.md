@@ -1,5 +1,40 @@
 # Session state: resume here
 
+## Round 16 (2026-11-05): finished B15/B16/B20 (left half-done by the audit), then the owner pushed back on the hairline-everywhere direction itself
+
+**Checked B9's own work list (B10-B21) against the actual code instead of trusting commit titles.** 9 of 12
+were genuinely done; 3 were only half-built:
+- **B15** (To-do header): the "New" button was correctly hidden on To-do, but tag chips never got the "one
+  Filter icon button past 3 tags" treatment — still a plain row, unbounded. **Fixed**: `SavedScreen.tsx` now
+  shows chips inline for ≤3 tags, a `.icon-btn` "Filter" (new icon, `Icon.tsx`) opening a `Sheet` for more.
+- **B16** (tool page tail): Copy/Share got their word labels, but List/Remind/Use-in/Reset were still four
+  separate icons, never collapsed behind "More". **Fixed**: `KeepAndShare.tsx` now has Copy, Share, and one
+  "More" icon-button opening a `Sheet` with the rest as `navrow`s.
+- **B20** (Bills): Resume/Pause/Stop were still two link buttons per row. **Fixed**: `BillsScreen.tsx` moves
+  them into `BillSheet` (the existing edit sheet, opened by tapping the row) for regular bills — card-bill
+  reminders keep the inline buttons since they have no detail sheet of their own to move them into.
+
+**Two real e2e regressions caught and fixed before push** (both confirmed pre-existing failures elsewhere
+ruled out by diffing against a `git stash` baseline): `qa-budget-new.test.mjs` B-204/B-212 expected
+Pause/Resume/Stop directly on the bill row; `tools1.test.mjs`'s T1-SAVE-reminder(-no-date)/T1-ICONS-named/
+T1-ICONS-to-list expected Remind-me/Add-to-list as direct `.keep__btn`s. All rewritten to open the sheet
+first. One extra bug found while fixing B-212: the test's own "ghost reminder" check was a false positive —
+it was reading the Stop snackbar's own text ("Stopped "Netflix""), not a real leftover reminder; fixed by
+waiting for the snackbar to detach (8s, `SnackBar.tsx`) before checking.
+
+**Verified:** `npm run check` 2723/2723, `npm run build`, `notes-todo`/`qa-budget-new` diffed against
+`git stash` baseline (zero regressions), full `tools1` (37 failures, all either pre-existing or unrelated
+timeout flakiness in calculators never touched this round — Date, Compare loan offers, Simple vs compound).
+
+**Then, mid-task, the owner pushed back directly:** the hairline-everywhere direction from Block B now reads
+as "too cluttered... too much in list," asked for *some* things back in a card or another structured view
+(not a blanket reversal), and separately: the Due tab's "Add a pack: advance tax" panel showing unconditionally
+is unwanted. **Not yet acted on — needs a plan, not a quick patch**, since the whole premise of Block B was
+"the app was breaking CLAUDE.md's own no-nested-cards rule." Next step: ask which specific screens/sections
+feel like they need structure back, since "a few things in card, a few in list" needs concrete targets before
+building, and the advance-tax panel fix is small and unambiguous (gate it, e.g. behind a dismiss or a "More"
+disclosure) — do that part now, ask about the rest.
+
 ## Round 15 (2026-11-05): found and merged two finished agent worktrees, fixed one pre-existing broken test
 
 **Last prompt:** "Check what we were doing earlier. There were some agents running. Could you check and see if we

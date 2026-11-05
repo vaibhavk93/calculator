@@ -43,7 +43,11 @@ export function BillsScreen({ onBack }: { onBack: () => void }) {
     if (i.paused) return 'Paused: no reminder and no new entries'
     return at === undefined ? 'No reminder is set. Tap Resume to turn it on' : `Next due ${shortDate(at)} · ${dueLabel(at, now)}`
   }
-  const actions = (i: RecurringItem) => (
+  // Card bill reminders have no detail sheet of their own (their day is set from Categories and cards), so
+  // their Pause/Resume/Stop stay here, on the row. Regular bills open BillSheet on tap, so theirs moved there
+  // instead (B20): the row already says the state in words (the title's "(paused)" and dueText's own line),
+  // so no separate chip is needed, just fewer buttons.
+  const cardBillActions = (i: RecurringItem) => (
     <div className="due__actions bills__actions">
       {i.paused || nextOf(i) === undefined ? (
         <button type="button" className="link-btn" aria-label={`Resume ${i.title}`} onClick={() => resume(i.id)}>Resume</button>
@@ -85,7 +89,6 @@ export function BillsScreen({ onBack }: { onBack: () => void }) {
                     <span className="budget__note">{billWords(i, money)}</span>
                     <span className="budget__note">{dueText(i)}</span>
                   </button>
-                  {actions(i)}
                 </div>
               ))}
             </div>
@@ -110,7 +113,7 @@ export function BillsScreen({ onBack }: { onBack: () => void }) {
                         <span className="budget__note">{day ? `Due on day ${day} of every month. ` : ''}Change the day in Categories and cards.</span>
                         <span className="budget__note">{dueText(i)}</span>
                       </div>
-                      {actions(i)}
+                      {cardBillActions(i)}
                     </div>
                   )
                 })}
@@ -130,6 +133,9 @@ export function BillsScreen({ onBack }: { onBack: () => void }) {
 function BillSheet({ id, onClose }: { id: string; onClose: () => void }) {
   const budget = useApp((s) => s.budget)
   const reminders = useApp((s) => s.reminders)
+  const pause = useApp((s) => s.pauseBill)
+  const resume = useApp((s) => s.resumeBill)
+  const stop = useApp((s) => s.stopBill)
   const store = useAppStore()
   const money = useMoney()
   const item = liveBills(budget).find((i) => i.id === id)
@@ -195,6 +201,14 @@ function BillSheet({ id, onClose }: { id: string; onClose: () => void }) {
           ) : (
             <p className="ffield__hint">{item.paused ? 'Resume the bill to pick its next due date.' : 'There is no reminder for this bill. Resume it to turn the reminder on.'}</p>
           )}
+        </div>
+        <div>
+          {item.paused ? (
+            <button type="button" className="link-btn" onClick={() => resume(id)}>Resume this bill</button>
+          ) : (
+            <button type="button" className="link-btn" onClick={() => pause(id)}>Pause this bill</button>
+          )}
+          <button type="button" className="link-btn link-btn--danger" onClick={() => { stop(id); onClose() }}>Stop this bill</button>
         </div>
       </div>
     </Sheet>

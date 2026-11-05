@@ -1670,7 +1670,8 @@ def('T1-SAVE-persist-all-tools', 'RUNTIME', 'Every one of the 26 calculators can
 def('T1-SAVE-reminder', 'POS', 'Remind me icon: sheet opens with the reminder switch on; Save stores a card and one reminder', () =>
   withPage({}, async ({ page }) => {
     const s = await openTool(page, tool('emi'))
-    await s.locator('.keep__btn[aria-label="Remind me"]').click()
+    await s.locator('.keep__btn[aria-label="More"]').click()
+    await page.locator('.sheet .navrow', { hasText: 'Remind me' }).click()
     const on = await page.locator('.sheet button[role=switch][aria-label="Remind me"]').getAttribute('aria-checked')
     await page.locator('.sheet .sheet__foot button.btn--primary').click()
     await page.waitForTimeout(800)
@@ -1681,7 +1682,8 @@ def('T1-SAVE-reminder', 'POS', 'Remind me icon: sheet opens with the reminder sw
 def('T1-SAVE-reminder-no-date', 'NEG', 'Reminder with the date cleared: Save says what is wrong instead of doing nothing', () =>
   withPage({}, async ({ page }) => {
     const s = await openTool(page, tool('emi'))
-    await s.locator('.keep__btn[aria-label="Remind me"]').click()
+    await s.locator('.keep__btn[aria-label="More"]').click()
+    await page.locator('.sheet .navrow', { hasText: 'Remind me' }).click()
     await page.locator('.sheet input[type=date]').fill('')
     await page.locator('.sheet .sheet__foot button.btn--primary').click()
     const open = await page.locator('.sheet').count()
@@ -1711,7 +1713,7 @@ def('T1-SAVE-sheet-close', 'UX', 'Save sheet closes with X, Escape and a tap out
     fail(bad)
   }),
 )
-def('T1-ICONS-named', 'UI', 'Copy / Share / Add to a list / Remind me icons have names and are 44px; "Add to a list" only on money answers', () =>
+def('T1-ICONS-named', 'UI', 'Copy / Share / More are named and 44px; More holds Add to a list (money answers only) and Remind me', () =>
   withPage({}, async ({ page }) => {
     const bad = []
     for (const [id, wantList] of [['emi', true], ['percentage', false], ['gst', true], ['date', false], ['currency', false]]) {
@@ -1719,9 +1721,13 @@ def('T1-ICONS-named', 'UI', 'Copy / Share / Add to a list / Remind me icons have
       const s = await openTool(page, tool(id))
       const b = await s.locator('.keep__btn').evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('title'), Math.round(e.getBoundingClientRect().width), Math.round(e.getBoundingClientRect().height)]))
       const names = b.map((x) => x[0])
-      for (const n of ['Copy', 'Share', 'Remind me']) if (!names.includes(n)) bad.push(`${id}: no ${n}`)
-      if (wantList !== names.includes('Add to a list')) bad.push(`${id}: "Add to a list" ${names.includes('Add to a list') ? 'shown' : 'missing'}`)
+      for (const n of ['Copy', 'Share', 'More']) if (!names.includes(n)) bad.push(`${id}: no ${n}`)
       for (const x of b) if (x[2] < 44 && x[3] < 44) bad.push(`${id}: ${x[0]} is ${x[2]}x${x[3]}`)
+      await s.locator('.keep__btn[aria-label="More"]').click()
+      const moreNames = await page.locator('.sheet .navrow__label').allInnerTexts()
+      if (wantList !== moreNames.includes('Add to a list')) bad.push(`${id}: "Add to a list" ${moreNames.includes('Add to a list') ? 'shown' : 'missing'} in More`)
+      if (!moreNames.includes('Remind me')) bad.push(`${id}: no Remind me in More`)
+      await page.locator('.sheet button[aria-label="Close More"]').click()
       await page.locator('.screen button[aria-label="Back"]').last().click()
       await page.locator('.screen button[aria-label="Back"]').last().click().catch(() => {})
     }
@@ -1761,7 +1767,8 @@ def('T1-ICONS-share', 'POS', 'Share: shows a message when the browser has no sha
 def('T1-ICONS-to-list', 'POS', 'Add to a list: sheet shows the amount, "Add to list" creates a list and opens it in Notes', () =>
   withPage({}, async ({ page }) => {
     const s = await openTool(page, tool('tip'))
-    await s.locator('.keep__btn[aria-label="Add to a list"]').click()
+    await s.locator('.keep__btn[aria-label="More"]').click()
+    await page.locator('.sheet .navrow', { hasText: 'Add to a list' }).click()
     const sum = await page.locator('.sheet .tolist__sum').innerText()
     await page.locator('.sheet .sheet__foot button.btn--primary').click()
     await page.waitForTimeout(800)

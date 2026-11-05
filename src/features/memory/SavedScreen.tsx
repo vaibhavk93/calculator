@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { EmptyState } from '../../components/EmptyState'
 import { Icon } from '../../components/Icon'
+import { Sheet } from '../../components/Sheet'
 import { useApp } from '../../components/StoreProvider'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useBackHandler } from '../../components/useBackHandler'
@@ -36,6 +37,7 @@ export function SavedScreen() {
   }
   const [query, setQuery] = useState('')
   const [tag, setTag] = useState<string | null>(null)
+  const [filterOpen, setFilterOpen] = useState(false)
   const tabTap = useApp((s) => s.tabTap)
   const openCard = useApp((s) => s.openCard)
   const showCard = useApp((s) => s.showCard)
@@ -52,6 +54,7 @@ export function SavedScreen() {
     setAdding(false)
     setQuery('')
     setTag(null)
+    setFilterOpen(false)
   }, [tabTap])
 
   // "Add to a list" sends the user here with the new list open.
@@ -113,7 +116,7 @@ export function SavedScreen() {
             <button type="button" className="link-btn" onClick={() => setView({ kind: 'trash' })}>Trash ({trashed.length})</button>
           </div>
         )}
-        {tags.length > 0 && (
+        {tags.length > 0 && tags.length <= 3 ? (
           <div className="chips" role="group" aria-label="Filter by tag">
             {tags.map((t) => (
               <button key={t} type="button" className="chip" aria-pressed={tag === t} onClick={() => setTag(tag === t ? null : t)}>
@@ -121,8 +124,30 @@ export function SavedScreen() {
               </button>
             ))}
           </div>
-        )}
+        ) : tags.length > 3 ? (
+          <div className="chips" role="group" aria-label="Filter">
+            <button type="button" className="icon-btn" aria-pressed={!!tag} aria-label={tag ? `Filter: ${tag}` : 'Filter by tag'} title="Filter by tag" onClick={() => setFilterOpen(true)}>
+              <Icon name="filter" size={20} />
+            </button>
+            {tag && (
+              <button type="button" className="chip" aria-pressed onClick={() => setTag(null)}>
+                {tag}
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
+      {filterOpen && (
+        <Sheet title="Filter by tag" onClose={() => setFilterOpen(false)}>
+          <div className="chips" role="group" aria-label="Tags">
+            {tags.map((t) => (
+              <button key={t} type="button" className="chip" aria-pressed={tag === t} onClick={() => { setTag(tag === t ? null : t); setFilterOpen(false) }}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      )}
 
       {mode === 'todo' ? (
         <TodoScreen query={query} tag={tag} tourRow={tour.empty} />
