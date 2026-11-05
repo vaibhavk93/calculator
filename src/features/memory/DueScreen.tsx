@@ -27,6 +27,8 @@ export function DueScreen() {
   const system = useApp((s) => s.settings.numberSystem)
   const decimals = useApp((s) => s.settings.decimals)
   const reminderTime = useApp((s) => s.settings.reminderTime)
+  const cardView = useApp((s) => s.settings.dueCardView)
+  const updateSettings = useApp((s) => s.updateSettings)
   const markPaid = useApp((s) => s.markPaid)
   const snooze = useApp((s) => s.snooze)
   const remove = useApp((s) => s.removeReminder)
@@ -84,39 +86,60 @@ export function DueScreen() {
           <span>{title}</span>
           <span className="sect__count">{items.length}</span>
         </h2>
-        <div className="group" aria-label={title}>
+        <div className={cardView ? 'card-grid' : 'group'} aria-label={title}>
           {items.map((r) => {
             const card = cards.find((c) => c.id === r.cardId)!
             // A bill or card-bill reminder belongs to a record in Budget: paying it adds the entry, and Remove ends the bill.
             const bill = billForCard(budget, r.cardId)
             const doneWord = card.kind === 'task' && !bill ? 'Done' : 'Mark paid'
-            return (
+            const checkBtn = (
+              <button type="button" className="due__check" aria-label={`${doneWord} ${card.title}`} title={`${doneWord} ${card.title}`} onClick={() => markPaid(r.id)}>
+                <Icon name="check" size={20} />
+              </button>
+            )
+            const moreBtn = (
+              <button type="button" className="icon-btn" aria-label={`More for ${card.title}`} title={`More for ${card.title}`} onClick={() => setMoreId(r.id)}>
+                <Icon name="more" size={20} />
+              </button>
+            )
+            const ask = askId === r.id && (
+              <div className="due__actions">
+                <span className="due__ask" role="alert">{bill ? 'Stop this bill? Past entries stay in your budget.' : 'Remove this reminder? The note stays.'}</span>
+                <button type="button" className="link-btn" onClick={() => setAskId(null)}>Keep it</button>
+                <button type="button" className="link-btn link-btn--danger" onClick={() => { remove(r.id); setAskId(null) }}>{bill ? 'Yes, stop it' : 'Yes, remove'}</button>
+              </div>
+            )
+            const body = (
+              <>
+                <span className="row__label">{card.title}</span>
+                <span className={overdue ? 'row__hint due__alert' : 'row__hint'}>
+                  {dueLabel(r.dueAt, now)} · {WHEN.format(r.dueAt)}
+                  {r.afterDays ? ` · repeats ${afterDaysLabel(r.afterDays)}` : r.repeat !== 'none' ? ` · ${r.repeat}` : ''}
+                </span>
+                {card.amount !== null && <span className="due__amt">{formatCell(new D(card.amount), card.amountFmt ?? 'money', { system, decimals })}</span>}
+              </>
+            )
+            return cardView ? (
+              <div className="due-card" key={r.id}>
+                <div className="due-card__top">
+                  {checkBtn}
+                  {moreBtn}
+                </div>
+                <button type="button" className="due-card__body" onClick={() => setOpenId(card.id)}>
+                  {body}
+                </button>
+                {ask}
+              </div>
+            ) : (
               <div className="due" key={r.id}>
                 {/* One main control per row: the check. Snooze and Remove live behind "More". */}
-                <button type="button" className="due__check" aria-label={`${doneWord} ${card.title}`} title={`${doneWord} ${card.title}`} onClick={() => markPaid(r.id)}>
-                  <Icon name="check" size={20} />
-                </button>
+                {checkBtn}
                 <button type="button" className="due__main tap-row" onClick={() => setOpenId(card.id)}>
-                  <span className="row__text">
-                    <span className="row__label">{card.title}</span>
-                    <span className={overdue ? 'row__hint due__alert' : 'row__hint'}>
-                      {dueLabel(r.dueAt, now)} · {WHEN.format(r.dueAt)}
-                      {r.afterDays ? ` · repeats ${afterDaysLabel(r.afterDays)}` : r.repeat !== 'none' ? ` · ${r.repeat}` : ''}
-                    </span>
-                    {card.amount !== null && <span className="due__amt">{formatCell(new D(card.amount), card.amountFmt ?? 'money', { system, decimals })}</span>}
-                  </span>
+                  <span className="row__text">{body}</span>
                   <Icon name="chevron" size={18} className="tap-row__chev" />
                 </button>
-                <button type="button" className="icon-btn" aria-label={`More for ${card.title}`} title={`More for ${card.title}`} onClick={() => setMoreId(r.id)}>
-                  <Icon name="more" size={20} />
-                </button>
-                {askId === r.id && (
-                  <div className="due__actions">
-                    <span className="due__ask" role="alert">{bill ? 'Stop this bill? Past entries stay in your budget.' : 'Remove this reminder? The note stays.'}</span>
-                    <button type="button" className="link-btn" onClick={() => setAskId(null)}>Keep it</button>
-                    <button type="button" className="link-btn link-btn--danger" onClick={() => { remove(r.id); setAskId(null) }}>{bill ? 'Yes, stop it' : 'Yes, remove'}</button>
-                  </div>
-                )}
+                {moreBtn}
+                {ask}
               </div>
             )
           })}
@@ -131,6 +154,10 @@ export function DueScreen() {
       {!open && (
         <header className="tabroot__bar">
           <h1 className="screen__title">Due</h1>
+          <span className="screen__spacer" />
+          <button type="button" className="icon-btn" aria-pressed={cardView} aria-label={cardView ? 'Show as a list' : 'Show as cards'} title={cardView ? 'Show as a list' : 'Show as cards'} onClick={() => updateSettings({ dueCardView: !cardView })}>
+            <Icon name={cardView ? 'list' : 'grid'} size={20} />
+          </button>
         </header>
       )}
       {!open && tour.row}

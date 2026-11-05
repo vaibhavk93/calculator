@@ -29,6 +29,7 @@ export type IconName =
   | 'plus'
   | 'swap'
   | 'filter'
+  | 'grid'
 
 const PATHS: Record<IconName, ReactNode> = {
   down: <path d="M6 9.5l6 6 6-6" />,
@@ -130,6 +131,14 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   filter: <path d="M4 5h16l-6 7v6.5l-4 2V12z" />,
+  grid: (
+    <>
+      <rect x="4" y="4" width="7" height="7" rx="1.5" />
+      <rect x="13" y="4" width="7" height="7" rx="1.5" />
+      <rect x="4" y="13" width="7" height="7" rx="1.5" />
+      <rect x="13" y="13" width="7" height="7" rx="1.5" />
+    </>
+  ),
 }
 
 export function Icon({ name, size = 20, className = '' }: { name: IconName; size?: number; className?: string }) {

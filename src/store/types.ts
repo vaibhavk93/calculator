@@ -39,6 +39,10 @@ export interface Settings {
   pinnedTools: string[]
   /** First-run tours: a tab's tour is absent until it is finished (`done`) or closed (`skipped`). Absent means "show the tip row". */
   tours: Partial<Record<TourId, 'done' | 'skipped'>>
+  /** Notes: a grid of bordered cards instead of the hairline list. Remembered, per screen. */
+  notesCardView: boolean
+  /** Due: a grid of bordered cards instead of the hairline list. Remembered, per screen. */
+  dueCardView: boolean
 }
 
 export type TourId = 'budget' | 'notes' | 'due'
@@ -66,6 +70,8 @@ export const DEFAULT_SETTINGS: Settings = {
   toolUse: {},
   pinnedTools: [],
   tours: {},
+  notesCardView: false,
+  dueCardView: false,
 }
 
 export interface HistoryEntry {
