@@ -10,26 +10,37 @@ export interface YearRow {
 const ONE = new D(1)
 const pct = (r: Dec) => r.div(100)
 
+/** A SIP snapshot after `months` months (every 12th month, plus the last month if it falls part way through a year). */
+export interface MonthRow {
+  months: number
+  invested: Dec
+  value: Dec
+}
+
 /**
- * SIP, payments at the START of each month (annuity-due), monthly rate = annual / 12 / 100.
- * `stepUp` raises the monthly amount by that % at the start of every new year (step-up SIP).
- * Simulated month by month, so the year-wise table and the closed form check each other in tests.
+ * SIP over a whole number of months, payments at the START of each month (annuity-due), monthly rate = annual / 12 / 100.
+ * `stepUpPct` raises the monthly amount by that % at the start of every completed 12 months (step-up SIP).
+ * Simulated month by month, so the table and the closed form check each other in tests.
+ * A row is returned every 12th month, and one more for the last month when `months` is not a multiple of 12.
  */
-export function sip(monthly: Dec, annualPct: Dec, years: number, stepUpPct: Dec = new D(0)): YearRow[] {
+export function sipMonths(monthly: Dec, annualPct: Dec, months: number, stepUpPct: Dec = new D(0)): MonthRow[] {
   const i = annualPct.div(1200)
   let amount = monthly
   let bal = new D(0)
   let invested = new D(0)
-  const out: YearRow[] = []
-  for (let y = 1; y <= years; y++) {
-    for (let m = 0; m < 12; m++) {
-      bal = bal.plus(amount).times(ONE.plus(i))
-      invested = invested.plus(amount)
-    }
-    out.push({ year: y, invested, value: bal })
-    amount = amount.times(ONE.plus(pct(stepUpPct)))
+  const out: MonthRow[] = []
+  for (let m = 1; m <= months; m++) {
+    bal = bal.plus(amount).times(ONE.plus(i))
+    invested = invested.plus(amount)
+    if (m % 12 === 0 || m === months) out.push({ months: m, invested, value: bal })
+    if (m % 12 === 0) amount = amount.times(ONE.plus(pct(stepUpPct)))
   }
   return out
+}
+
+/** SIP for whole years: `sipMonths` with the year-end rows labelled by year. */
+export function sip(monthly: Dec, annualPct: Dec, years: number, stepUpPct: Dec = new D(0)): YearRow[] {
+  return sipMonths(monthly, annualPct, years * 12, stepUpPct).map((r) => ({ year: r.months / 12, invested: r.invested, value: r.value }))
 }
 
 /** Closed form of a flat SIP: P × ((1+i)^n − 1) / i × (1+i). */
@@ -46,17 +57,32 @@ export function lumpsum(principal: Dec, annualPct: Dec, years: number): YearRow[
   return out
 }
 
+/** Lumpsum after any length of time: A = P(1+r)^t, t in years (18 months = 1.5, 90 days = 90/365). */
+export function lumpsumAt(principal: Dec, annualPct: Dec, years: Dec): Dec {
+  return principal.times(ONE.plus(pct(annualPct)).pow(years))
+}
+
+/** A row for each whole year and a last row at exactly `years` when that is not a whole number. Whole years match `lumpsum()`. */
+export function lumpsumRows(principal: Dec, annualPct: Dec, years: Dec): { years: Dec; invested: Dec; value: Dec }[] {
+  const out: { years: Dec; invested: Dec; value: Dec }[] = []
+  for (let y = 1; years.gte(y); y++) out.push({ years: new D(y), invested: principal, value: lumpsumAt(principal, annualPct, new D(y)) })
+  if (!years.isInteger()) out.push({ years, invested: principal, value: lumpsumAt(principal, annualPct, years) })
+  return out
+}
+
 /**
- * Monthly SIP needed to reach `target`. The existing corpus grows as a lumpsum (yearly compounding).
- * Returns 0 when the existing corpus alone gets there, null when there are no months.
+ * Monthly SIP needed to reach `target` in `months` months. The existing corpus grows as a lumpsum (yearly compounding,
+ * (1+r)^(months/12)) while the SIP grows every month. Returns 0 when the existing corpus alone gets there, null when there are no months.
  */
-export function goalSip(target: Dec, annualPct: Dec, years: number, existing: Dec): Dec | null {
-  const months = Math.round(years * 12)
+export function goalSipMonths(target: Dec, annualPct: Dec, months: number, existing: Dec): Dec | null {
   if (months <= 0) return null
-  const gap = target.minus(existing.times(ONE.plus(pct(annualPct)).pow(years)))
+  const gap = target.minus(existing.times(ONE.plus(pct(annualPct)).pow(new D(months).div(12))))
   if (gap.lte(0)) return new D(0)
   return gap.div(sipFutureValue(ONE, annualPct, months))
 }
+
+/** `goalSipMonths` for a number of years (rounded to whole months). */
+export const goalSip = (target: Dec, annualPct: Dec, years: number, existing: Dec): Dec | null => goalSipMonths(target, annualPct, Math.round(years * 12), existing)
 
 export interface SwpResult {
   /** Whole monthly withdrawals paid in full. null = the corpus never runs out. */
@@ -101,6 +127,11 @@ export function growCorpus(corpus: Dec, annualPct: Dec, months: number): Dec {
 /** FD: A = P(1 + r/n)^(n·t), n = compounding periods per year. */
 export function fd(principal: Dec, annualPct: Dec, years: Dec, perYear: number): Dec {
   return principal.times(ONE.plus(pct(annualPct).div(perYear)).pow(years.times(perYear)))
+}
+
+/** Yearly yield of a rate compounded `perYear` times: ((1 + r/n)^n − 1) × 100. 7% quarterly is 7.1859%. */
+export function effectiveYield(annualPct: Dec, perYear: number): Dec {
+  return ONE.plus(pct(annualPct).div(perYear)).pow(perYear).minus(1).times(100)
 }
 
 /**
