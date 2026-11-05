@@ -333,12 +333,13 @@ T('N41', 'UI', 'Sheets cover the tab bar (scrim and sheet above it)', async () =
   const tb = await box(p.locator('.tabbar')); const hit = await p.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return e ? (e.closest('.sheet,.scrim') ? 'cover' : e.className) : 'none' }, [tb.x + tb.width / 2, tb.y + tb.height / 2])
   eq(hit, 'cover', 'element at the tab bar centre')
 })
-T('R01', 'POS', 'Due: "Add a pack" adds the four advance-tax reminders once, never twice', async () => {
+T('R01', 'POS', 'Due: "Add a pack" adds the four advance-tax reminders, then the offer disappears (never twice)', async () => {
   const { page: p } = await open(); await tab(p, 'Due')
   await p.getByRole('button', { name: /Add advance tax reminders/ }).click(); await wait(200)
-  let s = await st(p); eq(s.reminders.length, 4, 'reminders after first add'); eq(s.cards.every((c) => /^Advance tax instalment \d of 4 \(\d+% due\)$/.test(c.title)), true, 'titles')
-  await p.getByRole('button', { name: /Add a pack/ }).click(); await wait(200)
-  s = await st(p); eq(s.reminders.length, 4, 'reminders after second add'); has(await snackText(p), 'already there')
+  const s = await st(p); eq(s.reminders.length, 4, 'reminders after first add'); eq(s.cards.every((c) => /^Advance tax instalment \d of 4 \(\d+% due\)$/.test(c.title)), true, 'titles')
+  // Once all 4 exist, the offer is noise: it is gone from the list (B20-adjacent), not just defended
+  // against a second click. The store's own dedup (never add past 4) has its own unit test.
+  eq(await p.locator('.due__pack').count(), 0, 'pack offer still shown after it is done')
 })
 T('R02', 'POS', 'Settings: reminder time is saved, and the test reminder says it needs the Android app on the web', async () => {
   const { page: p } = await open(); await p.getByRole('button', { name: 'Settings' }).click()

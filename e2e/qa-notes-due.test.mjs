@@ -420,11 +420,13 @@ T('N-074b', 'UX', 'Due row has one main control (the check) plus one More button
   eq((await p.locator('.sheet .navrow').allInnerTexts()).join('|'), 'Snooze 1 day|Snooze 3 days|Snooze 1 week|Remove reminder', 'choices')
   await p.getByRole('button', { name: /^Close/ }).click(); eq(await p.locator('.sheet').count(), 0, 'X closes'); eq((await st(p)).reminders.length, 1, 'nothing changed')
 })
-T('N-075', 'POS', 'Advance tax pack from zero: 4 reminders with the right dates (15 Dec 2026, 15 Mar, 15 Jun, 15 Sep 2027) in order; twice adds no more', async () => {
+T('N-075', 'POS', 'Advance tax pack from zero: 4 reminders with the right dates (15 Dec 2026, 15 Mar, 15 Jun, 15 Sep 2027) in order; the offer then disappears', async () => {
   const { page: p } = await open(); await tab(p, 'Due'); await p.getByRole('button', { name: /Add advance tax reminders/ }).click(); await wait(200)
   const labels = await p.locator('.tools__list .due .row__label').allInnerTexts(); eq(labels.length, 4, 'four rows')
   has(labels[0], '(75% due)'); has(labels[1], '(100% due)'); has(labels[2], '(15% due)'); has(labels[3], '(45% due)')
-  await p.getByRole('button', { name: /Add a pack/ }).click(); eq((await st(p)).reminders.length, 4, 'still four'); has(await snackText(p), 'already there')
+  // The pack offer is noise once it is done, so it hides itself rather than defending a second click
+  // (that dedup still exists in the store and has its own unit test).
+  eq(await p.locator('.due__pack').count(), 0, 'pack offer still shown once all 4 exist')
   const s = await stored(p); eq(s.reminders.every((r) => r.repeat === 'yearly' && r.leadDays === 7), true, 'yearly, 7 days')
 })
 T('N-076', 'CORNER', 'Pack uses the chosen reminder time (18:30) and a pack row can be marked done: next year, same time', async () => {
