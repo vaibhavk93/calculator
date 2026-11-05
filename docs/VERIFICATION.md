@@ -101,3 +101,13 @@ Each rule pack has one `RATES_AS_OF = { asOf, until }` (`src/engine/tax/rules.FY
 | GST slabs | No schedule | When the Council meets |
 | Currency snapshot | Daily | Live refresh not built, so the snapshot ages |
 | CII | Yearly | With the Budget |
+
+## Duration units: loans, unit converter, capital gains (2026-11-05)
+
+| What | Grade | How it was checked |
+|---|---|---|
+| Balance transfer: months or years left | D | 15 years gives the same result as 180 months. A saved card with no unit reads as months and gives the engine's figure. Whole-month rule and 1 to 600 limit tested in `loanDurationUnits.test.ts` |
+| Simple vs compound: years, months or days | D | P 100000 at 12% simple for 90 days: 100000 × 12 × 90 ÷ 365 ÷ 100 = 2958.9041 (hand-worked, matches). 3 months compounded monthly = 100000 × 1.01^3 − 100000 = 3030.10 exactly. 12 months, 365 days and 1 year give the same numbers. Old saved card gives the same four rows as before |
+| Part of a compounding period | **Unproven** | Compounding a part period fractionally is one convention. Some lenders charge plain simple interest for the part period. The result says so; no lender document was checked |
+| Unit converter: Month (1/12 of a 365-day year) | D | 1 year = 12 months, 1 month = 2,628,000 s = 30.4167 days. Other time units unchanged |
+| Capital gains: "held 38 months, 3 years 2 months" | D | Display only. Months held comes from the same function as before; the tax rules were not touched |
