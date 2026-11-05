@@ -114,6 +114,8 @@ export function sanitizeSettings(raw: unknown): Settings {
     toolUse: sanitizeToolUse(r.toolUse),
     pinnedTools: Array.isArray(r.pinnedTools) ? [...new Set(r.pinnedTools.filter(isToolId))].slice(0, MAX_PINNED_TOOLS) : [],
     tours: sanitizeTours(r.tours),
+    notesCardView: bool(r.notesCardView, d.notesCardView),
+    dueCardView: bool(r.dueCardView, d.dueCardView),
   }
 }
 

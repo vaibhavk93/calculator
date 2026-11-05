@@ -1020,6 +1020,37 @@ textarea.field {
   padding: var(--s-1) var(--s-2) var(--s-2);
 }
 
+/* Card view (a user toggle, docs/SESSION-STATE.md Round 17): check and More sit in their own top row --
+   never overlapping the tappable body below, same non-overlap rule as .due's own grid columns, just
+   stacked instead of side by side since a 2-column grid cell is too narrow for three columns. */
+.due-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ink-3);
+  border-radius: var(--r-md);
+  min-width: 0;
+}
+
+.due-card__top {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--s-1) var(--s-1) 0;
+}
+
+.due-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--s-3) var(--s-3);
+  text-align: left;
+}
+
+.due-card__body:active {
+  background: var(--key-op-pressed);
+}
+
 .due__alert,
 .group__title--alert {
   color: var(--alert);
