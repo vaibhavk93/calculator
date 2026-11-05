@@ -39,7 +39,7 @@ const geom = (page) =>
       arrow: path === 'M6 15l6-6 6 6' ? 'up' : path === 'M6 9.5l6 6 6-6' ? 'down' : null,
       overlapsKeep: bar && keep && !q('.answer').classList.contains('answer--idle') ? !(keep.bottom <= bar.top || keep.top >= bar.bottom) : null,
       mainAbove: (r(q('.result__row--main'))?.top ?? 0) < (r(q('.screen__body'))?.top ?? 0),
-      mainValueSize: parseFloat(getComputedStyle(q('.result__row--main .result__value')).fontSize),
+      mainValueSize: parseFloat(getComputedStyle(q('.result__row--main .hero__value')).fontSize),
       otherValueSize: parseFloat(getComputedStyle(q('.result__row:not(.result__row--main) .result__value')).fontSize),
     }
   })

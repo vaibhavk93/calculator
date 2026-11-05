@@ -27,6 +27,7 @@ export type IconName =
   | 'lock'
   | 'forward'
   | 'plus'
+  | 'swap'
 
 const PATHS: Record<IconName, ReactNode> = {
   down: <path d="M6 9.5l6 6 6-6" />,
@@ -120,6 +121,7 @@ const PATHS: Record<IconName, ReactNode> = {
   ),
   forward: <path d="M5 12h13M13 6.5l5.5 5.5-5.5 5.5" />,
   plus: <path d="M12 5v14M5 12h14" />,
+  swap: <path d="M8 20V4M8 4L4.5 7.5M8 4l3.5 3.5M16 4v16M16 20l-3.5-3.5M16 20l3.5-3.5" />,
   lock: (
     <>
       <rect x="5" y="11" width="14" height="9" rx="2" />

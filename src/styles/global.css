@@ -1229,6 +1229,13 @@ button:disabled {
     animation-delay: 0ms !important;
     transition-duration: 1ms !important;
   }
+
+  /* Text that is fitted by script (the calculator display, a tool's headline answer) changes font-size in a loop and reads
+     the size straight back. Even a 1ms transition makes the read-back lag, and the text shrinks to its minimum. */
+  .display__result,
+  .hero__value {
+    transition-property: none !important;
+  }
 }
 
 /* Due: the "add a pack" block under the list. */

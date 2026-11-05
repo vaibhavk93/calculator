@@ -91,7 +91,7 @@ const unitFields: Field[] = UNIT_CATEGORIES.flatMap((c): Field[] => {
   const [from, to] = UNIT_DEFAULTS[c.id]!
   const show = (v: Values) => v.category === c.id
   return [
-    { id: `from_${c.id}`, label: 'From unit', kind: 'select', options, default: from, visibleIf: show },
+    { id: `from_${c.id}`, label: 'From unit', kind: 'select', options, default: from, visibleIf: show, swapWith: `to_${c.id}` },
     { id: `to_${c.id}`, label: 'To unit', kind: 'select', options, default: to, visibleIf: show },
   ]
 })
@@ -125,7 +125,7 @@ const unitSpec: ToolSpec = {
         ? ['Everything goes through Celsius: °C = (°F − 32) × 5 ÷ 9, °F = °C × 9 ÷ 5 + 32, K = °C + 273.15', `${plain(value)} ${from.label} = ${plain(out)} ${to.label}`]
         : ['converted = value × size of from-unit ÷ size of to-unit', `${plain(value)} × ${from.factor} ÷ ${to.factor}`, `Sizes are in ${cat.units.find((u) => u.factor === '1')!.label.toLowerCase()}s`]
     return {
-      rows: [{ label: `${from.label} to ${to.label}`, value: out, main: true }],
+      rows: [{ label: `${from.label} to ${to.label}`, value: out, unit: to.label, main: true }],
       table: { title: `${plain(value)} ${from.label} in every unit`, columns: ['Unit', 'Value'], fmts: ['text', 'number'], rows: convertAll(cat.id, from.id, value).map((x) => [x.unit.label, x.value]) },
       formula,
     }
@@ -149,7 +149,7 @@ const currencySpec: ToolSpec = {
   keywords: ['currency', 'forex', 'exchange', 'dollar', 'usd', 'euro', 'pound', 'yen', 'rate'],
   fields: [
     { id: 'amount', label: 'Amount to convert', kind: 'number', default: '10000' },
-    { id: 'from', label: 'From currency', kind: 'select', options: currencyOptions, default: 'INR' },
+    { id: 'from', label: 'From currency', kind: 'select', options: currencyOptions, default: 'INR', swapWith: 'to' },
     { id: 'to', label: 'To currency', kind: 'select', options: currencyOptions, default: 'USD' },
   ],
   compute: (v) => {

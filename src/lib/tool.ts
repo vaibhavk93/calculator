@@ -37,6 +37,8 @@ interface FieldBase {
   cluster?: string
   /** Set on an advanced money field whose default is an example the person should check: while it still holds the default, the result says "uses example values". */
   example?: boolean
+  /** The id of a select field this one trades values with. The screen shows one "Swap from and to" button after this field. Both ids stay as they are. */
+  swapWith?: string
 }
 
 /** The label to show for a field right now. */
@@ -64,6 +66,8 @@ export interface ResultRow {
   fmt?: Fmt
   /** The headline figure. One per result. */
   main?: boolean
+  /** A unit shown after the number ("0.62 Mile"). Display and share text only: `value` stays a plain number. */
+  unit?: string
   /**
    * "This is good / bad for you." Colours the value green or red.
    *

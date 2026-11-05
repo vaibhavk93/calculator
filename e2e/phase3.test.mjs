@@ -33,7 +33,7 @@ try {
     {
       const { page, errors, close } = await openApp(app, { theme: 'dark', font, now: NOV3 })
       await openTool(page, 'ppf', 'Public Provident Fund')
-      check(`PPF: "Rates as of Nov 2026"${tag}`, (await checked(page)).includes('Rates as of Nov 2026'), (await checked(page)).join('|'))
+      check(`PPF: "Rates as of Nov 2026"${tag}`, (await checked(page)).some((t) => t.startsWith('Checked against') && t.endsWith('. Rates as of Nov 2026')), (await checked(page)).join('|'))
       await shot(page, `1-ppf${font}`)
       await noScroll(page, `PPF${tag}`)
       check(`PPF: no console errors${tag}`, errors.length === 0, errors.join('|'))
