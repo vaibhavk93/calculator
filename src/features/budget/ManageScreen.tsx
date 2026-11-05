@@ -33,8 +33,8 @@ type Target =
   | { kind: 'instrument'; id: string | null }
 
 /**
- * Limits, categories (with subcategories) and the cards, accounts and wallets entries can be paid from. Opened from Budget and
- * from Settings. `month` is the month whose limits are shown and changed when a limit is "for one month only".
+ * Limits, categories (with subcategories) and the cards, accounts and wallets entries can be paid from. Opened from Budget.
+ * `month` is the month whose limits are shown and changed when a limit is "for one month only".
  */
 export function ManageScreen({ onBack, month = monthKey(new Date()) }: { onBack: () => void; month?: string }) {
   useBackHandler(true, onBack)
@@ -61,11 +61,14 @@ export function ManageScreen({ onBack, month = monthKey(new Date()) }: { onBack:
     </button>
   )
 
+  // No limit set (for every month) is the plain case: say nothing rather than repeat "No limit" on every row.
+  const limitHint = (limit: string | null, monthOnly: boolean) => (limit === null && !monthOnly ? '' : limitLabel(limit, monthOnly ? 'month' : 'always', month))
   const catHint = (c: (typeof live)[number]) => {
-    const limit = limitLabel(amountText(effectiveLimit(c, month)), hasMonthLimit(c, month) ? 'month' : 'always', month)
-    return c.months && c.months.length > 0 ? `${limit} · Only in ${c.months.map(monthShortLabel).join(', ')}` : limit
+    const limit = limitHint(amountText(effectiveLimit(c, month)), hasMonthLimit(c, month))
+    const only = c.months && c.months.length > 0 ? `Only in ${c.months.map(monthShortLabel).join(', ')}` : ''
+    return [limit, only].filter(Boolean).join(' · ') || undefined
   }
-  const overallHint = limitLabel(amountText(effectiveOverall(budget, month)), hasMonthLimit({ overallByMonth: budget.overallByMonth }, month) ? 'month' : 'always', month)
+  const overallHint = limitHint(amountText(effectiveOverall(budget, month)), hasMonthLimit({ overallByMonth: budget.overallByMonth }, month)) || undefined
 
   return (
     <div className="screen" role="dialog" aria-modal="true" aria-label="Categories and cards">

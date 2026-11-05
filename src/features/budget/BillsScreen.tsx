@@ -13,7 +13,7 @@ import { dayText, shortDate } from '../../lib/tasks'
 import { Segmented } from '../settings/controls'
 import { GuardedFooter, MoneyInput, focusField, useDiscardGuard } from './formKit'
 import { ExpenseSheet } from './sheets'
-import { useMoney } from './SpendSummary'
+import { FitHero, useMoney } from './SpendSummary'
 
 type SheetState = null | { kind: 'add' } | { kind: 'edit'; id: string }
 
@@ -63,7 +63,7 @@ export function BillsScreen({ onBack }: { onBack: () => void }) {
             <section className="sect" aria-label="What your bills cost">
               <div className="budget__sum">
                 <span className="result__label">Per year, all running bills</span>
-                <span className="budget__hero">{money(totals.perYear)}</span>
+                <FitHero text={money(totals.perYear)} />
                 <span className="budget__note">About {money(totals.perMonth)} a month · {totals.count} {totals.count === 1 ? 'bill' : 'bills'}</span>
               </div>
             </section>

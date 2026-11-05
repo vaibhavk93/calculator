@@ -1,31 +1,23 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Icon } from '../../components/Icon'
 import { PickerSelect, type PickOption } from '../../components/PickerSelect'
 import { ScreenHeader } from '../../components/ScreenHeader'
-import { useApp, useAppStore } from '../../components/StoreProvider'
-import { saveBackupFile } from '../../lib/backupFile'
-import { Sheet } from '../../components/Sheet'
+import { useApp } from '../../components/StoreProvider'
 import { backupNudge, countItems } from '../../lib/backupNudge'
 import { checkReminderPermissions, ensurePermission, notificationsSupported, openExactAlarmSettings, scheduleTestReminder, type ReminderPermissions } from '../../lib/notifications'
 import { timeLabel } from '../../lib/reminders'
 import { ACCENT_NAMES, ACCENTS } from '../../lib/theme'
-import { notesExportText, exportableCards } from '../../lib/notes'
-import { backupFilename, buildBackup, parseBackup } from '../../store/backup'
-import { TABS, type CopyFormat, type PersistedData, type Tab } from '../../store/types'
+import { TABS, type CopyFormat, type Tab } from '../../store/types'
 import pkg from '../../../package.json'
-import { ExportSheet } from '../budget/ExportSheet'
-import { ManageScreen } from '../budget/ManageScreen'
 import { ALL_TOOLS } from '../tools/registry'
 import { GROUPS } from '../tools/groups'
+import { BackupScreen } from './BackupScreen'
 import { OptionRow, Row, Segmented, Toggle } from './controls'
 import { ReliableRemindersSheet } from './ReliableRemindersSheet'
-import { TipsAndTours } from '../onboarding/TipsAndTours'
-import { DATE_LOCALE } from '../../lib/dateLocale'
+import { TipsAndToursScreen } from '../onboarding/TipsAndTours'
 
 const TAB_LABEL: Record<Tab, string> = { calculate: 'Calculate', tools: 'Tools', saved: 'Notes', due: 'Due', budget: 'Budget' }
 const DECIMAL_CHOICES = ['auto', ...Array.from({ length: 11 }, (_, i) => String(i))]
-
-type Backup = { state: 'idle' } | { state: 'confirm'; data: PersistedData; exportedAt: string | null } | { state: 'done'; text: string } | { state: 'error'; text: string }
 
 /** One titled card of settings. A hairline list under a quiet heading, no card. */
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -34,6 +26,19 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <h2 className="sect__head">{title}</h2>
       {children}
     </section>
+  )
+}
+
+/** A settings row that opens a screen of its own. */
+function NavRow({ label, hint, onClick }: { label: string; hint: string; onClick: () => void }) {
+  return (
+    <button type="button" className="row row--button tap-row" onClick={onClick}>
+      <span className="row__text">
+        <span className="row__label">{label}</span>
+        <span className="row__hint">{hint}</span>
+      </span>
+      <Icon name="chevron" size={18} className="tap-row__chev" />
+    </button>
   )
 }
 
@@ -123,7 +128,6 @@ function ReminderSettings() {
 }
 
 export function SettingsScreen() {
-  const store = useAppStore()
   const s = useApp((x) => x.settings)
   const update = useApp((x) => x.updateSettings)
   const setOverlay = useApp((x) => x.setOverlay)
@@ -141,55 +145,9 @@ export function SettingsScreen() {
     ...GROUPS.flatMap((g) => g.tools.map((id) => ({ value: `tool:${id}`, label: ALL_TOOLS.find((t) => t.id === id)?.title ?? id, group: g.name }))),
   ]
 
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [backup, setBackup] = useState<Backup>({ state: 'idle' })
-  const [manageBudget, setManageBudget] = useState(false)
-  const [exportCsv, setExportCsv] = useState(false)
-
-  // Asks before the first save creates the Calc folder in Downloads. Resolves true to go ahead.
-  const [folderAsk, setFolderAsk] = useState<((ok: boolean) => void) | null>(null)
-  const showLinkSnack = useApp((x) => x.showLinkSnack)
-  const showNotice = useApp((x) => x.showNotice)
-  const toast = useApp((x) => x.toast)
+  const [page, setPage] = useState<'none' | 'backup' | 'tips'>('none')
   const items = useApp((x) => countItems(x))
   const nudge = backupNudge(items, s.lastBackupAt, s.backupDismissedAt, Date.now())
-
-  const exportBackup = async () => {
-    const r = await saveBackupFile(backupFilename(), buildBackup(store.getState().snapshot()), () => new Promise<boolean>((resolve) => setFolderAsk(() => resolve)))
-    setFolderAsk(null)
-    if (r.ok) update({ lastBackupAt: Date.now() })
-    if (r.ok && r.open) showLinkSnack(`Backup saved to ${r.where}`, { label: 'Open folder', run: () => void r.open!() })
-    else if (r.ok) showNotice(`Backup saved to ${r.where}`, 'info')
-    else if (r.reason === 'failed') showNotice(r.message, 'error')
-    else showNotice('No backup was made', 'info')
-  }
-
-  // All notes, lists and saved calculations as one plain text file, the same way a backup is saved.
-  const exportNotes = async () => {
-    const { cards, settings } = store.getState()
-    if (exportableCards(cards).length === 0) return toast('There are no notes to export yet')
-    const now = new Date()
-    const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-    const text = notesExportText(cards, { system: settings.numberSystem, decimals: settings.decimals }, now.getTime())
-    const r = await saveBackupFile(`calc-notes-${day}.txt`, text, () => new Promise<boolean>((resolve) => setFolderAsk(() => resolve)), 'text/plain')
-    setFolderAsk(null)
-    if (r.ok && r.open) showLinkSnack(`Notes saved to ${r.where}`, { label: 'Open folder', run: () => void r.open!() })
-    else if (r.ok) toast(`Notes saved to ${r.where}`)
-    else if (r.reason === 'failed') toast(r.message)
-    else toast('No file was made')
-  }
-
-  const chooseFile = async (file: File | undefined) => {
-    if (!file) return
-    const parsed = parseBackup(await file.text())
-    setBackup(parsed.ok ? { state: 'confirm', data: parsed.data, exportedAt: parsed.exportedAt } : { state: 'error', text: parsed.message })
-    if (fileRef.current) fileRef.current.value = ''
-  }
-
-  const restore = (data: PersistedData) => {
-    store.getState().restore(data)
-    setBackup({ state: 'done', text: `Restored ${data.history.length} calculations, ${data.cards.length} notes and lists, ${data.reminders.length} reminders and ${data.budget.expenses.length} budget entries.` })
-  }
 
   return (
     <div className="screen" role="dialog" aria-modal="true" aria-label="Settings">
@@ -293,98 +251,17 @@ export function SettingsScreen() {
 
         <ReminderSettings />
 
-        <Section title="Your data">
-          <button type="button" className="row row--button tap-row" onClick={() => setManageBudget(true)}>
-            <span className="row__text">
-              <span className="row__label">Categories and cards</span>
-              <span className="row__hint">Budget limits, categories, cards and accounts</span>
-            </span>
-            <Icon name="chevron" size={18} className="tap-row__chev" />
-          </button>
-          <button type="button" className="row row--button tap-row" onClick={() => void exportBackup()}>
-            <span className="row__text">
-              <span className="row__label">Export a backup</span>
-              <span className="row__hint">History and settings, as one file you keep</span>
-            </span>
-            <Icon name="chevron" size={18} className="tap-row__chev" />
-          </button>
-          <button type="button" className="row row--button tap-row" onClick={() => void exportNotes()}>
-            <span className="row__text">
-              <span className="row__label">Export notes</span>
-              <span className="row__hint">Notes, lists and saved calculations as a text file. To-dos are in the full backup</span>
-            </span>
-            <Icon name="chevron" size={18} className="tap-row__chev" />
-          </button>
-          <button type="button" className="row row--button tap-row" onClick={() => setExportCsv(true)}>
-            <span className="row__text">
-              <span className="row__label">Export expenses</span>
-              <span className="row__hint">Budget entries as a spreadsheet file (CSV)</span>
-            </span>
-            <Icon name="chevron" size={18} className="tap-row__chev" />
-          </button>
-          <button type="button" className="row row--button tap-row" onClick={() => fileRef.current?.click()}>
-            <span className="row__text">
-              <span className="row__label">Restore from a backup</span>
-              <span className="row__hint">Replaces what is on this phone now</span>
-            </span>
-            <Icon name="chevron" size={18} className="tap-row__chev" />
-          </button>
-          <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" aria-label="Choose a backup file" tabIndex={-1} onChange={(e) => void chooseFile(e.target.files?.[0])} />
+        <Section title="More">
+          <NavRow label="Backup and export" hint="Save a backup, restore one, or export notes and expenses" onClick={() => setPage('backup')} />
+          <NavRow label="Tips and tours" hint="Replay a tour, or bring back the first-visit tips" onClick={() => setPage('tips')} />
         </Section>
 
-        {backup.state === 'confirm' && (
-          <div className="confirm" style={{ margin: '16px 16px 0' }}>
-            <p>
-              Replace <strong>everything</strong> on this phone with the backup
-              {backup.exportedAt ? ` from ${new Date(backup.exportedAt).toLocaleDateString(DATE_LOCALE)}` : ''}? That means your calculations ({backup.data.history.length}), notes and lists ({backup.data.cards.length}), reminders ({backup.data.reminders.length}),
-              budget entries ({backup.data.budget.expenses.length}) and settings. What is on this phone now is lost. Save a backup of it first if you want to keep it.
-            </p>
-            <div className="confirm__actions">
-              <button type="button" className="btn" onClick={() => setBackup({ state: 'idle' })}>
-                Cancel
-              </button>
-              <button type="button" className="btn" onClick={() => void exportBackup()}>
-                Save a backup of this phone first
-              </button>
-              <button type="button" className="btn btn--primary" onClick={() => restore(backup.data)}>
-                Replace everything
-              </button>
-            </div>
-          </div>
-        )}
-        {(backup.state === 'done' || backup.state === 'error') && (
-          <p className="note" role="status" data-tone={backup.state === 'error' ? 'error' : undefined}>
-            {backup.text}
-          </p>
-        )}
-
-        <TipsAndTours />
-
-        <Section title="About">
-          <Row label="Calc" hint="Everything stays on this phone. No account, no ads, no tracking.">
-            <span className="row__value">{pkg.version}</span>
-          </Row>
-        </Section>
+        <p className="settings__foot">
+          Calc {pkg.version}. Everything stays on this phone. No account, no ads, no tracking.
+        </p>
       </div>
-      {manageBudget && <ManageScreen onBack={() => setManageBudget(false)} />}
-      {exportCsv && <ExportSheet onClose={() => setExportCsv(false)} />}
-      {folderAsk && (
-        <Sheet
-          title="Make a Calc folder?"
-          onClose={() => folderAsk(false)}
-          footer={
-            <>
-              <button type="button" className="btn btn--primary" onClick={() => folderAsk(true)}>Create folder and save</button>
-              <button type="button" className="btn" onClick={() => folderAsk(false)}>Not now</button>
-            </>
-          }
-        >
-          <p className="note" style={{ margin: 0 }}>
-            Backups are kept together in a <strong>Calc</strong> folder inside your Downloads, so they do not get lost among other files.
-            It does not exist yet.
-          </p>
-        </Sheet>
-      )}
+      {page === 'backup' && <BackupScreen onBack={() => setPage('none')} />}
+      {page === 'tips' && <TipsAndToursScreen onBack={() => setPage('none')} />}
     </div>
   )
 }

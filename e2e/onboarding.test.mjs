@@ -151,6 +151,7 @@ await T('due: row, 5 steps, last Try it opens Make reminders reliable', async (p
 // ---------------------------------------------------------------- Settings replay
 await T('settings: replay a tour, then bring the tips back', async (page) => {
   await page.locator('[aria-label="Settings"]').click()
+  await page.getByRole('button', { name: /^Tips and tours/ }).click()
   const sect = page.locator('section[aria-label="Tips and tours"]')
   ok((await sect.count()) === 1, 'Tips and tours section')
   ok((await sect.locator('.row--button').count()) === 4, 'three tours and the reset row')
@@ -166,6 +167,7 @@ await T('settings: replay a tour, then bring the tips back', async (page) => {
   ok((await tours(page)).budget === 'done', 'a finished tour stays done when closed early on replay')
   await sect.getByRole('button', { name: /Show first-visit tips again/ }).click()
   ok(Object.keys(await tours(page)).length === 0, 'tips reset')
+  await page.locator('[aria-label="Back"]').last().click() // out of Tips and tours, back to Settings
   await page.locator('[aria-label="Back"]').first().click()
   await tab(page, 'Due')
   ok((await row(page).count()) === 1, 'row is back on Due')

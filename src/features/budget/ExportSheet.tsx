@@ -8,11 +8,11 @@ import { EXPORT_RANGES, buildExpensesCsv, expensesCsvFilename, exportEntries, ty
 /**
  * "Export expenses": pick a date range, then save one CSV file (opens in Excel or Sheets). It goes the same way a backup
  * does: into Download/Calc on the phone, or an ordinary download in a browser. Nothing leaves the phone by itself.
- * Used from Settings > Your data and from the Budget Spending summary.
+ * Used from Settings > Backup and export and from the Budget Spending summary.
  */
 export function ExportSheet({ onClose }: { onClose: () => void }) {
   const store = useAppStore()
-  const showNotice = useApp((s) => s.showNotice)
+  const toast = useApp((s) => s.toast)
   const showLinkSnack = useApp((s) => s.showLinkSnack)
   const [range, setRange] = useState<ExportRange>('month')
   const [error, setError] = useState<string | null>(null)
@@ -34,7 +34,7 @@ export function ExportSheet({ onClose }: { onClose: () => void }) {
     setBusy(false)
     if (r.ok) {
       if (r.open) showLinkSnack(`Saved to ${r.where}`, { label: 'Open folder', run: () => void r.open!() })
-      else showNotice(`Saved to ${r.where}`, 'info')
+      else toast(`Saved to ${r.where}`)
       return onClose()
     }
     if (r.reason === 'failed') setError(r.message)

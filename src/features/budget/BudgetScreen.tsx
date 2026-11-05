@@ -10,7 +10,7 @@ import { BillsScreen } from './BillsScreen'
 import { ImportScreen } from './ImportScreen'
 import { ManageScreen } from './ManageScreen'
 import { ExpenseSheet } from './sheets'
-import { Bar, EntryRow, MonthNav, SpendSummary, limitWords, useMoney, type SummaryTab } from './SpendSummary'
+import { Bar, EntryRow, FitHero, MonthNav, SpendSummary, limitWords, useMoney, type SummaryTab } from './SpendSummary'
 
 type Page = 'home' | 'summary' | 'manage' | 'import' | 'bills'
 type SheetState = null | { id: string | null }
@@ -118,7 +118,7 @@ export function BudgetScreen() {
           <span className="result__label">{over
             ? `Over budget ${month === monthKey(new Date()) ? 'by' : `in ${monthLabel(month)}`}`
             : `${s.overall ? 'Left' : 'Spent'} ${month === monthKey(new Date()) ? 'this month' : `in ${monthLabel(month)}`}`}</span>
-          <span className={over ? 'budget__hero budget__hero--negative' : 'budget__hero'}>{money(over ? heroValue.abs() : heroValue)}</span>
+          <FitHero text={money(over ? heroValue.abs() : heroValue)} negative={over} />
           {s.overall ? (
             <>
               <Bar pct={s.overall.pct} />

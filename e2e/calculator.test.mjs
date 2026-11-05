@@ -458,12 +458,12 @@ C('CALC-234', 'CORNER', 'History: reusing an expression while typing adds it in 
   await tap(page, '1+2+'); await openHistory(page); await page.locator('.hrow__expr').first().click(); await wait(150); eq((await read(page)).expr, '1 + 2 + (9 × 9)')
 }, { data: mk({ history: [{ id: 'a', expression: '9*9', result: '81', at: 1 }] }) })
 C('CALC-235', 'POS', 'History: Name a row; the name shows', async ({ page }) => {
-  await openHistory(page); await page.locator('[aria-label^="Name "]').first().click(); await page.locator('.hrow__edit input').fill('Rent'); await page.locator('.hrow__edit button', { hasText: 'Save' }).click(); has(await page.locator('.hrow').first().innerText(), 'Rent')
+  await openHistory(page); await page.locator('[aria-label^="More for"]').first().click(); await page.locator('.hmenu__item', { hasText: 'Name' }).click(); await page.locator('#hrow-field').fill('Rent'); await page.locator('.sheet__foot button', { hasText: 'Save' }).click(); await page.locator('[aria-label="Close Calculation"]').click(); await wait(150); has(await page.locator('.hrow').first().innerText(), 'Rent')
   eq((await saved(page)).history[0].memo, 'Rent')
 }, { data: mk({ history: [row(7)] }) })
 C('CALC-236', 'POS', 'History: Lock from the More menu; lock icon shows; delete is disabled', async ({ page }) => {
   await openHistory(page); await page.locator('[aria-label^="More for"]').first().click(); await page.locator('.hmenu__item', { hasText: 'Lock' }).click(); await page.locator('[aria-label="Close Calculation"]').click(); await wait(150)
-  eq(await page.locator('.hrow [aria-label^="Delete"]').first().isDisabled(), true); eq((await saved(page)).history[0].locked, true)
+  await page.locator('[aria-label^="More for"]').first().click(); eq(await page.locator('.hmenu__item', { hasText: 'Delete' }).isDisabled(), true); eq((await saved(page)).history[0].locked, true)
 }, { data: mk({ history: [row(7)] }) })
 C('CALC-237', 'POS', 'History: Unlock a locked row', async ({ page }) => {
   await openHistory(page); await page.locator('[aria-label^="More for"]').first().click(); await page.locator('.hmenu__item', { hasText: 'Unlock' }).click(); await wait(100); eq((await saved(page)).history[0].locked, undefined)
@@ -491,10 +491,10 @@ C('CALC-243', 'POS', 'History: Copy from the More menu asks how (commas), copies
   if (await t.page.locator('.copyas__opt').count()) await t.page.locator('.copyas__opt').first().click(); await wait(250); has(await clipRead(t.page), '7 + 1 = 8')
 }, { data: mk({ history: [row(7)] }) })
 C('CALC-244', 'POS', 'History: Delete removes the row and offers Undo', async ({ page }) => {
-  await openHistory(page); await page.locator('.hrow [aria-label^="Delete"]').first().click(); eq(await page.locator('.hrow').count(), 1); has(await page.locator('.snack').innerText(), 'Removed from history'); has(await page.locator('.snack').innerText(), 'Undo')
+  await openHistory(page); await page.locator('[aria-label^="More for"]').first().click(); await page.locator('.hmenu__item', { hasText: 'Delete' }).click(); eq(await page.locator('.hrow').count(), 1); has(await page.locator('.snack').innerText(), 'Removed from history'); has(await page.locator('.snack').innerText(), 'Undo')
 }, { data: mk({ history: [row(7), row(6)] }) })
 C('CALC-245', 'POS', 'History: Undo puts the deleted row back in its place', async ({ page }) => {
-  await openHistory(page); await page.locator('.hrow [aria-label^="Delete"]').first().click(); await page.locator('.snack button', { hasText: 'Undo' }).click(); await wait(150)
+  await openHistory(page); await page.locator('[aria-label^="More for"]').first().click(); await page.locator('.hmenu__item', { hasText: 'Delete' }).click(); await page.locator('.snack button', { hasText: 'Undo' }).click(); await wait(150)
   const t = await page.locator('.hrow').allInnerTexts(); eq(t.length, 2); has(t[0], '7 + 1')
 }, { data: mk({ history: [row(7), row(6)] }) })
 C('CALC-246', 'POS', 'History: Clear all asks you to type CLEAR; button stays off until you do', async ({ page }) => {
@@ -539,10 +539,10 @@ C('CALC-258', 'CORNER', 'History: a locked row cannot be deleted from the More m
   await openHistory(page); await page.locator('[aria-label^="More for"]').first().click(); eq(await page.locator('.hmenu__item', { hasText: 'Delete' }).isDisabled(), true)
 }, { data: mk({ history: [row(7, { locked: true })] }) })
 C('CALC-259', 'CORNER', 'History: Name longer than 80 characters is cut to 80', async ({ page }) => {
-  await openHistory(page); await page.locator('[aria-label^="Name "]').first().click(); await page.locator('.hrow__edit input').fill('x'.repeat(120)); await page.locator('.hrow__edit button', { hasText: 'Save' }).click(); eq((await saved(page)).history[0].memo.length, 80)
+  await openHistory(page); await page.locator('[aria-label^="More for"]').first().click(); await page.locator('.hmenu__item', { hasText: 'Name' }).click(); await page.locator('#hrow-field').fill('x'.repeat(120)); await page.locator('.sheet__foot button', { hasText: 'Save' }).click(); await wait(100); eq((await saved(page)).history[0].memo.length, 80)
 }, { data: mk({ history: [row(7)] }) })
 C('CALC-260', 'CORNER', 'History: Name left blank clears the name', async ({ page }) => {
-  await openHistory(page); await page.locator('[aria-label^="Rename "]').first().click(); await page.locator('.hrow__edit input').fill('   '); await page.locator('.hrow__edit button', { hasText: 'Save' }).click(); eq((await saved(page)).history[0].memo, undefined)
+  await openHistory(page); await page.locator('[aria-label^="More for"]').first().click(); await page.locator('.hmenu__item', { hasText: 'Rename' }).click(); await page.locator('#hrow-field').fill('   '); await page.locator('.sheet__foot button', { hasText: 'Save' }).click(); await wait(100); eq((await saved(page)).history[0].memo, undefined)
 }, { data: mk({ history: [row(7, { memo: 'Rent' })] }) })
 C('CALC-261', 'POS', 'History: number system switch re-formats old rows (Indian -> International)', async ({ page }) => {
   await openHistory(page); has(await page.locator('.hrow').first().innerText(), '12,34,567'); await page.locator('[aria-label="Close History"]').click()
@@ -760,7 +760,7 @@ C('CALC-412', 'UX', 'Tapping the big number on a lone number needs 1 tap to edit
   await tap(page, '123'); const lab = await page.locator('.display__result').getAttribute('aria-label'); has(lab, 'Tap to edit')
 })
 C('CALC-413', 'UX', 'Undo is reachable after a wrong = (tap Undo once to reopen the expression)', async ({ page }) => { await tap(page, '2+3='); await key(page, 'Undo'); eq((await read(page)).res, '5'); eq((await read(page)).expr, '2 + 3') })
-C('CALC-414', 'UX', 'Delete from History is undoable from the snackbar (rule: every delete is undoable)', async ({ page }) => { await openHistory(page); await page.locator('.hrow [aria-label^="Delete"]').first().click(); eq(await page.locator('.snack button', { hasText: 'Undo' }).count(), 1) }, { data: mk({ history: [row(7)] }) })
+C('CALC-414', 'UX', 'Delete from History is undoable from the snackbar (rule: every delete is undoable)', async ({ page }) => { await openHistory(page); await page.locator('[aria-label^="More for"]').first().click(); await page.locator('.hmenu__item', { hasText: 'Delete' }).click(); eq(await page.locator('.snack button', { hasText: 'Undo' }).count(), 1) }, { data: mk({ history: [row(7)] }) })
 C('CALC-415', 'UX', 'Landscape: History button and Settings are still reachable', async ({ page }) => { await openHistory(page); eq(await page.locator('.sheet').count(), 1) }, { width: 800, height: 360 })
 C('CALC-416', 'UX', 'Memory display "M 5" uses the same number format as the screen (Indian grouping)', async ({ page }) => { await openSci(page); await kb(page, '1234567'); await key(page, 'Add to memory'); eq((await read(page)).mem, 'M 12,34,567') })
 C('CALC-417', 'UX', 'Scientific screen has a visible Back (system back is never required)', async ({ page }) => { await openSci(page); eq(await page.locator('.sci-screen [aria-label="Back"]').count(), 1) })
