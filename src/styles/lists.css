@@ -137,6 +137,47 @@
   align-self: center;
 }
 
+/* Card view (Notes/Due, a user toggle, docs/SESSION-STATE.md Round 17): the same rows, shown as a
+   2-column grid of bordered tiles instead of a hairline list. Border only, no tint -- a card's edge
+   says "this is one item", not a wash of colour. */
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-4);
+}
+
+/* Same flex-row shape as .row--split (main flex:1, pin flex:none, side by side -- never overlapping,
+   the geometry the layout-contract suite checks for), just bordered and placed in a grid cell. */
+.item-card {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--ink-3);
+  border-radius: var(--r-md);
+  min-width: 0;
+}
+
+.item-card__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 44px;
+  padding: var(--s-3);
+  text-align: left;
+}
+
+.item-card__main:active {
+  background: var(--key-op-pressed);
+}
+
+.item-card__pin {
+  flex: none;
+  align-self: flex-start;
+}
+
 /* ---- To-do, inside the Notes tab (.todo__*) and the Notes switch (.notes__*) */
 
 .todo {

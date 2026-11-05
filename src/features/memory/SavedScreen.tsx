@@ -38,6 +38,8 @@ export function SavedScreen() {
   const [query, setQuery] = useState('')
   const [tag, setTag] = useState<string | null>(null)
   const [filterOpen, setFilterOpen] = useState(false)
+  const cardView = useApp((s) => s.settings.notesCardView)
+  const setCardView = useApp((s) => s.updateSettings)
   const tabTap = useApp((s) => s.tabTap)
   const openCard = useApp((s) => s.openCard)
   const showCard = useApp((s) => s.showCard)
@@ -103,6 +105,11 @@ export function SavedScreen() {
         />
         <div className="saved__find">
           <input className="field" type="search" placeholder={mode === 'todo' ? 'Search tasks' : 'Search notes'} aria-label={mode === 'todo' ? 'Search tasks' : 'Search notes'} value={query} onChange={(e) => setQuery(e.target.value)} />
+          {mode === 'notes' && (
+            <button type="button" className="icon-btn" aria-pressed={cardView} aria-label={cardView ? 'Show as a list' : 'Show as cards'} title={cardView ? 'Show as a list' : 'Show as cards'} onClick={() => setCardView({ notesCardView: !cardView })}>
+              <Icon name={cardView ? 'list' : 'grid'} size={20} />
+            </button>
+          )}
           {/* On To-do the composer under the switch is the add, so there is no second filled button here. */}
           {mode === 'notes' && (
             <button type="button" className="btn btn--primary saved__add" onClick={() => setAdding(true)}>
@@ -173,10 +180,14 @@ export function SavedScreen() {
                   <span>{sec.title}</span>
                   <span className="sect__count">{sec.items.length}</span>
                 </h2>
-                <div className="group" aria-label={sec.title}>
-                  {sec.items.map((c) => (
-                    <CardRow key={c.id} card={c} found={matchSnippet(c, query)} due={reminders.find((r) => r.cardId === c.id && !r.done)?.dueAt} onOpen={() => setView({ kind: 'card', id: c.id })} onPin={() => togglePin(c.id)} />
-                  ))}
+                <div className={cardView ? 'card-grid' : 'group'} aria-label={sec.title}>
+                  {sec.items.map((c) =>
+                    cardView ? (
+                      <CardTile key={c.id} card={c} found={matchSnippet(c, query)} due={reminders.find((r) => r.cardId === c.id && !r.done)?.dueAt} onOpen={() => setView({ kind: 'card', id: c.id })} onPin={() => togglePin(c.id)} />
+                    ) : (
+                      <CardRow key={c.id} card={c} found={matchSnippet(c, query)} due={reminders.find((r) => r.cardId === c.id && !r.done)?.dueAt} onOpen={() => setView({ kind: 'card', id: c.id })} onPin={() => togglePin(c.id)} />
+                    ),
+                  )}
                 </div>
               </div>
             ))}
@@ -216,6 +227,34 @@ function CardRow({ card, due, found, onOpen, onPin }: { card: SavedCard; due: nu
         onClick={onPin}
       >
         <Icon name={card.pinned ? 'pinFilled' : 'pin'} size={20} />
+      </button>
+    </div>
+  )
+}
+
+/** Same card, shown as a bordered tile in a 2-column grid instead of a hairline row. No tint: a border
+    only (docs/DESIGN-SYSTEM.md's "where a tint may appear" keeps colour off plain content tiles). */
+function CardTile({ card, due, found, onOpen, onPin }: { card: SavedCard; due: number | undefined; found: string | null; onOpen: () => void; onPin: () => void }) {
+  return (
+    <div className="item-card">
+      <button type="button" className="item-card__main" onClick={onOpen}>
+        <span className="row__label">{card.title}</span>
+        <span className="row__hint">{card.summary || (card.kind === 'tape' ? 'Empty list' : '')}</span>
+        {found && <span className="row__hint row__found">{found}</span>}
+        {(card.tags.length > 0 || due !== undefined) && (
+          <span className="row__hint">
+            {[...card.tags, due !== undefined ? `Due ${dueLabel(due, Date.now()).toLowerCase()}` : ''].filter(Boolean).join(' · ')}
+          </span>
+        )}
+      </button>
+      <button
+        type="button"
+        className="icon-btn item-card__pin"
+        aria-pressed={card.pinned}
+        aria-label={card.pinned ? `Unpin ${card.title}` : `Pin ${card.title}`}
+        onClick={onPin}
+      >
+        <Icon name={card.pinned ? 'pinFilled' : 'pin'} size={18} />
       </button>
     </div>
   )

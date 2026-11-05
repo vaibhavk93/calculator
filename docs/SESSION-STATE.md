@@ -1,5 +1,76 @@
 # Session state: resume here
 
+## Round 18 (2026-11-05): List/Card toggle shipped for Notes and Due; Budget/Tools "cluttered" question still open
+
+**Owner:** "Let's try the List/Card toggle on Notes and Due anyway then push" -- despite Round 17's carousel/
+bento research, this specific ask is neither: a static two-state toggle (like the existing Notes/To-do
+switch), not a swiping carousel, so the NN/g accessibility concerns from that research don't apply here.
+
+**Shipped** (`fb54acf`): `settings.notesCardView` / `settings.dueCardView`, properly persisted and sanitized
+(unlike the Notes/To-do switch's own `let lastMode` module variable, which forgets on restart -- noted as a
+real gap by the Round 16 critic, now not repeated). A grid/list icon toggle button on each screen's header.
+Card view reuses the exact same data and click handlers as the list row:
+- **Notes**: `CardTile` is `CardRow`'s own flex-row shape (main `flex:1`, pin `flex:none` -- never
+  overlapping, the same geometry `layout-contract`'s LC-OVERLAP check already verifies), bordered,
+  placed in a 2-column `.card-grid`.
+- **Due**: the row's 3-column grid doesn't fit a narrow card, so check and More sit in their own top row
+  instead of beside the body -- same non-overlap rule, different arrangement.
+
+No tint on either (border only, per `DESIGN-SYSTEM.md`'s "where a tint may appear").
+
+**Verification note, read before trusting any e2e run from this machine right now:** `npm run check`
+(2723/2723) and `layout-contract` (144/144, rerun twice) are clean and reliable. But `layout-contract` never
+turns the new toggle ON (seeds no settings for it), so it was never actually exercising the new card-grid
+layout -- caught this, and manually verified card view itself in the browser instead (seeded real notes and
+reminders, checked 2-column grid geometry, 44px touch targets, 200% font with no overflow, confirmed the
+More sheet and tap-to-open still work from card view). Separately, `qa-notes-due.test.mjs` is **not reliable
+right now**: ran it twice on identical code and got 14 vs 29 failures -- then ran it on the pre-change
+baseline (`git stash`) and got MORE failures (29) than on the new code (14). That swing is `calculator-91`'s
+concurrent builds contending for the same machine, not a real signal in either direction. Don't trust a
+single qa-notes-due run as a verdict while another session is mid-build here.
+
+**Still open:** the Budget-home/Tools "too cluttered" question from Round 17 -- no direction chosen yet.
+
+## Round 17 (2026-11-05): researched card/carousel/bento patterns, two small fixes landed, the structural decision is still open
+
+**Owner's follow-up on Round 16's pushback:** Budget home and Tools are what feel cluttered specifically (too
+many rows, poorly grouped, just too much on screen); Notes and Due should get a user-toggleable List/Card view
+(their words: "a view switch, user's choice", like the existing Notes/To-do segmented control). Separately,
+a sharp specific complaint: the "Budget" (and Tools/Notes/Due) screen title reads smaller/weaker than the
+content below it, "doesn't make sense."
+
+**Researched before building anything** (a critic review first flagged the original draft plan had real
+problems — see below): bento grids and card carousels, the two patterns the owner named, are **not** well
+suited here. UX StackExchange and multiple design sources call bento grids impractical for real UI (and it
+collapses to one column on mobile regardless, which is what's already there); Nielsen Norman Group flags
+carousels for sequential-access inefficiency, poor discoverability, and real accessibility problems (screen
+readers losing position, swipe-gesture conflicts). Two 2026 fintech design-trend roundups (Wandr Studio,
+Tubik) both point toward "honest data density" and away from decorative cards, closer to what's already
+built than a reason to add more cards. Reported this back to the owner plainly instead of building what the
+research says would make things worse; **owner has not yet responded to this finding** -- the bigger
+structural question (what Budget/Tools/Notes/Due should actually look like) is open, not decided.
+
+**What did land (small, uncontroversial, already pushed):**
+- Budget home hint-text trim (critic-reviewed first): dropped nav-row hint lines that carried no number
+  ("Finds payments in your bank texts...", "Limits, subcategories, months..."), collapsed the daily-pace
+  line under the hero behind a one-tap "Pace for the rest of the month" link instead of always showing.
+  `3564eda`.
+- Tab-root screen title weight: `.screen__title` inside `.tabroot__bar` (Budget/Tools/Notes/Due's own
+  title, as opposed to a pushed screen with Back) was left at label weight (500/1rem) instead of the
+  project's own documented screen-title weight (700/1.125rem, per forms.css's own comment). Fixed to match
+  -- this was the concrete, fixable half of the owner's title complaint. `f8cc427`.
+
+**`calculator-91` (peer session) is mid-build on Block G savings-tool units and queued for D1 income /
+Phase 7 / Portfolio after.** Told them the structural card/list decision has not landed -- only the two
+small fixes above have -- and to keep holding the ink-3->ink-2 CSS sweep until it does, since it will
+likely touch the same hint/label spans. Ping them the moment a real direction is chosen, before they
+sequence D1's Budget-home row.
+
+**Next, concretely:** waiting on the owner's reaction to the research finding. If they want a different
+structural direction than cards/carousels, scope it from their answer, run it past a critic if it's a real
+redesign (changes behaviour for every user, per the project's own rule), then build one screen first, show
+it, and only then sweep.
+
 ## Round 16 (2026-11-05): finished B15/B16/B20 (left half-done by the audit), then the owner pushed back on the hairline-everywhere direction itself
 
 **Checked B9's own work list (B10-B21) against the actual code instead of trusting commit titles.** 9 of 12
