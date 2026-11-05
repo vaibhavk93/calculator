@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { FormField, RequiredNote } from '../../components/FormField'
 import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
-import { MAX_PINNED, MAX_TASK_TAGS, MAX_TASK_TITLE, type Repeat, type SavedCard } from '../../lib/memory'
+import { MAX_PINNED, MAX_TASK_TAGS, MAX_TASK_TITLE, mergeTags, type Repeat, type SavedCard } from '../../lib/memory'
 import { leadFields, leadsOf, timeLabel } from '../../lib/reminders'
 import { dayText, hasErrors, taskSummary, validateTask } from '../../lib/tasks'
 import { Segmented, Toggle } from '../settings/controls'
@@ -35,7 +35,7 @@ export function TaskSheet({ card, onClose }: { card?: SavedCard; onClose: () => 
   const [storeError, setStoreError] = useState<string | null>(null)
   const store = useAppStore()
 
-  const known = [...new Set([...cards.flatMap((c) => c.tags), ...tags])].sort()
+  const known = mergeTags(cards.flatMap((c) => c.tags), tags)
   const checked = validateTask({ title, date, repeat, afterDays: after, tags }, Date.now())
   const err = submitted ? checked.errors : {}
 

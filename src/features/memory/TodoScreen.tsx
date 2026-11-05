@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { EmptyState } from '../../components/EmptyState'
+import { useEffect, useMemo, useState } from 'react'
+import { EmptyState, type EmptyRow } from '../../components/EmptyState'
 import { Icon } from '../../components/Icon'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { matchesCard } from '../../lib/cardSearch'
@@ -17,7 +17,7 @@ let lastView: View = 'today'
  * To-do, inside the Notes tab. Today (due today and overdue), Upcoming (dated, later), All (with an undated Inbox).
  * Tick a task to finish it; tap its text to open it. `query` and `tag` come from the Notes search box.
  */
-export function TodoScreen({ query, tag, tourLink }: { query: string; tag: string | null; tourLink?: ReactNode }) {
+export function TodoScreen({ query, tag, tourRow }: { query: string; tag: string | null; tourRow?: EmptyRow | null }) {
   const cards = useApp((s) => s.cards)
   const reminders = useApp((s) => s.reminders)
   const tabTap = useApp((s) => s.tabTap)
@@ -108,10 +108,12 @@ export function TodoScreen({ query, tag, tourLink }: { query: string; tag: strin
             aria-describedby={addError ? 'todo-add-msg' : undefined}
             onChange={(e) => { setTitle(e.target.value); setAddError(null) }}
           />
+          <button type="button" className="result-actions__btn" aria-label="Add with a date, repeat or note" title="Add with a date, repeat or note" onClick={() => setSheet({ id: null })}>
+            <Icon name="edit" size={20} />
+          </button>
           <button type="submit" className="btn btn--primary">Add</button>
         </div>
         {addError && <p className="tape__error" id="todo-add-msg" role="alert">{addError}</p>}
-        <button type="button" className="link-btn todo__more" onClick={() => setSheet({ id: null })}>Add with a date, repeat or note</button>
       </form>
 
       <div className="todo__views">
@@ -129,7 +131,7 @@ export function TodoScreen({ query, tag, tourLink }: { query: string; tag: strin
 
       <div className="tools__list">
         {total === 0 ? (
-          <EmptyState title="No tasks yet" level="h2" action={tourLink}>Write what needs doing in the box above. Give a task a date and it shows in Today and in the Due tab.</EmptyState>
+          <EmptyState title="No tasks yet" level="h2" more={[tourRow ?? null]}>Write what needs doing in the box above. Give a task a date and it shows in Today and in the Due tab.</EmptyState>
         ) : (
           <>
             {body}

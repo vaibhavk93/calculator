@@ -3,7 +3,7 @@ import { Sheet } from '../../components/Sheet'
 import { FormField, RequiredNote } from '../../components/FormField'
 import { useApp } from '../../components/StoreProvider'
 import type { CardDraft } from '../../store/app'
-import { DEFAULT_TAGS, type Reminder, type Repeat, type SavedCard } from '../../store/types'
+import { DEFAULT_TAGS, mergeTags, type Reminder, type Repeat, type SavedCard } from '../../store/types'
 import { cleanAfterDays, leadFields, leadsOf } from '../../lib/reminders'
 import { Segmented, Toggle } from '../settings/controls'
 import { AfterDone, LeadPills } from './ReminderOptions'
@@ -58,7 +58,7 @@ export function SaveSheet({
   const [custom, setCustom] = useState('')
   const [titleError, setTitleError] = useState<string | null>(null)
 
-  const allTags = [...new Set([...DEFAULT_TAGS, ...known.flatMap((c) => c.tags), ...tags])]
+  const allTags = mergeTags(known.flatMap((c) => c.tags), tags, DEFAULT_TAGS)
   const toggle = (t: string) => setTags((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]))
   const addCustom = () => {
     const t = custom.trim().slice(0, 30)
@@ -89,7 +89,7 @@ export function SaveSheet({
   }
 
   return (
-    <Sheet title={card ? 'Update' : 'Save'} onClose={onClose} footer={<button type="button" className="btn btn--primary" onClick={done}>{card ? 'Update' : 'Save'}</button>}>
+    <Sheet title={card ? 'Update calculation' : 'Save calculation'}onClose={onClose} footer={<button type="button" className="btn btn--primary" onClick={done}>{card ? 'Update' : 'Save'}</button>}>
       <div className="save">
         <RequiredNote />
         <div className="save__card">

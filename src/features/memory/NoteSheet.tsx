@@ -3,7 +3,7 @@ import { FormField } from '../../components/FormField'
 import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { shareText } from '../../lib/share'
-import { MAX_NOTE_BODY, MAX_NOTE_TAGS, MAX_PINNED, type SavedCard } from '../../lib/memory'
+import { MAX_NOTE_BODY, MAX_NOTE_TAGS, MAX_PINNED, mergeTags, type SavedCard } from '../../lib/memory'
 import { bodyLimitHint, noteShareText, validateNote } from '../../lib/notes'
 import { Toggle } from '../settings/controls'
 import { TagPicker } from './TagPicker'
@@ -38,7 +38,7 @@ export function NoteSheet({ card, onClose }: { card?: SavedCard; onClose: () => 
     return () => clearTimeout(t)
   }, [card])
 
-  const known = [...new Set([...cards.flatMap((c) => c.tags), ...tags])].sort()
+  const known = mergeTags(cards.flatMap((c) => c.tags), tags)
   const checked = validateNote({ title, body, tags })
   const err = submitted ? checked.errors : {}
   const dirty = title !== (card?.title ?? '') || body !== (card?.note ?? '') || tags.join('\n') !== (card?.tags ?? []).join('\n') || pinned !== (card?.pinned ?? false)

@@ -100,10 +100,13 @@ export function SavedScreen() {
         />
         <div className="saved__find">
           <input className="field" type="search" placeholder={mode === 'todo' ? 'Search tasks' : 'Search notes'} aria-label={mode === 'todo' ? 'Search tasks' : 'Search notes'} value={query} onChange={(e) => setQuery(e.target.value)} />
-          <button type="button" className="btn btn--primary saved__add" onClick={() => setAdding(true)}>
-            <Icon name="plus" size={20} />
-            <span>New</span>
-          </button>
+          {/* On To-do the composer under the switch is the add, so there is no second filled button here. */}
+          {mode === 'notes' && (
+            <button type="button" className="btn btn--primary saved__add" onClick={() => setAdding(true)}>
+              <Icon name="plus" size={20} />
+              <span>New</span>
+            </button>
+          )}
         </div>
         {trashed.length > 0 && (
           <div className="saved__actions">
@@ -122,9 +125,9 @@ export function SavedScreen() {
       </div>
 
       {mode === 'todo' ? (
-        <TodoScreen query={query} tag={tag} tourLink={tour.link} />
+        <TodoScreen query={query} tag={tag} tourRow={tour.empty} />
       ) : live.length === 0 ? (
-        <EmptyState title="No notes yet" level="h2" action={tour.link}>
+        <EmptyState title="No notes yet" level="h2" more={[tour.empty]}>
           Tap New to write a note or start a list. Press Save on any calculator to keep it here. Add a reminder and the Due tab will keep track.
         </EmptyState>
       ) : (
