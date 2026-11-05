@@ -115,13 +115,22 @@ await T('C2 Add > New to-do opens the task sheet on the To-do side and the task 
   ok(d.cards.some((c) => c.kind === 'task' && c.title === 'Renew passport'), 'task stored')
 }, { data: seed([]) })
 
-await T('C2 the Add control is there on the To-do side too, and Esc closes the Add sheet', async (page) => {
+await T('C2 on the To-do side the composer is the add (no second filled New button); its icon button opens the task sheet and Esc closes it', async (page) => {
   await notes(page)
   await page.getByRole('radio', { name: /^To-do/ }).click()
-  await addBtn(page).click()
+  eq(await addBtn(page).count(), 0, 'no header New on To-do')
+  eq(await page.locator('.todo__add button[type=submit]').count(), 1, 'the composer Add is the one add')
+  const more = page.getByRole('button', { name: 'Add with a date, repeat or note' })
+  const box = await more.boundingBox()
+  ok(box.height >= 44 && box.width >= 44, `the icon button is at least 44px: ${box.width}x${box.height}`)
+  await more.click()
+  eq(await sheet(page).count(), 1, 'one sheet')
+  eq(await sheet(page).locator('.sheet__title').innerText(), 'New task', 'task sheet')
   await page.keyboard.press('Escape')
   await wait(100)
-  eq(await sheet(page).count(), 0, 'Escape closes the Add sheet')
+  eq(await sheet(page).count(), 0, 'Escape closes the sheet')
+  await page.getByRole('radio', { name: /^Notes/ }).click()
+  eq(await addBtn(page).count(), 1, 'New is back on Notes')
 }, { data: BUSY('dark') })
 
 // ------------------------------------------------------------------ C1: a plain note

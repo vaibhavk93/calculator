@@ -70,16 +70,14 @@ export function BudgetScreen() {
         {tour.row}
         <EmptyState
           title="No spending yet"
-          action={
-            <>
-              <button type="button" className="btn btn--primary" onClick={() => setSheet({ id: null })}>Add expense</button>
-              <button type="button" className="link-btn" onClick={() => setPage('import')}>Add from bank messages</button>
-              <button type="button" className="link-btn" onClick={() => setPage('bills')}>Bills and subscriptions</button>
-              <button type="button" className="link-btn" onClick={() => setPage('manage')}>Set a monthly limit</button>
-              <button type="button" className="link-btn" onClick={() => setPage('manage')}>Categories and cards</button>
-              {tour.link}
-            </>
-          }
+          action={<button type="button" className="btn btn--primary" onClick={() => setSheet({ id: null })}>Add expense</button>}
+          more={[
+            { label: 'Add from bank messages', onClick: () => setPage('import') },
+            { label: 'Bills and subscriptions', onClick: () => setPage('bills') },
+            { label: 'Set a monthly limit', onClick: () => setPage('manage') },
+            { label: 'Categories and cards', onClick: () => setPage('manage') },
+            tour.empty,
+          ]}
         >
           Add what you spend, one entry at a time. Set a monthly limit and this page shows what is left. It all stays on this phone.
         </EmptyState>

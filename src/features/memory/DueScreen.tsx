@@ -3,6 +3,7 @@ import { setMissed, missedText } from '../../lib/delivery'
 import { useMissedReminder } from '../../components/useMissedReminder'
 import { ReliableRemindersSheet } from '../settings/ReliableRemindersSheet'
 import { Icon } from '../../components/Icon'
+import { Sheet } from '../../components/Sheet'
 import { EmptyState } from '../../components/EmptyState'
 import { useApp } from '../../components/StoreProvider'
 import { formatCell } from '../../lib/toolFormat'
@@ -13,6 +14,9 @@ import type { Reminder } from '../../store/types'
 import { CardView } from './CardView'
 import { useTour } from '../onboarding/useTour'
 import { DATE_LOCALE } from '../../lib/dateLocale'
+
+/** Snooze moves the date by whole days: the reminder time of day is pinned, so an hour-level snooze would be ignored. */
+const SNOOZES: [number, string][] = [[1, 'Snooze 1 day'], [3, 'Snooze 3 days'], [7, 'Snooze 1 week']]
 
 const WHEN = new Intl.DateTimeFormat(DATE_LOCALE, { day: 'numeric', month: 'short' })
 
@@ -30,6 +34,8 @@ export function DueScreen() {
   const [openId, setOpenId] = useState<string | null>(null)
   // A reminder cannot be brought back once removed, so Remove asks first (the store has no undo for reminders).
   const [askId, setAskId] = useState<string | null>(null)
+  // The reminder whose "More" sheet (Snooze, Remove) is open. Remove closes it first and asks in the row, so two layers never stack.
+  const [moreId, setMoreId] = useState<string | null>(null)
   const tabTap = useApp((s) => s.tabTap)
   // "A reminder may not have shown": found when the app was opened (lib/delivery.ts). Calm, and never certain.
   const missed = useMissedReminder()
@@ -37,7 +43,7 @@ export function DueScreen() {
   const tour = useTour('due', (a) => a === 'reliable' && setFixing(true))
 
   // Tapping the Due tab while on it closes an open card.
-  useEffect(() => setOpenId(null), [tabTap])
+  useEffect(() => { setOpenId(null); setMoreId(null) }, [tabTap])
 
   const now = Date.now()
   // A reminder whose card is in Trash stays quiet until the card is restored.
@@ -45,6 +51,8 @@ export function DueScreen() {
   const g = groupReminders(live, now)
   const total = dueSoonTotal(live, cards, now)
   const open = cards.find((c) => c.id === openId && c.deletedAt === null)
+  const moreR = live.find((r) => r.id === moreId)
+  const more = moreR ? { id: moreR.id, title: cards.find((c) => c.id === moreR.cardId)?.title ?? 'Reminder' } : null
 
   if (g.overdue.length + g.week.length + g.later.length === 0) {
     return (
@@ -52,13 +60,8 @@ export function DueScreen() {
       {tour.row}
       <EmptyState
         title="No reminders yet"
-        action={
-          <>
-            <button type="button" className="btn btn--primary" onClick={() => setTab('saved')}>Open notes</button>
-            <button type="button" className="btn" onClick={addPack}>Add advance tax reminders</button>
-            {tour.link}
-          </>
-        }
+        action={<button type="button" className="btn btn--primary" onClick={() => setTab('saved')}>Open notes</button>}
+        more={[{ label: 'Add advance tax reminders', onClick: addPack }, tour.empty]}
       >
         Save a calculation, such as a card total or an EMI, and add a reminder. It will show up here and tell you when it is due. No account, no internet.
       </EmptyState>
@@ -83,8 +86,13 @@ export function DueScreen() {
             const card = cards.find((c) => c.id === r.cardId)!
             // A bill or card-bill reminder belongs to a record in Budget: paying it adds the entry, and Remove ends the bill.
             const bill = billForCard(budget, r.cardId)
+            const doneWord = card.kind === 'task' && !bill ? 'Done' : 'Mark paid'
             return (
               <div className="due" key={r.id}>
+                {/* One main control per row: the check. Snooze and Remove live behind "More". */}
+                <button type="button" className="due__check" aria-label={`${doneWord} ${card.title}`} title={`${doneWord} ${card.title}`} onClick={() => markPaid(r.id)}>
+                  <Icon name="check" size={20} />
+                </button>
                 <button type="button" className="due__main tap-row" onClick={() => setOpenId(card.id)}>
                   <span className="row__text">
                     <span className="row__label">{card.title}</span>
@@ -92,25 +100,20 @@ export function DueScreen() {
                       {dueLabel(r.dueAt, now)} · {WHEN.format(r.dueAt)}
                       {r.afterDays ? ` · repeats ${afterDaysLabel(r.afterDays)}` : r.repeat !== 'none' ? ` · ${r.repeat}` : ''}
                     </span>
+                    {card.amount !== null && <span className="due__amt">{formatCell(new D(card.amount), card.amountFmt ?? 'money', { system, decimals })}</span>}
                   </span>
                   <Icon name="chevron" size={18} className="tap-row__chev" />
                 </button>
-                {card.amount !== null && <span className="result__value">{formatCell(new D(card.amount), card.amountFmt ?? 'money', { system, decimals })}</span>}
-                <div className="due__actions">
-                  {askId === r.id ? (
-                    <>
-                      <span className="due__ask" role="alert">{bill ? 'Stop this bill? Past entries stay in your budget.' : 'Remove this reminder? The note stays.'}</span>
-                      <button type="button" className="link-btn" onClick={() => setAskId(null)}>Keep it</button>
-                      <button type="button" className="link-btn link-btn--danger" onClick={() => { remove(r.id); setAskId(null) }}>{bill ? 'Yes, stop it' : 'Yes, remove'}</button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" className="link-btn" onClick={() => markPaid(r.id)}>{card.kind === 'task' && !bill ? 'Done' : 'Mark paid'}</button>
-                      <button type="button" className="link-btn" onClick={() => snooze(r.id, 1)}>Snooze 1 day</button>
-                      <button type="button" className="link-btn link-btn--danger" onClick={() => setAskId(r.id)}>{bill ? 'Stop' : 'Remove'}</button>
-                    </>
-                  )}
-                </div>
+                <button type="button" className="icon-btn" aria-label={`More for ${card.title}`} title={`More for ${card.title}`} onClick={() => setMoreId(r.id)}>
+                  <Icon name="more" size={20} />
+                </button>
+                {askId === r.id && (
+                  <div className="due__actions">
+                    <span className="due__ask" role="alert">{bill ? 'Stop this bill? Past entries stay in your budget.' : 'Remove this reminder? The note stays.'}</span>
+                    <button type="button" className="link-btn" onClick={() => setAskId(null)}>Keep it</button>
+                    <button type="button" className="link-btn link-btn--danger" onClick={() => { remove(r.id); setAskId(null) }}>{bill ? 'Yes, stop it' : 'Yes, remove'}</button>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -158,6 +161,20 @@ export function DueScreen() {
         </div>
       </div>
       {open && <CardView card={open} onBack={() => setOpenId(null)} />}
+      {more && (
+        <Sheet title={more.title} onClose={() => setMoreId(null)}>
+          <div className="group" aria-label="Reminder options">
+            {SNOOZES.map(([days, label]) => (
+              <button key={days} type="button" className="navrow tap-row" onClick={() => { snooze(more.id, days); setMoreId(null) }}>
+                <span className="navrow__label">{label}</span>
+              </button>
+            ))}
+            <button type="button" className="navrow tap-row due__remove" onClick={() => { setAskId(more.id); setMoreId(null) }}>
+              <span className="navrow__label">Remove reminder</span>
+            </button>
+          </div>
+        </Sheet>
+      )}
       {fixing && <ReliableRemindersSheet onClose={() => setFixing(false)} />}
       {tour.sheet}
     </div>

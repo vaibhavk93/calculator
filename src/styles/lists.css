@@ -160,10 +160,6 @@
   align-items: center;
 }
 
-.todo__more {
-  align-self: flex-start;
-}
-
 .todo__views {
   flex: none;
   padding: 0 var(--s-4);
@@ -420,4 +416,43 @@
   flex-direction: column;
   gap: var(--s-2);
   font-size: 0.9375rem;
+}
+
+/* Empty states: the ways onward are one hairline list, edge to edge, under the one filled button. */
+.empty .group {
+  align-self: stretch;
+  margin: var(--s-3) calc(-1 * var(--s-5)) 0;
+}
+
+/* A list at a large font size (the 200% bug). Everything on a list screen may wrap; nothing may leave the 360px width. */
+.tape__sum {
+  max-width: 100%;
+  margin-left: auto;
+  overflow-wrap: anywhere;
+}
+
+.tape__line {
+  flex-wrap: wrap;
+}
+
+.tape__name {
+  flex: 1 1 5rem;
+}
+
+.tape__amt {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.screen__title-input ~ .screen__spacer {
+  display: none;
+}
+
+/* A tall empty state (200% font) scrolls inside its own box instead of running under the tab bar. */
+.empty {
+  min-height: 0;
+  overflow-y: auto;
+  justify-content: safe center;
 }

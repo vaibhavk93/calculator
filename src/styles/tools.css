@@ -803,6 +803,8 @@ textarea.field {
 .tape__total,
 .due__total {
   display: flex;
+  flex-wrap: wrap;
+  row-gap: var(--s-1);
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-4);
@@ -875,11 +877,39 @@ textarea.field {
 
 .due {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0 var(--s-3);
-  padding: var(--s-2) var(--s-4);
+  gap: 0 var(--s-1);
+  padding: var(--s-1) var(--s-2);
   border-top: 1px solid var(--line);
+}
+
+/* The one main control of a Due row: a 44px round check. Done for a task, Mark paid for a bill. */
+.due__check {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--ink-3);
+  border-radius: var(--r-lg);
+  color: var(--accent);
+}
+
+.due__check:active {
+  background: var(--key-op-pressed);
+}
+
+/* A reminder's amount sits under its date, in numbers type, so the row keeps one calm line of text per fact. */
+.due__amt {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.due__remove {
+  color: var(--alert);
 }
 
 /* Closes a Due group's list with a bottom hairline, same as .group > .row:last-child. */
@@ -891,7 +921,9 @@ textarea.field {
   display: flex;
   align-items: center;
   gap: var(--s-2);
+  min-width: 0;
   min-height: 48px;
+  padding: var(--s-1) var(--s-2);
   text-align: left;
 }
 
@@ -909,6 +941,10 @@ textarea.field {
   display: flex;
   flex-wrap: wrap;
   gap: var(--s-4);
+}
+
+.due > .due__actions {
+  padding: var(--s-1) var(--s-2) var(--s-2);
 }
 
 .due__alert,

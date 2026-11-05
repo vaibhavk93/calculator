@@ -48,7 +48,8 @@ const modeTodo = (p) => p.getByRole('radio', { name: /^To-do/ }).click()
 const view = (p, name) => p.getByRole('radio', { name, exact: true }).click()
 const quickAdd = async (p, t) => { await p.locator('input[aria-label="New task"]').fill(t); await p.locator('.todo__add button[type=submit]').click() }
 const sheetSave = (p) => p.locator('.sheet .sheet__foot .btn--primary').click()
-const settings = (p) => p.locator('[aria-label="Settings"]').click()
+// The Settings button lives on the Calculate screen only, so go there first.
+const settings = async (p) => { await tab(p, 'Calculate'); await p.locator('[aria-label="Settings"]').click() }
 const tourNext = (p) => p.locator('.sheet__foot .btn--primary')
 /** Every interactive thing on screen is at least 44px in one direction. Lists the ones that are not. */
 const smallTargets = (p, scope = '.app') => p.evaluate((sc) => {
@@ -386,22 +387,36 @@ T('N-070', 'POS', 'Due list order: Overdue first (alert words), then This week, 
 })
 T('N-071', 'UX', 'Mark paid on a one-time reminder says what happened and offers Undo; Undo brings it back to Due', async () => {
   const { page: p } = await open(seed({ cards: [emi('a', 'HDFC card')], reminders: [rem('r', 'a', NOW + DAY)] })); await tab(p, 'Due')
-  await p.getByRole('button', { name: 'Mark paid' }).click(); has(await snackText(p), 'Marked paid: "HDFC card"'); has(await text(p), 'No reminders yet')
+  await p.getByRole('button', { name: 'Mark paid HDFC card' }).click(); has(await snackText(p), 'Marked paid: "HDFC card"'); has(await text(p), 'No reminders yet')
   await p.locator('.snack').getByRole('button', { name: 'Undo' }).click(); has(await text(p, '.tools__list'), 'HDFC card')
 })
 T('N-072', 'POS', 'Mark paid on a monthly reminder moves it to next month, keeps the label "monthly"; a task says "Done"', async () => {
   const { page: p } = await open(seed({ cards: [emi('a', 'Rent'), task('t', 'Water filter')], reminders: [rem('r', 'a', ist('2026-11-05'), { repeat: 'monthly' }), rem('r2', 't', NOW)] })); await tab(p, 'Due')
-  await p.locator('.due', { hasText: 'Rent' }).getByRole('button', { name: 'Mark paid' }).click(); has(await text(p, '.tools__list'), '5 Dec'); has(await text(p, '.tools__list'), 'monthly')
-  eq(await p.locator('.due', { hasText: 'Water filter' }).getByRole('button', { name: 'Done' }).count(), 1, 'tasks use "Done"')
+  await p.locator('.due', { hasText: 'Rent' }).getByRole('button', { name: 'Mark paid Rent' }).click(); has(await text(p, '.tools__list'), '5 Dec'); has(await text(p, '.tools__list'), 'monthly')
+  eq(await p.locator('.due', { hasText: 'Water filter' }).getByRole('button', { name: 'Done Water filter' }).count(), 1, 'tasks use "Done"')
 })
-T('N-073', 'POS', 'Snooze 1 day moves the date one day on and says so in the row', async () => {
+/** Snooze and Remove live behind one "More for <title>" button per row; it opens a small sheet. */
+const more = async (p, title, choice) => { await p.getByRole('button', { name: `More for ${title}` }).click(); await p.locator('.sheet').getByRole('button', { name: choice }).click() }
+T('N-073', 'POS', 'Snooze 1 day (More sheet) moves the date one day on and says so in the row', async () => {
   const { page: p } = await open(seed({ cards: [emi('a', 'Rent')], reminders: [rem('r', 'a', ist('2026-11-05'))] })); await tab(p, 'Due')
-  await p.getByRole('button', { name: 'Snooze 1 day' }).click(); has(await text(p, '.tools__list'), '6 Nov'); eq((await st(p)).reminders[0].dueAt, ist('2026-11-06'), 'dueAt')
+  await more(p, 'Rent', 'Snooze 1 day'); has(await text(p, '.tools__list'), '6 Nov'); eq((await st(p)).reminders[0].dueAt, ist('2026-11-06'), 'dueAt'); eq(await p.locator('.sheet').count(), 0, 'sheet closed')
 })
-T('N-074', 'UX', 'Remove asks first: "Keep it" keeps, "Yes, remove" removes the reminder and keeps the note', async () => {
+T('N-073b', 'POS', 'Snooze 3 days and 1 week move the date by whole days; the reminder time of day is kept', async () => {
+  const { page: p } = await open(seed({ cards: [emi('a', 'Rent')], reminders: [rem('r', 'a', ist('2026-11-05'))] })); await tab(p, 'Due')
+  await more(p, 'Rent', 'Snooze 3 days'); has(await text(p, '.tools__list'), '8 Nov'); eq((await st(p)).reminders[0].dueAt, ist('2026-11-08'), 'dueAt 3 days')
+  await more(p, 'Rent', 'Snooze 1 week'); has(await text(p, '.tools__list'), '15 Nov'); eq((await st(p)).reminders[0].dueAt, ist('2026-11-15'), 'dueAt 1 week')
+})
+T('N-074', 'UX', 'Remove (More sheet) asks first: "Keep it" keeps, "Yes, remove" removes the reminder and keeps the note', async () => {
   const { page: p } = await open(seed({ cards: [emi('a', 'Rent')], reminders: [rem('r', 'a', NOW + DAY)] })); await tab(p, 'Due')
-  await p.getByRole('button', { name: 'Remove' }).click(); has(await text(p, '.due'), 'Remove this reminder? The note stays.'); await p.getByRole('button', { name: 'Keep it' }).click(); eq((await st(p)).reminders.length, 1, 'kept')
-  await p.getByRole('button', { name: 'Remove' }).click(); await p.getByRole('button', { name: 'Yes, remove' }).click(); const s = await st(p); eq(s.reminders.length, 0, 'removed'); eq(s.cards.length, 1, 'note stays')
+  await more(p, 'Rent', 'Remove reminder'); eq(await p.locator('.sheet').count(), 0, 'sheet closed before the ask'); has(await text(p, '.due'), 'Remove this reminder? The note stays.'); await p.getByRole('button', { name: 'Keep it' }).click(); eq((await st(p)).reminders.length, 1, 'kept')
+  await more(p, 'Rent', 'Remove reminder'); await p.getByRole('button', { name: 'Yes, remove' }).click(); const s = await st(p); eq(s.reminders.length, 0, 'removed'); eq(s.cards.length, 1, 'note stays')
+})
+T('N-074b', 'UX', 'Due row has one main control (the check) plus one More button; the More sheet has an X and the same four choices', async () => {
+  const { page: p } = await open(seed({ cards: [emi('a', 'Rent')], reminders: [rem('r', 'a', NOW + DAY)] })); await tab(p, 'Due')
+  eq(await p.locator('.due .link-btn').count(), 0, 'no text links left in the row'); eq(await p.locator('.due button').count(), 3, 'check, open, more')
+  await p.getByRole('button', { name: 'More for Rent' }).click()
+  eq((await p.locator('.sheet .navrow').allInnerTexts()).join('|'), 'Snooze 1 day|Snooze 3 days|Snooze 1 week|Remove reminder', 'choices')
+  await p.getByRole('button', { name: /^Close/ }).click(); eq(await p.locator('.sheet').count(), 0, 'X closes'); eq((await st(p)).reminders.length, 1, 'nothing changed')
 })
 T('N-075', 'POS', 'Advance tax pack from zero: 4 reminders with the right dates (15 Dec 2026, 15 Mar, 15 Jun, 15 Sep 2027) in order; twice adds no more', async () => {
   const { page: p } = await open(); await tab(p, 'Due'); await p.getByRole('button', { name: /Add advance tax reminders/ }).click(); await wait(200)

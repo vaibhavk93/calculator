@@ -133,7 +133,7 @@ export const TOURS: Record<TourId, Tour> = {
       {
         id: 'paid',
         heading: 'Mark paid or snooze',
-        text: 'Tap Mark paid when you have paid. A repeating reminder moves to its next date. Tap Snooze 1 day to hear about it tomorrow. Removing a reminder always asks first.',
+        text: 'Tap the round check beside a reminder when you have paid or done it. A repeating reminder moves to its next date. Tap the three dots to snooze it for 1 day, 3 days or a week. Removing a reminder always asks first.',
       },
       {
         id: 'tax',
