@@ -1,5 +1,36 @@
 # Session state: resume here
 
+## Round 18 (2026-11-05): List/Card toggle shipped for Notes and Due; Budget/Tools "cluttered" question still open
+
+**Owner:** "Let's try the List/Card toggle on Notes and Due anyway then push" -- despite Round 17's carousel/
+bento research, this specific ask is neither: a static two-state toggle (like the existing Notes/To-do
+switch), not a swiping carousel, so the NN/g accessibility concerns from that research don't apply here.
+
+**Shipped** (`fb54acf`): `settings.notesCardView` / `settings.dueCardView`, properly persisted and sanitized
+(unlike the Notes/To-do switch's own `let lastMode` module variable, which forgets on restart -- noted as a
+real gap by the Round 16 critic, now not repeated). A grid/list icon toggle button on each screen's header.
+Card view reuses the exact same data and click handlers as the list row:
+- **Notes**: `CardTile` is `CardRow`'s own flex-row shape (main `flex:1`, pin `flex:none` -- never
+  overlapping, the same geometry `layout-contract`'s LC-OVERLAP check already verifies), bordered,
+  placed in a 2-column `.card-grid`.
+- **Due**: the row's 3-column grid doesn't fit a narrow card, so check and More sit in their own top row
+  instead of beside the body -- same non-overlap rule, different arrangement.
+
+No tint on either (border only, per `DESIGN-SYSTEM.md`'s "where a tint may appear").
+
+**Verification note, read before trusting any e2e run from this machine right now:** `npm run check`
+(2723/2723) and `layout-contract` (144/144, rerun twice) are clean and reliable. But `layout-contract` never
+turns the new toggle ON (seeds no settings for it), so it was never actually exercising the new card-grid
+layout -- caught this, and manually verified card view itself in the browser instead (seeded real notes and
+reminders, checked 2-column grid geometry, 44px touch targets, 200% font with no overflow, confirmed the
+More sheet and tap-to-open still work from card view). Separately, `qa-notes-due.test.mjs` is **not reliable
+right now**: ran it twice on identical code and got 14 vs 29 failures -- then ran it on the pre-change
+baseline (`git stash`) and got MORE failures (29) than on the new code (14). That swing is `calculator-91`'s
+concurrent builds contending for the same machine, not a real signal in either direction. Don't trust a
+single qa-notes-due run as a verdict while another session is mid-build here.
+
+**Still open:** the Budget-home/Tools "too cluttered" question from Round 17 -- no direction chosen yet.
+
 ## Round 17 (2026-11-05): researched card/carousel/bento patterns, two small fixes landed, the structural decision is still open
 
 **Owner's follow-up on Round 16's pushback:** Budget home and Tools are what feel cluttered specifically (too
