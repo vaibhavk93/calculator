@@ -1,5 +1,45 @@
 # Session state: resume here
 
+## Round 17 (2026-11-05): researched card/carousel/bento patterns, two small fixes landed, the structural decision is still open
+
+**Owner's follow-up on Round 16's pushback:** Budget home and Tools are what feel cluttered specifically (too
+many rows, poorly grouped, just too much on screen); Notes and Due should get a user-toggleable List/Card view
+(their words: "a view switch, user's choice", like the existing Notes/To-do segmented control). Separately,
+a sharp specific complaint: the "Budget" (and Tools/Notes/Due) screen title reads smaller/weaker than the
+content below it, "doesn't make sense."
+
+**Researched before building anything** (a critic review first flagged the original draft plan had real
+problems — see below): bento grids and card carousels, the two patterns the owner named, are **not** well
+suited here. UX StackExchange and multiple design sources call bento grids impractical for real UI (and it
+collapses to one column on mobile regardless, which is what's already there); Nielsen Norman Group flags
+carousels for sequential-access inefficiency, poor discoverability, and real accessibility problems (screen
+readers losing position, swipe-gesture conflicts). Two 2026 fintech design-trend roundups (Wandr Studio,
+Tubik) both point toward "honest data density" and away from decorative cards, closer to what's already
+built than a reason to add more cards. Reported this back to the owner plainly instead of building what the
+research says would make things worse; **owner has not yet responded to this finding** -- the bigger
+structural question (what Budget/Tools/Notes/Due should actually look like) is open, not decided.
+
+**What did land (small, uncontroversial, already pushed):**
+- Budget home hint-text trim (critic-reviewed first): dropped nav-row hint lines that carried no number
+  ("Finds payments in your bank texts...", "Limits, subcategories, months..."), collapsed the daily-pace
+  line under the hero behind a one-tap "Pace for the rest of the month" link instead of always showing.
+  `3564eda`.
+- Tab-root screen title weight: `.screen__title` inside `.tabroot__bar` (Budget/Tools/Notes/Due's own
+  title, as opposed to a pushed screen with Back) was left at label weight (500/1rem) instead of the
+  project's own documented screen-title weight (700/1.125rem, per forms.css's own comment). Fixed to match
+  -- this was the concrete, fixable half of the owner's title complaint. `f8cc427`.
+
+**`calculator-91` (peer session) is mid-build on Block G savings-tool units and queued for D1 income /
+Phase 7 / Portfolio after.** Told them the structural card/list decision has not landed -- only the two
+small fixes above have -- and to keep holding the ink-3->ink-2 CSS sweep until it does, since it will
+likely touch the same hint/label spans. Ping them the moment a real direction is chosen, before they
+sequence D1's Budget-home row.
+
+**Next, concretely:** waiting on the owner's reaction to the research finding. If they want a different
+structural direction than cards/carousels, scope it from their answer, run it past a critic if it's a real
+redesign (changes behaviour for every user, per the project's own rule), then build one screen first, show
+it, and only then sweep.
+
 ## Round 16 (2026-11-05): finished B15/B16/B20 (left half-done by the audit), then the owner pushed back on the hairline-everywhere direction itself
 
 **Checked B9's own work list (B10-B21) against the actual code instead of trusting commit titles.** 9 of 12
