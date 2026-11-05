@@ -88,3 +88,22 @@ export const MAX_TASK_TAGS = 5
 export const MAX_NOTE_BODY = 5000
 export const MAX_NOTE_TAGS = 10
 export const DEFAULT_TAGS = ['Credit Card', 'Loan', 'Rent', 'Investment', 'Tax', 'Travel', 'Work', 'Shopping'] as const
+
+/**
+ * The tag chips a sheet shows: the user's own tags (every tag on a saved card), then the starter tags only while the
+ * user has fewer than 3 of their own, then anything picked now that is not there yet. "Loan" and "loan" are one chip
+ * (the first spelling wins, own tags before starters), so tapping a chip never moves it.
+ */
+export function mergeTags(own: readonly string[], picked: readonly string[], starters: readonly string[] = []): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  const add = (t: string) => {
+    const k = t.toLowerCase()
+    if (!seen.has(k)) (seen.add(k), out.push(t))
+  }
+  const mine = [...own].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+  mine.forEach(add)
+  if (out.length < 3) starters.forEach(add)
+  picked.forEach(add)
+  return out
+}
