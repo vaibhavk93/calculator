@@ -24,9 +24,10 @@ describe('edit history on an expense', () => {
   it('says it in plain words', () => {
     const money = (p: string) => `₹${p}`
     const cat = (id: string | null) => (id === 'food' ? 'Food' : 'Uncategorised')
-    // Day labels follow the device locale on purpose, so "2 Nov" here and "Nov 2" on a US-locale phone are
-    // both right. Deriving the expected day the same way keeps this test about the SENTENCE, not the locale.
-    const day = (y: number, m: number, d: number) => new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(new Date(y, m - 1, d))
+    // Day labels are always en-IN now (owner decision, 2026-11-04, src/lib/dateLocale.ts): "2 Nov" on every
+    // phone, not just an India-locale one. Deriving the expected day the same way keeps this test about the
+    // SENTENCE, not the formatting.
+    const day = (y: number, m: number, d: number) => new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' }).format(new Date(y, m - 1, d))
     const changed = day(2026, 11, 2)
     expect(editWords({ at: AT, field: 'amount', from: '900', to: '950' }, money, cat)).toBe(`Changed ${changed}: was ₹900`)
     expect(editWords({ at: AT, field: 'date', from: '2026-10-28', to: '2026-10-29' }, money, cat)).toBe(`Changed ${changed}: date was ${day(2026, 10, 28)}`)
