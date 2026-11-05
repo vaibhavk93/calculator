@@ -501,7 +501,7 @@ describe('N-156..N-166 lists, totals and paste', () => {
     expect(listSummary([L('a', '5', { done: true }), L('b', '5', { skip: true })], true, o)).toContain('All 1 done')
     expect(listSummary([L('a', '5', { done: true }), L('b', '5', { skip: true })], true, o)).toContain('1 skipped')
     expect(listSummary([L('a', '5'), L('b', '5')], false, o)).toContain('2 lines')
-    expect(listSummary([], true, o)).toBe('0 lines, total ₹0.00')
+    expect(listSummary([], true, o)).toBe('0 lines, total ₹0')
   })
   it('N-159 paste: bullets, numbers, ticks, rupee signs, CRLF, blank lines, amounts', () => {
     const r = parsePastedList('- Milk\r\n\r\n2. Eggs ₹60\n[x] Bread\n☑ Rice 1,200\n  ')!

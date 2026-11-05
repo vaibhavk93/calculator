@@ -132,7 +132,7 @@ describe('taking a number to a list', () => {
     expect(card.checklist).toBe(true)
     expect(card.lines.map((l) => l.label)).toEqual(['Friend 1', 'Friend 2', 'Friend 3', 'Friend 4', 'Friend 5'])
     expect(card.amount).toBe('5000')
-    expect(card.summary).toBe('0 of 5 done, ₹5,000.00 left')
+    expect(card.summary).toBe('0 of 5 done, ₹5,000 left')
   })
 
   it('ticking lines updates the summary, and unticking puts the money back', () => {
@@ -141,12 +141,12 @@ describe('taking a number to a list', () => {
     const [a, b] = get().cards[0]!.lines
     store.getState().toggleLine(id, a!.id)
     store.getState().toggleLine(id, b!.id)
-    expect(get().cards[0]!.summary).toBe('2 of 3 done, ₹1,000.00 left')
+    expect(get().cards[0]!.summary).toBe('2 of 3 done, ₹1,000 left')
     // A second tap on the same line skips it (it leaves the totals); a third makes it pending again.
     store.getState().toggleLine(id, b!.id)
-    expect(get().cards[0]!.summary).toBe('1 of 2 done, ₹1,000.00 left, 1 skipped')
+    expect(get().cards[0]!.summary).toBe('1 of 2 done, ₹1,000 left, 1 skipped')
     store.getState().toggleLine(id, b!.id)
-    expect(get().cards[0]!.summary).toBe('1 of 3 done, ₹2,000.00 left')
+    expect(get().cards[0]!.summary).toBe('1 of 3 done, ₹2,000 left')
     expect(get().cards[0]!.lines.filter((l) => l.done)).toHaveLength(1)
   })
 

@@ -75,10 +75,10 @@ describe('repeatLines', () => {
 describe('listSummary', () => {
   it('a plain list says lines and total; a checklist says how many are done and what is left', () => {
     const lines = [L('1000', true, 'a'), L('1000', false, 'b'), L('1000', false, 'c')]
-    expect(listSummary(lines, false, IN)).toBe('3 lines, total ₹3,000.00')
-    expect(listSummary(lines, true, IN)).toBe('1 of 3 done, ₹2,000.00 left')
-    expect(listSummary(lines.map((l) => ({ ...l, done: true })), true, IN)).toBe('All 3 done, total ₹3,000.00')
-    expect(listSummary([L('5')], false, IN)).toBe('1 line, total ₹5.00')
+    expect(listSummary(lines, false, IN)).toBe('3 lines, total ₹3,000')
+    expect(listSummary(lines, true, IN)).toBe('1 of 3 done, ₹2,000 left')
+    expect(listSummary(lines.map((l) => ({ ...l, done: true })), true, IN)).toBe('All 3 done, total ₹3,000')
+    expect(listSummary([L('5')], false, IN)).toBe('1 line, total ₹5')
   })
 })
 
@@ -107,8 +107,8 @@ describe('three-state lines', () => {
   it('the summary says how many are skipped, and handles all done or all skipped', () => {
     const IN = { system: 'indian', decimals: 'auto' } as const
     const lines = [mk('1000', { done: true }, 'a'), mk('500', {}, 'b'), mk('300', { skip: true }, 'c')]
-    expect(listSummary(lines, true, IN)).toBe('1 of 2 done, ₹500.00 left, 1 skipped')
-    expect(listSummary([lines[0]!, lines[2]!], true, IN)).toBe('All 1 done, total ₹1,000.00, 1 skipped')
+    expect(listSummary(lines, true, IN)).toBe('1 of 2 done, ₹500 left, 1 skipped')
+    expect(listSummary([lines[0]!, lines[2]!], true, IN)).toBe('All 1 done, total ₹1,000, 1 skipped')
     expect(listSummary([mk('5', { skip: true })], true, IN)).toBe('All 1 skipped')
   })
 })

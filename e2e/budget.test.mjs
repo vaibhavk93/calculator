@@ -43,7 +43,7 @@ export const BASE = (o = {}) => budgetOf({ categories: CATS(), instruments: INST
 const toC = (s) => { const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(String(s)); if (!m) fail('bad amount ' + s); return (m[1] ? -1n : 1n) * (BigInt(m[2]) * 100n + BigInt(((m[3] ?? '') + '00').slice(0, 2))) }
 const sumC = (list) => list.reduce((t, x) => t + toC(x.amount), 0n)
 const uiC = (text) => { const m = /(−?)₹\s*([\d,]+)(?:\.(\d+))?/.exec(text); if (!m) fail('no money in ' + JSON.stringify(text)); return (m[1] ? -1n : 1n) * (BigInt(m[2].replace(/,/g, '')) * 100n + BigInt(((m[3] ?? '') + '00').slice(0, 2))) }
-const inr = (c) => { const neg = c < 0n; const a = neg ? -c : c; const whole = (a / 100n).toString(), p = (a % 100n).toString().padStart(2, '0'); const head = whole.slice(0, -3), tail = whole.slice(-3); const g = whole.length <= 3 ? whole : head.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + tail; return `${neg ? '−' : ''}₹${g}.${p}` }
+const inr = (c) => { const neg = c < 0n; const a = neg ? -c : c; const whole = (a / 100n).toString(), p = (a % 100n).toString().padStart(2, '0'); const head = whole.slice(0, -3), tail = whole.slice(-3); const g = whole.length <= 3 ? whole : head.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + tail; return `${neg ? '−' : ''}₹${g}${p === '00' ? '' : '.' + p}` } // whole rupees drop the .00 on auto (docs: B11)
 const live = (b, month) => b.expenses.filter((e) => e.deletedAt === null && (!month || e.date.startsWith(month)))
 const spending = (b, month, pred = () => true) => live(b, month).filter((e) => !e.settlement && pred(e))
 
@@ -197,7 +197,7 @@ T('EM09', 'UX', 'after the first expense the empty state gives way to the month 
   const { page } = await c.open()
   await addExpense(page, { amount: '250' })
   const t = await bodyText(page)
-  lacks(t, 'No spending yet'); has(t, 'Spent this month'); has(await heroText(page), '₹250.00')
+  lacks(t, 'No spending yet'); has(t, 'Spent this month'); has(await heroText(page), '₹250')
 })
 T('EM10', 'CORNER', 'deleting the only entry returns to the empty state and Undo brings it back', async (c) => {
   const { page } = await c.open({ budget: BASE({ expenses: [exp('2026-11-03', '100')] }) })
@@ -209,7 +209,22 @@ T('EM10', 'CORNER', 'deleting the only entry returns to the empty state and Undo
 T('EM11', 'CORNER', 'empty month (other months have data): hero 0, friendly text, no bad text', async (c) => {
   const { page } = await c.open({ budget: BASE({ expenses: [exp('2026-09-03', '100')] }) })
   const t = await bodyText(page)
-  has(t, 'Nothing spent in November 2026'); has(await heroText(page), '₹0.00'); noBadText(t)
+  has(t, 'Nothing spent in November 2026'); has(await heroText(page), '₹0'); noBadText(t)
+})
+T('EM11b', 'POS', 'over budget: label says "Over budget by", hero is red, no duplicate "Over by" line', async (c) => {
+  const { page } = await c.open({ budget: BASE({ overall: '1000', expenses: [exp('2026-11-03', '1500')] }) })
+  eq(await page.locator('.budget__sum .result__label').innerText(), 'Over budget by')
+  eq(await heroText(page), '₹500')
+  has(await page.locator('.budget__hero').first().getAttribute('class'), 'budget__hero--negative')
+  lacks(await bodyText(page), 'Over by ₹500')
+})
+T('EM11c', 'CORNER', 'over budget in a past month says "Over budget in October 2026"; under budget keeps "Left this month" and the plain hero', async (c) => {
+  const past = await c.open({ budget: BASE({ overall: '1000', expenses: [exp('2026-10-03', '1500')] }) })
+  await past.page.getByRole('button', { name: 'Previous month' }).click()
+  eq(await past.page.locator('.budget__sum .result__label').innerText(), 'Over budget in October 2026')
+  const { page } = await c.open({ budget: BASE({ overall: '1000', expenses: [exp('2026-11-03', '400')] }) })
+  eq(await page.locator('.budget__sum .result__label').innerText(), 'Left this month')
+  eq(await page.locator('.budget__hero').first().getAttribute('class'), 'budget__hero')
 })
 T('EM12', 'CORNER', 'month arrows on an empty app do not break (10 quick taps each way)', async (c) => {
   const { page } = await c.open({ budget: BASE({ expenses: [exp('2026-11-03', '100')] }) })
@@ -375,21 +390,21 @@ T('DT11', 'POS', 'date starts as today (15 Nov 2026) and has a date picker', asy
 T('DT12', 'CORNER', 'year change: 31 Dec 2025 and 1 Jan 2026 land in the right months', async (c) => {
   const { page } = await c.open({ budget: BASE({ expenses: [exp('2025-12-31', '111'), exp('2026-01-01', '222')] }) })
   for (let i = 0; i < 10; i++) await page.getByRole('button', { name: 'Previous month' }).click()
-  eq(await monthLabelOf(page), 'January 2026'); has(await heroText(page), '₹222.00')
+  eq(await monthLabelOf(page), 'January 2026'); has(await heroText(page), '₹222')
   await page.getByRole('button', { name: 'Previous month' }).click()
-  eq(await monthLabelOf(page), 'December 2025'); has(await heroText(page), '₹111.00')
+  eq(await monthLabelOf(page), 'December 2025'); has(await heroText(page), '₹111')
 })
 T('DT13', 'CORNER', 'month ends: 28 Feb, 30 Nov, 1 Dec are counted in their own month only', async (c) => {
   const b = BASE({ expenses: [exp('2026-11-30', '30'), exp('2026-12-01', '1'), exp('2026-02-28', '28'), exp('2026-03-01', '3')] })
   const { page } = await c.open({ budget: b })
-  has(await heroText(page), '₹30.00')
-  await page.getByRole('button', { name: 'Next month' }).click(); has(await heroText(page), '₹1.00')
+  has(await heroText(page), '₹30')
+  await page.getByRole('button', { name: 'Next month' }).click(); has(await heroText(page), '₹1')
 })
 T('DT14', 'UX', 'an entry dated last month is saved but not in this month\'s Recent', async (c) => {
   const { page } = await c.open({ budget: BASE({ expenses: [exp('2026-11-03', '5')] }) })
   await addExpense(page, { amount: '77', date: '2026-10-20' })
-  has(await heroText(page), '₹5.00')
-  await page.getByRole('button', { name: 'Previous month' }).click(); has(await heroText(page), '₹77.00')
+  has(await heroText(page), '₹5')
+  await page.getByRole('button', { name: 'Previous month' }).click(); has(await heroText(page), '₹77')
 })
 T('DT15', 'UX', 'editing an entry: date shown as saved, not reset to today', async (c) => {
   const { page } = await c.open({ budget: BASE({ expenses: [exp('2026-11-03', '5')] }) })
@@ -694,7 +709,7 @@ T('ST04', 'POS', 'Card bill saved against the card; month total does not change'
   const { page } = await c.open({ budget: BASE({ expenses: [exp('2026-11-02', '300')] }) })
   await addExpense(page, { amount: '9999', settlement: 'Card bill', inst: 'Tata Neo' })
   const e = (await lastDisk(page, 2)).expenses[0]; eq([e.settlement, e.instrumentId], ['cardBill', 'i-neo'])
-  has(await heroText(page), '₹300.00'); eq(uiC(await heroText(page)), 30000n)
+  has(await heroText(page), '₹300'); eq(uiC(await heroText(page)), 30000n)
 })
 T('ST05', 'UX', 'a bill or transfer row says "Not counted as spending" and its own name', async (c) => {
   const { page } = await c.open({ budget: SETT() })
@@ -709,12 +724,12 @@ T('ST06', 'POS', 'settlements are left out of every total: home, summary, by mod
 })
 T('ST07', 'POS', 'card "Owes" = charges (credit + UPI via the card) minus bill payments', async (c) => {
   const { page } = await c.open({ budget: SETT() }); await toManage(page)
-  has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Owes ₹3,700.00')
+  has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Owes ₹3,700')
 })
 T('ST08', 'CORNER', 'card "Paid ahead" when the bill is bigger than the charges, and "Nothing owed" at zero', async (c) => {
   const b = SETT({ extra: [exp('2026-11-07', '4000', { settlement: 'cardBill', instrumentId: 'i-neo' })] })
   const { page } = await c.open({ budget: b }); await toManage(page)
-  has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Paid ₹300.00 ahead')
+  has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Paid ₹300 ahead')
   const z = SETT({ extra: [exp('2026-11-07', '3700', { settlement: 'cardBill', instrumentId: 'i-neo' })] })
   const o = await c.open({ budget: z }); await toManage(o.page)
   has(await MAN(o.page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Nothing owed')
@@ -731,26 +746,26 @@ T('ST10', 'ERR', 'editing a credit card (any field) keeps its bill payments atta
   await page.locator('#inst-holder').fill('V Kumawat'); await page.getByRole('button', { name: 'Save', exact: true }).click()
   await page.locator('.sheet').waitFor({ state: 'detached' })
   const t = await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText()
-  bug('B-04', t.includes('Owes ₹5,700.00'), 'after changing only the holder name the card owes 5,700 instead of 3,700: the bill payment lost its card')
-  has(t, 'Owes ₹3,700.00')
+  bug('B-04', t.includes('Owes ₹5,700'), 'after changing only the holder name the card owes 5,700 instead of 3,700: the bill payment lost its card')
+  has(t, 'Owes ₹3,700')
 })
 T('ST11', 'UX', 'switching an entry from Card bill to Spending shows category and mode and clears the card', async (c) => {
   const { page } = await c.open({ budget: SETT() })
-  await page.getByRole('button', { name: /^Edit ₹2,000.00 Card bill payment/ }).click()
+  await page.getByRole('button', { name: /^Edit ₹2,000 Card bill payment/ }).click()
   await S(page).getByRole('radio', { name: 'Spending' }).click()
   has(await S(page).innerText(), 'Paid with')
 })
 T('ST12', 'UX', 'deleting a bill payment brings the card\'s Owes back up; Undo puts it back', async (c) => {
   const { page } = await c.open({ budget: SETT() })
-  await page.getByRole('button', { name: /^Delete ₹2,000.00 Card bill/ }).click()
-  await toManage(page); has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Owes ₹5,700.00')
+  await page.getByRole('button', { name: /^Delete ₹2,000 Card bill/ }).click()
+  await toManage(page); has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Owes ₹5,700')
   await MAN(page).getByRole('button', { name: /back/i }).first().click()
   await page.locator('.snack').getByRole('button', { name: 'Undo' }).click()
-  await toManage(page); has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Owes ₹3,700.00')
+  await toManage(page); has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Owes ₹3,700')
 })
 T('ST13', 'UX', 'a settlement edit sheet says what it is and has Save changes + Delete', async (c) => {
   const { page } = await c.open({ budget: SETT() })
-  await page.getByRole('button', { name: /^Edit ₹1,000.00 Transfer/ }).click()
+  await page.getByRole('button', { name: /^Edit ₹1,000 Transfer/ }).click()
   has(await S(page).innerText(), 'Moving money between your own accounts. Not counted as spending.')
   ok(await S(page).getByRole('button', { name: 'Save changes' }).count() === 1 && await S(page).getByRole('button', { name: 'Delete this expense' }).count() === 1)
 })

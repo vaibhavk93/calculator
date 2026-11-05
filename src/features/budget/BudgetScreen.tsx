@@ -117,14 +117,14 @@ export function BudgetScreen() {
         {/* Tier 1, the answer: the one figure this screen exists to show. No card, no tint -- see
             docs/THE-PLAN.md section 7. */}
         <div className="budget__sum">
-          <span className="result__label">{`${s.overall ? 'Left' : 'Spent'} ${month === monthKey(new Date()) ? 'this month' : `in ${monthLabel(month)}`}`}</span>
-          <span className="budget__hero">{money(over ? heroValue.abs() : heroValue)}</span>
+          <span className="result__label">{over
+            ? `Over budget ${month === monthKey(new Date()) ? 'by' : `in ${monthLabel(month)}`}`
+            : `${s.overall ? 'Left' : 'Spent'} ${month === monthKey(new Date()) ? 'this month' : `in ${monthLabel(month)}`}`}</span>
+          <span className={over ? 'budget__hero budget__hero--negative' : 'budget__hero'}>{money(over ? heroValue.abs() : heroValue)}</span>
           {s.overall ? (
             <>
               <Bar pct={s.overall.pct} />
-              <span className={over ? 'budget__note budget__note--over' : 'budget__note'}>
-                {over ? `Over by ${money(s.overall.left.abs())}` : `${money(s.spent)} spent of ${money(s.overall.limit)}`}
-              </span>
+              {!over && <span className="budget__note">{`${money(s.spent)} spent of ${money(s.overall.limit)}`}</span>}
               {s.overall.scope === 'month' && <span className="budget__note">Limit for {monthShortLabel(month)} only</span>}
               {pace && paceDay && <span className="budget__note">About {money(paceDay.gt(0) ? paceDay : pace.perDay)} a day for the next {pace.days} {pace.days === 1 ? 'day' : 'days'}</span>}
             </>

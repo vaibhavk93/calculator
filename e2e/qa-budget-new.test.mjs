@@ -156,7 +156,7 @@ T('B-004', 'RUNTIME', 'reload keeps the data and the same screen total', async (
   await addExpense(page, { amount: '321', cat: 'Food' })
   await page.waitForTimeout(500)
   await page.reload(); await page.waitForSelector('.app')
-  has(await bodyText(page), '₹321.00')
+  has(await bodyText(page), '₹321')
 })
 T('B-005', 'NEG', 'note longer than 200 characters is capped, not refused or lost', async (c) => {
   const { page } = await c.open({ budget: BASE() })
@@ -183,7 +183,7 @@ T('B-007', 'NEG', 'date far in the future and before the year 2000 are refused i
 T('B-008', 'CORNER', 'an entry dated in another month does not change this month, but shows in that month', async (c) => {
   const { page } = await c.open({ budget: BASE() })
   await addExpense(page, { amount: '700', date: '2026-10-03' })
-  has(await page.locator('.budget__hero').first().innerText(), '₹0.00')
+  has(await page.locator('.budget__hero').first().innerText(), '₹0')
 })
 T('B-009', 'RUNTIME', 'rapid double tap on Add expense saves exactly one entry (3 tries)', async (c) => {
   const { page } = await c.open({ budget: BASE() })
@@ -255,7 +255,7 @@ T('B-102', 'POS', 'a semicolon file with a decimal comma (450,00) is read as 450
   const { page } = await c.open({ budget: BASE() }); await toImport(page)
   await pickFile(page, file('s.csv', 'Statement\nDate;Narration;Withdrawal Amt.;Deposit Amt.\n02/11/2026;SHOP;450,00;\n'))
   await page.getByText('Found').first().waitFor()
-  has(await findRows(page).first().innerText(), '₹450.00')
+  has(await findRows(page).first().innerText(), '₹450')
 })
 T('B-103', 'NEG', 'a file over 5 MB is refused in plain words and nothing is listed', async (c) => {
   const { page } = await c.open({ budget: BASE() }); await toImport(page)
@@ -415,7 +415,7 @@ T('B-201', 'POS', 'Repeats = Monthly on Add expense makes a bill: Bills page wor
   eq((b.recurring ?? []).length, 1)
   await toBills(page)
   const t = await bodyText(page)
-  has(t, '₹199.00 a month = ₹2,388.00 a year'); has(t, 'Per year, all running bills'); has(t, 'Next due')
+  has(t, '₹199 a month = ₹2,388 a year'); has(t, 'Per year, all running bills'); has(t, 'Next due')
   noBad(t)
 })
 T('B-202', 'POS', 'quarterly and yearly words are right', async (c) => {
@@ -424,7 +424,7 @@ T('B-202', 'POS', 'quarterly and yearly words are right', async (c) => {
   await addExpense(page, { amount: '12000', note: 'Domain', repeat: 'Yearly', date: '2026-06-01' })
   await toBills(page)
   const t = await bodyText(page)
-  has(t, '₹1,200.00 every 3 months = ₹4,800.00 a year'); has(t, '₹12,000.00 a year, about ₹1,000.00 a month')
+  has(t, '₹1,200 every 3 months = ₹4,800 a year'); has(t, '₹12,000 a year, about ₹1,000 a month')
 })
 T('B-203', 'POS', 'Mark paid in Due adds this period\'s expense once; a second tap does not double it', async (c) => {
   const { page } = await c.open({ budget: BASE() })
@@ -465,7 +465,7 @@ T('B-205', 'NEG', 'Edit bill: empty name and zero amount are refused in plain wo
   has(e, 'Give it a name'); has(e, 'Enter an amount above zero')
   await S(page).locator('#bill-title').fill('Netflix 4K'); await S(page).locator('#bill-amount').fill('649'); await save(page)
   await S(page).waitFor({ state: 'detached' })
-  has(await bodyText(page), '₹649.00 a month = ₹7,788.00 a year')
+  has(await bodyText(page), '₹649 a month = ₹7,788 a year')
 })
 T('B-206', 'UX', '"Add a bill" on the Bills page opens the sheet already on Monthly', async (c) => {
   const { page } = await c.open({ budget: BASE() }); await toBills(page)
@@ -518,10 +518,10 @@ T('B-212', 'RUNTIME', 'a stopped bill removed from Due does not leave a ghost: B
 // ================================================================== E. refunds, search, cycle, trip, bulk, history
 T('B-301', 'POS', 'a refund lowers the month total, shows a minus and the word Refund; "Biggest spends" leaves it out', async (c) => {
   const { page } = await c.open({ budget: BASE({ expenses: [exp('2026-11-03', '1000', { categoryId: 'c-food' }), exp('2026-11-04', '400', { refund: true, categoryId: 'c-food', note: 'Returned shirt' })] }) })
-  has(await page.locator('.budget__hero').first().innerText(), '₹600.00')
+  has(await page.locator('.budget__hero').first().innerText(), '₹600')
   await toSummary(page); await entriesTab(page)
   const t = await SUM(page).innerText()
-  has(t, 'Refund'); has(t, '−₹400.00')
+  has(t, 'Refund'); has(t, '−₹400')
 })
 T('B-302', 'CORNER', 'refund bigger than all spending shows a negative total in words, no NaN, no crash', async (c) => {
   const { page } = await c.open({ budget: BASE({ expenses: [exp('2026-11-03', '100'), exp('2026-11-04', '400', { refund: true })] }) })
@@ -569,7 +569,7 @@ T('B-307', 'POS', 'statement cycle: pick the card, switch to Statement cycle, en
   await page.locator('.pick__opt, .sheet button').filter({ hasText: /Tata Neo/ }).first().click()
   await SUM(page).getByRole('radio', { name: 'Statement cycle' }).click()
   const t = await SUM(page).innerText()
-  has(t, 'Statement cycle: 6 Oct to 5 Nov'); has(t, '₹100.00'); lacks(t, '₹700.00'); lacks(t, 'Day by day')
+  has(t, 'Statement cycle: 6 Oct to 5 Nov'); has(t, '₹100'); lacks(t, '₹700'); lacks(t, 'Day by day')
   noBad(t)
 })
 T('B-308', 'POS', 'card statement cycle is not offered for a card without a statement day', async (c) => {
@@ -615,7 +615,7 @@ T('B-312', 'POS', 'edit history: changing the amount and category lists plain-wo
   await S(page).waitFor({ state: 'detached' })
   await page.getByRole('button', { name: /^Edit ₹150/ }).first().click()
   const t = await S(page).locator('[aria-label="Changes to this entry"]').innerText()
-  has(t.replace(/\n/g, ' | '), 'was ₹100.00', 'amount change')
+  has(t.replace(/\n/g, ' | '), 'was ₹100', 'amount change')
   has(t.replace(/\n/g, ' | '), 'category was Food', 'category change')
   noBad(t)
 })
@@ -663,7 +663,7 @@ T('B-403', 'POS', 'card cost: annual fee plus fee/interest category entries for 
   const { page } = await c.open({ budget: b }); await toManage(page)
   await pageOf(page, 'Categories and cards').locator('.navrow', { hasText: 'Tata Neo' }).click()
   const t = await S(page).innerText()
-  has(t, 'cost you'); has(t, '₹800.00')
+  has(t, 'cost you'); has(t, '₹800')
 })
 T('B-404', 'POS', 'card bill reminder from the card form makes a Due reminder and a "Card bill reminders" row; it never adds an expense', async (c) => {
   const { page } = await c.open({ budget: BASE() }); await toManage(page)
@@ -765,7 +765,7 @@ T('B-701', 'RUNTIME', 'a month of use: 120 entries across 9 categories, a limit,
   noBad(await bodyText(page))
   await toSummary(page)
   const t = await SUM(page).locator('section[aria-label="Total"] .budget__hero').innerText()
-  const want = `${total / 100n}.${String(total % 100n).padStart(2, '0')}`
+  const want = `${total / 100n}${total % 100n === 0n ? '' : '.' + String(total % 100n).padStart(2, '0')}` // whole rupees drop .00
   eq(t.replace(/[₹,\s]/g, ''), want, 'month total')
   eq(await overflowing(page), [])
 })

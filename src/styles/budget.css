@@ -26,6 +26,10 @@
   overflow-wrap: anywhere;
 }
 
+.budget__hero--negative {
+  color: var(--negative);
+}
+
 .budget__track {
   align-self: stretch;
   height: 6px;

@@ -16,6 +16,14 @@ const budget = (expenses: BudgetExpense[]): BudgetData => ({
 })
 const today = new Date(2026, 10, 15) // 15 Nov 2026
 
+describe('buildExpensesCsv amounts', () => {
+  it('writes the raw stored amount, never the on-screen format (whole money drops .00 on screen only)', () => {
+    const csv = buildExpensesCsv(budget([e('1', '2026-11-02', '24000.00'), e('2', '2026-11-03', '1250.5'), e('3', '2026-11-04', '43391.004')]), 'month', today)
+    const amounts = csv.trim().split('\n').slice(1).map((l) => l.split(',')[1])
+    expect(amounts.sort()).toEqual(['1250.5', '24000.00', '43391.004'])
+  })
+})
+
 describe('csvCell', () => {
   it('leaves plain text alone', () => expect(csvCell('lunch')).toBe('lunch'))
   it('quotes commas, newlines and doubles quotes', () => {
