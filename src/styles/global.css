@@ -810,8 +810,10 @@ button:disabled {
 .screen__title {
   margin: 0;
   min-width: 0;
-  font-size: 1rem;
-  font-weight: 500;
+  /* Same weight as every other screen title (forms.css: "screen title 700") -- this one was left at
+     label weight (500), which read as weaker than the content below it. */
+  font-size: 1.125rem;
+  font-weight: 700;
   /* Wraps at a large font size; a header must never cut its own title off. */
   overflow-wrap: anywhere;
 }
