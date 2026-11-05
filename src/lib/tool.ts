@@ -1,4 +1,5 @@
 import { D, type Dec } from '../engine'
+import type { TimeUnit } from '../engine/duration'
 import { decimalComma } from './decimalComma'
 
 /**
@@ -23,6 +24,26 @@ export type Values = Record<string, string | string[][]>
 /** How a unit sits next to a number field. Display only. */
 export type Unit = 'rupee' | 'percent' | 'years' | 'months' | 'days' | 'none'
 
+export type { TimeUnit }
+
+/**
+ * A duration box the person can switch between years, months and days. `units[0]` MUST equal what the box meant
+ * before the switch existed (the field's `unit`; "years" for a text box where a bare number means years), because a
+ * saved card has no unit key and reopens on `units[0]`. The chosen unit lives in `values['<id>__unit']`, not in the spec.
+ */
+export interface WithUnits {
+  units?: TimeUnit[]
+}
+
+/** The key under which the chosen unit of field `id` is stored in the form values. */
+export const unitKey = (id: string): string => `${id}__unit`
+
+/** The unit chosen for a duration field: the stored one if it is on offer, else `units[0]` (a missing, empty or garbage key). */
+export function unitOf(f: { id: string; unit?: Unit; units?: TimeUnit[] }, v: Values): TimeUnit {
+  const raw = v[unitKey(f.id)]
+  return f.units?.find((u) => u === raw) ?? f.units?.[0] ?? (f.unit as TimeUnit)
+}
+
 interface FieldBase {
   id: string
   label: string
@@ -45,13 +66,13 @@ interface FieldBase {
 export const labelOf = (f: { label: string; labelFor?: (v: Values) => string }, v: Values): string => f.labelFor?.(v) || f.label
 
 export type Field =
-  | (FieldBase & { kind: 'number'; unit?: Unit; default?: string })
+  | (FieldBase & WithUnits & { kind: 'number'; unit?: Unit; default?: string })
   | (FieldBase & { kind: 'select'; options: { value: string; label: string }[]; default: string })
   | (FieldBase & { kind: 'date'; default?: string })
   /** A time of day, "HH:MM" (24 hour). Blank is allowed when the spec says what blank means. */
   | (FieldBase & { kind: 'time'; default?: string })
   /** `chip` adds a small unit label after the box, worked out from the typed text (the loan term shows "years" for a bare number). */
-  | (FieldBase & { kind: 'text'; default?: string; chip?: (text: string) => string })
+  | (FieldBase & WithUnits & { kind: 'text'; default?: string; chip?: (text: string) => string })
   /** A growable list of rows. `columns` are the fields of one row (number, select, date or text). */
   | (FieldBase & { kind: 'rows'; columns: Exclude<Field, { kind: 'rows' }>[]; min: number; max: number; defaultRows: string[][] })
 
@@ -68,6 +89,8 @@ export interface ResultRow {
   main?: boolean
   /** A unit shown after the number ("0.62 Mile"). Display and share text only: `value` stays a plain number. */
   unit?: string
+  /** Set on a headline row that is a duration: its unit, so "Use in another tool" sends it only to a box that offers that unit. A row without it goes only to unit-less boxes. */
+  timeUnit?: TimeUnit
   /**
    * "This is good / bad for you." Colours the value green or red.
    *
@@ -183,6 +206,8 @@ export function defaultValues(spec: ToolSpec): Values {
   for (const f of spec.fields) {
     if (f.kind === 'rows') out[f.id] = f.defaultRows.map((r) => [...r])
     else out[f.id] = 'default' in f && f.default !== undefined ? f.default : ''
+    // A duration box opens on `units[0]`, the old meaning, so a saved card (no unit key) and a fresh form agree.
+    if ((f.kind === 'number' || f.kind === 'text') && f.units && f.units.length > 1) out[unitKey(f.id)] = f.units[0]!
   }
   return out
 }

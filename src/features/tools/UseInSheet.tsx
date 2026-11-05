@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
-import type { Fmt } from '../../lib/tool'
+import type { Fmt, TimeUnit } from '../../lib/tool'
 import { linkTargets } from '../../lib/toolLink'
 import { formatCell } from '../../lib/toolFormat'
 import type { Dec } from '../../engine'
@@ -14,7 +14,7 @@ import { prefillDraft } from './ToolScreen'
  * Nothing is guessed, even when a tool has only one fitting box. The target opens with that box filled and
  * every other box as it was.
  */
-export function UseInSheet({ fromToolId, value, text, fmt, label, onClose }: { fromToolId: string; value: Dec; text: string; fmt: Fmt; label: string; onClose: () => void }) {
+export function UseInSheet({ fromToolId, value, text, fmt, unit, label, onClose }: { fromToolId: string; value: Dec; text: string; fmt: Fmt; unit?: TimeUnit; label: string; onClose: () => void }) {
   const store = useAppStore()
   const tab = useApp((s) => s.tab)
   const setTab = useApp((s) => s.setTab)
@@ -22,7 +22,7 @@ export function UseInSheet({ fromToolId, value, text, fmt, label, onClose }: { f
   const showCard = useApp((s) => s.showCard)
   const system = useApp((s) => s.settings.numberSystem)
   const decimals = useApp((s) => s.settings.decimals)
-  const targets = linkTargets(ALL_TOOLS, fromToolId, fmt)
+  const targets = linkTargets(ALL_TOOLS, fromToolId, fmt, unit)
   const [toolId, setToolId] = useState<string | null>(null)
   const [fieldId, setFieldId] = useState<string | null>(null)
   const [missing, setMissing] = useState(false)
@@ -32,7 +32,7 @@ export function UseInSheet({ fromToolId, value, text, fmt, label, onClose }: { f
   const go = () => {
     const spec = ALL_TOOLS.find((s) => s.id === toolId)
     if (!spec || !fieldId) return setMissing(true)
-    prefillDraft(store, spec, fieldId, text)
+    prefillDraft(store, spec, fieldId, text, unit)
     onClose()
     showCard(null)
     if (tab !== 'tools') setTab('tools')

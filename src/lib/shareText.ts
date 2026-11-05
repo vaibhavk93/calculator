@@ -1,8 +1,9 @@
 import { D } from '../engine'
+import { typedUnit, unitText } from '../engine/duration'
 import type { FormatOptions } from './format'
 import { formatDecimal } from './format'
 import { RUPEE } from './toolFormat'
-import { parseNum, type Field, type Values } from './tool'
+import { parseNum, unitOf, type Field, type Values } from './tool'
 
 export interface ShareLine {
   label: string
@@ -36,9 +37,14 @@ export function inputLines(fields: Field[], values: Values, opts: FormatOptions)
       const n = parseNum(raw)
       if (n === null) continue
       const grouped = formatDecimal(new D(n), { ...opts, decimals: 'auto' })
+      // A box with a unit switch prints the chosen unit ("18 months", "1 month"); a fixed unit prints as it always did.
       const text =
-        f.unit === 'rupee' ? RUPEE + grouped : f.unit === 'percent' ? `${grouped}%` : f.unit && f.unit !== 'none' ? `${grouped} ${f.unit}` : grouped
+        f.unit === 'rupee' ? RUPEE + grouped : f.unit === 'percent' ? `${grouped}%` : f.units && f.units.length > 1 ? `${grouped} ${unitText(n, unitOf(f, values))}` : f.unit && f.unit !== 'none' ? `${grouped} ${f.unit}` : grouped
       out.push({ label: f.label, text })
+    } else if (f.kind === 'text' && f.units && f.units.length > 1) {
+      // The loan term: a bare number takes the chosen unit; a typed "18 months" already says it.
+      const n = parseNum(raw)
+      out.push({ label: f.label, text: typedUnit(raw) || n === null ? raw : `${raw.trim()} ${unitText(n, unitOf(f, values))}` })
     } else if (f.kind === 'date' || f.kind === 'time' || f.kind === 'text') {
       out.push({ label: f.label, text: raw })
     }

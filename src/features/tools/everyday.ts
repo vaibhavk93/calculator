@@ -125,7 +125,7 @@ const unitSpec: ToolSpec = {
         ? ['Everything goes through Celsius: °C = (°F − 32) × 5 ÷ 9, °F = °C × 9 ÷ 5 + 32, K = °C + 273.15', `${plain(value)} ${from.label} = ${plain(out)} ${to.label}`]
         : ['converted = value × size of from-unit ÷ size of to-unit', `${plain(value)} × ${from.factor} ÷ ${to.factor}`, `Sizes are in ${cat.units.find((u) => u.factor === '1')!.label.toLowerCase()}s`]
     return {
-      rows: [{ label: `${from.label} to ${to.label}`, value: out, unit: to.label, main: true }],
+      rows: [{ label: `${from.label} to ${to.label}`, value: out, unit: to.label, timeUnit: cat.id === 'time' ? ({ d: 'days', yr: 'years' } as const)[to.id as 'd' | 'yr'] : undefined, main: true }],
       table: { title: `${plain(value)} ${from.label} in every unit`, columns: ['Unit', 'Value'], fmts: ['text', 'number'], rows: convertAll(cat.id, from.id, value).map((x) => [x.unit.label, x.value]) },
       formula,
     }
@@ -467,7 +467,7 @@ const dateSpec: ToolSpec = {
     const p = ymd(a, b)!
     return {
       rows: [
-        { label: 'Days apart', value: new D(days), fmt: 'int', main: true },
+        { label: 'Days apart', value: new D(days), fmt: 'int', timeUnit: 'days', main: true },
         { label: 'Weeks and days', value: `${Math.floor(days / 7)} weeks, ${days % 7} days`, fmt: 'text' },
         { label: 'Years, months, days', value: `${p.years} years, ${p.months} months, ${p.days} days`, fmt: 'text' },
       ],

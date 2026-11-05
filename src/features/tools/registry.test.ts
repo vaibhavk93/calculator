@@ -37,6 +37,16 @@ describe('every calculator spec', () => {
         for (const s of selects) expect(s.options.map((o) => o.value), `${s.id} default`).toContain(s.default)
       })
 
+      it('keeps "__" out of field ids (it is reserved for <id>__unit), and a unit switch starts on the old unit', () => {
+        const all = spec.fields.flatMap((f) => (f.kind === 'rows' ? [f, ...f.columns] : [f]))
+        expect(all.filter((f) => f.id.includes('__')).map((f) => f.id)).toEqual([])
+        for (const f of spec.fields) {
+          if ((f.kind !== 'number' && f.kind !== 'text') || !f.units) continue
+          // A bare number in the loan term text box means years; a number box's old meaning is its `unit`.
+          expect(f.units[0], `${f.id}: units[0] must be what the box meant before the switch`).toBe(f.kind === 'number' ? f.unit : 'years')
+        }
+      })
+
       it('shows a real result from its default values, not an error', () => {
         const out = spec.compute(defaultValues(spec))
         expect(isError(out) ? out.error : 'ok').toBe('ok')
