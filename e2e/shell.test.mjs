@@ -1077,7 +1077,7 @@ T('L-600h', 'UI', '600 history rows (cap 200) plus 100 named rows: History opens
 })
 T('L-20k', 'RUNTIME', '20,000 budget entries: Budget home and summary open in under 5 s', async (app) => {
   const d = seed(); d.budget.expenses = manyExpenses(20000); const { page, errors } = await open(app, { data: d })
-  let t0 = Date.now(); await tab(page, 'Budget'); await page.waitForSelector('text=Left this month', { timeout: 8000 }); const a = Date.now() - t0
+  let t0 = Date.now(); await tab(page, 'Budget'); await page.waitForSelector('text=/Left this month|Over budget/', { timeout: 8000 }); const a = Date.now() - t0
   t0 = Date.now(); await page.click('text=Spending summary'); await settle(page, 100); const b = Date.now() - t0
   ok(a < 5000 && b < 5000, `home ${a} ms, summary ${b} ms`); ok(errors.length === 0, errors.join(';')); note(`20k entries: Budget home ${a} ms, summary ${b} ms`)
 })
