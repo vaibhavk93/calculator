@@ -111,3 +111,18 @@ Each rule pack has one `RATES_AS_OF = { asOf, until }` (`src/engine/tax/rules.FY
 | Part of a compounding period | **Unproven** | Compounding a part period fractionally is one convention. Some lenders charge plain simple interest for the part period. The result says so; no lender document was checked |
 | Unit converter: Month (1/12 of a 365-day year) | D | 1 year = 12 months, 1 month = 2,628,000 s = 30.4167 days. Other time units unchanged |
 | Capital gains: "held 38 months, 3 years 2 months" | D | Display only. Months held comes from the same function as before; the tax rules were not touched |
+
+## Duration units: savings calculators (2026-11-05)
+
+| What | Grade | How it was checked |
+|---|---|---|
+| SIP in months: 5000 a month, 12%, 18 months | D | Hand loop, month by month, payment at the start of the month: 99,054.48 (float loop 99054.4752, closed form P × ((1+i)^n − 1) ÷ i × (1+i) with 1.01^18 = 1.196147 gives the same). 120 months gives 11,61,695, equal to 10 years (the audit figure was right). Step-up starts at month 13: 13 months with 10% invests 65,500. Tested in `savingsDuration.test.ts` |
+| SIP for a goal in months | D | Whole years equal the old `goalSip` to the last digit. 18 months: the SIP asked for, run through an independent loop, plus the savings grown by 1.12^1.5, hits the target to 1e-9. "Already saved" still grows once a year; the note now says so (the monthly SIP part grows every month) |
+| Lump sum in months and days | D | Whole years equal the old `lumpsum()`. 90 days at 12% on 1,00,000: 1,00,000 × 1.12^(90 ÷ 365) = 1,02,833.82. 365 days = 1 year exactly. A 365-day year is used; leap years are ignored (stated in the note) |
+| Fixed deposit in days, months, years | D | 90 days, 7% compounded quarterly: 1,00,000 × 1.0175^(4 × 90 ÷ 365) = 1,01,725.82. 6 months equals 0.5 years |
+| Effective yearly yield | D | (1 + 0.07 ÷ 4)^4 = 1.0175^4 = 1.0718590, so 7.1859% (the audit's 7.1859% and 1.07186 were right). Yearly compounding gives the rate itself; 12% monthly gives 12.6825% |
+| Odd days in a deposit | **Unproven** | A part of a compounding period is compounded fractionally here. A bank may pay plain simple interest for that part instead. The result says so; no bank document was checked |
+| Recurring deposit in months | D | 18 months equals 1.5 years; the table now ends with a "Month 18" row (it used to drop the part year); that row equals the headline maturity. Part months give "Time must come to whole months" |
+| Inflation and CAGR in months | D | 18 months equals 1.5 years, 24 months equals 2 years. CAGR has no days option (1% in one day would read as 1.01^365 = 37.8 times a year) |
+| Input limits | D | Return or rate 0 to 100 on sip, step-up, goal-sip, lump sum, swp, fd, rd, inflation; rates of 1e6, 100.01 and -1 are refused. Months 1 to 720 (sip family, rd); lumpsum at most 60 years; fd at most 50; inflation at most 100. Huge years in any unit give a plain error, never NaN or Infinity |
+| Old saved cards | D | `savingsGolden.json` holds what the code gave before this change for the default and two samples of each of the nine tools. A card with no unit key must give the same rows, table, chart, formula and note. Only additions are allowed: the fd "Effective yearly yield" row and formula line, the rd part-year table row, the goal-sip cautious-side sentence |

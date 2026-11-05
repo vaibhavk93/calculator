@@ -196,7 +196,7 @@ describe('fixed deposit in years, months, days', () => {
     const t = new D(90).div(365)
     const want = fd(new D(100000), new D(7), t, 4)
     expect(row('fd', { years: '90', years__unit: 'days' }, 'Maturity value').toString()).toBe(want.toString())
-    // independent float check: 100000 x 1.0175^(0.98630...) = 101,719.5 (about)
+    // independent float check: 100000 x 1.0175^(4 x 90/365) = 101,725.82
     expect(Math.abs(want.toNumber() - 100000 * 1.0175 ** (4 * (90 / 365)))).toBeLessThan(1e-6)
   })
   it('6 months equals 0.5 years; 12 months equals 1 year', () => {
