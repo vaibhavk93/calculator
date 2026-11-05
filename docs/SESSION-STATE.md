@@ -1,5 +1,31 @@
 # Session state: resume here
 
+## Round 15 (2026-11-05): found and merged two finished agent worktrees, fixed one pre-existing broken test
+
+**Last prompt:** "Check what we were doing earlier. There were some agents running. Could you check and see if we
+can continue from where those agents stopped over here?"
+
+Found 6 worktrees under `.claude/worktrees/`: 4 were stale (their commits already merged into `dev`, safe
+leftovers). 2 had real, finished, unmerged work with no process still running behind them:
+
+| Branch | What it had | How it merged |
+|---|---|---|
+| `agent-adb76e6f309838e47` (B17, B14 part 3, B20) | Committed through `da3455c`, plus an uncommitted fix (FitHero reading its own size mid-transition) and matching e2e updates | **5 real conflicts** in `SettingsScreen.tsx`, `SpendSummary.tsx`, `BudgetScreen.tsx`, `TipsAndTours.tsx`, `qa-notes-due.test.mjs` — resolved by hand, not git's default. The branch forked before Block C (plain-text notes, "Export notes") landed, so merging it as-is would have silently deleted that feature; added it back as a row in the new `BackupScreen.tsx` instead, with the `DATE_LOCALE` fix it was missing too |
+| `agent-aff87b45583687bce` (duration units: balance-transfer, simple-compound, Month, capital gains) | Committed through `476df17`, plus an uncommitted `VERIFICATION.md` note | Clean merge, no conflicts |
+
+**Also found:** `dev` itself had 1 failing unit test (`expenseEdits.test.ts`) — the dates-India-first decision
+changed `editWords()`'s output format but nobody updated this test's expectation. Fixed before touching
+either worktree, so the merge verification itself wasn't muddied by an unrelated pre-existing failure.
+
+**Verified before and after each merge:** `npm run check` (2529 → 2710 → 2723, all passing), `npm run build`,
+and the calculator/onboarding/qa-budget-new/qa-notes-due/shell e2e suites diffed against a baseline worktree
+at the pre-merge commit. Two shell RUNTIME timing tests (`SH-R02`/`SH-R03`) looked new on first run; reran
+both old and new code twice each and confirmed they fail intermittently on **both** — pre-existing flakiness
+(headless browser timing under load), not something this merge caused.
+
+Cleaned up: removed all 6 agent worktrees and their branches, and the `/tmp` baseline worktree, once merged.
+Pushed as `642f879..dda1c6c`.
+
 ## Round 14 (2026-11-04): B6 and B8 shipped, then "build everything in the plan, one by one, then full QA"
 
 **Last prompt:** "go with option 1, do B8", then: "One by one, create or build whatever is present in the plan, and then

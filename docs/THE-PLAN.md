@@ -33,10 +33,10 @@ history, not plans.
 | **Calculators** | **60** (docs elsewhere still say 51 or 57 — those are stale) |
 | **Tabs** | Calculate · Tools · Notes (+To-do) · Due · Budget |
 | **Budget** | expenses, categories + subcategories, cards/accounts, limits per month, bills & subscriptions, statement cycles, refunds, trips, heatmap, CSV export/import, bank-message scan |
-| **Notes** | saved calculations, lists (label + amount), to-dos. **No plain text note** |
+| **Notes** | saved calculations, lists (label + amount), to-dos, **plain text notes** (Block C, 2026-11-05) |
 | **Due** | reminders, lead times, repeats, advance-tax pack, battery-settings guide |
 | **Platform** | offline, no account, no analytics. Android only. Local backup file |
-| **Tests** | 2529 unit tests + 7 e2e suites |
+| **Tests** | 2723 unit tests + 7 e2e suites |
 
 **⚠ The old roadmap's status column was a whole session out of date.** Verified in code on 2026-11-04:
 every Phase 1 item and nearly every Phase 2 item it marked "Planned" is actually built — reminder time
@@ -232,12 +232,6 @@ None of these can be proven in a browser.
 | **Phase 7 "turn modules on/off"** | **Build it** | The project rule still sends it through one critic first, to shrink it, not to reopen the decision |
 | **Portfolio (P1)** | **Yes, build it** | After the design work, as planned |
 | **Lock-a-history-row control** | **Keep it** | Remove the "remove it when next touched" note |
-
----|---|
-| **`ink-3` contrast on tints** | **A.** Lighten `ink-3` to `#929292` — passes everywhere, but ink-2 and ink-3 become nearly identical (separation drops 1.56 → 1.25). **B.** Stop using `ink-3` for hint text; hints become `ink-2` — ramp kept, ink-3 becomes a border colour only. **C.** Accept it and write the exception into the design system |
-| **Dates** | Force `en-IN` everywhere, or keep following the phone's locale |
-| **Phase 7 "turn modules on/off"** | 8 items, planned, never critiqued. It changes behaviour for every user, so the project rule says a critic runs first. Worth it only if the app really is too big — which the design reset in §7 may fix more cheaply |
-| **Portfolio** | P1 (holdings + dated value history) is ready to build. Adds a 6th thing to an app you already find too big — do it after the design reset, not before |
 
 ---
 
