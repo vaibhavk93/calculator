@@ -180,6 +180,21 @@ calendar view (M) · quiet hours and a daily digest (S-M) · **boot & timezone r
 **⚠ Boot rescheduling is small and was filed under "Later", but today one reboot silently cancels every
 reminder with no sign anything is wrong.** It belongs here, not in Later.
 
+### Block G — Calculator units and improvements *(owner, 2026-11-05: "everything is in years; should be days, months and more")*
+
+Audit first: `docs/CALC-AUDIT-2026-11-05.md` (every calculator's inputs and units, the engine's day/month/year basis, one reusable
+unit-control design that keeps every existing field id and saved value valid, other missing inputs/presets/validation, a batched
+work list C-U1...). Rules that stay: **field and tool ids never change** (saved items store inputs by field id); an old saved value
+must keep its old meaning (default unit = what the field means today); where a rule needs a primary source we lack, it stays BLOCKED.
+Then build in batches, each owning separate files, in separate worktrees.
+
+### Owner's order of work (2026-11-05)
+
+1. Finish the UI group (B12-B20, hints) and Block G (calculator units and improvements).
+2. Keep building the planned features: D1 income, D5 rules, EMI-for-N-months + snooze choices, Phase 7 modules, Portfolio P1.
+3. **Then make the Android build; the owner installs it and tests on the phone** (`scripts/build-android.sh install`, `docs/BUILD-ANDROID.md`).
+4. Full QA after the phone test.
+
 ### Phase 7 — modules on/off (owner: build it; critic shrank it, 2026-11-05)
 
 **Two switches only: "Budget" and "Notes and reminders" (Notes + Due together). Tools is always on.** One `modules: { budget, notes }`
