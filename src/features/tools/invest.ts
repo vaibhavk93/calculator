@@ -52,16 +52,16 @@ function wholeYears(y: Dec): number | { error: string } {
 const negative = (n: Record<string, Dec>) => Object.values(n).some((v) => v.isNegative())
 
 /** One table and chart row: `cell` is the year number, or words ("Month 18") for a last row that is part way through a year. */
-interface GrowRow {
+export interface GrowRow {
   cell: Dec | string
   label: string
   invested: Dec
   value: Dec
 }
-const yearRow = (r: YearRow): GrowRow => ({ cell: new D(r.year), label: `Y${r.year}`, invested: r.invested, value: r.value })
+export const yearRow = (r: YearRow): GrowRow => ({ cell: new D(r.year), label: `Y${r.year}`, invested: r.invested, value: r.value })
 
 /** Stacked chart and year-wise table: invested vs returns (D13, the growth visualiser). */
-function growth(rows: GrowRow[], valueLabel = 'Value'): Pick<Output, 'chart' | 'table'> {
+export function growth(rows: GrowRow[], valueLabel = 'Value'): Pick<Output, 'chart' | 'table'> {
   return {
     chart: {
       title: 'Invested vs returns',

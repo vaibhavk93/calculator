@@ -73,3 +73,51 @@ export const DICGC = {
   confirmed: '2026-11-06',
 } as const
 
+/**
+ * Small-savings pack, read 2026-11-06 (`docs/RESEARCH-BLOCKED-2026-11-06.md` section 1).
+ * RATES: the Oct-Dec 2026 quarter is "unchanged from those notified for the second quarter"
+ * (OM F.No.1/4/2019-NS, 30.09.2026, DEA Budget Division; read from the scan at
+ * https://www.staffnews.in/wp-content/uploads/2026/10/ECE_15533.pdf, a staff-news host). The OM carries
+ * rates forward and has no table, so each number comes from the National Savings Institute rate page
+ * `https://www.nsiindia.gov.in/InternalPage.aspx?Id_Pk=<rateId>`, whose last row ends 30.09.2026.
+ * RULES (limits, term, payout) come from the scheme rule text at `Id_Pk=<ruleId>`. A rate is NEVER copied from
+ * a rule text: those still carry 2020 rates (SCSS 7.4%, MIS 6.6%, TD 5.5/6.7%, NSC table 6.8%).
+ * Jan-Mar 2027 is not announced (due ~30 Dec 2026): every screen says "official to 31 Dec 2026".
+ *
+ * STILL BLOCKED, not built: Post Office RD (no compounding wording in the rule text), VPF/EPF (rate unnotified).
+ */
+export const SMALL_SAVINGS_SOURCE = 'OM F.No.1/4/2019-NS, 30.09.2026'
+export const OFFICIAL_TO = '31 Dec 2026'
+
+/** Sukanya Samriddhi: rate Id_Pk 179 (8.2% since 01.01.2024), rules 171 / 89. */
+export const SSY = {
+  rate: '8.2',
+  minYearly: '250',
+  maxYearly: '150000',
+  /** Account may be opened until the girl is this old. */
+  openUntilAge: 10,
+  /** Deposits for 15 years from opening; the account matures 21 years from opening. */
+  depositYears: 15,
+  termYears: 21,
+} as const
+
+/** National Savings Certificate: rate 182 (7.70% since 01-04-2023), rules 167 / 90. Interest compounds yearly, "deemed reinvested". */
+export const NSC = { rate: '7.7', min: '1000', years: 5 } as const
+
+/** Senior Citizens Savings Scheme: rate 181 (8.20% since 1.04.2023), rules 168 / 62. Interest paid quarterly; unclaimed interest earns nothing. */
+export const SCSS = { rate: '8.2', min: '1000', max: '3000000', multiple: '1000', years: 5, minAge: 60 } as const
+
+/** Kisan Vikas Patra: rate 180 (7.5%, matures in 115 months), rules 170 / 56. "Deposit ... shall double on maturity." */
+export const KVP = { rate: '7.5', months: 115, min: '1000' } as const
+
+/** Monthly Income Scheme: rate 183 (7.4%), rules 166 / 57. Interest paid monthly. */
+export const MIS = { rate: '7.4', min: '1000', maxSingle: '900000', maxJoint: '1500000', years: 5 } as const
+
+/**
+ * Post Office Time Deposit: rates 185 (1/2/3/5 years: 6.90 / 7.00 / 7.10 / 7.50%), rules 164 / 58.
+ * The rule text says "compounded on quarterly basis and payable ... at the end of each year", and the rate on the
+ * opening date holds to maturity. **ASSUMPTION:** the text does not say whether the yearly interest is paid out to
+ * you or stays in the deposit, so the screen offers both and defaults to "paid out" (the rule's wording).
+ */
+export const TD = { rates: { 1: '6.9', 2: '7', 3: '7.1', 5: '7.5' } as Record<number, string> } as const
+
