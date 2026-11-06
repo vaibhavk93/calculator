@@ -32,6 +32,14 @@ So the parser can be improved from real failures, it keeps a log of messages it 
 The key (`salt`) is random, made on this phone, never leaves it. The same real value always maps to the same fake one on this phone, so repeats stay visible. ⚠ **Remember:** this is not encryption. It is meant to stop a reader learning real values, not to stop someone who also has the phone's salt.
 History: the first version only swapped digits, and an account holder's name inside an "Info:" line was visible. That log was deleted and masking switched to the word list above.
 
+## Merchant rules (D5, built 2026-11-06)
+`BudgetData.rules` (max 100, newest first, `{ id, match, categoryId }`), edited at Budget > Categories and cards > Rules (`RulesScreen.tsx`).
+- **Match:** the cleaned merchant contains `match` as whole words, ignoring case, at least 3 characters. Done with `indexOf` plus a letter/digit check on both sides (`ruleMatches`), not a regex, so any typed character is safe and non-English letters count as letters.
+- **Priority:** newest matching rule, then `suggestFor` (last entry with the same note), then the built-in word list. Wired by passing `(note) => ruleFor(...) ?? suggestFor(...)` as the existing `suggest` argument. No parser change.
+- **A rule never creates a category.** A rule whose category is deleted is skipped and shown as "Category removed". It is kept (categories are only soft-deleted, so a backup or undo brings it back). There is no category merge in the app today; if one is added, rules must follow it.
+- **Privacy:** a rule holds only a short merchant word. "Remember this merchant" builds it from the cleaned merchant with every word that has a digit dropped and at most two words kept (`ruleTextFromMerchant`). Message text, amounts and card digits are never stored.
+- **Not built:** applying rules to old entries, card-specific rules, amount filters, ordering controls. Typing a note by hand does not use rules (it still uses the older "same note" suggestion).
+
 ## Not in this version
 - Live listener for new messages (`RECEIVE_SMS`), or a notification listener: broader access, worse battery and privacy.
 - PDF statements (formats differ per bank, many are password-protected). CSV statements ARE built: Add from bank messages > Pick statement file (file chooser, no permission, `src/lib/statementParse.ts`).
