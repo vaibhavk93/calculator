@@ -58,3 +58,18 @@ export const EXAMPLE = {
   npsAnnuityShare: '40',
   npsAnnuityRate: '6',
 } as const
+
+/**
+ * Deposit insurance (DICGC), read 2026-11-06 from https://www.dicgc.org.in/guide-to-deposit-insurance and
+ * https://www.dicgc.org.in/FAQs. Rs 5,00,000 per depositor per bank "in the same right and capacity", principal
+ * and interest together. All individual-capacity accounts at one bank (all branches, all types) share one limit;
+ * joint, partner, guardian and trustee accounts insure separately; different banks insure separately.
+ * Press talks of Rs 7.5 lakh (secondary): no notification found, so it is NOT used. No start date is printed:
+ * a primary date for when Rs 5 lakh began was not found.
+ */
+export const DICGC = {
+  cover: '500000',
+  source: 'DICGC, Guide to Deposit Insurance and FAQs',
+  confirmed: '2026-11-06',
+} as const
+

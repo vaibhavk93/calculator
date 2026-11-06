@@ -79,7 +79,7 @@ A result carries a quiet "Checked against <source>" line only for tools rated **
 | In-hand salary | C | Built on the income-tax engine. Professional tax is a user input | Real payslip |
 | **CII 384** | **Not confirmed** | Seen in search snippets of the official page only | Fetch the notification |
 | **Finance Act 2026 as finally passed** | **Not checked** | Checked against the Finance Bill text and memorandum | Re-check before the next FY |
-| **HRA exemption** | **Not built** | Current rule is in the Income-tax Rules 2026; no readable official copy | Fetch when readable |
+| **HRA exemption** | **A** | Income-tax Rules 2026 Rule 279 (G.S.R. 198(E)) read from a Gazette copy; worked example from `docs/RESEARCH-BLOCKED-2026-11-06.md` section 2 reproduced in `hra.test.ts` | — |
 
 ## Product metrics
 
@@ -88,6 +88,12 @@ A result carries a quiet "Checked against <source>" line only for tools rated **
 | A/B sample size | **A** | R `power.prop.test` documentation (two examples) and inverse-normal values |
 | CAC/LTV, payback, funnel, ARR/MRR, retention, Rule of 40 | D | Standard definitions, hand-worked numbers |
 | Markup and margin | B | Textbook example recalled, not fetched live: cost 80, price 100 gives markup 25% (on cost) and margin 20% (on price); second method margin = markup ÷ (1 + markup), so 50% markup = 33.33% margin. Both tested in `markup.test.ts` |
+
+## Calculators from the 2026-11-06 research (`docs/RESEARCH-BLOCKED-2026-11-06.md`)
+
+| Calculator | Status | Basis | Next cross-check |
+|---|---|---|---|
+| FD ladder | **A** for the two limits, **D** for the maths | DICGC cover Rs 5,00,000 per depositor per bank, principal and interest together (dicgc.org.in guide and FAQs). TDS limits Rs 50,000 / Rs 1,00,000 at 10%: Act s.393(1) Table Sl.5(ii), Finance Act 2026. Compounding: 1,00,000 at 7% quarterly for 5 years = 1,00,000 × 1.0175^20 = 1,41,478 (hand-worked). **Assumptions on screen:** one bank name = one depositor in one capacity; the "first year's interest" is each FD's first 12 months, not a tax-year tally. The no-PAN TDS rate is not modelled (not read). Tested in `fdLadder.test.ts` | A bank's own interest certificate |
 
 ## Things that go stale
 

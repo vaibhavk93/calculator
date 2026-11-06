@@ -85,6 +85,13 @@
  *    S.O. 5109(E), for the purposes of Chapter III of the Code on Social Security, replacing
  *    S.O. 2702(E), 29 May 2026 (Rs 15,000):
  *    https://www.labour.gov.in/static/uploads/2026/09/2b0f1dbbd3769fc388416186ec145328.pdf
+ * 9. TDS on bank interest — READ 2026-11-06: Income-tax Act, 2025 s.393(1) Table Sl.5(ii) ("interest other than
+ *    interest on securities" paid by a bank, co-operative bank or post office): threshold Rs 1,00,000 for a
+ *    senior citizen, Rs 50,000 for anyone else. Rate 10%: Finance Act 2026 (Act 4 of 2026), First Schedule
+ *    Part II para 1(a)(i): https://taxo.online/wp-content/uploads/2026/03/FinanceAct2026.pdf. Finance Act 2026
+ *    does not amend Sl.5(ii). Senior citizen = 60 or more "at any time during the relevant tax year" (s.2(100)).
+ *    Form 121 is the no-TDS declaration (Rule 211, s.393(6)). The no-PAN rate was NOT read and is NOT modelled.
+ *    See `tdsBankInterest` below. The old section was 194A (mapping is ours, not a government table).
  *
  * STILL NOT IN THIS FILE for want of a primary source: the leave-encashment exempt limit (Rs 25 lakh is
  * CBDT Notification 31/2023, 24 May 2023 — secondary only, could not be opened), and the notified EPF
@@ -256,6 +263,13 @@ export const RULES_FY2026_27 = {
     metroCities: ['Mumbai', 'Kolkata', 'Delhi', 'Chennai', 'Hyderabad', 'Pune', 'Ahmedabad', 'Bengaluru'],
     /** Rule 205, Form No. 124 Table Sl.1: landlord PAN needed above this much rent in a tax year. */
     landlordPanAbove: '100000',
+  },
+
+  /** s.393(1) Table Sl.5(ii), source 9 in the header. TDS applies once a payer's interest for the year passes the threshold. */
+  tdsBankInterest: {
+    thresholdSenior: '100000',
+    thresholdOther: '50000',
+    ratePct: '10',
   },
 
   /** EPF employee contribution, % of basic + DA (EPF Scheme 1952 para 29). Example default; user can change. */

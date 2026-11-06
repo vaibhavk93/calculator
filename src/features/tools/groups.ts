@@ -59,7 +59,7 @@ export const GROUPS: ToolGroup[] = [
   ]),
   group('savings', 'Savings and investing', 6, [
     { title: 'Grow your money', tools: ['sip', 'step-up-sip', 'lumpsum', 'goal-sip'] },
-    { title: 'Fixed returns', tools: ['fd', 'rd', 'ppf'] },
+    { title: 'Fixed returns', tools: ['fd', 'fd-ladder', 'rd', 'ppf'] },
     { title: 'Retirement', tools: ['nps', 'epf', 'swp'] },
     { title: 'Measure growth', tools: ['inflation', 'cagr-xirr'] },
     { title: 'Check your finances', tools: ['emergency-fund', 'debt-to-income', 'savings-rate'] },

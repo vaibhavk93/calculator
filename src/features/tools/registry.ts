@@ -4,7 +4,8 @@ import { TOOLS as invest } from './invest'
 import { TOOLS as loans } from './loans'
 import { TOOLS as metrics } from './metrics'
 import { TOOLS as planning } from './planning'
+import { TOOLS as savings } from './savings'
 import { TOOLS as tax } from './tax'
 
 /** Every calculator the Tools tab lists. One file per module; add a spec there, not here. */
-export const ALL_TOOLS: ToolSpec[] = [...everyday, ...loans, ...invest, ...tax, ...metrics, ...planning]
+export const ALL_TOOLS: ToolSpec[] = [...everyday, ...loans, ...invest, ...savings, ...tax, ...metrics, ...planning]
