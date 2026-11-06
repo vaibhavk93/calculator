@@ -34,6 +34,12 @@ export function firstDue(dateKey: string, repeat: BillRepeat, now: number, time:
   return { dueAt: rollForward(addMonths(paid, step(repeat), d), repeat, d, now), anchorDay: d }
 }
 
+/** When the last payment falls, for a bill next due at `nextDue` with `remaining` payments left (the next one included). */
+export const lastPaymentAt = (nextDue: number, repeat: BillRepeat, anchorDay: number, remaining: number): number => addMonths(nextDue, step(repeat) * (remaining - 1), anchorDay)
+
+/** "1 payment left", "5 payments left". */
+export const paymentsLeftText = (n: number): string => `${n} ${n === 1 ? 'payment' : 'payments'} left`
+
 /** The next time a card bill is due, on `dueDay` (1 to 28) at `time`: this month's if it is today or later, else next month's. */
 export function cardBillDue(dueDay: number, now: number, time: string): number {
   const n = new Date(now)

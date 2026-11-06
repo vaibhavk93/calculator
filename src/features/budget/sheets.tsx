@@ -14,6 +14,7 @@ import {
   activeCategories,
   categoryMonths,
   categoryName,
+  cleanPaymentCount,
   dayKey,
   editWords,
   eligibleInstruments,
@@ -35,7 +36,7 @@ import {
   type Settlement,
 } from '../../lib/budget'
 import { D } from '../../engine'
-import { firstDue, looksMonthly, repeatWord } from '../../lib/recurring'
+import { firstDue, lastPaymentAt, looksMonthly, repeatWord } from '../../lib/recurring'
 import { formatCell } from '../../lib/toolFormat'
 import { shortDate } from '../../lib/tasks'
 import { Row, Segmented, Toggle } from '../settings/controls'
@@ -118,6 +119,8 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, rememberAs,
   const [refund, setRefund] = useState(start.refund)
   const [income, setIncome] = useState(start.income)
   const [repeat, setRepeat] = useState<BillRepeat | 'none'>(start.repeat)
+  // "Number of payments" for a bill that ends: typed text, '' = never ends. Only used when Repeats is on.
+  const [payments, setPayments] = useState('')
   const [view, setView] = useState<View>({ v: 'form' })
   // Category and mode pre-fill from an earlier entry with the same note, until the user picks one themselves.
   const [picked, setPicked] = useState(expense !== undefined)
@@ -136,7 +139,7 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, rememberAs,
     if (!expense) amountRef.current?.focus()
   }, [expense])
 
-  const dirty = amount !== start.amount || date !== start.date || categoryId !== start.categoryId || mode !== start.mode || instrumentId !== start.instrumentId || note !== start.note || settlement !== start.settlement || refund !== start.refund || income !== start.income || repeat !== start.repeat
+  const dirty = amount !== start.amount || date !== start.date || categoryId !== start.categoryId || mode !== start.mode || instrumentId !== start.instrumentId || note !== start.note || settlement !== start.settlement || refund !== start.refund || income !== start.income || repeat !== start.repeat || payments !== ''
   const guard = useDiscardGuard(dirty, onClose)
 
   const month = /^\d{4}-\d{2}/.test(date) ? date.slice(0, 7) : monthKey(new Date())
@@ -156,7 +159,9 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, rememberAs,
     if (first) return focusField(first === 'paidWith' && mode === null && settlement === null ? 'exp-mode' : FIELD_ID[first])
     const draft = { amount, categoryId, mode, instrumentId, date, note: note.trim(), settlement, refund: settlement === null && !income && refund, income: settlement === null && income }
     const rep = settlement === null && !refund && !income && repeat !== 'none' ? repeat : null
-    if (expense ? update(expense.id, draft, rep) : add(draft, rep)) {
+    if (rep && !expense?.recurringId && paymentsError) return focusField('exp-payments')
+    const count = rep ? (cleanPaymentCount(payments) ?? null) : null
+    if (expense ? update(expense.id, draft, rep, count) : add(draft, rep, count)) {
       // The entry is saved first; a rule that cannot be made (cap reached) says so in a notice but never loses the entry.
       if (!expense && canRemember && remember && categoryId) addRule(rememberAs!, categoryId)
       if (!expense) onSaved?.()
@@ -296,7 +301,12 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, rememberAs,
   const catError = shown('category')
   const instError = shown('paidWith')
   const linked = expense?.recurringId ? (budget.recurring ?? []).find((r) => r.id === expense.recurringId && r.deletedAt === null) : undefined
-  const nextDue = repeat !== 'none' && !errors.date ? firstDue(date, repeat, Date.now(), reminderTime).dueAt : null
+  const first = repeat !== 'none' && !errors.date ? firstDue(date, repeat, Date.now(), reminderTime) : null
+  const nextDue = first?.dueAt ?? null
+  // The entry is payment 1, so a bill of N payments has N - 1 left from the next due date.
+  const paymentCount = cleanPaymentCount(payments)
+  const paymentsError = paymentCount === undefined || paymentCount === 1 ? 'Use a whole number from 2 to 600, or leave it empty' : undefined
+  const lastDate = first && typeof paymentCount === 'number' && paymentCount >= 2 ? lastPaymentAt(first.dueAt, repeat as BillRepeat, first.anchorDay, paymentCount - 1) : null
   // A quiet guess from the person's own repeats. Never automatic: it only offers, and "Not now" is remembered for this note.
   const hintKey = note.trim().toLowerCase()
   const guess = !linked && !expense?.recurringId && settlement === null && !refund && !income && repeat === 'none' && !hintGone && hintKey !== '' && !dismissedHints.has(hintKey) ? looksMonthly(budget, { note, amount, date }, expense?.id ?? null) : null
@@ -435,6 +445,7 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, rememberAs,
                 {linked ? (
                   <p className="ffield__hint">This entry is part of a bill that repeats {repeatWord(linked.repeat)}. Change or stop it in Bills.</p>
                 ) : (
+                  <>
                   <div className="ffield">
                     <span className="ffield__label" id="exp-repeat-label">Repeats</span>
                     <Segmented<BillRepeat | 'none'>
@@ -449,6 +460,12 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, rememberAs,
                         : `This entry counts as the first payment. Next due ${shortDate(nextDue)}: it shows in Due, and marking it paid adds the entry.`}
                     </p>
                   </div>
+                  {repeat !== 'none' && (
+                      <FormField label="Number of payments" htmlFor="exp-payments" error={payments !== '' || submitted ? paymentsError : undefined} hint={lastDate !== null ? `Last payment on ${shortDate(lastDate)}` : 'Counts this entry as the first. Leave empty if it never ends'}>
+                        <input id="exp-payments" className="field field--mono" inputMode="numeric" value={payments} autoComplete="off" onChange={(e) => setPayments(e.target.value.replace(/\D/g, '').slice(0, 3))} aria-invalid={paymentsError && payments !== '' ? true : undefined} aria-describedby="exp-payments-msg" />
+                      </FormField>
+                  )}
+                  </>
                 )}
               </div>
             </details>
