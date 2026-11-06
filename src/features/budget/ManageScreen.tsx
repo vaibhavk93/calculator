@@ -23,6 +23,7 @@ import {
 import { CategoryEditSheet } from './CategoryEditSheet'
 import { InstrumentForm } from './InstrumentForm'
 import { OverallLimitSheet } from './limits'
+import { RulesScreen } from './RulesScreen'
 import { useMoney } from './SpendSummary'
 
 type Target =
@@ -31,6 +32,7 @@ type Target =
   | { kind: 'category'; id: string }
   | { kind: 'newCategory' }
   | { kind: 'instrument'; id: string | null }
+  | { kind: 'rules' }
 
 /**
  * Limits, categories (with subcategories) and the cards, accounts and wallets entries can be paid from. Opened from Budget.
@@ -96,6 +98,13 @@ export function ManageScreen({ onBack, month = monthKey(new Date()) }: { onBack:
           </div>
         </section>
 
+        <section className="sect sect--settings" aria-label="Merchant rules">
+          <h2 className="sect__head">Merchant rules</h2>
+          <div className="sect__body">
+            {row('rules', 'Rules', (budget.rules ?? []).length === 0 ? 'Pick a category by merchant when adding from messages' : `${(budget.rules ?? []).length} ${(budget.rules ?? []).length === 1 ? 'rule' : 'rules'}`, () => setTarget({ kind: 'rules' }))}
+          </div>
+        </section>
+
         <section className="sect sect--settings" aria-label="Payment methods">
           <h2 className="sect__head">Payment methods</h2>
           <div className="sect__body">
@@ -122,6 +131,7 @@ export function ManageScreen({ onBack, month = monthKey(new Date()) }: { onBack:
       {target?.kind === 'category' && <CategoryEditSheet id={target.id} month={month} onClose={close} />}
       {target?.kind === 'newCategory' && <CategoryEditSheet id={null} month={month} onClose={close} />}
       {target?.kind === 'instrument' && <InstrumentForm id={target.id} onClose={close} />}
+      {target?.kind === 'rules' && <RulesScreen onBack={close} />}
     </div>
   )
 }
