@@ -497,3 +497,8 @@
   overflow-y: auto;
   justify-content: safe center;
 }
+
+/* The one filled button must not shrink when the list under it is tall (it went 23px high on a 640px phone). */
+.empty > .btn {
+  flex: none;
+}

@@ -216,6 +216,13 @@ row. Hide-amounts flag (local). Cut: categories/platform/folio/note, units and g
 XIRR/invested (P2), reminders (P2). Files: `src/engine/investments/portfolio.ts`, `src/lib/portfolio.ts`, store types/persistence/app, one
 screen + sheet inside `features/budget`. Additive, schema stays 3. Waits for D1 (same store files) and for the card/list design decision.
 
+**Built (branch worktree-agent-a6463555a5fc13c7b, from dev 42e0217).** `src/engine/investments/portfolio.ts` (pure maths), `src/lib/portfolio.ts` (words, form checks,
+`sanitizePortfolio`), `portfolio?` on the stored data (schema stays 3), five actions in `app.ts`, `features/budget/PortfolioScreen.tsx` reached from "More in Budget"
+(and from the empty Budget list, or it could not be reached before the first expense). Choices: amounts hidden by default (screen state only); a value on the same day
+replaces that day; the 121st value drops the oldest; a month that lacks a holding's first value leaves it out and says so in words on that month's row; a value dated one day ahead is
+kept on load (phone in another time zone), two days ahead is dropped. Tests: `engine/investments/portfolio.test.ts`, `store/portfolio.test.ts`, `store/qa-privacy-portfolio.test.ts`,
+`src/portfolio-rules.test.ts`, browser pass `e2e/portfolio.test.mjs`. One CSS line added (`.empty > .btn { flex: none }`): the extra empty-list row squeezed the Add button to 23px at 360x640.
+
 ### Phase 7 — modules on/off (owner: build it; critic shrank it, 2026-11-05)
 
 **Two switches only: "Budget" and "Notes and reminders" (Notes + Due together). Tools is always on.** One `modules: { budget, notes }`
