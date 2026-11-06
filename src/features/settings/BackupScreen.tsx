@@ -84,10 +84,12 @@ export function BackupScreen({ onBack }: { onBack: () => void }) {
       <div className="screen__body">
         <section className="sect sect--settings" aria-label="Backup">
           <h2 className="sect__head">Backup</h2>
+          <div className="settings__panel">
           {row('Export a backup', 'History and settings, as one file you keep', () => void exportBackup())}
           {notesOn && row('Export notes', 'Notes, lists and saved calculations as a text file. To-dos are in the full backup', () => void exportNotes())}
           {row('Restore from a backup', 'Replaces what is on this phone now', () => fileRef.current?.click())}
           <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" aria-label="Choose a backup file" tabIndex={-1} onChange={(e) => void chooseFile(e.target.files?.[0])} />
+          </div>
         </section>
 
         {backup.state === 'confirm' && (
@@ -119,7 +121,7 @@ export function BackupScreen({ onBack }: { onBack: () => void }) {
         {budgetOn && (
           <section className="sect sect--settings" aria-label="Export">
             <h2 className="sect__head">Export</h2>
-            {row('Export expenses', 'Budget entries as a spreadsheet file (CSV)', () => setExportCsv(true))}
+            <div className="settings__panel">{row('Export expenses', 'Budget entries as a spreadsheet file (CSV)', () => setExportCsv(true))}</div>
           </section>
         )}
       </div>

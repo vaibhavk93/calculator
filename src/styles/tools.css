@@ -884,8 +884,32 @@ textarea.field {
   border-bottom: 1px solid var(--line);
 }
 
+/* Due's hero: the one large number on the screen, label above (docs/design-reference, Due). */
 .due__total {
   flex: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-1);
+  border-bottom: 0;
+}
+
+.due__label {
+  font-size: 0.875rem;
+  color: var(--ink-2);
+}
+
+.due__hero {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: min(2.5rem, 11vw);
+  font-weight: 500;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.due__view {
+  flex: none;
+  padding: var(--s-2) var(--s-4);
 }
 
 .tape__sum {
@@ -947,17 +971,29 @@ textarea.field {
   color: var(--alert);
 }
 
+/* A Due row. A bill: icon, title + ONE meta line, Mark paid, More. A task: round check, title + meta, More.
+   When the font is large the buttons drop under the text, at the right, instead of squeezing it. */
 .due {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0 var(--s-1);
-  padding: var(--s-1) var(--s-2);
+  gap: 0 var(--s-2);
+  padding: var(--s-1) var(--s-2) var(--s-1) var(--s-4);
   border-top: 1px solid var(--line);
 }
 
-/* The one main control of a Due row: a 44px round check. Done for a task, Mark paid for a bill. */
+.due:not(.due--pay) {
+  padding-left: var(--s-2);
+}
+
+.due__icon {
+  flex: none;
+  color: var(--ink-2);
+}
+
+/* The one main control of a task row: a 44px round check. */
 .due__check {
+  flex: none;
   display: grid;
   place-items: center;
   width: 44px;
@@ -971,12 +1007,26 @@ textarea.field {
   background: var(--key-op-pressed);
 }
 
-/* A reminder's amount sits under its date, in numbers type, so the row keeps one calm line of text per fact. */
+/* A bill's Mark paid: worded, so it can't be mistaken for "done with the reminder". */
+.due__pay {
+  flex: none;
+  min-height: 44px;
+  padding: 0 var(--s-3);
+  font-size: 0.875rem;
+}
+
+.due__btns {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  margin-left: auto;
+}
+
+/* The amount inside the meta line, in numbers type. */
 .due__amt {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 0.875rem;
-  color: var(--ink-2);
   overflow-wrap: anywhere;
 }
 
@@ -990,17 +1040,34 @@ textarea.field {
 }
 
 .due__main {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
+  flex: 1 1 0;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-height: 48px;
-  padding: var(--s-1) var(--s-2);
+  justify-content: center;
+  padding: var(--s-2) 0;
   text-align: left;
+}
+
+/* A bill row needs room for its words: below this the buttons wrap under, at the right. */
+.due--pay .due__main {
+  flex-basis: 8rem;
 }
 
 .due__main:active {
   background: var(--key-op-pressed);
+}
+
+.due .row__hint,
+.due-card .row__hint {
+  color: var(--ink-2);
+}
+
+.due .due__alert,
+.due-card .due__alert {
+  color: var(--alert);
 }
 
 .due__ask {
@@ -1009,45 +1076,78 @@ textarea.field {
 }
 
 .due__actions {
-  grid-column: 1 / -1;
+  flex: 1 1 100%;
   display: flex;
   flex-wrap: wrap;
   gap: var(--s-4);
 }
 
 .due > .due__actions {
-  padding: var(--s-1) var(--s-2) var(--s-2);
+  padding: var(--s-1) 0 var(--s-2);
 }
 
-/* Card view (a user toggle, docs/SESSION-STATE.md Round 17): check and More sit in their own top row --
-   never overlapping the tappable body below, same non-overlap rule as .due's own grid columns, just
-   stacked instead of side by side since a 2-column grid cell is too narrow for three columns. */
+.due-card > .due__actions {
+  padding: 0 var(--s-4) var(--s-3);
+}
+
+/* Card view: one flat card per item (surface, no border, nothing nested). The body opens it, More sits
+   beside it, and the Mark paid / done control is inside the card, under the amount. */
 .due-card {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--ink-3);
+  background: var(--surface);
   border-radius: var(--r-md);
   min-width: 0;
 }
 
 .due-card__top {
   display: flex;
-  justify-content: space-between;
-  padding: var(--s-1) var(--s-1) 0;
+  align-items: flex-start;
 }
 
 .due-card__body {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  width: 100%;
+  gap: var(--s-1);
   min-height: 44px;
-  padding: 0 var(--s-3) var(--s-3);
+  padding: var(--s-3) 0 var(--s-2) var(--s-4);
+  border-radius: var(--r-md);
   text-align: left;
+}
+
+.due-card__body > .row__label {
+  font-weight: 600;
 }
 
 .due-card__body:active {
   background: var(--key-op-pressed);
+}
+
+.due-card__amt {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: min(1.75rem, 8vw);
+  font-weight: 500;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.due-card__act {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 0 var(--s-4) var(--s-3);
+}
+
+.due-card__act .due__pay {
+  flex: 1;
+}
+
+.due-card__word {
+  font-size: 0.875rem;
+  color: var(--ink-2);
 }
 
 .due__alert,

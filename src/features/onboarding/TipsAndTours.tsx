@@ -23,6 +23,7 @@ export function TipsAndToursScreen({ onBack }: { onBack: () => void }) {
       <div className="screen__body">
         <section className="sect sect--settings" aria-label="Tips and tours">
           <h2 className="sect__head">Replay</h2>
+          <div className="settings__panel">
           {TOUR_LIST.filter((t) => tabOn(settings, TOUR_TAB[t.id])).map((t) => (
             <button key={t.id} type="button" className="row row--button tap-row" onClick={() => setOpen(t.id)}>
               <span className="row__text">
@@ -39,6 +40,7 @@ export function TipsAndToursScreen({ onBack }: { onBack: () => void }) {
             </span>
             <Icon name="chevron" size={18} className="tap-row__chev" />
           </button>
+          </div>
         </section>
       </div>
       {open && <TourSheet tour={open} onClose={() => setOpen(null)} />}

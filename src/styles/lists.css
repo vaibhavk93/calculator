@@ -137,23 +137,50 @@
   align-self: center;
 }
 
-/* Card view (Notes/Due, a user toggle, docs/SESSION-STATE.md Round 17): the same rows, shown as a
-   2-column grid of bordered tiles instead of a hairline list. Border only, no tint -- a card's edge
-   says "this is one item", not a wash of colour. */
+/* A Notes row: a small kind icon (a shape to scan by), the text, the pin. Never wraps: the text shrinks. */
+.row--note {
+  flex-wrap: nowrap;
+  gap: var(--s-3);
+}
+
+.row__kind {
+  flex: none;
+  align-self: center;
+  color: var(--ink-2);
+}
+
+.row--note .row__hint,
+.item-card .row__hint {
+  color: var(--ink-2);
+}
+
+/* List or Card, then New, on one line under the search (docs/design-reference, Notes List / Card). */
+.saved__view {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+}
+
+.saved__view .seg {
+  flex: 1 1 10rem;
+}
+
+/* Card view (Notes and Due, docs/design-reference): one flat card per item, one column, the surface colour,
+   no border and no card inside it. The card shows the item's content; the whole card opens it. */
 .card-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
   gap: var(--s-3);
   padding: var(--s-2) var(--s-4);
 }
 
-/* Same flex-row shape as .row--split (main flex:1, pin flex:none, side by side -- never overlapping,
-   the geometry the layout-contract suite checks for), just bordered and placed in a grid cell. */
+/* Same flex-row shape as .row--split (main flex:1, pin flex:none, side by side, never overlapping,
+   the geometry the layout-contract suite checks for). */
 .item-card {
   display: flex;
   align-items: stretch;
-  border: 1px solid var(--ink-3);
+  background: var(--surface);
   border-radius: var(--r-md);
   min-width: 0;
 }
@@ -163,9 +190,10 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--s-1);
   min-height: 44px;
-  padding: var(--s-3);
+  padding: var(--s-3) 0 var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
   text-align: left;
 }
 
@@ -173,9 +201,89 @@
   background: var(--key-op-pressed);
 }
 
+.item-card__main > .row__label {
+  font-weight: 600;
+}
+
 .item-card__pin {
   flex: none;
   align-self: flex-start;
+}
+
+/* A calculation's answer: the one large number on its card. */
+.item-card__num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: min(1.75rem, 8vw);
+  font-weight: 500;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+/* A plain note's first lines. */
+.item-card__text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.item-card__lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.item-card__line,
+.item-card__total {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: 0.9375rem;
+}
+
+.item-card__line--done {
+  color: var(--ink-2);
+  text-decoration: line-through;
+}
+
+.item-card__linelabel {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.item-card__lineval {
+  flex: none;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.item-card__total {
+  justify-content: space-between;
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--line);
+  font-weight: 600;
+}
+
+/* A preview tick, not a control: the card opens the list, where the real checkboxes are. */
+.item-card__box {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid var(--ink-3);
+  border-radius: var(--r-sm);
+}
+
+.item-card__box--on {
+  border-color: var(--accent-fill);
+  background: var(--accent-fill);
+  color: var(--accent-ink);
 }
 
 /* ---- To-do, inside the Notes tab (.todo__*) and the Notes switch (.notes__*) */
