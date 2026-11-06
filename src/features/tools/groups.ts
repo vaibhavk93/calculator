@@ -65,8 +65,9 @@ export const GROUPS: ToolGroup[] = [
     { title: 'Check your finances', tools: ['emergency-fund', 'debt-to-income', 'savings-rate'] },
   ]),
   group('tax', 'Tax and salary', 7, [
-    { title: 'Your tax', tools: ['income-tax', 'advance-tax', 'capital-gains', 'presumptive-44ada'] },
-    { title: 'Your pay', tools: ['in-hand-salary', 'gratuity'] },
+    { title: 'Your tax', tools: ['income-tax', 'advance-tax'] },
+    { title: 'Your pay', tools: ['in-hand-salary', 'hra', 'gratuity'] },
+    { title: 'Gains and freelance income', tools: ['capital-gains', 'presumptive-44ada'] },
   ]),
   group('business', 'Business metrics', 8, [
     { title: 'Customers', tools: ['cac-ltv', 'cac-payback', 'retention'] },
