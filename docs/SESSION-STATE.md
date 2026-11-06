@@ -1,5 +1,15 @@
 # Session state: resume here
 
+## Round 21 (2026-11-06): the other four unblocked calculators
+
+One commit each: **FD ladder** `a0b6df2`, **LTCG harvesting** `ea1a57d`, **small-savings pack** (SSY, NSC, SCSS, KVP, MIS, Post Office TD) `37b442e`, **gold jewellery bill** `9dba0c9`. Engines + tests first, then specs (`savings.ts`, `gold.ts` are new; harvesting is in `tax.ts`), rows added to `docs/VERIFICATION.md`. Rates and sources are in `investments/rates.ts` ("official to 31 Dec 2026"), the tax rules file (TDS on bank interest) and `convert/gstRates.ts` (gold).
+
+**Flagged as assumptions (on screen and in the rules files):** Post Office TD (the rule text does not say if yearly interest is paid out or stays in: both offered); SSY (one deposit a year, constant rate); gold inter-state IGST taken as 3% (IGST notification not read) and 22K/18K/14K price = 24K rate x karat / 24; FD ladder (one bank name = one depositor; TDS year = each FD's first 12 months). Not modelled: no-PAN TDS, s.198(3) low-income reduction, old-gold exchange.
+
+**Schedule IV re-check done:** the signed text of Notification 01/2026-Central Tax (Rate) amends only Schedule I (150, 151) and III (2, 3). Residual: 19/2025 (31 Dec 2025) text not opened, a secondary summary says Schedule II only.
+
+**Open:** a date column inside a rows field (LTCG harvesting) shows "10/01/202" clipped at 360px; it is a CSS fix in the row grid, not done (CSS was out of bounds). Post Office RD and VPF/EPF stay blocked.
+
 ## Round 20 (2026-11-06): HRA calculator built; the 2026-11-06 research turned into code
 
 **Lane chosen because of a peer session.** `calculator-91` messaged to say it is implementing the new
