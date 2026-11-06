@@ -997,7 +997,7 @@ T('Y13', 'UI', 'keyboard focus ring is visible on buttons (focus-visible outline
 })
 T('Y14', 'UI', 'tappable things look tappable: Settings rows that open something have a chevron, toggles have role=switch', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page)
-  ok(await page.locator('.tap-row .tap-row__chev').count() >= 3, 'chevrons: ' + await page.locator('.tap-row .tap-row__chev').count()); ok(await page.locator('[role=switch]').count() === 3, 'switches ' + await page.locator('[role=switch]').count())
+  ok(await page.locator('.tap-row .tap-row__chev').count() >= 3, 'chevrons: ' + await page.locator('.tap-row .tap-row__chev').count()); ok(await page.locator('[role=switch]').count() === 5, 'switches ' + await page.locator('[role=switch]').count())
   for (const sw of await page.locator('[role=switch]').all()) ok(await sw.getAttribute('aria-checked') !== null, 'switch without aria-checked')
 })
 T('Y15', 'UI', 'radio groups (theme, number format, angle, accent) have a group name and exactly one checked item', async (app) => {
@@ -1247,7 +1247,7 @@ T('R08', 'UX', 'tab labels are not truncated at 320 px width and 200% font', asy
 })
 T('R09', 'UI', 'Settings headings, section order and the Reminders-free layout read naturally (observation of heading list)', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page)
-  const h = await page.locator('.screen h1, .screen h2').allInnerTexts(); ok(h.join('|') === 'Settings|Appearance|Numbers|Behaviour|Reminders|More', h.join('|'))
+  const h = await page.locator('.screen h1, .screen h2').allInnerTexts(); ok(h.join('|') === 'Settings|Appearance|Numbers|Show in the app|Behaviour|Reminders|More', h.join('|'))
 })
 T('R10', 'RUNTIME', 'document title, theme-color meta and html lang stay valid after a theme change', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page); await page.click('[role=radio]:text-is("Light")')
