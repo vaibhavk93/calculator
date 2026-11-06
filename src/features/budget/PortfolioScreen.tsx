@@ -139,7 +139,7 @@ export function PortfolioScreen({ onBack }: { onBack: () => void }) {
                     <span className="row__label">{monthShortLabel(m.month)}</span>
                     <span className="budget__amt spend__amt">{shown(m.total)}</span>
                     <Bar pct={pctOf(m.total.abs(), peak)} />
-                    {left.length > 0 && <span className="budget__note">Leaves out {left.join(', ')}: no value yet</span>}
+                    {left.length > 0 && <span className="budget__note">Leaves out {left.length > 2 ? `${left.length} holdings` : left.join(' and ')}: no value yet</span>}
                   </div>
                 )
               })}
