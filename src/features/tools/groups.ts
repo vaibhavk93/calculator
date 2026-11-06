@@ -38,7 +38,7 @@ export const GROUPS: ToolGroup[] = [
     { title: 'Number systems', tools: ['number-base'] },
   ]),
   group('money', 'Money and shopping', 2, [
-    { title: 'Prices and bills', tools: ['discount', 'gst', 'unit-price'] },
+    { title: 'Prices and bills', tools: ['discount', 'gst', 'unit-price', 'gold-bill'] },
     { title: 'Sharing a bill', tools: ['tip'] },
     { title: 'Foreign money', tools: ['currency'] },
   ]),
