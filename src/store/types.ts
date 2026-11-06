@@ -4,6 +4,7 @@ import type { BudgetData } from '../lib/budget'
 import type { Reminder, SavedCard } from '../lib/memory'
 import type { AccentName, ThemePreference } from '../lib/theme'
 import type { Modules } from '../lib/modules'
+import type { Holding } from '../lib/portfolio'
 import type { Values } from '../lib/tool'
 
 export type Tab = 'calculate' | 'tools' | 'saved' | 'due' | 'budget'
@@ -134,8 +135,12 @@ export interface PersistedData {
   memory: string | null
   input: InputState
   budget: BudgetData
+  /** Portfolio: things you own or owe, each with dated values. Additive and optional: absent in old backups, which load as empty. */
+  portfolio?: Holding[]
   /** What was typed into each calculator and not saved (tool id -> its field values), so reopening one resumes it. Absent: none. At most MAX_DRAFTS. */
   drafts?: Record<string, Values>
 }
+
+export type { Holding, HoldingKind, HoldingValue } from '../lib/portfolio'
 
 export const MAX_DRAFTS = 40

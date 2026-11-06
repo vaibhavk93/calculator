@@ -10,10 +10,11 @@ import { useTour } from '../onboarding/useTour'
 import { BillsScreen } from './BillsScreen'
 import { ImportScreen } from './ImportScreen'
 import { ManageScreen } from './ManageScreen'
+import { PortfolioScreen } from './PortfolioScreen'
 import { ExpenseSheet } from './sheets'
 import { Bar, EntryRow, FitHero, MonthNav, SpendSummary, limitWords, useMoney, type SummaryTab } from './SpendSummary'
 
-type Page = 'home' | 'summary' | 'manage' | 'import' | 'bills'
+type Page = 'home' | 'summary' | 'manage' | 'import' | 'bills' | 'portfolio'
 type SheetState = null | { id: string | null }
 
 const entriesWord = (n: number) => `${n} ${n === 1 ? 'entry' : 'entries'}`
@@ -65,6 +66,7 @@ export function BudgetScreen() {
       {page === 'manage' && <ManageScreen onBack={() => setPage('home')} month={month} />}
       {page === 'import' && <ImportScreen onBack={() => setPage('home')} />}
       {page === 'bills' && <BillsScreen onBack={() => setPage('home')} />}
+      {page === 'portfolio' && <PortfolioScreen onBack={() => setPage('home')} />}
     </>
   )
 
@@ -79,6 +81,7 @@ export function BudgetScreen() {
           more={[
             { label: 'Add from bank messages', onClick: () => setPage('import') },
             { label: 'Bills and subscriptions', onClick: () => setPage('bills') },
+            { label: 'Portfolio', onClick: () => setPage('portfolio') },
             { label: 'Set a monthly limit', onClick: () => setPage('manage') },
             { label: 'Categories and cards', onClick: () => setPage('manage') },
             tour.empty,
@@ -203,6 +206,13 @@ export function BudgetScreen() {
               <span className="row__text">
                 <span className="row__label">Bills and subscriptions</span>
                 {bills.count > 0 && <span className="row__hint">{`${bills.count} running · about ${money(bills.perMonth)} a month = ${money(bills.perYear)} a year`}</span>}
+              </span>
+              <Icon name="chevron" size={18} className="navrow__chev" />
+            </button>
+            <button type="button" className="navrow tap-row" onClick={() => { setMoreOpen(false); setPage('portfolio') }}>
+              <span className="row__text">
+                <span className="row__label">Portfolio</span>
+                <span className="row__hint">What you own and what you owe</span>
               </span>
               <Icon name="chevron" size={18} className="navrow__chev" />
             </button>
