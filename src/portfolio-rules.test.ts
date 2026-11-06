@@ -20,10 +20,11 @@ describe('Portfolio lives inside Budget, nowhere else', () => {
   it('the Budget tab is only rendered when it is on (the tab falls back to Calculate when Budget is off), so its Portfolio row goes with it', () => {
     expect(read('App.tsx')).toMatch(/tab === 'budget' && <BudgetScreen/)
   })
-  it('the Portfolio row is in both Budget lists: "More in Budget" and the empty-state list', () => {
+  it('net worth is the "Net worth" side of the Budget home switch, shown in the empty state too; there is no separate Portfolio page or row', () => {
     const budget = read('features/budget/BudgetScreen.tsx')
-    expect(budget).toMatch(/<span className="row__label">Portfolio<\/span>/)
-    expect(budget).toMatch(/label: 'Portfolio'/)
+    expect(budget).toMatch(/\{ value: 'networth', label: 'Net worth' \}/)
+    expect(budget).toMatch(/<PortfolioView hidden=\{hidden\} \/>/)
+    expect(budget).not.toMatch(/'Portfolio'|>Portfolio</)
   })
 })
 
@@ -41,9 +42,9 @@ describe('Portfolio privacy: the code that sends things out never mentions it', 
   })
 })
 
-describe('Hide amounts is local to the screen', () => {
+describe('Hide amounts is local to Budget home', () => {
   it('is plain component state that starts hidden, and the stored types and sanitisers know nothing about it', () => {
-    expect(read('features/budget/PortfolioScreen.tsx')).toMatch(/useState\(true\)/)
+    expect(read('features/budget/BudgetScreen.tsx')).toMatch(/const \[hidden, setHidden\] = useState\(true\)/)
     for (const f of ['store/types.ts', 'store/persistence.ts', 'lib/portfolio.ts', 'store/app.ts']) expect(read(f)).not.toMatch(/hideAmounts|amountsHidden/)
   })
 })

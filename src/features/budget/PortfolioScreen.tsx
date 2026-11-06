@@ -1,15 +1,15 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { EmptyState } from '../../components/EmptyState'
 import { FormField, RequiredNote } from '../../components/FormField'
 import { Icon } from '../../components/Icon'
 import { PickerSelect, type PickOption } from '../../components/PickerSelect'
-import { ScreenHeader } from '../../components/ScreenHeader'
 import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { tintStyle } from '../../components/tint'
 import { D, type Dec } from '../../engine'
 import {
   ASSET_KINDS,
+  HOLDING_KINDS,
   LIABILITY_KINDS,
   countedHoldings,
   isLiability,
@@ -23,10 +23,13 @@ import {
 import { KIND_LABEL, KIND_ONE, STALE_DAYS, cleanHoldingName, isOld, updatedWords, validateHolding, type Holding, type HoldingKind } from '../../lib/portfolio'
 import { dayText, shortDate } from '../../lib/tasks'
 import { monthShortLabel } from '../../lib/budget'
+import { DATE_LOCALE } from '../../lib/dateLocale'
 import { GuardedFooter, MoneyInput, focusField, useDiscardGuard } from './formKit'
-import { Bar, FitHero, useMoney } from './SpendSummary'
+import { FitHero, useMoney } from './SpendSummary'
 
 const HIDDEN = '••••'
+/** A trend column's label: just the month ("Jun"); the full month and year are in the chart's spoken label. */
+const MONTH = new Intl.DateTimeFormat(DATE_LOCALE, { month: 'short' })
 type SheetState = null | { kind: 'add' } | { kind: 'edit'; id: string }
 
 const KIND_OPTIONS: PickOption[] = [
@@ -35,50 +38,25 @@ const KIND_OPTIONS: PickOption[] = [
 ]
 
 const pctOf = (part: Dec, whole: Dec): number => (whole.isZero() ? 0 : part.div(whole).times(100).toNumber())
-
-function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
-  return (
-    <section className="sect" aria-label={title}>
-      <h2 className="sect__head">
-        <span>{title}</span>
-        {count !== undefined && <span className="sect__count">{count}</span>}
-      </h2>
-      <div className="sect__body">{children}</div>
-    </section>
-  )
-}
+/** Each kind's mark: one of the eight section inks. Identity only, never good or bad, and always next to its name. */
+const kindMark = (k: HoldingKind): CSSProperties => ({ background: `var(--tint-${(HOLDING_KINDS.indexOf(k) % 8) + 1}-ink)` })
 
 /**
- * Portfolio: a list of what you own and what you owe, each with one current value and the day it was set. Net worth, the split and
- * the last 6 months are worked out from that (engine/investments/portfolio.ts), never stored. Rupees only. Reached from
- * "More in Budget", so it hides with the Budget tab. Back is handled by BudgetScreen.
+ * Net worth, inside Budget home (the "Net worth" side of its switch). A list of what you own and what you owe, each with
+ * one current value and the day it was set. Net worth, the split and the last 6 months are worked out from that
+ * (engine/investments/portfolio.ts), never stored. Rupees only.
  *
- * "Hide amounts" is this screen's own state only: it is never saved, never in a backup and never logged. It starts hidden.
+ * `hidden` ("hide amounts", the eye in Budget's header) belongs to BudgetScreen: never saved, never in a backup, never
+ * logged, and it starts hidden. Hidden also hides the bars, because proportions give the split away.
  */
-export function PortfolioScreen({ onBack }: { onBack: () => void }) {
+export function PortfolioView({ hidden }: { hidden: boolean }) {
   const portfolio = useApp((s) => s.portfolio)
   const money = useMoney()
-  const [hidden, setHidden] = useState(true)
   const [sheet, setSheet] = useState<SheetState>(null)
 
   const today = dayText(Date.now())
   const live = portfolio.filter((h) => h.deletedAt === null)
   const shown = (v: Dec) => (hidden ? HIDDEN : money(v))
-
-  const total = netWorth(live)
-  const counted = countedHoldings(live)
-  const stale = staleCount(live, today)
-  const oldest = oldestAsOf(live)
-  const split = splitByKind(live)
-  const owns = split.filter((r) => !r.liability)
-  const owes = split.filter((r) => r.liability)
-  const ownTotal = owns.reduce((a, r) => a.plus(r.total), new D(0))
-  const oweTotal = owes.reduce((a, r) => a.plus(r.total), new D(0))
-  const names = new Map(live.map((h) => [h.id, h.name]))
-  const months = monthlySeries(live, today).filter((m) => m.included > 0)
-  const peak = months.reduce((a, m) => (m.total.abs().gt(a) ? m.total.abs() : a), new D(0))
-
-  const holdings = [...live].sort((a, b) => (latestValue(b)?.date ?? '').localeCompare(latestValue(a)?.date ?? '') || a.name.localeCompare(b.name))
 
   const sheets = (
     <>
@@ -89,72 +67,107 @@ export function PortfolioScreen({ onBack }: { onBack: () => void }) {
 
   if (live.length === 0) {
     return (
-      <div className="screen" role="dialog" aria-modal="true" aria-label="Portfolio">
-        <ScreenHeader title="Portfolio" onBack={onBack} />
-        <div className="screen__body">
-          <EmptyState title="No portfolio yet" action={<button type="button" className="btn btn--primary" onClick={() => setSheet({ kind: 'add' })}>Add</button>}>
-            List what you own and what you owe, and this page works out your net worth. It is in rupees and stays on this phone.
-          </EmptyState>
-        </div>
+      <div className="networth" role="region" aria-label="Net worth">
+        <EmptyState title="Nothing listed yet" level="h2" action={<button type="button" className="btn btn--primary" onClick={() => setSheet({ kind: 'add' })}>Add</button>}>
+          List what you own and what you owe, and this page works out your net worth. It is in rupees and stays on this phone.
+        </EmptyState>
         {sheets}
       </div>
     )
   }
 
-  const kindRows = (rows: typeof split, side: Dec) =>
-    rows.map((r) => (
-      <div key={r.kind} className="budget__row budget__row--plain">
-        <span className="row__label">{KIND_LABEL[r.kind]}</span>
-        <span className="budget__amt spend__amt">{shown(r.total)}</span>
-        <Bar pct={pctOf(r.total, side)} />
-        <span className="budget__note">{r.count} {r.count === 1 ? 'item' : 'items'} · {Math.round(pctOf(r.total, side))}% of {r.liability ? 'what you owe' : 'what you own'}</span>
+  const total = netWorth(live)
+  const counted = countedHoldings(live)
+  const stale = staleCount(live, today)
+  const oldest = oldestAsOf(live)
+  const split = splitByKind(live)
+  const names = new Map(live.map((h) => [h.id, h.name]))
+  const months = monthlySeries(live, today).filter((m) => m.included > 0)
+  const peak = months.reduce((a, m) => (m.total.abs().gt(a) ? m.total.abs() : a), new D(0))
+  const holdings = [...live].sort((a, b) => (latestValue(b)?.date ?? '').localeCompare(latestValue(a)?.date ?? '') || a.name.localeCompare(b.name))
+  const negative = !hidden && total.isNegative()
+  const staleWords = `${stale} of ${counted} ${counted === 1 ? 'value' : 'values'} older than ${STALE_DAYS} days`
+
+  // One side of the split: a bar (only while amounts show) and a legend that names every colour in words.
+  const side = (title: string, rows: typeof split) => {
+    if (rows.length === 0) return null
+    const whole = rows.reduce((a, r) => a.plus(r.total), new D(0))
+    return (
+      <div className="networth__side">
+        <span className="budget__note">{title}</span>
+        {!hidden && (
+          <div className="networth__split" aria-hidden="true">
+            {rows.map((r) => <span key={r.kind} style={{ ...kindMark(r.kind), width: `${pctOf(r.total, whole)}%` }} />)}
+          </div>
+        )}
+        <ul className="networth__legend">
+          {rows.map((r) => (
+            <li key={r.kind}>
+              <span className="networth__dot" style={kindMark(r.kind)} aria-hidden="true" />
+              <span className="networth__kind">{KIND_LABEL[r.kind]}{hidden ? '' : ` · ${Math.round(pctOf(r.total, whole))}%`}</span>
+              <span className="budget__amt">{shown(r.total)}</span>
+            </li>
+          ))}
+        </ul>
       </div>
-    ))
+    )
+  }
 
   return (
-    <div className="screen" role="dialog" aria-modal="true" aria-label="Portfolio">
-      <ScreenHeader title="Portfolio" onBack={onBack} />
-      <div className="screen__body">
-        <div className="sections">
-          <section className="sect" aria-label="Net worth">
-            <div className="budget__sum">
-              <span className="result__label">Net worth</span>
-              {!hidden && total.isNegative() && <span className="budget__note">You owe more than you own</span>}
-              <FitHero text={shown(total)} />
-              <span className="budget__note">{stale} of {counted} {counted === 1 ? 'value' : 'values'} older than {STALE_DAYS} days</span>
-              {stale > 0 && oldest && <span className="budget__note">Includes values from {shortDate(Date.parse(`${oldest}T00:00:00`))}</span>}
-              <button type="button" className="link-btn" aria-pressed={!hidden} onClick={() => setHidden((h) => !h)}>{hidden ? 'Show amounts' : 'Hide amounts'}</button>
-            </div>
-          </section>
+    <div className="networth" role="region" aria-label="Net worth">
+      <div className="budget__sum">
+        <span className="result__label">Net worth</span>
+        <FitHero text={negative ? `−${money(total.abs())}` : shown(total)} negative={negative} />
+        {negative && <span className="budget__note">Liabilities are larger than assets</span>}
+      </div>
 
-          {owns.length > 0 && <Section title="What you own">{kindRows(owns, ownTotal)}</Section>}
-          {owes.length > 0 && <Section title="What you owe">{kindRows(owes, oweTotal)}</Section>}
-
-          {months.length > 1 && (
-            <Section title="Last 6 months">
-              {[...months].reverse().map((m) => {
-                const left = m.excluded.map((id) => names.get(id)).filter((n): n is string => !!n)
-                return (
-                  <div className="budget__row budget__row--plain" key={m.month}>
-                    <span className="row__label">{monthShortLabel(m.month)}</span>
-                    <span className="budget__amt spend__amt">{shown(m.total)}</span>
-                    <Bar pct={pctOf(m.total.abs(), peak)} />
-                    {left.length > 0 && <span className="budget__note">Leaves out {left.length > 2 ? `${left.length} holdings` : left.join(' and ')}: no value yet</span>}
-                  </div>
-                )
-              })}
-            </Section>
-          )}
-
-          <Section title="Your list" count={live.length}>
-            {holdings.map((h) => (
-              <HoldingRow key={h.id} h={h} today={today} shown={shown} onOpen={() => setSheet({ kind: 'edit', id: h.id })} />
-            ))}
-            <div className="manage__actions">
-              <button type="button" className="btn btn--primary" onClick={() => setSheet({ kind: 'add' })}>Add</button>
-            </div>
-          </Section>
+      {stale > 0 ? (
+        <div className="networth__stale">
+          <Icon name="clock" size={16} />
+          <span>
+            {staleWords}
+            {oldest && <span className="networth__stale-sub">Includes values from {shortDate(Date.parse(`${oldest}T00:00:00`))}</span>}
+          </span>
         </div>
+      ) : (
+        <p className="networth__fresh budget__note">{staleWords}</p>
+      )}
+
+      <h2 className="group__title">Split by kind</h2>
+      {side('What you own', split.filter((r) => !r.liability))}
+      {side('What you owe', split.filter((r) => r.liability))}
+
+      {months.length > 1 && !hidden && (
+        <>
+          <h2 className="group__title">Last 6 months</h2>
+          <div className="networth__trend" role="img" aria-label={`Net worth by month: ${months.map((m) => `${monthShortLabel(m.month)} ${money(m.total)}`).join(', ')}`}>
+            {months.map((m, i) => (
+              <span key={m.month} className="networth__col">
+                <span className="networth__well">
+                  <span
+                    className={`networth__bar${m.total.isNegative() ? ' networth__bar--negative' : i === months.length - 1 ? ' networth__bar--now' : ''}`}
+                    style={{ height: `${Math.max(4, pctOf(m.total.abs(), peak))}%` }}
+                  />
+                </span>
+                <span className="networth__month">{MONTH.format(new Date(`${m.month}-15T00:00:00`))}</span>
+              </span>
+            ))}
+          </div>
+          {months.map((m) => {
+            const left = m.excluded.map((id) => names.get(id)).filter((n): n is string => !!n)
+            return left.length > 0 && <p key={m.month} className="budget__note networth__gap">Leaves out {left.length > 2 ? `${left.length} holdings` : left.join(' and ')} in {monthShortLabel(m.month)}: no value yet</p>
+          })}
+        </>
+      )}
+
+      <h2 className="group__title">Holdings · tap to update</h2>
+      <div className="group" aria-label="Holdings">
+        {holdings.map((h) => (
+          <HoldingRow key={h.id} h={h} today={today} shown={shown} onOpen={() => setSheet({ kind: 'edit', id: h.id })} />
+        ))}
+      </div>
+      <div className="budget__add">
+        <button type="button" className="btn btn--primary" onClick={() => setSheet({ kind: 'add' })}>Add</button>
       </div>
       {sheets}
     </div>
@@ -166,19 +179,21 @@ function HoldingRow({ h, today, shown, onOpen }: { h: Holding; today: string; sh
   if (!v) return null
   const old = isOld(v.date, today)
   const words = `${updatedWords(v.date, today)}${old ? ' · old' : ''}`
-  const kind = `${KIND_LABEL[h.kind]}${isLiability(h.kind) ? ' · you owe this' : ''}`
+  const owe = isLiability(h.kind)
+  const kind = `${KIND_LABEL[h.kind]}${owe ? ' · you owe this' : ''}`
+  const amount = shown(new D(v.amount))
   return (
-    <div className="bills__item">
-      <button type="button" className="budget__row tap-row" aria-label={`Update value of ${h.name}. ${kind}. ${words}`} onClick={onOpen}>
+    <button type="button" className="networth__row tap-row" aria-label={`Update value of ${h.name}. ${kind}. ${words}`} onClick={onOpen}>
+      <span className="networth__dot" style={kindMark(h.kind)} aria-hidden="true" />
+      <span className="row__text">
         <span className="row__label">{h.name}</span>
-        <span className="budget__amt spend__amt">{shown(new D(v.amount))}</span>
-        <Icon name="chevron" size={18} className="tap-row__chev" />
-        <span className="budget__note">{kind}</span>
-        <span className="budget__note">{words}</span>
-      </button>
-    </div>
+        <span className="row__hint networth__age">{old && <Icon name="clock" size={14} />}{kind} · {words}</span>
+      </span>
+      <span className="budget__amt">{owe && amount !== HIDDEN ? `−${amount}` : amount}</span>
+    </button>
   )
 }
+
 
 /** Name, kind, first value and its day. */
 function AddSheet({ onClose }: { onClose: () => void }) {

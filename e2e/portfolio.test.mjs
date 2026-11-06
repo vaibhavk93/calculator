@@ -28,10 +28,12 @@ const data = (portfolio, extra = {}, theme = 'dark') => ({ schemaVersion: 3, set
 
 const toPortfolio = async (page) => {
   await tab(page, 'Budget'); await settle(page)
-  await page.locator('.navrow', { hasText: 'More in Budget' }).click(); await settle(page)
-  await page.locator('.sheet .navrow', { hasText: 'Portfolio' }).click(); await settle(page, 300)
+  // Net worth is the second side of Budget home's switch now (no separate Portfolio page).
+  await page.getByRole('radio', { name: 'Net worth' }).click(); await settle(page, 300)
 }
-const text = (page) => page.locator('.screen[aria-label="Portfolio"]').innerText()
+const NW = '[role=region][aria-label="Net worth"]'
+const text = (page) => page.locator(NW).innerText()
+const showAmounts = (page) => page.getByRole('button', { name: 'Show amounts' }).click()
 const stateHoldings = async (page) => (await stored(page))?.portfolio ?? []
 
 const app = await startApp()
@@ -42,8 +44,8 @@ try {
     await toPortfolio(o.page)
     const t = await text(o.page)
     check(/List what you own and what you owe/.test(t), `${name}: empty sentence`)
-    check((await o.page.locator('.screen[aria-label="Portfolio"] .btn').count()) === 1, `${name}: exactly one button (Add)`)
-    check((await o.page.locator('.screen[aria-label="Portfolio"] .btn--primary', { hasText: /^Add$/ }).count()) === 1, `${name}: it is the filled Add button`)
+    check((await o.page.locator(`${NW} .btn`).count()) === 1, `${name}: exactly one button (Add)`)
+    check((await o.page.locator(`${NW} .btn--primary`, { hasText: /^Add$/ }).count()) === 1, `${name}: it is the filled Add button`)
     check((await overflowing(o.page)).length === 0, `${name}: no sideways overflow`)
     await shot(o.page, name)
     check(o.errors.length === 0, `${name}: no console errors ${o.errors.join('|')}`)
@@ -64,9 +66,9 @@ try {
     check(/updated yesterday/.test(t) && /updated 5 days ago/.test(t), `${name}: other rows say their age in words`)
     check((await overflowing(o.page)).length === 0, `${name}: no sideways overflow`)
     await shot(o.page, `${name}-hidden`)
-    await o.page.locator('.screen[aria-label="Portfolio"] .link-btn', { hasText: 'Show amounts' }).click(); await settle(o.page)
+    await showAmounts(o.page); await settle(o.page)
     const t2 = await text(o.page)
-    check(/14,05,000/.test(t2) && /You owe more than you own/.test(t2), `${name}: shown, net worth is -14,05,000 (2,395,000 owned - 38,00,000 owed)`)
+    check(/14,05,000/.test(t2) && /Liabilities are larger than assets/.test(t2), `${name}: shown, net worth is -14,05,000 (2,395,000 owned - 38,00,000 owed)`)
     check(/3,25,000/.test(t2) && /8,40,000/.test(t2) && /38,00,000/.test(t2), `${name}: row amounts shown`)
     check(/What you own/.test(t2) && /What you owe/.test(t2) && /Last 6 months/.test(t2), `${name}: split and months sections`)
     check(/Leaves out/.test(t2) && /no value yet/.test(t2), `${name}: months where a holding had no value yet say so, in words`)
@@ -80,7 +82,7 @@ try {
   const o = await openApp(app, { data: data(SAMPLE), font: 100 })
   const { page } = o
   await toPortfolio(page)
-  await page.locator('.screen[aria-label="Portfolio"] .link-btn', { hasText: 'Show amounts' }).click()
+  await showAmounts(page)
   await page.locator('.tap-row', { hasText: 'Mutual funds' }).click(); await settle(page, 300)
   check((await page.locator('.sheet h2, .sheet [role=dialog] h2').first().innerText().catch(() => '')).includes('Update value') || (await page.locator('.sheet').innerText()).includes('Update value'), 'update sheet opens, titled Update value')
   check((await page.inputValue('#pfu-amount')) === '840000', 'the number is pre-filled with the last value')
@@ -111,7 +113,7 @@ try {
   if (await page.locator('.expense__discard').count()) { await page.locator('.expense__discard .btn--danger').click(); await settle(page, 200) }
 
   // add
-  await page.locator('.screen[aria-label="Portfolio"] .btn--primary', { hasText: /^Add$/ }).click(); await settle(page, 300)
+  await page.locator(`${NW} .btn--primary`, { hasText: /^Add$/ }).click(); await settle(page, 300)
   await shot(page, 'add-sheet')
   await page.locator('.sheet .btn--primary', { hasText: /^Add$/ }).click(); await settle(page, 200)
   const errs = await page.locator('.sheet').innerText()
@@ -158,7 +160,6 @@ try {
   check(!/hid(e|den)/i.test(raw), 'storage holds no hide flag')
 
   // backup round trip
-  await page.locator('.screen[aria-label="Portfolio"] .icon-btn[aria-label=Back]').click(); await settle(page, 200)
   await tab(page, 'Calculate'); await settle(page, 200)
   await page.click('[aria-label=Settings]'); await settle(page, 200)
   await page.click('text=Backup and export'); await settle(page, 200)
@@ -186,14 +187,13 @@ try {
   // ---- Budget off hides the entry
   const off = await openApp(app, { data: data(SAMPLE, { modules: { budget: false, notes: true } }), font: 100 })
   const tabs = await off.page.locator('.tabbar .tab span').allTextContents()
-  check(!tabs.includes('Budget'), `Budget off: no Budget tab (${tabs.join(', ')}), so no Portfolio row`)
+  check(!tabs.includes('Budget'), `Budget off: no Budget tab (${tabs.join(', ')}), so no Net worth view`)
   check(((await stored(off.page))?.portfolio ?? []).length === 6, 'Budget off: the data stays in storage')
   await off.close()
   const on = await openApp(app, { data: data(SAMPLE, { modules: { budget: true, notes: true } }), font: 100 })
   await tab(on.page, 'Budget'); await settle(on.page)
-  await on.page.locator('.navrow', { hasText: 'More in Budget' }).click(); await settle(on.page)
-  check((await on.page.locator('.sheet .navrow', { hasText: 'Portfolio' }).count()) === 1, 'Budget on: the Portfolio row is in "More in Budget"')
-  await shot(on.page, 'more-in-budget')
+  check((await on.page.getByRole('radio', { name: 'Net worth' }).count()) === 1, 'Budget on: the Net worth switch is on Budget home')
+  await shot(on.page, 'budget-home-switch')
   await on.close()
 } finally {
   await app.stop()

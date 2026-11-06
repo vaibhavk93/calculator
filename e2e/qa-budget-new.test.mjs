@@ -799,7 +799,7 @@ T('B-702', 'RUNTIME', 'switching months 24 times quickly and opening/closing the
 })
 T('B-703', 'UX', 'every delete is undoable: entry, bill stop, bulk move all show an Undo', async (c) => {
   const { page } = await c.open({ budget: BASE({ expenses: [exp('2026-11-03', '100', { categoryId: 'c-food' })] }) })
-  await page.getByRole('button', { name: /^Delete/ }).first().click()
+  await page.getByRole('button', { name: /^Edit/ }).first().click(); await S(page).getByRole('button', { name: 'Delete this expense' }).click()
   ok(await page.locator('.snack').getByRole('button', { name: 'Undo' }).count() === 1, 'no Undo after deleting an entry')
 })
 
