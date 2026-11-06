@@ -3,7 +3,7 @@ import { ACCENT_NAMES, type AccentName, type ThemePreference } from '../lib/them
 import type { KeyValueStorage } from '../lib/storage'
 import { parseTime } from '../lib/reminders'
 import { MAX_COUNTED_TOOLS, MAX_PINNED_TOOLS, MAX_USE_COUNT } from '../lib/toolUse'
-import { MAX_RECURRING, MAX_RULES, RULE_MAX, cleanRuleMatch, sanitizeEdits, isAccountType, isBillRepeat, isMonthKey, isSettlement, type MerchantRule, type RecurringItem } from '../lib/budget'
+import { MAX_RECURRING, MAX_RULES, RULE_MAX, cleanRuleMatch, sanitizeEdits, isAccountType, isBillRepeat, isPaymentCount, isMonthKey, isSettlement, type MerchantRule, type RecurringItem } from '../lib/budget'
 import {
   DEFAULT_SETTINGS,
   MAX_HISTORY,
@@ -463,6 +463,7 @@ function sanitizeRecurring(raw: unknown, catIds: Set<string>, instById: Map<stri
       cardId: goodId(r.cardId) ? r.cardId : null,
       ...(r.paused === true ? { paused: true as const } : {}),
       ...(r.paused === true && typeof r.pausedDue === 'number' && Number.isFinite(r.pausedDue) ? { pausedDue: r.pausedDue } : {}),
+      ...(kind === 'bill' && isPaymentCount(r.remaining) ? { remaining: r.remaining } : {}),
       deletedAt: num(r.deletedAt),
     })
     if (out.length >= MAX_RECURRING) break

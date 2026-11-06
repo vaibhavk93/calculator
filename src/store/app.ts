@@ -14,7 +14,9 @@ import {
 } from '../engine'
 import { parseNum } from '../lib/tool'
 import {
+  MAX_PAYMENTS,
   MAX_RECURRING,
+  isPaymentCount,
   MAX_RULES,
   MAX_SUBCATEGORIES,
   cleanRuleMatch,
@@ -170,12 +172,13 @@ export interface AppState {
   /**
    * Records something spent (or, with `draft.refund`, money coming back). Returns false (and says why) when the amount is not a positive number.
    * With `repeat` the entry is also the first payment of a new recurring bill: one record that owns the Due reminder and the later entries.
+   * `payments` (2 to 600, with `repeat`) is how many payments the bill has IN ALL, this entry included; the bill ends after the last.
    */
-  addExpense: (draft: ExpenseDraft, repeat?: BillRepeat | null) => boolean
+  addExpense: (draft: ExpenseDraft, repeat?: BillRepeat | null, payments?: number | null) => boolean
   /** Changes an entry. Same rules as addExpense. `repeat` turns an entry that is not yet a bill into one. */
-  updateExpense: (id: string, draft: ExpenseDraft, repeat?: BillRepeat | null) => boolean
-  /** Changes a bill's name, amount, repeat or (when running) next due date ("YYYY-MM-DD"). Returns false (and says why) when refused. */
-  updateBill: (id: string, patch: { title?: string; amount?: string; repeat?: BillRepeat; date?: string }) => boolean
+  updateExpense: (id: string, draft: ExpenseDraft, repeat?: BillRepeat | null, payments?: number | null) => boolean
+  /** Changes a bill's name, amount, repeat or (when running) next due date ("YYYY-MM-DD"). `remaining` is the payments left, the next included (null = never ends). Returns false (and says why) when refused. */
+  updateBill: (id: string, patch: { title?: string; amount?: string; repeat?: BillRepeat; date?: string; remaining?: number | null }) => boolean
   /** No reminder and no new entries until resumed. Past entries stay. */
   pauseBill: (id: string) => void
   /** Carries on from where it was paused (the next due date on or after today). */
@@ -417,6 +420,23 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       return cardId
     }
 
+    /**
+     * Ends a bill: it is marked stopped, and its helper card (nothing else is on it) and reminder go. Past entries stay.
+     * Says nothing itself: returns the function that puts all of it back, so each caller wraps it in the ONE Undo it offers
+     * (stopping a bill, or paying its last instalment, which must also take the payment back).
+     */
+    const endBill = (item: RecurringItem): (() => void) => {
+      const { cards, reminders } = get()
+      const card = cards.find((c) => c.id === item.cardId)
+      const rem = reminders.find((r) => r.cardId === item.cardId)
+      patchBill(item.id, (i) => ({ ...i, deletedAt: deps.now() }))
+      set({ cards: cards.filter((c) => c.id !== item.cardId), reminders: reminders.filter((r) => r.cardId !== item.cardId) })
+      return () => {
+        patchBill(item.id, (i) => ({ ...i, deletedAt: null }))
+        set({ cards: card ? [card, ...get().cards.filter((c) => c.id !== card.id)] : get().cards, reminders: rem ? [...get().reminders.filter((r) => r.cardId !== item.cardId), rem] : get().reminders })
+      }
+    }
+
     /** Makes the record together with its Due card and reminder. Returns the record's id, or null (and says why). */
     const makeBill = (d: Omit<RecurringItem, 'id' | 'cardId' | 'deletedAt'> & { dueAt: number; anchorDay: number }): string | null => {
       if (liveBills(get().budget).length >= MAX_RECURRING) return (fail(`You can keep up to ${MAX_RECURRING} bills.`), null)
@@ -473,12 +493,16 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       if (!item.paused && (!rem || rem.anchorDay !== card.dueDay)) armBill({ ...item, title }, cardBillDue(card.dueDay, deps.now(), settings.reminderTime), card.dueDay)
     }
 
+    /** "Number of payments" typed on an entry that starts a bill: this entry is the first, so the bill has one fewer left. undefined = none given; false = not 2 to 600 (a bill of 1 payment is just an entry). */
+    const leftAfterFirst = (payments: number | null | undefined): number | undefined | false => (payments == null ? undefined : isPaymentCount(payments) && payments >= 2 ? payments - 1 : false)
+    const BAD_PAYMENTS = `Number of payments must be a whole number from 2 to ${MAX_PAYMENTS}`
+
     /** Starts a recurring bill from an entry that was just checked: this entry is its first payment. Returns the record's id, or null (and says why). */
-    const startBill = (e: { amount: string; categoryId: string | null; mode: PaymentModeId | null; instrumentId: string | null; date: string; note: string }, repeat: BillRepeat): string | null => {
+    const startBill = (e: { amount: string; categoryId: string | null; mode: PaymentModeId | null; instrumentId: string | null; date: string; note: string }, repeat: BillRepeat, remaining?: number): string | null => {
       const { budget, settings } = get()
       const { dueAt, anchorDay } = firstDue(e.date, repeat, deps.now(), settings.reminderTime)
       const title = (e.note || (e.categoryId ? categoryName(budget, e.categoryId) : 'Recurring bill')).slice(0, 120)
-      return makeBill({ kind: 'bill', title, amount: e.amount, repeat, categoryId: e.categoryId, mode: e.mode, instrumentId: e.instrumentId, dueAt, anchorDay })
+      return makeBill({ kind: 'bill', title, amount: e.amount, repeat, categoryId: e.categoryId, mode: e.mode, instrumentId: e.instrumentId, ...(remaining !== undefined ? { remaining } : {}), dueAt, anchorDay })
     }
 
     /** A limit as a clean string, null for "none", or undefined (and a notice) when it is not acceptable. */
@@ -681,24 +705,30 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         undoable(`Cleared ${toRemove.length} calculations`, () => restoreHistory(toRemove))
       },
 
-      addExpense: (draft, repeat = null) => {
+      addExpense: (draft, repeat = null, payments = null) => {
         const e = checkedExpense(draft)
         if (typeof e === 'string') return fail(e)
         if (get().budget.expenses.length >= MAX_EXPENSES) return fail(`You can keep up to ${MAX_EXPENSES} entries.`)
         const { settlement, refund, income, ...rest } = e
-        const recurringId = repeat && !settlement && !refund && !income ? startBill(e, repeat) : undefined
+        const makesBill = repeat && !settlement && !refund && !income
+        const left = makesBill ? leftAfterFirst(payments) : undefined
+        if (left === false) return fail(BAD_PAYMENTS)
+        const recurringId = makesBill ? startBill(e, repeat, left) : undefined
         if (recurringId === null) return false
         const { budget } = get()
         set({ budget: { ...budget, expenses: [{ id: deps.newId(), ...rest, deletedAt: null, ...(settlement ? { settlement } : {}), ...(refund ? { refund: true } : {}), ...(income ? { income: true as const } : {}), ...(recurringId ? { recurringId } : {}) }, ...budget.expenses] }, notice: null })
         return true
       },
 
-      updateExpense: (id, draft, repeat = null) => {
+      updateExpense: (id, draft, repeat = null, payments = null) => {
         const old = get().budget.expenses.find((x) => x.id === id)
         const e = checkedExpense(draft, old?.categoryId ?? null)
         if (typeof e === 'string') return fail(e)
         const { settlement, refund, income, ...rest } = e
-        const recurringId = repeat && old && !old.recurringId && !settlement && !refund && !income ? startBill(e, repeat) : undefined
+        const makesBill = repeat && old && !old.recurringId && !settlement && !refund && !income
+        const left = makesBill ? leftAfterFirst(payments) : undefined
+        if (left === false) return fail(BAD_PAYMENTS)
+        const recurringId = makesBill ? startBill(e, repeat, left) : undefined
         if (recurringId === null) return false
         const { budget } = get()
         const at = deps.now()
@@ -725,7 +755,11 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const repeat = patch.repeat ?? item.repeat
         const rem = get().reminders.find((r) => r.cardId === item.cardId)
         const dueAt = patch.date !== undefined ? atTime(parseDay(patch.date)!, settings.reminderTime) : (rem?.dueAt ?? item.pausedDue)
-        const next: RecurringItem = { ...item, title, amount, repeat, ...(item.paused && dueAt !== undefined ? { pausedDue: dueAt } : {}) }
+        if (patch.remaining != null && !isPaymentCount(patch.remaining)) return fail(`Number of payments must be a whole number from 1 to ${MAX_PAYMENTS}`)
+        // Only an explicit remaining (a number, or null for "never ends") changes it. Any other edit keeps it as it is.
+        const { remaining: kept, ...bare } = item
+        const remaining = patch.remaining === undefined ? kept : (patch.remaining ?? undefined)
+        const next: RecurringItem = { ...bare, title, amount, repeat, ...(remaining !== undefined ? { remaining } : {}), ...(item.paused && dueAt !== undefined ? { pausedDue: dueAt } : {}) }
         patchBill(id, () => next)
         if (!item.paused && dueAt !== undefined) armBill(next, dueAt, patch.date !== undefined ? new Date(dueAt).getDate() : (rem?.anchorDay ?? new Date(dueAt).getDate()))
         else if (item.cardId) get().updateCard(item.cardId, { title, amount, summary: 'Paused' })
@@ -758,18 +792,10 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       },
 
       stopBill: (id) => {
-        const { cards, reminders } = get()
         const item = liveBills(get().budget).find((i) => i.id === id)
         if (!item) return
-        const card = cards.find((c) => c.id === item.cardId)
-        const rem = reminders.find((r) => r.cardId === item.cardId)
-        patchBill(id, (i) => ({ ...i, deletedAt: deps.now() }))
         // Its helper card goes with it (nothing else is on it), and comes back with Undo.
-        set({ cards: cards.filter((c) => c.id !== item.cardId), reminders: reminders.filter((r) => r.cardId !== item.cardId) })
-        undoable(`Stopped "${item.title}"`, () => {
-          patchBill(id, (i) => ({ ...i, deletedAt: null }))
-          set({ cards: card ? [card, ...get().cards.filter((c) => c.id !== card.id)] : get().cards, reminders: rem ? [...get().reminders.filter((r) => r.cardId !== item.cardId), rem] : get().reminders })
-        })
+        undoable(`Stopped "${item.title}"`, endBill(item))
       },
 
       setCardBillReminder: (instrumentId, on) => {
@@ -1162,10 +1188,23 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const paid = { ...r, history: [...r.history, { paidAt: deps.now(), amount }].slice(-200) }
         // A bill that repeats also puts this period's payment in the budget (once), and Undo takes both back.
         const added = settleBill(r)
+        // A bill with a set number of payments counts this one.
+        const bill = billForCard(get().budget, r.cardId)
+        const left = bill?.kind === 'bill' && !bill.paused ? bill.remaining : undefined
+        if (bill && left !== undefined && left <= 1) {
+          // The last payment: the entry is recorded, then the bill ends. ONE Undo takes back both (there is only one undo slot).
+          const restoreBill = endBill(bill)
+          return undoable('Last payment recorded. This bill has ended.', () => {
+            if (added) dropExpense(added)
+            restoreBill()
+          })
+        }
+        if (bill && left !== undefined) patchBill(bill.id, (i) => ({ ...i, remaining: left - 1 }))
         set({ reminders: get().reminders.map((x) => (x.id === reminderId ? (next === null ? { ...paid, done: true } : { ...paid, dueAt: next }) : x)) })
         // A wrong tap on Mark paid takes a reminder out of Due, so it always offers Undo (QA N-133).
         undoable(added ? 'Paid. Added to your budget' : card ? `${card.kind === 'task' ? 'Done' : 'Marked paid'}: "${card.title}"` : 'Marked paid', () => {
           if (added) dropExpense(added)
+          if (bill && left !== undefined) patchBill(bill.id, (i) => ({ ...i, remaining: left }))
           set({ reminders: get().reminders.map((x) => (x.id === reminderId ? r : x)) })
         })
       },
@@ -1194,6 +1233,11 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
           const { done: _d, doneAt: _t, ...rest } = card
           setCard({ ...rest, updatedAt: now })
           if (rem?.done) setRem({ ...rem, done: false })
+          return true
+        }
+        // A bill with a set number of payments is paid the way Due pays it, so the count and the last-payment end work from here too.
+        if (rem && !rem.done && billForCard(get().budget, id)?.remaining !== undefined) {
+          get().markPaid(rem.id)
           return true
         }
         const next = rem && !rem.done ? nextOccurrence(rem, now) : null

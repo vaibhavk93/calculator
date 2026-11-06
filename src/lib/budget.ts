@@ -577,6 +577,18 @@ export const BILL_REPEATS = [
 export type BillRepeat = (typeof BILL_REPEATS)[number]['id']
 export const isBillRepeat = (v: unknown): v is BillRepeat => BILL_REPEATS.some((r) => r.id === v)
 export const MAX_RECURRING = 100
+/** The most payments a bill can be set to end after ("EMI for 600 months" is 50 years). */
+export const MAX_PAYMENTS = 600
+/** A whole number from 1 to MAX_PAYMENTS. Anything else (0, 1.5, '12', NaN) is not a payment count. */
+export const isPaymentCount = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= MAX_PAYMENTS
+/** What was typed in "Number of payments": '' is fine (never ends, returns null); a good count returns the number; anything else returns undefined. */
+export function cleanPaymentCount(text: string): number | null | undefined {
+  const t = text.trim()
+  if (t === '') return null
+  if (!/^\d{1,3}$/.test(t)) return undefined
+  const n = Number(t)
+  return isPaymentCount(n) ? n : undefined
+}
 
 /**
  * One bill or subscription that repeats. It owns BOTH the Due reminder (a task card and its reminder, found by `cardId`;
@@ -600,6 +612,12 @@ export interface RecurringItem {
   paused?: boolean
   /** Only while paused: when it was next due (ms), so Resume carries on from there. */
   pausedDue?: number
+  /**
+   * Payments left INCLUDING the next one ("EMI for 24 months" stores 24). Absent = it never ends. Counts down each time the bill is
+   * marked paid; the payment that finds it at 1 is the last, and the bill ends. Lives here, not on the reminder, so editing the
+   * bill's date or card never touches it. Only a 'bill' has one.
+   */
+  remaining?: number
   deletedAt: number | null
 }
 
