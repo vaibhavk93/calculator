@@ -23,10 +23,13 @@ import {
 import { KIND_LABEL, KIND_ONE, STALE_DAYS, cleanHoldingName, isOld, updatedWords, validateHolding, type Holding, type HoldingKind } from '../../lib/portfolio'
 import { dayText, shortDate } from '../../lib/tasks'
 import { monthShortLabel } from '../../lib/budget'
+import { DATE_LOCALE } from '../../lib/dateLocale'
 import { GuardedFooter, MoneyInput, focusField, useDiscardGuard } from './formKit'
 import { FitHero, useMoney } from './SpendSummary'
 
 const HIDDEN = '••••'
+/** A trend column's label: just the month ("Jun"); the full month and year are in the chart's spoken label. */
+const MONTH = new Intl.DateTimeFormat(DATE_LOCALE, { month: 'short' })
 type SheetState = null | { kind: 'add' } | { kind: 'edit'; id: string }
 
 const KIND_OPTIONS: PickOption[] = [
@@ -36,7 +39,7 @@ const KIND_OPTIONS: PickOption[] = [
 
 const pctOf = (part: Dec, whole: Dec): number => (whole.isZero() ? 0 : part.div(whole).times(100).toNumber())
 /** Each kind's mark: one of the eight section inks. Identity only, never good or bad, and always next to its name. */
-const kindMark = (k: HoldingKind): CSSProperties => ({ background: `var(--tint-${HOLDING_KINDS.indexOf(k) % 8}-ink)` })
+const kindMark = (k: HoldingKind): CSSProperties => ({ background: `var(--tint-${(HOLDING_KINDS.indexOf(k) % 8) + 1}-ink)` })
 
 /**
  * Net worth, inside Budget home (the "Net worth" side of its switch). A list of what you own and what you owe, each with
@@ -146,7 +149,7 @@ export function PortfolioView({ hidden }: { hidden: boolean }) {
                     style={{ height: `${Math.max(4, pctOf(m.total.abs(), peak))}%` }}
                   />
                 </span>
-                <span className="networth__month">{monthShortLabel(m.month)}</span>
+                <span className="networth__month">{MONTH.format(new Date(`${m.month}-15T00:00:00`))}</span>
               </span>
             ))}
           </div>
@@ -184,8 +187,7 @@ function HoldingRow({ h, today, shown, onOpen }: { h: Holding; today: string; sh
       <span className="networth__dot" style={kindMark(h.kind)} aria-hidden="true" />
       <span className="row__text">
         <span className="row__label">{h.name}</span>
-        <span className="row__hint">{kind}</span>
-        <span className="row__hint networth__age">{old && <Icon name="clock" size={14} />}{words}</span>
+        <span className="row__hint networth__age">{old && <Icon name="clock" size={14} />}{kind} · {words}</span>
       </span>
       <span className="budget__amt">{owe && amount !== HIDDEN ? `−${amount}` : amount}</span>
     </button>

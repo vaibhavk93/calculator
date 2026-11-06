@@ -859,7 +859,8 @@ button.heat__cell:active {
   font-size: 0.75rem;
   color: var(--ink-2);
   text-align: center;
-  overflow-wrap: anywhere;
+  /* Never split a month name; at 200% font a long one ("Sept") spills a little into the gap beside it. */
+  white-space: nowrap;
 }
 
 .networth__gap {
@@ -882,17 +883,21 @@ button.heat__cell:active {
   flex: 1 1 9rem;
 }
 
-.networth__age {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-}
-
+/* The clock sits inline before the words, so the line wraps as text. */
 .networth__age > .icon {
-  flex: none;
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: -2px;
 }
 
 .networth > .budget__add {
   margin-top: var(--s-4);
+}
+
+/* Pace and Change limits share one line; each keeps its 44px tap height. */
+.budget__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s-4);
+  margin-left: calc(-1 * var(--s-1));
 }

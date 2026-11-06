@@ -132,14 +132,13 @@ export function BudgetScreen() {
               </div>
               <Bar pct={s.overall.pct} />
               {!over && <span className="budget__note">{money(s.overall.left)} left{s.overall.scope === 'month' ? ` · limit for ${monthShortLabel(month)} only` : ''}</span>}
-              {pace && paceDay && (
-                showPace ? (
-                  <span className="budget__note">About {money(paceDay.gt(0) ? paceDay : pace.perDay)} a day for the next {pace.days} {pace.days === 1 ? 'day' : 'days'}</span>
-                ) : (
-                  <button type="button" className="link-btn budget__link" onClick={() => setShowPace(true)}>Pace for the rest of the month</button>
-                )
+              {pace && paceDay && showPace && (
+                <span className="budget__note">About {money(paceDay.gt(0) ? paceDay : pace.perDay)} a day for the next {pace.days} {pace.days === 1 ? 'day' : 'days'}</span>
               )}
-              <button type="button" className="link-btn budget__link" onClick={() => setPage('manage')}>Change limits</button>
+              <div className="budget__links">
+                {pace && paceDay && !showPace && <button type="button" className="link-btn" onClick={() => setShowPace(true)}>Pace for the rest of the month</button>}
+                <button type="button" className="link-btn" onClick={() => setPage('manage')}>Change limits</button>
+              </div>
             </div>
           )}
           {attention.length > 0 && (
