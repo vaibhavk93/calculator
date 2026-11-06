@@ -114,12 +114,12 @@ window.PAGES = {
   'notes-new-list': async () => { await tab('Notes'); await click('.saved__add', 'New'); await A.sleep(200); await click('.row--button', 'New list'); return A.top() },
   'notes-trash': async () => { await tab('Notes'); await click('.link-btn', 'Trash'); return A.top() },
   'due': async () => { await tab('Due'); return A.d.querySelector('.tools') },
-  'save-sheet': async () => { await tab('Tools'); await click('.group[aria-label="Browse by what you need"] .navrow', 'Loans'); await click('.navrow', 'Loan EMI'); await click('.link-btn', 'Save'); return A.d.querySelector('.sheet') },
+  'save-sheet': async () => { await tab('Tools'); await click('.group[aria-label="Groups"] .navrow', 'Loans'); await click('.navrow', 'Loan EMI'); await click('.link-btn', 'Save'); return A.d.querySelector('.sheet') },
   'tolist-sheet': async () => { await press('5', '0', '0', '0', 'Divide', '5', 'Equals'); await click('.chip', 'To list'); return A.d.querySelector('.sheet') },
   'remind-sheet': async () => { await press('5', '0', '0', '0', 'Divide', '5', 'Equals'); await click('.chip', 'Remind me'); return A.d.querySelector('.sheet') },
   'paste-sheet': async () => { await click('.util__btn', 'Paste'); await A.sleep(600); return A.d.querySelector('.sheet') || A.d.querySelector('.calc') },
 }
-for (let g = 1; g <= 8; g++) PAGES['group-' + g] = async () => { await tab('Tools'); A.d.querySelectorAll('.group[aria-label="Browse by what you need"] .navrow')[g - 1].click(); await A.sleep(450); return A.top() }
+for (let g = 1; g <= 8; g++) PAGES['group-' + g] = async () => { await tab('Tools'); A.d.querySelectorAll('.group[aria-label="Groups"] .navrow')[g - 1].click(); await A.sleep(450); return A.top() }
 
 A.pageSweep = async (keys, zoom, withData = true) => {
   const out = []

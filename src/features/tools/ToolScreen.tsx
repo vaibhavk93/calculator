@@ -458,6 +458,7 @@ function Result({ out, mainRef, verified, rates, examples }: { out: Output; main
           </span>
         </div>
       ))}
+      {out.chart && <SplitBar chart={out.chart} />}
       {out.note && <p className="result__note">{out.note}</p>}
       {out.span && (
         // Says nothing the rows above do not: hidden from a screen reader so it is not read twice.
@@ -471,7 +472,6 @@ function Result({ out, mainRef, verified, rates, examples }: { out: Output; main
       )}
       {checked && <p className="result__checked">{checked}</p>}
       {examples.length > 0 && <p className="result__checked">Uses example values for {examples.join(', ').toLowerCase()}. Check them under More options.</p>}
-      {out.chart && <SplitBar chart={out.chart} />}
       {out.chart && <Chart chart={out.chart} />}
       {out.table && <Table table={out.table} fmt={fmt} />}
       {out.formula && (

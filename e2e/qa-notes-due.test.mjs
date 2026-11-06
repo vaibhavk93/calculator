@@ -366,7 +366,7 @@ T('N-056', 'POS', 'Inline rename: Enter saves, Escape cancels, empty name keeps 
 })
 T('N-057', 'POS', 'Save a calculation from a calculator, rename it in the sheet, add a note, find it by search, open it again', async () => {
   const { page: p } = await open()
-  await tab(p, 'Tools'); await p.locator('.group[aria-label="Browse by what you need"] .navrow', { hasText: 'Loans and EMI' }).click(); await p.locator('.navrow .row__label').filter({ hasText: 'Loan EMI' }).first().click(); await p.waitForSelector('.tool')
+  await tab(p, 'Tools'); await p.locator('.group[aria-label="Groups"] .navrow', { hasText: 'Loans and EMI' }).click(); await p.locator('.navrow .row__label').filter({ hasText: 'Loan EMI' }).first().click(); await p.waitForSelector('.tool')
   await p.locator('.screen__bar .link-btn').click(); await p.locator('#save-title').fill('Car loan'); await p.locator('#save-note').fill('bank visit friday'); await sheetSave(p)
   has(await snackText(p), 'Saved to Notes'); await notesTab(p); await p.getByLabel('Search notes').fill('car')
   has(await text(p, '.tools__list'), 'Car loan'); await p.locator('.row__main').first().click(); has(await text(p, '.screen'), 'Car loan')

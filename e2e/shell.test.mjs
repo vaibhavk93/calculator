@@ -374,7 +374,7 @@ T('A22', 'RUNTIME', 'device language Arabic and Hindi do not change the app lang
 })
 
 // ================================================================== N. TABS, SCREENS, OVERLAYS
-const START = { Calculate: /^0/, Tools: /Browse by what you need/, Notes: /Notes[\s\S]*Home loan EMI/, Due: /Home loan EMI/, Budget: /Left this month/ }
+const START = { Calculate: /^0/, Tools: /Scientific calculator\s+Groups/, Notes: /Notes[\s\S]*Home loan EMI/, Due: /Home loan EMI/, Budget: /Left this month/ }
 for (const [name, re] of Object.entries(START)) {
   T('N0' + (Object.keys(START).indexOf(name) + 1), 'POS', `${name} tab opens and shows its start state, marked current`, async (app) => {
     const { page, errors } = await open(app, { data: seed() })
@@ -387,15 +387,15 @@ for (const [name, re] of Object.entries(START)) {
 }
 T('N06', 'POS', 'tab tap inside a calculator goes back to the Tools start', async (app) => {
   const { page } = await open(app, { data: seed({ settings: { startupTool: 'emi' } }) })
-  ok(!/Browse by what you need/.test(await body(page)), 'tool not open first')
+  ok(!/Scientific calculator\s+Groups/.test(await body(page)), 'tool not open first')
   await tab(page, 'Tools'); await settle(page)
-  ok(/Browse by what you need/.test(await body(page)), 'did not return to the Tools start')
+  ok(/Scientific calculator\s+Groups/.test(await body(page)), 'did not return to the Tools start')
 })
 T('N07', 'POS', 'tab tap inside the Scientific calculator goes back to Tools start', async (app) => {
   const { page } = await open(app, { data: seed() })
   await SCREENS.sci(page); ok(await page.locator('.sci-screen, .keypad').count() > 0, 'scientific not open')
   await tab(page, 'Tools'); await settle(page)
-  ok(/Browse by what you need/.test(await body(page)), 'not at Tools start')
+  ok(/Scientific calculator\s+Groups/.test(await body(page)), 'not at Tools start')
 })
 T('N08', 'POS', 'tab tap inside a Notes card goes back to the Notes list', async (app) => {
   const { page } = await open(app, { data: seed() })
@@ -641,7 +641,7 @@ T('S21', 'POS', 'Opens on: choose a calculator (EMI), reload, app opens inside i
   await page.fill('.sheet input[type=search], .sheet input', 'EMI'); await settle(page, 150)
   await page.locator('.sheet [role=option]').filter({ hasText: /^EMI/ }).first().click(); await settle(page, 600)
   ok((await stored(page)).settings.startupTool === 'emi', 'startupTool ' + (await stored(page)).settings.startupTool)
-  await page.reload(); await page.waitForSelector('.app'); ok(!/Browse by what you need/.test(await body(page)), 'tool not open')
+  await page.reload(); await page.waitForSelector('.app'); ok(!/Scientific calculator\s+Groups/.test(await body(page)), 'tool not open')
   await openSettings(page); await pickFrom(page, 'Opens on', 'Notes'); await settle(page, 600)
   const s = (await stored(page)).settings; ok(s.startupTool === null && s.startupTab === 'saved', JSON.stringify([s.startupTool, s.startupTab]))
 })
