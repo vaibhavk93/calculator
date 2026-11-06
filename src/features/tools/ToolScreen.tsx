@@ -184,15 +184,18 @@ function UnitSwitch({ field, values, set }: { field: Extract<Leaf, { kind: 'numb
   const raw = (values[field.id] as string) ?? ''
   const typed = field.kind === 'text' ? typedUnit(raw) : null
   return (
-    <Segmented
-      label={`Unit of ${field.label}`}
-      value={typed ?? unitOf(field, values)}
-      options={field.units!.map((u) => ({ value: u, label: UNIT_CHOICE[u] }))}
-      onChange={(u) => {
-        if (typed) set(field.id, withoutUnit(raw))
-        set(unitKey(field.id), u)
-      }}
-    />
+    // Full width under its box: the choices share the row equally.
+    <div className="unit-switch">
+      <Segmented
+        label={`Unit of ${field.label}`}
+        value={typed ?? unitOf(field, values)}
+        options={field.units!.map((u) => ({ value: u, label: UNIT_CHOICE[u] }))}
+        onChange={(u) => {
+          if (typed) set(field.id, withoutUnit(raw))
+          set(unitKey(field.id), u)
+        }}
+      />
+    </div>
   )
 }
 
@@ -380,6 +383,30 @@ function Chart({ chart }: { chart: ResultChart }) {
   )
 }
 
+/**
+ * Principal vs interest over the whole loan, as one bar. Only for a chart whose two series are yearly principal and
+ * interest paid (Loan EMI): adding up its own bars gives the whole-loan split, no new maths. Hidden from a screen
+ * reader: the rows above already say the totals in words.
+ */
+function SplitBar({ chart }: { chart: ResultChart }) {
+  const [p, i] = chart.series
+  if (chart.series.length !== 2 || p?.name !== 'Principal' || i?.name !== 'Interest') return null
+  const total = (s: { values: number[] }) => s.values.reduce((a, b) => a + b, 0)
+  const share = (total(p) / (total(p) + total(i) || 1)) * 100
+  return (
+    <div className="splitbar" aria-hidden="true">
+      <p className="result__sub">Principal vs interest</p>
+      <span className="splitbar__track">
+        <span className="splitbar__part" style={{ width: `${share}%` }} />
+      </span>
+      <span className="chart__legend">
+        <span><i className="splitbar__key" /> Principal</span>
+        <span><i className="splitbar__key splitbar__key--interest" /> Interest</span>
+      </span>
+    </div>
+  )
+}
+
 /** The words of a row's value: number text, then its unit (smaller, quieter), then the screen-reader line for good or bad. */
 function valueParts(row: ResultRow, text: string) {
   const unit = row.unit ? ` ${row.unit}` : ''
@@ -422,6 +449,7 @@ function Result({ out, mainRef, verified, rates, examples }: { out: Output; main
   const checked = [verified && `Checked against ${verified.source}`, rates && ratesLine(rates, Date.now())].filter(Boolean).join('. ')
   const body = (
     <>
+      {hero && rows.length > 0 && <h3 className="result__sub">Breakdown</h3>}
       {rows.map((r) => (
         <div key={r.label} className="result__row">
           <span className="result__label">{r.label}</span>
@@ -443,6 +471,7 @@ function Result({ out, mainRef, verified, rates, examples }: { out: Output; main
       )}
       {checked && <p className="result__checked">{checked}</p>}
       {examples.length > 0 && <p className="result__checked">Uses example values for {examples.join(', ').toLowerCase()}. Check them under More options.</p>}
+      {out.chart && <SplitBar chart={out.chart} />}
       {out.chart && <Chart chart={out.chart} />}
       {out.table && <Table table={out.table} fmt={fmt} />}
       {out.formula && (
@@ -684,8 +713,9 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
         }
       />
       <div className="screen__body tool" ref={bodyRef}>
-        {/* 1. Edit: where you type. A tinted card. */}
-        <h2 className="section-head section-head--tint" id="inputs-head">
+        {/* 1. Edit: where you type. One flat neutral panel, because it is one bundle of controls
+            (docs/design-reference/IMPLEMENTATION-NOTES.md, "Tool page"). The heading is for screen readers. */}
+        <h2 className="sr-only" id="inputs-head">
           What you are working out
         </h2>
         <form className="tool__form inputcard" aria-labelledby="inputs-head" onSubmit={(e) => e.preventDefault()}>

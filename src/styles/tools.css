@@ -506,11 +506,10 @@
   line-height: 1.2;
 }
 
+/* Under the hero: "Breakdown" over bare hairline rows. Related facts, not a control group, so no panel. */
 .result__card {
-  margin-top: var(--s-3);
+  margin-top: var(--s-2);
   padding: 0 var(--s-4) var(--s-3);
-  background: var(--surface);
-  border-radius: var(--r-md);
 }
 
 .result__unit {
@@ -1067,23 +1066,76 @@ textarea.field {
  * a small dot beside a row. It is never used on the Result card, the answer bar or beside a number: those
  * keep their colour for good, bad and tappable. Set with tintStyle(n); eight are defined in src/lib/theme.ts. */
 
+/* Tools home: the Scientific calculator row. A plain hairline row with an icon, like the design reference. */
 .hero {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--s-3);
-  width: calc(100% - 2 * var(--s-4));
-  min-height: 48px;
-  margin: var(--s-2) var(--s-4) var(--s-1);
-  padding: 0 var(--s-4);
-  border: 1px solid var(--ink-3);
-  border-radius: var(--r-md);
+  width: 100%;
+  min-height: 56px;
+  margin-top: var(--s-3);
+  padding: var(--s-2) var(--s-4);
+  border-bottom: 1px solid var(--line);
   font-size: 1rem;
   text-align: left;
 }
 
 .hero:active {
   background: var(--key-op-pressed);
+}
+
+/* Tools home: "Your tools", a row of small flat icon tiles that scrolls sideways. No border, no wash. */
+.tiles {
+  display: flex;
+  gap: var(--s-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0 var(--s-4) var(--s-1);
+}
+
+.tiles::-webkit-scrollbar {
+  display: none;
+}
+
+.tile {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-1);
+  width: 5rem;
+  min-height: 44px;
+  padding: 0;
+  text-align: center;
+}
+
+.tile__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  background: var(--raised);
+  border-radius: var(--r-md);
+  color: var(--ink);
+}
+
+.tile:active .tile__icon {
+  background: var(--key-op-pressed);
+}
+
+.tile__pin {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  color: var(--ink-2);
+}
+
+.tile__label {
+  font-size: 0.75rem;
+  line-height: 1.25;
+  color: var(--ink);
+  overflow-wrap: anywhere;
 }
 
 /* A titled section: a small heading over hairline rows, no card and no wash (docs/THE-PLAN.md Block B8, the
@@ -1144,11 +1196,53 @@ textarea.field {
   font-size: 0.875rem;
 }
 
+/* A calculator's inputs: one flat neutral panel, the bundle of controls (design reference, "Tool page").
+   It was a tinted card; the tint now shows only on the group's dot and title. */
 .inputcard {
-  margin: 0 var(--s-4);
-  background: var(--tint);
+  margin: var(--s-2) var(--s-4) 0;
+  background: var(--surface);
   border-radius: var(--r-md);
   padding: var(--s-4);
+}
+
+/* The years / months / days switch: full width under its box, the choices share the row. */
+.unit-switch .seg {
+  flex-wrap: nowrap;
+  gap: 0;
+}
+
+.unit-switch .seg__opt {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Loan EMI: the whole-loan principal vs interest split. Neutral tones, the same as the yearly chart under it. */
+.splitbar {
+  margin-top: var(--s-2);
+}
+
+.splitbar__track {
+  display: flex;
+  height: 10px;
+  background: var(--ink);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.splitbar__part {
+  background: var(--ink-3);
+}
+
+.splitbar .chart__legend {
+  margin-top: var(--s-2);
+}
+
+.splitbar__key {
+  background: var(--ink-3);
+}
+
+.splitbar__key--interest {
+  background: var(--ink);
 }
 
 /* ---------------------------------------------------------------- row blocks

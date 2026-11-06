@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Icon } from '../../components/Icon'
+import { Icon, type IconName } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { tintStyle } from '../../components/tint'
@@ -13,6 +13,18 @@ import { ToolScreen } from './ToolScreen'
 
 const matches = (t: ToolSpec, q: string) =>
   [t.title, t.blurb, ...t.keywords].some((s) => s.toLowerCase().includes(q))
+
+/** The one-colour stroke icon a "Your tools" tile shows: its group's. */
+const GROUP_ICON: Record<string, IconName> = {
+  math: 'sum',
+  money: 'tag',
+  units: 'ruler',
+  life: 'calendar',
+  loans: 'percent',
+  savings: 'trend',
+  tax: 'receipt',
+  business: 'chart',
+}
 
 const specsOf = (g: ToolGroup) => g.tools.map((id) => ALL_TOOLS.find((t) => t.id === id)).filter((t): t is ToolSpec => !!t)
 
@@ -125,34 +137,34 @@ export function ToolsScreen() {
           )
         ) : (
           <>
-            <button type="button" className="hero tap-row" onClick={() => setNav({ scientific: true })}>
-              <span>Scientific calculator</span>
-              <Icon name="chevron" size={18} className="navrow__chev" />
-            </button>
             {mine.length > 0 && (
               <>
                 <h2 className="section-head">Your tools</h2>
-                <div className="group">
+                {/* Small flat icon tiles in one row that scrolls sideways: a shape reads faster than a word when
+                    scanning (docs/design-reference/DIAGNOSIS-AND-DECISIONS.md, change 3). The icon is the group's. */}
+                <div className="tiles">
                   {mine.map((t) => (
-                    <button key={t.id} type="button" className="navrow tap-row" style={tintStyle(groupOfTool(t.id)?.tint ?? 8)} onClick={() => setNav({ tool: t.id })}>
-                      <span className="dot" aria-hidden="true" />
-                      <span className="navrow__label">{t.title}</span>
-                      {pinnedTools.includes(t.id) && (
-                        <>
-                          <Icon name="pinFilled" size={16} />
-                          <span className="sr-only">Pinned</span>
-                        </>
-                      )}
-                      <Icon name="chevron" size={18} className="navrow__chev" />
+                    <button key={t.id} type="button" className="tile" onClick={() => setNav({ tool: t.id })}>
+                      <span className="tile__icon" aria-hidden="true">
+                        <Icon name={GROUP_ICON[groupOfTool(t.id)?.id ?? ''] ?? 'calculate'} size={20} />
+                        {pinnedTools.includes(t.id) && <Icon name="pinFilled" size={12} className="tile__pin" />}
+                      </span>
+                      <span className="tile__label">{t.title}</span>
+                      {pinnedTools.includes(t.id) && <span className="sr-only">, pinned</span>}
                     </button>
                   ))}
                 </div>
               </>
             )}
-            <h2 className="section-head">Browse by what you need</h2>
+            <button type="button" className="hero tap-row" onClick={() => setNav({ scientific: true })}>
+              <Icon name="calculate" size={20} />
+              <span className="navrow__label">Scientific calculator</span>
+              <Icon name="chevron" size={18} className="navrow__chev" />
+            </button>
+            <h2 className="section-head">Groups</h2>
             {/* One hairline list, same .group / .navrow pattern as Budget's "More in Budget": the eight groups are
                 links to other screens (tier 3), so no tinted card each. The colour is only the small .dot. */}
-            <div className="group" aria-label="Browse by what you need">
+            <div className="group" aria-label="Groups">
               {GROUPS.map((g) => (
                 <button
                   key={g.id}
