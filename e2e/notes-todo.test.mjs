@@ -59,7 +59,7 @@ const btn = (p, name, scope = '.app') => p.locator(scope).getByRole('button', { 
 
 /** Opens Loan EMI the way a person does: Tools tab, the "Loans and EMI" row, the row. */
 const openEmi = async (p) => {
-  await tab(p, 'Tools'); await p.locator('.group[aria-label="Browse by what you need"] .navrow', { hasText: 'Loans and EMI' }).click()
+  await tab(p, 'Tools'); await p.locator('.group[aria-label="Groups"] .navrow', { hasText: 'Loans and EMI' }).click()
   await p.locator('.navrow .row__label').filter({ hasText: 'Loan EMI' }).first().click(); await p.waitForSelector('.tool')
 }
 

@@ -33,6 +33,14 @@ export type IconName =
   | 'swap'
   | 'filter'
   | 'grid'
+  | 'percent'
+  | 'trend'
+  | 'receipt'
+  | 'calendar'
+  | 'tag'
+  | 'ruler'
+  | 'chart'
+  | 'sum'
 
 const PATHS: Record<IconName, ReactNode> = {
   down: <path d="M6 9.5l6 6 6-6" />,
@@ -161,6 +169,46 @@ const PATHS: Record<IconName, ReactNode> = {
       <rect x="13" y="13" width="7" height="7" rx="1.5" />
     </>
   ),
+  // One per Tools group: "Your tools" tiles show the group's icon (src/features/tools/groups.ts).
+  percent: (
+    <>
+      <path d="M18 6L6 18" />
+      <circle cx="7.5" cy="7.5" r="2" />
+      <circle cx="16.5" cy="16.5" r="2" />
+    </>
+  ),
+  trend: (
+    <>
+      <path d="M3 17l6-6 4 4 8-8" />
+      <path d="M15 7h6v6" />
+    </>
+  ),
+  receipt: (
+    <>
+      <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" />
+      <path d="M9 8h6M9 12h6M9 16h3" />
+    </>
+  ),
+  calendar: (
+    <>
+      <rect x="4" y="5" width="16" height="15" rx="2" />
+      <path d="M4 10h16M8 3v4M16 3v4" />
+    </>
+  ),
+  tag: (
+    <>
+      <path d="M3.5 12.5V4h8.5l8.5 8.5-8.5 8.5z" />
+      <path d="M8 8h.01" />
+    </>
+  ),
+  ruler: (
+    <>
+      <rect x="2.5" y="8" width="19" height="8" rx="1.5" />
+      <path d="M6.5 8v3.5M10.5 8v2M14.5 8v3.5M18.5 8v2" />
+    </>
+  ),
+  chart: <path d="M4 20h16M7 16v-5M12 16V6M17 16v-8" />,
+  sum: <path d="M17 5H7l5.5 7L7 19h10" />,
 }
 
 export function Icon({ name, size = 20, className = '' }: { name: IconName; size?: number; className?: string }) {
