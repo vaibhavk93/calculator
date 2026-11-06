@@ -94,6 +94,7 @@ A result carries a quiet "Checked against <source>" line only for tools rated **
 | Calculator | Status | Basis | Next cross-check |
 |---|---|---|---|
 | FD ladder | **A** for the two limits, **D** for the maths | DICGC cover Rs 5,00,000 per depositor per bank, principal and interest together (dicgc.org.in guide and FAQs). TDS limits Rs 50,000 / Rs 1,00,000 at 10%: Act s.393(1) Table Sl.5(ii), Finance Act 2026. Compounding: 1,00,000 at 7% quarterly for 5 years = 1,00,000 × 1.0175^20 = 1,41,478 (hand-worked). **Assumptions on screen:** one bank name = one depositor in one capacity; the "first year's interest" is each FD's first 12 months, not a tax-year tally. The no-PAN TDS rate is not modelled (not read). Tested in `fdLadder.test.ts` | A bank's own interest certificate |
+| LTCG harvesting | **A** for the rules, **D** for the numbers | Act text read from the Gazette PDF: s.198(2)(a) 12.5% above Rs 1,25,000, s.2(101) long-term = more than 12 months, s.90(7)-(8) grandfathering (research section 5). Hand-worked: holdings gaining 60,000 and 1,00,000 fill the 1,25,000 room (60,000 + 65,000); 12.5% of 1,25,000 = 15,625, with 4% cess 16,250. Grandfathering cases (cost used 1,50,000 / 1,40,000 / 1,60,000) and the exact-12-months edge are in `harvest.test.ts`. **Not modelled, said on screen:** s.198(3) low-income reduction, surcharge, brokerage; no anti-wash-sale rule was read, so none is assumed. The 31 Jan 2018 value is an input and a pre-2018 holding without it is refused | An AMC capital-gains statement |
 
 ## Things that go stale
 
