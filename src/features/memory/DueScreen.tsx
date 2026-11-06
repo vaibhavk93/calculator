@@ -58,6 +58,7 @@ export function DueScreen() {
   const moreR = live.find((r) => r.id === moreId)
   const more = moreR ? { id: moreR.id, title: cards.find((c) => c.id === moreR.cardId)?.title ?? 'Reminder' } : null
   // The pack offer is noise once it has been taken: hide it the moment all 4 titles already exist.
+  const showPack = useApp((x) => x.settings.showAdvanceTaxOffer)
   const packDone = advanceTaxPack(now, reminderTime).every((p) => cards.some((c) => c.deletedAt === null && c.title === p.title))
 
   if (g.overdue.length + g.week.length + g.later.length === 0) {
@@ -210,7 +211,7 @@ export function DueScreen() {
             and bleed into the tab bar underneath -- a real, pre-existing bug the new layout-contract
             suite caught (confirmed against the commit before this change, identical numbers). Scrolling
             with everything else is what guarantees it is always reachable. */}
-        {!packDone && (
+        {showPack && !packDone && (
           <div className="due__pack">
             <p className="note">Advance tax is due 15 Jun, 15 Sep, 15 Dec and 15 Mar. Add all four, then edit them like any reminder.</p>
             <button type="button" className="btn" onClick={addPack}>Add a pack: advance tax</button>

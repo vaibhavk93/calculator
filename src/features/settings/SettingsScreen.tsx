@@ -82,6 +82,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0')
 /** When reminders arrive, a way to prove they do, and (on the phone) what the system allows. */
 function ReminderSettings() {
   const time = useApp((x) => x.settings.reminderTime)
+  const offer = useApp((x) => x.settings.showAdvanceTaxOffer)
   const update = useApp((x) => x.updateSettings)
   const toast = useApp((x) => x.toast)
   const [fixing, setFixing] = useState(false)
@@ -107,6 +108,9 @@ function ReminderSettings() {
           value={time}
           onChange={(e) => e.target.value && update({ reminderTime: e.target.value })}
         />
+      </Row>
+      <Row label="Advance-tax reminders offer" hint="Shows a one-tap pack of the 4 advance-tax dates on Due">
+        <Toggle label="Advance-tax reminders offer" checked={offer} onChange={(showAdvanceTaxOffer) => update({ showAdvanceTaxOffer })} />
       </Row>
       <button type="button" className="row row--button tap-row" onClick={() => void sendTest()}>
         <span className="row__text">

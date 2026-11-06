@@ -114,6 +114,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     keepHistory: bool(r.keepHistory, d.keepHistory),
     copyFormat: oneOf(r.copyFormat, ['ask', 'with', 'without'] as const, d.copyFormat),
     reminderTime: parseTime(r.reminderTime) ? (r.reminderTime as string) : d.reminderTime,
+    showAdvanceTaxOffer: bool(r.showAdvanceTaxOffer, d.showAdvanceTaxOffer),
     lastBackupAt: stamp(r.lastBackupAt),
     backupNudgedAt: stamp(r.backupNudgedAt),
     backupDismissedAt: stamp(r.backupDismissedAt),

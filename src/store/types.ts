@@ -27,6 +27,8 @@ export interface Settings {
   copyFormat: CopyFormat
   /** When reminder notifications arrive, "HH:MM" (24 hour). */
   reminderTime: string
+  /** Due shows a one-tap pack of the 4 advance-tax dates only when this is on. Off by default. */
+  showAdvanceTaxOffer: boolean
   /** When a backup file was last saved from Settings, in ms. Null: never. */
   lastBackupAt: number | null
   /** When the launch reminder to back up was last shown, in ms. At most one per 14 days. */
@@ -67,6 +69,7 @@ export const DEFAULT_SETTINGS: Settings = {
   keepHistory: true,
   copyFormat: 'ask',
   reminderTime: '09:00',
+  showAdvanceTaxOffer: false,
   lastBackupAt: null,
   backupNudgedAt: null,
   backupDismissedAt: null,
