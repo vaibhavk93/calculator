@@ -1,5 +1,37 @@
 # Session state: resume here
 
+## Round 19 (2026-11-05/06): Budget home collapses to one "More" row; Tools still untouched
+
+**Continuing the Budget/Tools density question from Round 18** without re-asking: the evidence-backed move
+was progressive disclosure (the research already favoured it over cards/carousels). Budget home's 4 pure-
+navigation rows (Spending summary, Bills, Add from bank messages, Categories and cards) now collapse behind
+one "More in Budget" row + sheet -- cuts the always-visible row count from ~13 toward ~9. `6547313`.
+
+**Real cost of this one UI change: ~20 e2e call sites across 7 files**, all clicking those 4 rows directly
+on the home screen. Fixed each (conditionally -- the zero-spend empty state's own action list was never
+behind a sheet, so `openMoreIfNeeded` checks first). Found a genuine timing bug this exposed: a still-
+showing snackbar can now intercept the click on "More in Budget" since it sits higher up the page --
+every navigation helper now waits out `.snack` first.
+
+**While verifying, found 5 more stale e2e call sites from Round 16's earlier KeepAndShare "More" button
+work** (not today's Budget change) -- "Reset inputs" and "Use in another tool" moved behind that tool
+page's own More button back then, but phase2/phase3/phase3b/qa-tools.test.mjs never got updated. Fixed.
+
+**Found and separately flagged, NOT fixed here (confirmed pre-existing, fails identically on dev before any
+of today's changes):** `qa-tools.test.mjs` T-100's "Use in another tool" flow picks a target calculator and
+field correctly but the screen never actually navigates afterward. Spawned as its own task
+(`task_05a3f08e`) rather than scope-creeping into it here.
+
+**Verified:** `npm run check` (2922/2922, test count keeps climbing as the peer session merges Block G/D1/D5
+work in parallel on the same shared `dev` branch), build, `layout-contract` 144/144, and
+budget/qa-budget-new/paidwith/phase2/phase3/phase3b each diffed against a `git stash` baseline to confirm
+zero new regressions. Confirmed the collapsed row and sheet directly in the browser.
+
+**Still open:** Tools home's "too many rows, not grouped well" complaint from Round 17 -- untouched. The
+earlier critic review found Tools home's rows are already fairly minimal (no verbose hints, "Your tools"
+already capped at 5) with no equivalent collapsible content the way Budget's 4 nav rows were -- the next
+investigation there needs to look harder rather than apply the same pattern by default.
+
 ## Round 18 (2026-11-05): List/Card toggle shipped for Notes and Due; Budget/Tools "cluttered" question still open
 
 **Owner:** "Let's try the List/Card toggle on Notes and Due anyway then push" -- despite Round 17's carousel/
