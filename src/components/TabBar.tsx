@@ -1,5 +1,6 @@
 import { Icon, type IconName } from './Icon'
 import { useApp } from './StoreProvider'
+import { tabOn } from '../lib/modules'
 import type { Tab } from '../store/types'
 
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
@@ -13,10 +14,11 @@ const TABS: { id: Tab; label: string; icon: IconName }[] = [
 export function TabBar() {
   const tab = useApp((s) => s.tab)
   const setTab = useApp((s) => s.setTab)
+  const settings = useApp((s) => s.settings)
 
   return (
     <nav className="tabbar" aria-label="Main">
-      {TABS.map((t) => (
+      {TABS.filter((t) => tabOn(settings, t.id)).map((t) => (
         <button
           key={t.id}
           type="button"

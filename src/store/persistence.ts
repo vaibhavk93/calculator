@@ -86,6 +86,12 @@ function sanitizeTours(raw: unknown): Settings['tours'] {
   return out
 }
 
+/** A missing key is ON, and so is any junk: an old backup (or a damaged file) loads as everything on. Only a real `false` hides. */
+export function sanitizeModules(raw: unknown): Settings['modules'] {
+  const r = isObject(raw) ? raw : {}
+  return { budget: r.budget !== false, notes: r.notes !== false }
+}
+
 export function sanitizeSettings(raw: unknown): Settings {
   const r = isObject(raw) ? raw : {}
   const d = DEFAULT_SETTINGS
@@ -116,6 +122,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     tours: sanitizeTours(r.tours),
     notesCardView: bool(r.notesCardView, d.notesCardView),
     dueCardView: bool(r.dueCardView, d.dueCardView),
+    modules: sanitizeModules(r.modules),
   }
 }
 

@@ -225,6 +225,12 @@ Hide, never delete; a hidden tab falls back to Calculate when read, stored `star
 result icons and the bank-message reader. Reminders keep ringing with the Due tab hidden (hint line says so). Cut: presets, first-run
 question, inner switches, "pause reminders". To verify first: whether Budget bills schedule notifications. Size M, after the UI group.
 
+**Built (branch worktree-agent-aea3c8d23e875e665).** `src/lib/modules.ts` (`tabOn`, `moduleOn`, `startTab`, `withModule`), `sanitizeModules` in persistence, a
+"Show in the app" group in Settings, tests in `src/store/modules.test.ts`, browser pass in `e2e/modules.test.mjs`. **Verified: Budget bills DO schedule
+notifications** (every bill owns a Due card and a reminder), so the Budget switch hint says bill reminders still ring. With both switches off the bar has 2 tabs
+(Calculate, Tools), not 3. Also hidden with Notes off: the Save button and the next-step chip on a calculator, "Export notes". Not hidden: reminder time and
+permission rows in Settings (reminders still ring). A "missed reminder" banner lives on Due, so it is not seen while Due is hidden.
+
 ### Block F — Phone truth
 
 Reminders really firing · backup/restore round-trip · TalkBack · rotation · the SMS scan window fix.

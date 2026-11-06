@@ -3,6 +3,7 @@ import type { DecimalSetting, NumberSystem } from '../lib/format'
 import type { BudgetData } from '../lib/budget'
 import type { Reminder, SavedCard } from '../lib/memory'
 import type { AccentName, ThemePreference } from '../lib/theme'
+import type { Modules } from '../lib/modules'
 import type { Values } from '../lib/tool'
 
 export type Tab = 'calculate' | 'tools' | 'saved' | 'due' | 'budget'
@@ -43,6 +44,8 @@ export interface Settings {
   notesCardView: boolean
   /** Due: a grid of bordered cards instead of the hairline list. Remembered, per screen. */
   dueCardView: boolean
+  /** "Show in the app": Budget, and Notes with Due. Off hides, never deletes. Read only through lib/modules.ts. */
+  modules: Modules
 }
 
 export type TourId = 'budget' | 'notes' | 'due'
@@ -72,6 +75,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tours: {},
   notesCardView: false,
   dueCardView: false,
+  modules: { budget: true, notes: true },
 }
 
 export interface HistoryEntry {
