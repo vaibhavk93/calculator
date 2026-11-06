@@ -30,7 +30,7 @@ history, not plans.
 
 | | |
 |---|---|
-| **Calculators** | **60** (docs elsewhere still say 51 or 57 — those are stale) |
+| **Calculators** | **61** (HRA exemption added 2026-11-06; docs elsewhere still say 51/57/60 — those are stale) |
 | **Tabs** | Calculate · Tools · Notes (+To-do) · Due · Budget |
 | **Budget** | expenses, categories + subcategories, cards/accounts, limits per month, bills & subscriptions, statement cycles, refunds, trips, heatmap, CSV export/import, bank-message scan |
 | **Notes** | saved calculations, lists (label + amount), to-dos, **plain text notes** (Block C, 2026-11-05) |
