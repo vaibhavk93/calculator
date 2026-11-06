@@ -328,8 +328,9 @@ C('T-072', 'POS', 'SWP with saving years at a different return: start amount and
 C('T-073', 'CORNER', 'SWP: never runs out, 100+ years, bad saving years (fraction, 61, negative, junk), zero withdrawal', async ({ page }) => {
   await open(page, 'swp'); await fill(page, 'withdraw', '5000'); has(await rv(page, 'Lasts'), 'Never runs out')
   await fill(page, 'withdraw', '6700'); await noBad(page)
-  await fill(page, 'withdraw', '10000'); await fill(page, 'wait', '1.5'); await expectError(page, 'whole number', 'wait 1.5')
-  await fill(page, 'wait', '61'); await expectError(page, '60 or fewer', 'wait 61'); await fill(page, 'wait', '-1'); ok(await err(page), 'negative wait accepted')
+  await fill(page, 'withdraw', '10000'); await fill(page, 'wait', '1.5'); await noBad(page) // 1.5 years is 18 whole months, valid since the Years/Months switch
+  await fill(page, 'wait', '1.55'); await expectError(page, 'whole months', 'wait 1.55')
+  await fill(page, 'wait', '61'); await expectError(page, 'whole months', 'wait 61'); await fill(page, 'wait', '-1'); ok(await err(page), 'negative wait accepted')
   await fill(page, 'wait', 'abc'); ok(await err(page), 'junk wait silently ignored'); await fill(page, 'wait', '60'); await noBad(page)
   await fill(page, 'wait', '0'); await fill(page, 'withdraw', '0'); await expectError(page, 'more than zero', 'withdraw 0')
 })
