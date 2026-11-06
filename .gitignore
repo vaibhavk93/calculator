@@ -7,3 +7,5 @@ coverage/
 
 # local browser-test output
 e2e/shots/
+
+/node_modules

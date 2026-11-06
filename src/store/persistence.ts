@@ -383,25 +383,28 @@ export function sanitizeBudget(raw: unknown): BudgetData {
     const mode = isPaymentMode(e.mode) ? e.mode : null
     const inst = typeof e.instrumentId === 'string' ? instById.get(e.instrumentId) : undefined
     const settlement = isSettlement(e.settlement) ? e.settlement : undefined
+    const income = e.income === true && !settlement && e.refund !== true
     expenses.push({
       id: e.id,
       date: e.date,
       amount: e.amount,
       // A category that no longer exists is "Uncategorised"; the entry is kept.
       // A settlement is not spending, so it has no category.
-      categoryId: !settlement && typeof e.categoryId === 'string' && catIds.has(e.categoryId) ? e.categoryId : null,
-      mode,
+      categoryId: !settlement && !income && typeof e.categoryId === 'string' && catIds.has(e.categoryId) ? e.categoryId : null,
+      mode: income ? null : mode,
       // A deleted or unknown instrument, or one the mode does not accept, is dropped; the entry is kept. A card bill keeps the card it paid off.
       instrumentId:
         settlement === 'cardBill' ? (inst && inst.deletedAt === null && inst.kind === 'credit' ? inst.id : null)
-        : settlement ? null
+        : settlement || income ? null
         : inst && inst.deletedAt === null && mode !== null && instrumentFitsMode(mode, inst) ? inst.id : null,
       note: str(e.note, 200),
       deletedAt: num(e.deletedAt),
       ...(settlement ? { settlement } : {}),
       // A refund is spending turned round; a settlement is never one.
       ...(e.refund === true && !settlement ? { refund: true as const } : {}),
-      ...(goodId(e.recurringId) ? { recurringId: e.recurringId } : {}),
+      // Money in is only kept when it is the ONLY kind the entry claims (settlement, then refund, win), so a damaged file cannot invent income.
+      ...(income ? { income: true as const } : {}),
+      ...(!income && goodId(e.recurringId) ? { recurringId: e.recurringId } : {}),
       ...ifSet({ edits: sanitizeEdits(e.edits) }),
     })
     if (expenses.length >= MAX_EXPENSES) break

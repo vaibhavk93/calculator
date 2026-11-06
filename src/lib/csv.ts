@@ -45,12 +45,14 @@ export function buildExpensesCsv(budget: BudgetData, range: ExportRange, today: 
     lines.push(
       [
         e.date,
-        e.refund ? `-${e.amount}` : e.amount, // a validated plain decimal, never text, so it is not escaped. A refund is negative so a SUM adds up right.
-        csvCell(e.settlement ? '' : categoryName(budget, e.categoryId).replace(' › ', ' > ')),
+        // A validated plain decimal, never text, so it is not escaped. Amount is money OUT: a refund or money that came in is negative, so a SUM
+        // of spending rows is never inflated by income (card bills and transfers are positive and say so in Type; filter them out of a SUM).
+        e.refund || e.income ? `-${e.amount}` : e.amount,
+        csvCell(e.settlement || e.income ? '' : categoryName(budget, e.categoryId).replace(' › ', ' > ')),
         csvCell(e.mode ? modeLabel(e.mode) : ''),
         csvCell(inst ? instrumentLabel(inst) : ''),
         csvCell(e.note),
-        e.settlement ? TYPE[e.settlement] ?? 'spending' : e.refund ? 'refund' : 'spending',
+        e.settlement ? TYPE[e.settlement] ?? 'spending' : e.income ? 'income' : e.refund ? 'refund' : 'spending',
       ].join(','),
     )
   }

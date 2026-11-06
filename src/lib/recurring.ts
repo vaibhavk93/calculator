@@ -1,5 +1,5 @@
 import { D, type Dec } from '../engine'
-import { BILL_REPEATS, validateAmount, validateDate, type BillRepeat, type BudgetData, type RecurringItem } from './budget'
+import { BILL_REPEATS, countsAsSpend, validateAmount, validateDate, type BillRepeat, type BudgetData, type RecurringItem } from './budget'
 import { MAX_TASK_TITLE } from './memory'
 import { parseNum } from './tool'
 import { addMonths, atTime, startOfDay } from './reminders'
@@ -100,7 +100,7 @@ export function looksMonthly(
   if (!key || liveBills(budget).some((b) => b.title.trim().toLowerCase() === key)) return null
   const rows: { day: number; amount: Dec }[] = []
   for (const e of budget.expenses) {
-    if (e.deletedAt !== null || e.id === selfId || e.settlement || e.refund || e.recurringId || e.note.trim().toLowerCase() !== key) continue
+    if (e.deletedAt !== null || e.id === selfId || !countsAsSpend(e) || e.refund || e.recurringId || e.note.trim().toLowerCase() !== key) continue
     rows.push({ day: dayNumber(e.date), amount: new D(e.amount) })
   }
   const amount = parseNum(draft.amount)

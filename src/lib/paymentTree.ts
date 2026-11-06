@@ -2,6 +2,7 @@ import { D, type Dec } from '../engine'
 import {
   PAYMENT_MODES,
   UPI_DEFAULT_LABEL,
+  countsAsSpend,
   entriesIn,
   entryMatches,
   instrumentLabel,
@@ -41,7 +42,7 @@ const add = (a: { spent: Dec; count: number }, e: BudgetExpense) => {
 
 export function paymentTree(budget: BudgetData, month: string, filter: Filter = {}): PayNode[] {
   const instById = new Map(budget.instruments.map((i) => [i.id, i]))
-  const spend = entriesIn(budget, month, filter.cycleDay).filter((e) => !e.settlement && entryMatches(budget, e, filter))
+  const spend = entriesIn(budget, month, filter.cycleDay).filter((e) => countsAsSpend(e) && entryMatches(budget, e, filter))
   const modes = new Map<PaymentModeId | 'none', BudgetExpense[]>()
   for (const e of spend) {
     const k = e.mode ?? 'none'

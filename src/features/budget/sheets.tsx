@@ -104,6 +104,7 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
       note: expense?.note ?? prefill?.note ?? '',
       settlement: (expense?.settlement ?? prefill?.settlement ?? null) as Settlement | null,
       refund: expense?.refund ?? prefill?.refund ?? false,
+      income: expense?.income ?? prefill?.income ?? false,
       repeat: (startRepeat ?? 'none') as BillRepeat | 'none',
     }
   })
@@ -115,6 +116,7 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
   const [note, setNote] = useState(start.note)
   const [settlement, setSettlement] = useState<Settlement | null>(start.settlement)
   const [refund, setRefund] = useState(start.refund)
+  const [income, setIncome] = useState(start.income)
   const [repeat, setRepeat] = useState<BillRepeat | 'none'>(start.repeat)
   const [view, setView] = useState<View>({ v: 'form' })
   // Category and mode pre-fill from an earlier entry with the same note, until the user picks one themselves.
@@ -132,11 +134,11 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
     if (!expense) amountRef.current?.focus()
   }, [expense])
 
-  const dirty = amount !== start.amount || date !== start.date || categoryId !== start.categoryId || mode !== start.mode || instrumentId !== start.instrumentId || note !== start.note || settlement !== start.settlement || refund !== start.refund || repeat !== start.repeat
+  const dirty = amount !== start.amount || date !== start.date || categoryId !== start.categoryId || mode !== start.mode || instrumentId !== start.instrumentId || note !== start.note || settlement !== start.settlement || refund !== start.refund || income !== start.income || repeat !== start.repeat
   const guard = useDiscardGuard(dirty, onClose)
 
   const month = /^\d{4}-\d{2}/.test(date) ? date.slice(0, 7) : monthKey(new Date())
-  const errors = validateExpense({ amount, date, categoryId, mode, instrumentId, settlement }, budget, new Date(), expense?.categoryId ?? null)
+  const errors = validateExpense({ amount, date, categoryId, mode, instrumentId, settlement, income }, budget, new Date(), expense?.categoryId ?? null)
   const shown = (f: Field) => (submitted || touched[f] ? errors[f] : undefined)
   const touch = (f: Field) => () => setTouched((t) => ({ ...t, [f]: true }))
   const aria = (f: Field, hint = false) => ({
@@ -148,15 +150,15 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
     setSubmitted(true)
     const first = (['amount', 'date', 'category', 'paidWith'] as Field[]).find((f) => errors[f])
     if (first) return focusField(first === 'paidWith' && mode === null && settlement === null ? 'exp-mode' : FIELD_ID[first])
-    const draft = { amount, categoryId, mode, instrumentId, date, note: note.trim(), settlement, refund: settlement === null && refund }
-    const rep = settlement === null && !refund && repeat !== 'none' ? repeat : null
+    const draft = { amount, categoryId, mode, instrumentId, date, note: note.trim(), settlement, refund: settlement === null && !income && refund, income: settlement === null && income }
+    const rep = settlement === null && !refund && !income && repeat !== 'none' ? repeat : null
     if (expense ? update(expense.id, draft, rep) : add(draft, rep)) { if (!expense) onSaved?.(); return onClose() }
     setStoreError(store.getState().notice?.text ?? 'Could not save this entry')
   }
 
   const changeNote = (v: string) => {
     setNote(v)
-    const hit = picked || settlement ? null : suggestFor(budget, v)
+    const hit = picked || settlement || income ? null : suggestFor(budget, v)
     if (hit) {
       setCategoryId(hit.categoryId)
       setMode(hit.mode)
@@ -184,9 +186,16 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
     setPicked(true)
   }
   /** Spending, a refund (spending turned round), a card bill payment or an own-account transfer. Only spending repeats. */
-  const chooseKind = (v: 'spend' | 'refund' | Settlement) => {
+  const chooseKind = (v: 'spend' | 'refund' | 'income' | Settlement) => {
     setRefund(v === 'refund')
-    if (v === 'spend' || v === 'refund') {
+    setIncome(v === 'income')
+    if (v === 'income') {
+      // Money in has no category, mode or card: clear them so nothing stale is sent.
+      setCategoryId(null)
+      setMode(null)
+      setInstrumentId(null)
+    }
+    if (v === 'spend' || v === 'refund' || v === 'income') {
       if (settlement !== null) chooseSettlement(null)
     } else chooseSettlement(v)
     if (v !== 'spend') setRepeat('none')
@@ -217,7 +226,7 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
     budget.categories.some((c) => c.deletedAt === null && c.parentId === null && c.name.toLowerCase() === name.toLowerCase()) ? null : validateCategoryName(name, budget, null)
 
   // ---- paid from: pills for up to five (not UPI), a picker above that
-  const payMode: PaymentModeId | null = settlement === 'cardBill' ? 'credit' : settlement === 'transfer' ? null : mode
+  const payMode: PaymentModeId | null = settlement === 'cardBill' ? 'credit' : settlement === 'transfer' || income ? null : mode
   const eligible = eligibleInstruments(budget, payMode)
   const adds = payMode === null ? [] : addChoices(payMode)
   const kind: InstrumentKind | null = payMode === null || payMode === 'cash' ? null : eligible[0]?.kind ?? adds[0]?.kind ?? null
@@ -281,17 +290,17 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
   const nextDue = repeat !== 'none' && !errors.date ? firstDue(date, repeat, Date.now(), reminderTime).dueAt : null
   // A quiet guess from the person's own repeats. Never automatic: it only offers, and "Not now" is remembered for this note.
   const hintKey = note.trim().toLowerCase()
-  const guess = !linked && !expense?.recurringId && settlement === null && !refund && repeat === 'none' && !hintGone && hintKey !== '' && !dismissedHints.has(hintKey) ? looksMonthly(budget, { note, amount, date }, expense?.id ?? null) : null
+  const guess = !linked && !expense?.recurringId && settlement === null && !refund && !income && repeat === 'none' && !hintGone && hintKey !== '' && !dismissedHints.has(hintKey) ? looksMonthly(budget, { note, amount, date }, expense?.id ?? null) : null
   const trail = expense?.edits ?? []
   const trailMoney = (plain: string) => formatCell(new D(plain), 'money', { system, decimals })
 
   return (
     <Sheet
-      title={expense ? (expense.refund ? 'Edit refund' : 'Edit expense') : (title ?? (refund ? 'Add refund' : 'Add expense'))}
+      title={expense ? (expense.refund ? 'Edit refund' : expense.income ? 'Edit money in' : 'Edit expense') : (title ?? (refund ? 'Add refund' : income ? 'Add money in' : 'Add expense'))}
       onClose={guard.requestClose}
       footer={
-        <GuardedFooter guard={guard} question="Discard this expense?">
-          <button type="button" className="btn btn--primary" onClick={submit}>{expense ? 'Save changes' : refund ? 'Add refund' : 'Add expense'}</button>
+        <GuardedFooter guard={guard} question={income ? 'Discard this entry?' : 'Discard this expense?'}>
+          <button type="button" className="btn btn--primary" onClick={submit}>{expense ? 'Save changes' : refund ? 'Add refund' : income ? 'Add money in' : 'Add expense'}</button>
         </GuardedFooter>
       }
     >
@@ -307,7 +316,7 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
           </FormField>
         </div>
 
-        {settlement === null && (
+        {settlement === null && !income && (
           <div className="save__card" style={tintStyle(7)}>
             <div className="ffield" data-invalid={catError ? '' : undefined}>
               <span className="ffield__label" id="exp-cat-label">Category</span>
@@ -370,20 +379,21 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
             )}
           </div>
         )}
-        {instError && payMode === null && settlement === null && <p className="ffield__error" id="exp-inst-msg" role="alert">{instError}</p>}
+        {instError && payMode === null && settlement === null && !income && <p className="ffield__error" id="exp-inst-msg" role="alert">{instError}</p>}
 
         <div className="save__card" style={tintStyle(7)}>
           <div className="ffield">
             <span className="ffield__label" id="exp-kind-label">What is this</span>
-            <Segmented<'spend' | 'refund' | Settlement>
+            <Segmented<'spend' | 'refund' | 'income' | Settlement>
               label="What is this"
-              value={settlement ?? (refund ? 'refund' : 'spend')}
+              value={settlement ?? (refund ? 'refund' : income ? 'income' : 'spend')}
               onChange={chooseKind}
-              options={[{ value: 'spend', label: 'Spending' }, { value: 'refund', label: 'Refund' }, { value: 'cardBill', label: 'Card bill' }, { value: 'transfer', label: 'Transfer' }]}
+              options={[{ value: 'spend', label: 'Spending' }, { value: 'refund', label: 'Refund' }, { value: 'income', label: 'Money in' }, { value: 'cardBill', label: 'Card bill' }, { value: 'transfer', label: 'Transfer' }]}
             />
-            {refund && settlement === null && <p className="ffield__hint">Money that came back, such as a returned item. It lowers your spending.</p>}
+            {refund && settlement === null && <p className="ffield__hint">Money that came back, such as a returned item. It lowers your spending. Use this when someone pays you back.</p>}
+            {income && settlement === null && <p className="ffield__hint">Money that came in, such as salary. It is not spending. Put where it came from in the note.</p>}
             {settlement === 'cardBill' && <p className="ffield__hint">Paying off a credit card. Not counted as spending.</p>}
-            {settlement === 'transfer' && <p className="ffield__hint">Moving money between your own accounts. Not counted as spending.</p>}
+            {settlement === 'transfer' && <p className="ffield__hint">Moving money between your own accounts. Not counted as spending. Sending money to another person is spending: use Spending.</p>}
           </div>
         </div>
 

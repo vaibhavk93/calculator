@@ -184,3 +184,26 @@ describe('design system (docs/DESIGN-SYSTEM.md)', () => {
     expect(bad).toEqual([])
   })
 })
+
+// ---------------------------------------------------------------- budget totals (docs/BUDGET-PLAN.md, money in)
+
+describe('spend totals go through countsAsSpend (lib/budget.ts)', () => {
+  const SRC_FILES = ALL.filter((f) => /\.tsx?$/.test(f) && !isTest(f))
+
+  // A new total that skips only `settlement` would count money that came in as spending. Ask the helper instead.
+  it('nothing outside lib/budget.ts filters entries with `!x.settlement`', () => {
+    const bad: string[] = []
+    for (const f of SRC_FILES) {
+      if (rel(f) === 'lib/budget.ts') continue
+      for (const m of stripComments(read(f)).matchAll(/!\s*[\w.?]+\.settlement\b(?!\s*[=!]==)/g)) bad.push(`${rel(f)}: ${m[0]}`)
+    }
+    expect(bad).toEqual([])
+  })
+
+  // Reading the `income` flag is for deciding what an entry IS (sheet, list row, CSV, saving, loading), not for totals.
+  const MAY_READ_INCOME = ['lib/budget.ts', 'lib/csv.ts', 'lib/smsParse.ts', 'store/app.ts', 'store/persistence.ts', 'features/budget/sheets.tsx', 'features/budget/SpendSummary.tsx']
+  it("only the known files read an entry's `.income` flag", () => {
+    const bad = SRC_FILES.filter((f) => /\be\.income\b|\bexpense\??\.income\b|\bx\.income\b|\bd\.income\b/.test(stripComments(read(f))) && !MAY_READ_INCOME.includes(rel(f)))
+    expect(bad.map(rel)).toEqual([])
+  })
+})
