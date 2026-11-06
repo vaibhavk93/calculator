@@ -461,7 +461,7 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, rememberAs,
                     </p>
                   </div>
                   {repeat !== 'none' && (
-                      <FormField label="Number of payments" htmlFor="exp-payments" error={payments !== '' || submitted ? paymentsError : undefined} hint={lastDate !== null ? `Last payment on ${shortDate(lastDate)}` : 'Leave empty if it never ends'}>
+                      <FormField label="Number of payments" htmlFor="exp-payments" error={payments !== '' || submitted ? paymentsError : undefined} hint={lastDate !== null ? `Last payment on ${shortDate(lastDate)}` : 'Counts this entry as the first. Leave empty if it never ends'}>
                         <input id="exp-payments" className="field field--mono" inputMode="numeric" value={payments} autoComplete="off" onChange={(e) => setPayments(e.target.value.replace(/\D/g, '').slice(0, 3))} aria-invalid={paymentsError && payments !== '' ? true : undefined} aria-describedby="exp-payments-msg" />
                       </FormField>
                   )}
