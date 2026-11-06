@@ -399,7 +399,7 @@ for (const [theme, font] of [['dark', 100], ['light', 100], ['dark', 200], ['lig
     await notes(page)
     await shot(page, `look-${tag}-1-notes-home`)
     eq(await smallTargets(page, '.tools'), [], 'Notes home targets')
-    has(await page.locator('.saved__find').innerText(), 'New', 'Add control shows its word')
+    has(await page.locator('.saved__view').innerText(), 'New', 'Add control shows its word')
 
     await addBtn(page).click()
     await shot(page, `look-${tag}-2-add-sheet`)

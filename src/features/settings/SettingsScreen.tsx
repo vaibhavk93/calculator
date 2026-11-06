@@ -20,12 +20,12 @@ import { TipsAndToursScreen } from '../onboarding/TipsAndTours'
 const TAB_LABEL: Record<Tab, string> = { calculate: 'Calculate', tools: 'Tools', saved: 'Notes', due: 'Due', budget: 'Budget' }
 const DECIMAL_CHOICES = ['auto', ...Array.from({ length: 11 }, (_, i) => String(i))]
 
-/** One titled card of settings. A hairline list under a quiet heading, no card. */
+/** One titled group of settings: a small heading over ONE flat panel of rows (docs/design-reference, Settings). */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="sect sect--settings" aria-label={title}>
       <h2 className="sect__head">{title}</h2>
-      {children}
+      <div className="settings__panel">{children}</div>
     </section>
   )
 }
