@@ -3,7 +3,7 @@ import { ACCENT_NAMES, type AccentName, type ThemePreference } from '../lib/them
 import type { KeyValueStorage } from '../lib/storage'
 import { parseTime } from '../lib/reminders'
 import { MAX_COUNTED_TOOLS, MAX_PINNED_TOOLS, MAX_USE_COUNT } from '../lib/toolUse'
-import { MAX_RECURRING, sanitizeEdits, isAccountType, isBillRepeat, isMonthKey, isSettlement, type RecurringItem } from '../lib/budget'
+import { MAX_RECURRING, MAX_RULES, RULE_MAX, cleanRuleMatch, sanitizeEdits, isAccountType, isBillRepeat, isMonthKey, isSettlement, type MerchantRule, type RecurringItem } from '../lib/budget'
 import {
   DEFAULT_SETTINGS,
   MAX_HISTORY,
@@ -410,7 +410,29 @@ export function sanitizeBudget(raw: unknown): BudgetData {
     if (expenses.length >= MAX_EXPENSES) break
   }
   const recurring = sanitizeRecurring(raw.recurring, catIds, instById)
-  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, ...ifSet({ overallByMonth: limitMap(raw.overallByMonth) }), categories: cats, instruments, expenses, ...ifSet({ smsSeen: seenList(raw.smsSeen) }), ...(recurring.length > 0 ? { recurring } : {}) }
+  const rules = sanitizeRules(raw.rules, catIds)
+  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, ...ifSet({ overallByMonth: limitMap(raw.overallByMonth) }), categories: cats, instruments, expenses, ...ifSet({ smsSeen: seenList(raw.smsSeen) }), ...(recurring.length > 0 ? { recurring } : {}), ...(rules.length > 0 ? { rules } : {}) }
+}
+
+/**
+ * Merchant rules, newest first as stored. Junk, repeats (by id or by the same text, the newer wins) and anything past the cap are dropped.
+ * A rule is kept when its category ever existed, even if that category is now deleted: Undo and backups must bring it back. A category
+ * id that never existed cannot come back, so that rule is dropped.
+ */
+function sanitizeRules(raw: unknown, catIds: Set<string>): MerchantRule[] {
+  const out: MerchantRule[] = []
+  const ids = new Set<string>()
+  const texts = new Set<string>()
+  for (const r of Array.isArray(raw) ? raw : []) {
+    if (!isObject(r) || !goodId(r.id) || ids.has(r.id) || !goodId(r.categoryId) || !catIds.has(r.categoryId) || typeof r.match !== 'string') continue
+    const m = cleanRuleMatch(r.match.replace(/\s+/g, ' ').trim().slice(0, RULE_MAX).trim())
+    if (!m.ok || texts.has(m.value.toLowerCase())) continue
+    ids.add(r.id)
+    texts.add(m.value.toLowerCase())
+    out.push({ id: r.id, match: m.value, categoryId: r.categoryId })
+    if (out.length >= MAX_RULES) break
+  }
+  return out
 }
 
 /** Bills and subscriptions. A bill needs a real amount; a card bill needs a card that exists and is a credit card. Anything else is dropped. */

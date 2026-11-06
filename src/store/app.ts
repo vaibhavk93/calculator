@@ -15,7 +15,9 @@ import {
 import { parseNum } from '../lib/tool'
 import {
   MAX_RECURRING,
+  MAX_RULES,
   MAX_SUBCATEGORIES,
+  cleanRuleMatch,
   categoryName,
   categoryActiveIn,
   categoryUsable,
@@ -210,6 +212,13 @@ export interface AppState {
   renameCategory: (id: string, name: string) => void
   /** Deleting a top-level category deletes its subcategories too. Entries stay, shown as Uncategorised. */
   deleteCategory: (id: string) => void
+  /**
+   * Makes a merchant rule (newest wins). The same text (ignoring case) already there: its category is replaced and it becomes the
+   * newest, so there is never a second one. False, with a notice in plain words, when the text or the category is not usable or at the cap.
+   */
+  addRule: (match: string, categoryId: string) => boolean
+  /** Removes a rule; the snackbar offers Undo, which puts it back in the same place. */
+  deleteRule: (id: string) => void
   /** Adds a card, account or wallet. Returns its id, or the existing one with the same name and kind. Null (with a notice) when not valid. */
   addInstrument: (draft: InstrumentDraft) => string | null
   /** Changes some fields. Entries whose mode no longer accepts it lose it. False (with a notice) when not valid. */
@@ -924,6 +933,33 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const { budget } = get()
         const at = deps.now()
         set({ budget: { ...budget, categories: budget.categories.map((c) => ((c.id === id || c.parentId === id) && c.deletedAt === null ? { ...c, deletedAt: at } : c)) } })
+      },
+
+      addRule: (match, categoryId) => {
+        const m = cleanRuleMatch(match)
+        if (!m.ok) return fail(m.error)
+        const { budget } = get()
+        if (!categoryUsable(budget, categoryId)) return fail('Pick a category from the list')
+        const rules = budget.rules ?? []
+        const same = rules.find((r) => r.match.toLowerCase() === m.value.toLowerCase())
+        if (!same && rules.length >= MAX_RULES) return fail(`You can have up to ${MAX_RULES} rules. Delete one first.`)
+        const next = { id: same?.id ?? deps.newId(), match: same?.match ?? m.value, categoryId }
+        set({ budget: { ...budget, rules: [next, ...rules.filter((r) => r !== same)] } })
+        return true
+      },
+
+      deleteRule: (id) => {
+        const { budget } = get()
+        const rules = budget.rules ?? []
+        const at = rules.findIndex((r) => r.id === id)
+        if (at < 0) return
+        const gone = rules[at]!
+        set({ budget: { ...budget, rules: rules.filter((r) => r.id !== id) } })
+        undoable('Rule deleted', () => {
+          const b = get().budget
+          const cur = (b.rules ?? []).filter((r) => r.id !== id)
+          set({ budget: { ...b, rules: [...cur.slice(0, at), gone, ...cur.slice(at)] } })
+        })
       },
 
       addInstrument: (draft) => {

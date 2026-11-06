@@ -6,7 +6,7 @@ import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
 import { D } from '../../engine'
-import { INSTRUMENT_KINDS, categoryName, instrumentLabel, modeLabel, suggestFor } from '../../lib/budget'
+import { INSTRUMENT_KINDS, categoryName, instrumentLabel, modeLabel, ruleFor, ruleTextFromMerchant, suggestFor } from '../../lib/budget'
 import { buildStatementCandidates } from '../../lib/statementParse'
 import { copyText } from '../../lib/device'
 import { addToParseLog, clearParseLog, loadParseLog, logSalt, readBankMessages, smsSupported } from '../../lib/sms'
@@ -73,7 +73,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
       return
     }
     const s = store.getState()
-    const res = buildCandidates(r.messages, s.budget, (note) => suggestFor(s.budget, note), await logSalt())
+    const res = buildCandidates(r.messages, s.budget, (note) => ruleFor(s.budget, note) ?? suggestFor(s.budget, note), await logSalt())
     setResult(res)
     void addToParseLog(res.log).then((l) => setLogCount(l.length))
     setBusy(false)
@@ -85,7 +85,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
     if (file.size > 5_000_000) return setMessage('That file is too big for a statement (over 5 MB).')
     if (/\.pdf$/i.test(file.name)) return setMessage('PDF statements are not supported yet. Download the statement as CSV from your bank site and pick that.')
     const s = store.getState()
-    const r = buildStatementCandidates(await file.text(), s.budget, stmtFor || null, (note) => suggestFor(s.budget, note))
+    const r = buildStatementCandidates(await file.text(), s.budget, stmtFor || null, (note) => ruleFor(s.budget, note) ?? suggestFor(s.budget, note))
     if (!r.ok) { setResult(null); return setMessage(r.message) }
     setResult(r.result)
   }
@@ -131,7 +131,9 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
   const row = (c: Candidate, dupe = false) => {
     const inst = c.instrumentId ? budget.instruments.find((i) => i.id === c.instrumentId) : undefined
     const how = [c.mode ? modeLabel(c.mode) : '', inst ? instrumentLabel(inst) : c.bank && c.last4 ? `${c.bank} ••${c.last4}` : ''].filter(Boolean).join(' · ')
-    const what = c.kind === 'cardBill' ? 'Credit card bill payment' : c.categoryId ? categoryName(budget, c.categoryId) : 'Uncategorised'
+    // Says why when a rule of yours chose the category, so a wrong rule is easy to spot.
+    const rule = c.kind === 'spend' && c.categoryId && c.merchant ? ruleFor(budget, c.merchant) : null
+    const what = c.kind === 'cardBill' ? 'Credit card bill payment' : c.categoryId ? `${categoryName(budget, c.categoryId)}${rule && rule.categoryId === c.categoryId ? ` (rule: ${rule.match})` : ''}` : 'Uncategorised'
     const name = c.merchant || 'Bank payment'
     return (
       <div key={c.id} className="budget__entry import__row">
@@ -222,6 +224,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
       {edit && (
         <ExpenseSheet
           prefill={draftOf(edit)}
+          rememberAs={edit.kind === 'spend' && edit.merchant ? ruleTextFromMerchant(edit.merchant) ?? undefined : undefined}
           onSaved={() => { markSeen([edit.id]); drop(edit.id) }}
           onClose={() => setEdit(null)}
         />

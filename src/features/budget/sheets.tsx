@@ -38,7 +38,7 @@ import { D } from '../../engine'
 import { firstDue, looksMonthly, repeatWord } from '../../lib/recurring'
 import { formatCell } from '../../lib/toolFormat'
 import { shortDate } from '../../lib/tasks'
-import { Segmented } from '../settings/controls'
+import { Row, Segmented, Toggle } from '../settings/controls'
 import { GuardedFooter, MoneyInput, focusField, useDiscardGuard } from './formKit'
 import { InstrumentForm } from './InstrumentForm'
 import { PickTrigger, PickView } from './pick'
@@ -81,7 +81,7 @@ type View = { v: 'form' } | { v: 'category' } | { v: 'inst' } | { v: 'newInst'; 
  * the button is never disabled. The store checks again before it saves. A list of choices or the card form takes the
  * place of this form inside the same sheet (docs/FORMS-AND-SHEETS.md: never stack a sheet on a sheet), then returns here.
  */
-export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, onClose }: { expense?: BudgetExpense; /** A new entry that starts with these values (a calculator result, or a bank message being reviewed). */ prefill?: Partial<ExpenseDraft> & { amount: string; note: string }; /** Replaces "Add expense" as the sheet's title. */ title?: string; /** "Repeats" starts on this (the Bills page opens the sheet on Monthly). */ startRepeat?: BillRepeat; /** Called after a NEW entry is saved. */ onSaved?: () => void; onClose: () => void }) {
+export function ExpenseSheet({ expense, prefill, title, startRepeat, rememberAs, onSaved, onClose }: { expense?: BudgetExpense; /** A new entry that starts with these values (a calculator result, or a bank message being reviewed). */ prefill?: Partial<ExpenseDraft> & { amount: string; note: string }; /** Replaces "Add expense" as the sheet's title. */ title?: string; /** "Repeats" starts on this (the Bills page opens the sheet on Monthly). */ startRepeat?: BillRepeat; /** Bank-message review only: the short merchant word a rule can be made from. When the person changes the suggested category, a "Remember this merchant" switch appears. */ rememberAs?: string; /** Called after a NEW entry is saved. */ onSaved?: () => void; onClose: () => void }) {
   const budget = useApp((s) => s.budget)
   const add = useApp((s) => s.addExpense)
   const update = useApp((s) => s.updateExpense)
@@ -126,6 +126,8 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
   const [storeError, setStoreError] = useState<string | null>(null)
   const [hintGone, setHintGone] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [remember, setRemember] = useState(false)
+  const addRule = useApp((s) => s.addRule)
   const system = useApp((s) => s.settings.numberSystem)
   const decimals = useApp((s) => s.settings.decimals)
 
@@ -146,13 +148,20 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
     'aria-describedby': shown(f) || hint ? `${FIELD_ID[f]}-msg` : undefined,
   })
 
+  const canRemember = !expense && !!rememberAs && settlement === null && !income && categoryId !== null && categoryId !== start.categoryId
+
   const submit = () => {
     setSubmitted(true)
     const first = (['amount', 'date', 'category', 'paidWith'] as Field[]).find((f) => errors[f])
     if (first) return focusField(first === 'paidWith' && mode === null && settlement === null ? 'exp-mode' : FIELD_ID[first])
     const draft = { amount, categoryId, mode, instrumentId, date, note: note.trim(), settlement, refund: settlement === null && !income && refund, income: settlement === null && income }
     const rep = settlement === null && !refund && !income && repeat !== 'none' ? repeat : null
-    if (expense ? update(expense.id, draft, rep) : add(draft, rep)) { if (!expense) onSaved?.(); return onClose() }
+    if (expense ? update(expense.id, draft, rep) : add(draft, rep)) {
+      // The entry is saved first; a rule that cannot be made (cap reached) says so in a notice but never loses the entry.
+      if (!expense && canRemember && remember && categoryId) addRule(rememberAs!, categoryId)
+      if (!expense) onSaved?.()
+      return onClose()
+    }
     setStoreError(store.getState().notice?.text ?? 'Could not save this entry')
   }
 
@@ -346,6 +355,12 @@ export function ExpenseSheet({ expense, prefill, title, startRepeat, onSaved, on
                 ))}
               </div>
             </div>
+
+            {canRemember && (
+              <Row label="Remember this merchant" hint={`Next time, "${rememberAs}" goes to ${categoryName(budget, categoryId!)}`}>
+                <Toggle label={`Remember ${rememberAs} as ${categoryName(budget, categoryId!)}`} checked={remember} onChange={setRemember} />
+              </Row>
+            )}
           </div>
         )}
 
