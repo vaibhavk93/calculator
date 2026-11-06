@@ -3,6 +3,7 @@ import { formatDecimal } from '../../lib/format'
 import { advanceTax } from '../../engine/tax/advanceTax'
 import { capitalGains, type Asset } from '../../engine/tax/capitalGains'
 import { gratuity } from '../../engine/tax/gratuity'
+import { hraExemption } from '../../engine/tax/hra'
 import { compareRegimes, inHandSalary, presumptive, type Regime, type TaxResult } from '../../engine/tax/incomeTax'
 import { RATES_AS_OF, RULES_FY2026_27 as R, taxNote, type AgeBand } from '../../engine/tax/rules.FY2026-27'
 import { yearsMonthsText } from '../../engine/duration'
@@ -444,6 +445,118 @@ const gratuitySpec: ToolSpec = {
   },
 }
 
+// ---- E9 HRA exemption (Rule 279) ------------------------------------------------------
+
+const METROS = R.hra.metroCities
+const hraSpec: ToolSpec = {
+  id: 'hra',
+  rates: RATES_AS_OF,
+  title: 'HRA exemption',
+  blurb: 'Tax-free part of your rent allowance',
+  category: 'tax',
+  verified: { source: 'Income-tax Rules 2026, Rule 279 (G.S.R. 198(E), 20 Mar 2026)' },
+  keywords: ['hra', 'house rent allowance', 'rent', 'exempt', 'landlord', 'pan', 'rule 279', '10(13a)'],
+  fields: [
+    money('basic', 'Monthly basic pay', '50000'),
+    money('hra', 'Monthly HRA received', '25000'),
+    money('rent', 'Monthly rent you pay', '20000'),
+    {
+      id: 'city',
+      label: 'Where you rent',
+      kind: 'select',
+      default: 'metro',
+      hint: `${METROS.length} cities get 50%: ${METROS.join(', ')}.`,
+      options: [
+        { value: 'metro', label: `One of the ${METROS.length} cities (50%)` },
+        { value: 'other', label: 'Anywhere else (40%)' },
+      ],
+    },
+    { ...regimeField, default: 'old', hint: 'The new regime gives no HRA exemption.' },
+    money('da', 'Monthly dearness allowance', '0', 'Only if your terms of employment provide for DA.', true),
+    {
+      id: 'months',
+      label: 'Months you paid rent',
+      kind: 'number',
+      unit: 'months',
+      default: '12',
+      hint: '1 to 12, counting only the months you lived there.',
+      advanced: true,
+    },
+  ],
+  compute: (v) => {
+    const r = need(v, [
+      { id: 'basic', label: 'Monthly basic pay' },
+      { id: 'hra', label: 'Monthly HRA received' },
+      { id: 'rent', label: 'Monthly rent' },
+    ])
+    if (!r.ok) return r
+    const junk = junkOptional(v, [
+      { id: 'da', label: 'Dearness allowance' },
+      { id: 'months', label: 'Months you paid rent' },
+    ])
+    if (junk) return junk
+    const months = parseNum(v.months) ?? new D(12)
+    if (!months.isInteger()) return { error: 'Months must be a whole number' }
+    if (months.lt(1) || months.gt(12)) return { error: 'Months you paid rent must be 1 to 12' }
+    const newRegime = v.regime === 'new'
+    const metro = v.city !== 'other'
+    const h = hraExemption(
+      { basic: r.n.basic!, da: opt(v, 'da'), hra: r.n.hra!, rent: r.n.rent!, metro, months: months.toNumber(), newRegime },
+      R,
+    )
+    if (!h) return { error: 'Amounts cannot be negative' }
+
+    const pct = metro ? R.hra.metroPct : R.hra.otherPct
+    const limbWords = {
+      actual: 'the HRA you actually received',
+      rentOverTenth: `your rent above a tenth of salary`,
+      shareOfSalary: `${pct}% of your salary`,
+    }[h.binding]
+
+    const rows: ResultRow[] = [
+      { label: 'Tax-free HRA', value: h.exempt, fmt: 'money', main: true },
+      { label: 'Taxable HRA', value: h.taxable, fmt: 'money' },
+      { label: 'HRA received', value: h.received, fmt: 'money' },
+      { label: 'Rent paid', value: h.rentPaid, fmt: 'money' },
+      { label: 'Salary counted (basic + DA)', value: h.salary, fmt: 'money' },
+    ]
+
+    const table: ResultTable = {
+      title: 'The three limits — the least one is your exemption',
+      columns: ['Rule 279(1)', 'Amount'],
+      // One fmt per column: the first column is the rule's wording, the second the money.
+      fmts: ['text', 'money'],
+      rows: [
+        ['HRA actually received', h.limbs.actual],
+        [`Rent paid − ${R.hra.rentLessSalaryPct}% of salary`, h.limbs.rentOverTenth],
+        [`${pct}% of salary`, h.limbs.shareOfSalary],
+      ],
+    }
+
+    const pan = h.landlordPanNeeded
+      ? ` Your rent is over ₹${r0(new D(R.hra.landlordPanAbove))} for the year, so your employer needs the landlord's name, address and PAN (Form 124).`
+      : ''
+    const own = ' You cannot claim this for a home you own, and rent must really be paid.'
+    const split = months.eq(12) ? '' : ' Pay or rent changed mid-year? Work out each period separately and add the tax-free parts.'
+
+    return {
+      rows,
+      table,
+      formula: newRegime
+        ? [
+            'New regime: HRA is fully taxable, there is no exemption',
+            `The old regime would have made ₹${r0(h.limbs.actual.isZero() ? ZERO : D.max(D.min(h.limbs.actual, h.limbs.rentOverTenth, h.limbs.shareOfSalary), ZERO))} of it tax-free`,
+          ]
+        : [
+            `Tax-free = least of: HRA received, rent − ${R.hra.rentLessSalaryPct}% of salary, and ${pct}% of salary`,
+            `least of ₹${r0(h.limbs.actual)}, ₹${r0(h.limbs.rentOverTenth)}, ₹${r0(h.limbs.shareOfSalary)} = ₹${r0(h.exempt)}`,
+            `Here ${limbWords} is the limit.`,
+          ],
+      note: `${NOTE} Salary here means basic pay plus DA only where your terms provide for it — no other allowance counts.${pan}${own}${split}`,
+    }
+  },
+}
+
 // ---- E7 presumptive (44ADA) -----------------------------------------------------------
 
 const presumptiveSpec: ToolSpec = {
@@ -504,4 +617,4 @@ const presumptiveSpec: ToolSpec = {
   },
 }
 
-export const TOOLS: ToolSpec[] = [incomeTaxSpec, salarySpec, cgSpec, advanceSpec, gratuitySpec, presumptiveSpec]
+export const TOOLS: ToolSpec[] = [incomeTaxSpec, salarySpec, cgSpec, advanceSpec, gratuitySpec, hraSpec, presumptiveSpec]
