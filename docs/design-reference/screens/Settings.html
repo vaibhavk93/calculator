@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#060606}
+.panel{background:#0D0D0D;border-radius:10px;margin:0 20px 22px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid #262626;color:#F5F5F5;width:100%;box-sizing:border-box;text-align:left;background:none;border-left:none;border-right:none;border-top:none;font-family:'IBM Plex Sans',sans-serif;cursor:pointer}
+.panel .row:last-child{border-bottom:none}
+.sw{position:relative;width:42px;height:26px;flex-shrink:0}
+.sw input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.sw .track{position:absolute;inset:0;background:#262626;border-radius:20px;transition:background .15s}
+.sw .knob{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#A4A4A4;transition:transform .15s}
+.sw input:checked + .track{background:#CCD539}
+.sw input:checked + .track + .knob{transform:translateX(16px);background:#121300}
+</style>
+</helmet>
+<div style="width:390px;height:844px;background:#060606;color:#F5F5F5;font-family:'IBM Plex Sans',sans-serif;display:flex;flex-direction:column;overflow:hidden">
+
+  <div style="display:flex;align-items:center;gap:8px;padding:18px 16px 12px">
+    <button aria-label="Back" style="all:unset;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#F5F5F5"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <span style="font-weight:600;font-size:1.05rem">Settings</span>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding-top:4px">
+
+    <div style="font-size:0.78rem;color:#A4A4A4;padding:10px 20px 8px">Appearance</div>
+    <div class="panel">
+      <button class="row"><span style="flex:1;font-size:0.92rem">Theme</span><span style="font-size:0.84rem;color:#A4A4A4">Dark</span></button>
+      <button class="row"><span style="flex:1;font-size:0.92rem">Font size</span><span style="font-size:0.84rem;color:#A4A4A4">System</span></button>
+    </div>
+
+    <div style="font-size:0.78rem;color:#A4A4A4;padding:0 20px 8px">Numbers</div>
+    <div class="panel">
+      <button class="row"><span style="flex:1;font-size:0.92rem">Number format</span><span style="font-size:0.84rem;color:#A4A4A4">12,34,567.89</span></button>
+      <button class="row"><span style="flex:1;font-size:0.92rem">Date format</span><span style="font-size:0.84rem;color:#A4A4A4">5 Nov 2026</span></button>
+    </div>
+
+    <div style="font-size:0.78rem;color:#A4A4A4;padding:0 20px 8px">Show in the app</div>
+    <div class="panel">
+      <div class="row" style="cursor:default">
+        <span style="flex:1"><div style="font-size:0.92rem">Budget</div><div style="font-size:0.76rem;color:#818181;margin-top:2px">Hidden, not deleted</div></span>
+        <label class="sw" aria-label="Show Budget tab"><input type="checkbox" checked><span class="track"></span><span class="knob"></span></label>
+      </div>
+      <div class="row" style="cursor:default">
+        <span style="flex:1"><div style="font-size:0.92rem">Notes &amp; reminders</div><div style="font-size:0.76rem;color:#818181;margin-top:2px">Hidden, not deleted</div></span>
+        <label class="sw" aria-label="Show Notes and reminders tabs"><input type="checkbox" checked><span class="track"></span><span class="knob"></span></label>
+      </div>
+    </div>
+
+    <div style="font-size:0.78rem;color:#A4A4A4;padding:0 20px 8px">Behaviour</div>
+    <div class="panel">
+      <button class="row"><span style="flex:1;font-size:0.92rem">Confirm before deleting</span><span style="font-size:0.84rem;color:#A4A4A4">On</span></button>
+      <button class="row"><span style="flex:1;font-size:0.92rem">Calculator history limit</span><span style="font-size:0.84rem;color:#A4A4A4">200</span></button>
+    </div>
+
+    <div style="font-size:0.78rem;color:#A4A4A4;padding:0 20px 8px">Reminders</div>
+    <div class="panel">
+      <button class="row"><span style="flex:1;font-size:0.92rem">Due time</span><span style="font-size:0.84rem;color:#A4A4A4">9:00 AM</span></button>
+      <button class="row"><span style="flex:1;font-size:0.92rem">Bill reminders</span><span style="font-size:0.84rem;color:#A4A4A4">3 days before</span></button>
+    </div>
+
+    <div class="panel">
+      <button class="row"><span style="flex:1;font-size:0.92rem">Backup and export</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="#818181" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button class="row"><span style="flex:1;font-size:0.92rem">Tips and tours</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 6l6 6-6 6" stroke="#818181" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+
+    <div style="text-align:center;padding:10px 20px 30px;font-size:0.78rem;color:#5D5D5D">Calc 2.4.0 · local-only, no account</div>
+
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

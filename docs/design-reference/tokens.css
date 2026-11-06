@@ -1,0 +1,70 @@
+/* Calc design tokens — from the Design canvas pass (Claude, Cowork).
+   Dark is default; light is complete and equal, not an inversion —
+   raised sits lighter than ground in dark, darker than ground in light. */
+
+:root {
+  /* dark (default) */
+  --bg: #060606;
+  --surface: #0D0D0D;
+  --raised: #181818;
+  --line: #262626;          /* separators only, never a control border */
+  --ink: #F5F5F5;
+  --ink-2: #A4A4A4;
+  --ink-3: #818181;         /* borders/icons only, never text */
+  --accent: #CCD539;        /* fill only — buttons, bars, chips, active segment */
+  --accent-text: #CCD539;   /* citron as text/icon on dark — fine, high contrast */
+  --accent-ink: #121300;    /* text ON an accent fill, both themes */
+  --alert: #EF675A;         /* overdue / errors only, never "bad" by itself */
+  --positive: #8BC48A;      /* money saved/received — ASSUMPTION, not in original brief table, confirm before reuse */
+
+  /* section identity tints — dots/headings only, never a fill behind a result */
+  --tint-loans: #7C8CF2;
+  --tint-savings: #5EC8C8;
+  --tint-tax: #E3B341;
+  --tint-dates: #C98FD6;
+  --tint-business: #6FA8DC;
+  --tint-health: #9C7CF2;
+  --tint-everyday: #8C8C8C;
+  --tint-fun: #D9B88A;
+
+  --r-s: 4px; --r-m: 10px; --r-l: 20px; /* only these, or 0 — no other radius */
+}
+
+:root[data-theme="light"] {
+  --bg: #FFFFFF;
+  --surface: #F7F7F7;
+  --raised: #F2F2F2;
+  --line: #DEDEDE;
+  --ink: #121212;
+  --ink-2: #525252;
+  --ink-3: #5D5D5D;
+  --accent: #CCD539;        /* fill unchanged across themes */
+  --accent-text: #5C6100;   /* citron as TEXT/icon on light must shift — raw #CCD539 fails contrast on white */
+  --accent-ink: #121300;
+  --alert: #BE241F;         /* darker red for contrast on white */
+  --positive: #1F7A3D;       /* ASSUMPTION — same caveat as dark */
+}
+
+/* Type: IBM Plex Mono (tabular figures) for every number the user reads.
+   IBM Plex Sans for words and for keys you press. All sizes in rem. */
+.mono {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+body {
+  font-family: 'IBM Plex Sans', sans-serif;
+}
+
+/* Scale actually used across screens — keep to these, don't invent new sizes */
+/* hero:   2.3–2.8rem / weight 500 / line-height 1   — the ONE big answer per screen */
+/* title:  1.2–1.3rem / weight 600                    — screen/section headers */
+/* body:   0.88–0.95rem / weight 400                  — row text */
+/* label:  0.76–0.82rem / weight 400–500, ink-2        — meta, captions, section headings */
+/* hint:   0.68–0.76rem / weight 400, ink-3            — timestamps, disclaimers */
+
+/* Spacing scale — px, keep to these */
+/* 4 · 8 · 12 · 16 · 20 · 24 · 32 */
+
+/* Rule of thumb enforced across every screen in this pass:
+   a flat panel (surface bg, r-m radius) means "these are bundled controls",
+   never "this needs emphasis." Emphasis is hero size/weight + bare, no panel. */
