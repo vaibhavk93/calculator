@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { RATES_AS_OF as GST } from '../../engine/convert/gstRates'
-import { RATES_AS_OF as INVEST } from '../../engine/investments/rates'
+import { EXAMPLE, PPF, RATES_AS_OF as INVEST } from '../../engine/investments/rates'
 import { RATES_AS_OF as LOANS } from '../../engine/loans/rules'
-import { RATES_AS_OF as TAX } from '../../engine/tax/rules.FY2026-27'
+import { RULES_FY2026_27 as TAX_RULES, RATES_AS_OF as TAX } from '../../engine/tax/rules.FY2026-27'
 import { defaultValues, exampleFieldsInUse, labelOf } from '../../lib/tool'
 import { ALL_TOOLS } from './registry'
 
@@ -64,5 +64,39 @@ describe('date difference span', () => {
   it('shows start, end and the count between', () => {
     const r = tool('date').compute({ mode: 'diff', from: '2026-01-01', to: '2026-01-31' })
     expect('rows' in r && r.span).toEqual({ start: 'Thu 1 Jan 2026', end: 'Sat 31 Jan 2026', between: '30 days' })
+  })
+})
+
+// Added 2026-11-06 with the primary-source research (`docs/RESEARCH-BLOCKED-2026-11-06.md`).
+// These numbers now have a government document behind them, so a silent revert to the old
+// "example value" guesses should fail loudly rather than ship a confidently wrong figure.
+describe('numbers upgraded to a primary source on 2026-11-06', () => {
+  it('PPF 7.1% is the official rate, not an example, and the screen uses it', () => {
+    expect(PPF.rate).toBe('7.1')
+    expect(PPF.rateSource).toContain('F.No.1/4/2019-NS')
+    expect(defaultValues(tool('ppf')).rate).toBe('7.1')
+    // Quarterly reset: the pack must expire with the quarter, not with the tax year.
+    expect(INVEST.until).toBe('2027-01-01')
+  })
+
+  it('the EPS pension wage ceiling is the Rs 25,000 notified from 17 Sep 2026', () => {
+    expect(EXAMPLE.epsWageCeiling).toBe('25000')
+    expect(defaultValues(tool('epf')).ceiling).toBe('25000')
+  })
+
+  it('HRA follows Rule 279: eight 50% cities, 40% elsewhere, PAN above Rs 1 lakh', () => {
+    expect(TAX_RULES.hra.metroPct).toBe('50')
+    expect(TAX_RULES.hra.otherPct).toBe('40')
+    expect(TAX_RULES.hra.rentLessSalaryPct).toBe('10')
+    expect(TAX_RULES.hra.landlordPanAbove).toBe('100000')
+    // The list grew from four cities to eight on 1 Apr 2026. Pune/Ahmedabad/Bengaluru/Hyderabad are the new ones.
+    expect(TAX_RULES.hra.metroCities).toHaveLength(8)
+    for (const c of ['Mumbai', 'Kolkata', 'Delhi', 'Chennai', 'Hyderabad', 'Pune', 'Ahmedabad', 'Bengaluru'])
+      expect(TAX_RULES.hra.metroCities, c).toContain(c)
+  })
+
+  it('the gratuity divisor stays 26 but is flagged as an assumption, not statute', () => {
+    // Code on Social Security s.53(2) has no divisor; 26 is from the repealed 1972 Act.
+    expect(TAX_RULES.gratuity.coveredDivisor).toBe('26')
   })
 })
