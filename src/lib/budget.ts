@@ -615,7 +615,23 @@ export interface BudgetData {
   smsSeen?: string[]
   /** Bills and subscriptions that repeat (see RecurringItem). Absent in older backups: none. */
   recurring?: RecurringItem[]
+  /** Merchant rules, NEWEST FIRST (the first one that matches wins). Absent: none. See MerchantRule. */
+  rules?: MerchantRule[]
 }
+
+/**
+ * "When the merchant contains `match`, suggest this category." Only the short merchant word is stored, never message text.
+ * A rule whose category was deleted is kept (so Undo and backups work) but skipped when matching and shown as "category removed".
+ */
+export interface MerchantRule {
+  id: string
+  match: string
+  categoryId: string
+}
+
+export const MAX_RULES = 100
+export const RULE_MIN = 3
+export const RULE_MAX = 40
 
 /** What the add/edit sheet sends. Mode and instrument must go together (see paymentError). */
 export interface ExpenseDraft {
@@ -920,6 +936,55 @@ export function suggestFor(
     mode: best.mode,
     instrumentId: paymentError(budget, best.mode, best.instrumentId) === null ? best.instrumentId : null,
   }
+}
+
+// ---------------------------------------------------------------- merchant rules
+
+const squash = (s: string) => s.replace(/\s+/g, ' ').trim()
+const WORDY = /[\p{L}\p{N}]/u
+
+/** The text of a rule, tidied, or a plain-words reason it cannot be used. */
+export function cleanRuleMatch(text: string): { ok: true; value: string } | { ok: false; error: string } {
+  const v = squash(text)
+  if (v.length < RULE_MIN) return { ok: false, error: `Type at least ${RULE_MIN} letters, so the rule does not hit unrelated shops.` }
+  if (v.length > RULE_MAX) return { ok: false, error: `Keep it to ${RULE_MAX} characters or fewer.` }
+  if (!WORDY.test(v)) return { ok: false, error: 'Use letters or numbers.' }
+  return { ok: true, value: v }
+}
+
+/**
+ * True when `match` appears in `text` as whole words, ignoring case: "ola" is in "OLA CABS" but not in "Cola".
+ * Done with indexOf and a letter/digit check on both sides (not a regex), so any character a person types is safe and
+ * non-English letters count as letters (\b would not).
+ */
+export function ruleMatches(match: string, text: string): boolean {
+  const needle = squash(match).toLowerCase()
+  if (needle.length < RULE_MIN) return false
+  const hay = squash(text).toLowerCase()
+  for (let i = hay.indexOf(needle); i >= 0; i = hay.indexOf(needle, i + 1)) {
+    const before = hay.slice(0, i)
+    const after = hay.slice(i + needle.length)
+    if (!/[\p{L}\p{N}]$/u.test(before) && !/^[\p{L}\p{N}]/u.test(after)) return true
+  }
+  return false
+}
+
+/** The rule (newest first) that decides the category for a merchant, or null. A rule whose category is gone is skipped. */
+export function ruleFor(budget: Pick<BudgetData, 'categories' | 'rules'>, merchant: string): { categoryId: string; match: string } | null {
+  for (const r of budget.rules ?? []) {
+    if (categoryUsable(budget, r.categoryId) && ruleMatches(r.match, merchant)) return { categoryId: r.categoryId, match: r.match }
+  }
+  return null
+}
+
+/**
+ * The short word to remember for a merchant: words with a digit are dropped (card or account digits, order numbers) and at most
+ * two words are kept. Null when nothing usable is left.
+ */
+export function ruleTextFromMerchant(merchant: string): string | null {
+  const words = squash(merchant).split(' ').filter((w) => !/\d/.test(w)).slice(0, 2).join(' ')
+  const r = cleanRuleMatch(words.slice(0, RULE_MAX).trim())
+  return r.ok ? r.value : null
 }
 
 // ---------------------------------------------------------------- spend summary maths
