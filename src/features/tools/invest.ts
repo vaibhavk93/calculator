@@ -1,18 +1,46 @@
 import { D, type Dec } from '../../engine/decimal'
 import { formatDecimal } from '../../lib/format'
-import { cagr, epf, fd, goalSip, growCorpus, lumpsum, ppf, rd, sip, swp, xirr, type YearRow } from '../../engine/investments/invest'
+import { toWholeMonths, toYears, unitText, type TimeUnit } from '../../engine/duration'
+import { cagr, effectiveYield, epf, fd, goalSipMonths, growCorpus, lumpsumRows, ppf, rd, sip, sipMonths, swp, xirr, type YearRow } from '../../engine/investments/invest'
 import { EXAMPLE, PPF, RATES_AS_OF } from '../../engine/investments/rates'
-import { junkOptional, need, parseNum, type Field, type Output, type ToolSpec } from '../../lib/tool'
+import { junkOptional, need, parseNum, unitOf, type Field, type Output, type ToolSpec } from '../../lib/tool'
 
 /** Grouped the Indian way for the worked-out lines (1,50,000 and not 150000). */
 const s = (v: Dec, dp = 2) => formatDecimal(v.toDecimalPlaces(dp), { system: 'indian', decimals: 'auto' })
 const EX = 'Example rate, enter your own'
 
-const num = (id: string, label: string, def: string, unit: Extract<Field, { kind: 'number' }>['unit'] = 'none', hint?: string, advanced?: boolean, example?: boolean): Field => ({
-  id, label, kind: 'number', unit, default: def, hint, advanced, example,
+const num = (id: string, label: string, def: string, unit: Extract<Field, { kind: 'number' }>['unit'] = 'none', hint?: string, advanced?: boolean, example?: boolean, units?: TimeUnit[]): Field => ({
+  id, label, kind: 'number', unit, default: def, hint, advanced, example, ...(units ? { units } : {}),
 })
 const RETURN = 'Expected yearly return'
 const WHOLE = 'Whole years only'
+const WHOLE_MONTHS_HINT = 'Whole months only. 1.5 years is 18 months.'
+
+// The duration boxes. `units[0]` is what the box meant before the switch existed (years), so a saved card reopens the same.
+const YM: TimeUnit[] = ['years', 'months']
+const YMD: TimeUnit[] = ['years', 'months', 'days']
+/** What `unitOf` needs to read the chosen unit of a duration box by id. */
+const dur = (id: string, units: TimeUnit[]) => ({ id, unit: 'years' as const, units })
+const YEARS_YM = dur('years', YM)
+const YEARS_YMD = dur('years', YMD)
+const WAIT_YM = dur('wait', YM)
+
+const RETURN_ERR = 'Enter a yearly return from 0 to 100%'
+const RATE_ERR = 'Enter a yearly interest rate from 0 to 100%'
+const rateBad = (r: Dec) => r.isNegative() || r.gt(100)
+const WHOLE_MONTHS_ERR = 'Time must come to whole months, from 1 month to 60 years'
+const DAYS_NOTE = 'A year is counted as 365 days; leap years are ignored.'
+
+/** Whole months from a duration typed in years or months: 1 to 720 (60 years), else null. */
+const wholeMonths = (n: Dec, unit: TimeUnit): number | null => {
+  const m = toWholeMonths(n, unit === 'months' ? 'months' : 'years')
+  return m === null || m > 720 ? null : m
+}
+
+/** "18 months ÷ 12 = 1.5 years" for a box not in years, so the worked line shows how the time was read. [] for years. */
+const timeLine = (n: Dec, unit: TimeUnit, t: Dec): string[] => (unit === 'years' ? [] : [`Time = ${n.toFixed()} ${unitText(n, unit)} ÷ ${unit === 'months' ? 12 : 365} = ${t.toDecimalPlaces(4).toFixed()} years`])
+/** The time as it goes into a worked line: the typed years as they were, else the converted years. */
+const tShow = (n: Dec, unit: TimeUnit, t: Dec) => (unit === 'years' ? s(n) : s(t, 4))
 
 /** Whole years 1..60, or an error. */
 function wholeYears(y: Dec): number | { error: string } {
@@ -23,12 +51,21 @@ function wholeYears(y: Dec): number | { error: string } {
 
 const negative = (n: Record<string, Dec>) => Object.values(n).some((v) => v.isNegative())
 
+/** One table and chart row: `cell` is the year number, or words ("Month 18") for a last row that is part way through a year. */
+interface GrowRow {
+  cell: Dec | string
+  label: string
+  invested: Dec
+  value: Dec
+}
+const yearRow = (r: YearRow): GrowRow => ({ cell: new D(r.year), label: `Y${r.year}`, invested: r.invested, value: r.value })
+
 /** Stacked chart and year-wise table: invested vs returns (D13, the growth visualiser). */
-function growth(rows: YearRow[], valueLabel = 'Value'): Pick<Output, 'chart' | 'table'> {
+function growth(rows: GrowRow[], valueLabel = 'Value'): Pick<Output, 'chart' | 'table'> {
   return {
     chart: {
       title: 'Invested vs returns',
-      labels: rows.map((r) => `Y${r.year}`),
+      labels: rows.map((r) => r.label),
       series: [
         { name: 'Invested', values: rows.map((r) => r.invested.toNumber()) },
         { name: 'Returns', values: rows.map((r) => r.value.minus(r.invested).toNumber()) },
@@ -38,10 +75,17 @@ function growth(rows: YearRow[], valueLabel = 'Value'): Pick<Output, 'chart' | '
       title: 'Year by year',
       columns: ['Year', 'Invested', 'Returns', valueLabel],
       fmts: ['int', 'money', 'money', 'money'],
-      rows: rows.map((r) => [new D(r.year), r.invested, r.value.minus(r.invested), r.value]),
+      rows: rows.map((r) => [r.cell, r.invested, r.value.minus(r.invested), r.value]),
     },
   }
 }
+
+/** SIP rows: a whole year is "Y1", a last row part way through a year is "Month 18". */
+const monthRows = (rows: ReturnType<typeof sipMonths>): GrowRow[] =>
+  rows.map((r) => {
+    const whole = r.months % 12 === 0
+    return { cell: whole ? new D(r.months / 12) : `Month ${r.months}`, label: whole ? `Y${r.months / 12}` : `M${r.months}`, invested: r.invested, value: r.value }
+  })
 
 const SIP_NOTE = 'Assumes each payment goes in at the start of the month and grows at return ÷ 12 each month, the usual convention for Indian SIP calculators. Returns are not guaranteed.'
 
@@ -51,14 +95,15 @@ const sipSpec: ToolSpec = {
   blurb: 'What your monthly SIP grows to',
   category: 'invest',
   keywords: ['mutual fund', 'systematic investment plan', 'monthly investment', 'corpus'],
-  fields: [num('monthly', 'Monthly investment', '5000', 'rupee'), num('rate', RETURN, '12', 'percent'), num('years', 'Number of years', '10', 'years', WHOLE)],
+  fields: [num('monthly', 'Monthly investment', '5000', 'rupee'), num('rate', RETURN, '12', 'percent'), num('years', 'Number of years', '10', 'years', WHOLE_MONTHS_HINT, undefined, undefined, YM)],
   compute: (v) => {
     const r = need(v, [{ id: 'monthly', label: 'Monthly amount' }, { id: 'rate', label: 'Expected return' }, { id: 'years', label: 'Years' }])
     if (!r.ok) return r
+    if (rateBad(r.n.rate!)) return { error: RETURN_ERR, field: 'rate' }
     if (negative(r.n)) return { error: 'Use positive numbers' }
-    const y = wholeYears(r.n.years!)
-    if (typeof y !== 'number') return y
-    const rows = sip(r.n.monthly!, r.n.rate!, y)
+    const months = wholeMonths(r.n.years!, unitOf(YEARS_YM, v))
+    if (months === null) return { error: WHOLE_MONTHS_ERR, field: 'years' }
+    const rows = sipMonths(r.n.monthly!, r.n.rate!, months)
     const last = rows[rows.length - 1]!
     return {
       rows: [
@@ -66,8 +111,8 @@ const sipSpec: ToolSpec = {
         { label: 'Total invested', value: last.invested, fmt: 'money' },
         { label: 'Gains', value: last.value.minus(last.invested), fmt: 'money' },
       ],
-      ...growth(rows),
-      formula: ['FV = P × ((1+i)^n − 1) ÷ i × (1+i), i = return ÷ 12 ÷ 100', `${s(r.n.monthly!)} × ((1+${s(r.n.rate!.div(1200), 6)})^${y * 12} − 1) ÷ ${s(r.n.rate!.div(1200), 6)} × (1+${s(r.n.rate!.div(1200), 6)})`],
+      ...growth(monthRows(rows)),
+      formula: ['FV = P × ((1+i)^n − 1) ÷ i × (1+i), i = return ÷ 12 ÷ 100', `${s(r.n.monthly!)} × ((1+${s(r.n.rate!.div(1200), 6)})^${months} − 1) ÷ ${s(r.n.rate!.div(1200), 6)} × (1+${s(r.n.rate!.div(1200), 6)})`],
       note: SIP_NOTE,
     }
   },
@@ -83,11 +128,12 @@ const stepUpSpec: ToolSpec = {
   compute: (v) => {
     const r = need(v, [{ id: 'monthly', label: 'Monthly amount' }, { id: 'rate', label: 'Expected return' }, { id: 'years', label: 'Years' }, { id: 'step', label: 'Yearly raise' }])
     if (!r.ok) return r
+    if (rateBad(r.n.rate!)) return { error: RETURN_ERR, field: 'rate' }
     if (negative(r.n)) return { error: 'Use positive numbers' }
-    const y = wholeYears(r.n.years!)
-    if (typeof y !== 'number') return y
-    const rows = sip(r.n.monthly!, r.n.rate!, y, r.n.step!)
-    const flat = sip(r.n.monthly!, r.n.rate!, y).at(-1)!
+    const months = wholeMonths(r.n.years!, unitOf(YEARS_YM, v))
+    if (months === null) return { error: WHOLE_MONTHS_ERR, field: 'years' }
+    const rows = sipMonths(r.n.monthly!, r.n.rate!, months, r.n.step!)
+    const flat = sipMonths(r.n.monthly!, r.n.rate!, months).at(-1)!
     const last = rows.at(-1)!
     return {
       rows: [
@@ -97,10 +143,10 @@ const stepUpSpec: ToolSpec = {
         { label: 'Without step-up', value: flat.value, fmt: 'money' },
         { label: 'Extra from step-up', value: last.value.minus(flat.value), fmt: 'money' },
       ],
-      ...growth(rows),
+      ...growth(monthRows(rows)),
       formula: [
         'Each year the monthly amount × (1 + step ÷ 100); each month balance = (balance + amount) × (1 + return ÷ 1200)',
-        `Year ${y} monthly amount = ${s(r.n.monthly!)} × ${s(new D(1).plus(r.n.step!.div(100)), 4)}^${y - 1}`,
+        `${months % 12 === 0 ? `Year ${months / 12}` : `Month ${months}`} monthly amount = ${s(r.n.monthly!)} × ${s(new D(1).plus(r.n.step!.div(100)), 4)}^${Math.floor((months - 1) / 12)}`,
       ],
       note: SIP_NOTE,
     }
@@ -113,14 +159,21 @@ const lumpsumSpec: ToolSpec = {
   blurb: 'One-time investment, compounded yearly',
   category: 'invest',
   keywords: ['one time', 'compound interest', 'maturity'],
-  fields: [num('amount', 'Amount invested', '100000', 'rupee'), num('rate', RETURN, '12', 'percent'), num('years', 'Number of years', '10', 'years', WHOLE)],
+  fields: [num('amount', 'Amount invested', '100000', 'rupee'), num('rate', RETURN, '12', 'percent'), num('years', 'Number of years', '10', 'years', 'Fractions are fine, e.g. 1.5, or switch to months or days', undefined, undefined, YMD)],
   compute: (v) => {
     const r = need(v, [{ id: 'amount', label: 'Amount' }, { id: 'rate', label: 'Expected return' }, { id: 'years', label: 'Years' }])
     if (!r.ok) return r
+    if (rateBad(r.n.rate!)) return { error: RETURN_ERR, field: 'rate' }
     if (negative(r.n)) return { error: 'Use positive numbers' }
-    const y = wholeYears(r.n.years!)
-    if (typeof y !== 'number') return y
-    const rows = lumpsum(r.n.amount!, r.n.rate!, y)
+    const unit = unitOf(YEARS_YMD, v)
+    const t = toYears(r.n.years!, unit)
+    if (t.lte(0) || t.gt(60)) return { error: 'Time must be more than 0 and at most 60 years', field: 'years' }
+    // The last row, when the time is not a whole number of years, is named in the unit it was typed in ("18 months").
+    const typed = `${r.n.years!.toFixed()} ${unitText(r.n.years!, unit)}`
+    const rows: GrowRow[] = lumpsumRows(r.n.amount!, r.n.rate!, t).map((x) => {
+      const partial = !t.isInteger() && x.years.eq(t)
+      return { cell: partial ? typed : x.years, label: partial ? `${unit[0]!.toUpperCase()}${r.n.years!.toFixed()}` : `Y${x.years.toFixed()}`, invested: x.invested, value: x.value }
+    })
     const last = rows.at(-1)!
     return {
       rows: [
@@ -128,8 +181,8 @@ const lumpsumSpec: ToolSpec = {
         { label: 'Gains', value: last.value.minus(last.invested), fmt: 'money' },
       ],
       ...growth(rows),
-      formula: ['A = P × (1 + r ÷ 100)^years', `${s(r.n.amount!)} × (1 + ${s(r.n.rate!)} ÷ 100)^${y}`],
-      note: 'Compounded once a year. Returns are not guaranteed.',
+      formula: ['A = P × (1 + r ÷ 100)^years', `${s(r.n.amount!)} × (1 + ${s(r.n.rate!)} ÷ 100)^${tShow(r.n.years!, unit, t)}`, ...timeLine(r.n.years!, unit, t)],
+      note: 'Compounded once a year. Returns are not guaranteed.' + (t.isInteger() ? '' : ' A part of a year compounds fractionally.') + (unit === 'days' ? ` ${DAYS_NOTE}` : ''),
     }
   },
 }
@@ -143,7 +196,7 @@ const goalSpec: ToolSpec = {
   fields: [
     num('target', 'Target amount', '1000000', 'rupee'),
     num('rate', RETURN, '12', 'percent'),
-    num('years', 'Number of years', '10', 'years', WHOLE),
+    num('years', 'Number of years', '10', 'years', WHOLE_MONTHS_HINT, undefined, undefined, YM),
     num('existing', 'Already saved', '0', 'rupee', undefined, true),
   ],
   compute: (v) => {
@@ -152,22 +205,25 @@ const goalSpec: ToolSpec = {
     const junk = junkOptional(v, [{ id: 'existing', label: 'Already saved' }])
     if (junk) return junk
     const existing = parseNum(v.existing) ?? new D(0)
+    if (rateBad(r.n.rate!)) return { error: RETURN_ERR, field: 'rate' }
     if (negative(r.n) || existing.isNegative()) return { error: 'Use positive numbers' }
-    const y = wholeYears(r.n.years!)
-    if (typeof y !== 'number') return y
-    const p = goalSip(r.n.target!, r.n.rate!, y, existing)!
-    const grown = existing.times(new D(1).plus(r.n.rate!.div(100)).pow(y))
+    const months = wholeMonths(r.n.years!, unitOf(YEARS_YM, v))
+    if (months === null) return { error: WHOLE_MONTHS_ERR, field: 'years' }
+    const p = goalSipMonths(r.n.target!, r.n.rate!, months, existing)!
+    const grown = existing.times(new D(1).plus(r.n.rate!.div(100)).pow(new D(months).div(12)))
     return {
       rows: [
         { label: 'Monthly SIP needed', value: p, fmt: 'money', main: true },
         { label: 'Savings so far grow to', value: grown, fmt: 'money' },
-        { label: 'Total you will invest', value: p.times(y * 12), fmt: 'money' },
+        { label: 'Total you will invest', value: p.times(months), fmt: 'money' },
       ],
       formula: [
         'P = (target − saved × (1+r)^years) ÷ (((1+i)^n − 1) ÷ i × (1+i)), i = r ÷ 12',
-        `(${s(r.n.target!)} − ${s(grown)}) ÷ SIP factor for ${y * 12} months`,
+        `(${s(r.n.target!)} − ${s(grown)}) ÷ SIP factor for ${months} months`,
       ],
-      note: p.isZero() ? 'What you have already saved reaches the target on its own.' : SIP_NOTE,
+      note: p.isZero()
+        ? 'What you have already saved reaches the target on its own.'
+        : SIP_NOTE + (existing.gt(0) ? ' Saved money grows once a year while the monthly SIP grows every month, so the answer is on the cautious side.' : ''),
     }
   },
 }
@@ -182,7 +238,7 @@ const swpSpec: ToolSpec = {
     num('corpus', 'Starting amount', '1000000', 'rupee'),
     num('withdraw', 'Monthly withdrawal', '10000', 'rupee'),
     num('rate', RETURN, '8', 'percent', 'While you are withdrawing'),
-    num('wait', 'Years of saving first', '0', 'years', 'Years the money keeps growing before the first withdrawal. 0 means start now.', true),
+    num('wait', 'Years of saving first', '0', 'years', 'Time the money keeps growing before the first withdrawal, in whole months. 0 means start now.', true, undefined, YM),
     num('saveRate', 'Return in the saving years', '', 'percent', 'Leave blank to use the same return as above', true),
   ],
   compute: (v) => {
@@ -192,10 +248,13 @@ const swpSpec: ToolSpec = {
     if (junk) return junk
     const wait = parseNum(v.wait) ?? new D(0)
     const saveRate = parseNum(v.saveRate) ?? r.n.rate!
+    if (rateBad(r.n.rate!)) return { error: RETURN_ERR, field: 'rate' }
+    if (rateBad(saveRate)) return { error: 'Enter a yearly return from 0 to 100% for the saving years', field: 'saveRate' }
     if (negative(r.n) || wait.isNegative() || saveRate.isNegative()) return { error: 'Use positive numbers' }
-    if (!wait.isInteger() || wait.gt(60)) return { error: 'Years of saving must be a whole number, 60 or fewer' }
+    const waitMonths = wait.isZero() ? 0 : wholeMonths(wait, unitOf(WAIT_YM, v))
+    if (waitMonths === null) return { error: 'Time of saving must come to whole months, 60 years at most', field: 'wait' }
     if (r.n.withdraw!.isZero()) return { error: 'Enter a withdrawal more than zero' }
-    const start = growCorpus(r.n.corpus!, saveRate, wait.toNumber() * 12)
+    const start = growCorpus(r.n.corpus!, saveRate, waitMonths)
     const out = swp(start, r.n.withdraw!, r.n.rate!)
     const chart = {
       title: 'Balance at each year end',
@@ -203,8 +262,8 @@ const swpSpec: ToolSpec = {
       series: [{ name: 'Balance', values: out.yearEnd.map((b) => b.toNumber()) }],
     }
     const formula = ['Each month: balance × (1 + return ÷ 1200) − withdrawal', `Interest in month 1 = ${s(start.times(r.n.rate!).div(1200))} vs withdrawal ${s(r.n.withdraw!)}`]
-    if (wait.gt(0)) formula.unshift(`Saving years first: ${s(r.n.corpus!)} × (1 + ${s(saveRate)} ÷ 1200)^${wait.times(12).toFixed()} = ${s(start)}`)
-    const startRow: Output['rows'] = wait.gt(0) ? [{ label: 'Amount when withdrawals start', value: start, fmt: 'money' }] : []
+    if (waitMonths > 0) formula.unshift(`Saving years first: ${s(r.n.corpus!)} × (1 + ${s(saveRate)} ÷ 1200)^${waitMonths} = ${s(start)}`)
+    const startRow: Output['rows'] = waitMonths > 0 ? [{ label: 'Amount when withdrawals start', value: start, fmt: 'money' }] : []
     if (out.months === null) {
       return {
         rows: [{ label: 'Lasts', value: 'Never runs out', fmt: 'text', main: true }, ...startRow],
@@ -215,7 +274,7 @@ const swpSpec: ToolSpec = {
     }
     if (out.months >= 1200) return { rows: [{ label: 'Lasts', value: 'More than 100 years', fmt: 'text', main: true }, ...startRow], formula }
     const end = new Date()
-    end.setMonth(end.getMonth() + wait.toNumber() * 12 + out.months)
+    end.setMonth(end.getMonth() + waitMonths + out.months)
     return {
       rows: [
         { label: 'Months it lasts', value: new D(out.months), fmt: 'int', timeUnit: 'months', main: true },
@@ -226,7 +285,7 @@ const swpSpec: ToolSpec = {
       ],
       chart,
       formula,
-      note: 'Withdrawals come at each month’s end, after that month’s return, and the last one is whatever is left. Returns are not guaranteed.' + (wait.gt(0) ? ' Months are counted from the first withdrawal, after the saving years.' : ' Using one return for both saving and withdrawing years is a common error: set the saving-years return under More options if they differ.'),
+      note: 'Withdrawals come at each month’s end, after that month’s return, and the last one is whatever is left. Returns are not guaranteed.' + (waitMonths > 0 ? ' Months are counted from the first withdrawal, after the saving years.' : ' Using one return for both saving and withdrawing years is a common error: set the saving-years return under More options if they differ.'),
     }
   },
 }
@@ -242,7 +301,7 @@ const fdSpec: ToolSpec = {
   fields: [
     num('principal', 'Deposit amount', '100000', 'rupee'),
     num('rate', 'Yearly interest rate', '7', 'percent', EX),
-    num('years', 'Number of years', '5', 'years', 'Fractions are fine, e.g. 1.5'),
+    num('years', 'Number of years', '5', 'years', 'Fractions are fine, e.g. 1.5, or switch to months or days', undefined, undefined, YMD),
     {
       id: 'comp', label: 'Compounded', kind: 'select', default: 'quarterly', advanced: true,
       options: Object.keys(PERIODS).map((k) => ({ value: k, label: k[0]!.toUpperCase() + k.slice(1) })),
@@ -255,22 +314,37 @@ const fdSpec: ToolSpec = {
     const junk = junkOptional(v, [{ id: 'slab', label: 'Your tax slab' }])
     if (junk) return junk
     const slab = parseNum(v.slab) ?? new D(0)
+    if (rateBad(r.n.rate!)) return { error: RATE_ERR, field: 'rate' }
     if (negative(r.n) || slab.isNegative()) return { error: 'Use positive numbers' }
     if (slab.gt(100)) return { error: 'Tax slab must be 100% or less' }
-    if (r.n.years!.isZero()) return { error: 'Enter years more than zero' }
+    const unit = unitOf(YEARS_YMD, v)
+    const t = toYears(r.n.years!, unit)
+    if (t.isZero()) return { error: 'Enter years more than zero', field: 'years' }
+    if (t.gt(50)) return { error: 'Use 50 years or fewer', field: 'years' }
     const n = PERIODS[v.comp as keyof typeof PERIODS] ?? 4
-    const m = fd(r.n.principal!, r.n.rate!, r.n.years!, n)
+    const m = fd(r.n.principal!, r.n.rate!, t, n)
     const interest = m.minus(r.n.principal!)
     const tax = interest.times(slab).div(100)
+    // Does the time end part way through a compounding period (odd days, 7 months compounded quarterly)? Nine places first: 7 months is 7/12 held to 40 digits.
+    const partPeriod = !t.times(n).toDecimalPlaces(9).isInteger()
     return {
       rows: [
         { label: 'Maturity value', value: m, fmt: 'money', main: true },
         { label: 'Interest earned', value: interest, fmt: 'money' },
         { label: 'Tax on interest', value: tax, fmt: 'money' },
         { label: 'Value after tax', value: m.minus(tax), fmt: 'money' },
+        { label: 'Effective yearly yield', value: effectiveYield(r.n.rate!, n), fmt: 'percent' },
       ],
-      formula: ['A = P × (1 + r ÷ (100 × n))^(n × years)', `${s(r.n.principal!)} × (1 + ${s(r.n.rate!)} ÷ ${100 * n})^(${n} × ${s(r.n.years!)})`],
-      note: 'Tax is your slab rate on the whole interest; cess, surcharge and TDS timing are not included.',
+      formula: [
+        'A = P × (1 + r ÷ (100 × n))^(n × years)',
+        `${s(r.n.principal!)} × (1 + ${s(r.n.rate!)} ÷ ${100 * n})^(${n} × ${tShow(r.n.years!, unit, t)})`,
+        ...timeLine(r.n.years!, unit, t),
+        'Effective yearly yield = ((1 + r ÷ (100 × n))^n − 1) × 100',
+      ],
+      note:
+        'Tax is your slab rate on the whole interest; cess, surcharge and TDS timing are not included.' +
+        (partPeriod ? ' A part of a compounding period is compounded fractionally here. A bank may pay plain simple interest for that part instead (unproven), so ask yours.' : '') +
+        (unit === 'days' ? ` ${DAYS_NOTE}` : ''),
     }
   },
 }
@@ -281,18 +355,27 @@ const rdSpec: ToolSpec = {
   blurb: 'Maturity value of a monthly deposit',
   category: 'invest',
   keywords: ['rd', 'recurring deposit', 'post office rd', 'monthly deposit'],
-  fields: [num('monthly', 'Monthly deposit', '5000', 'rupee'), num('rate', 'Yearly interest rate', '7', 'percent', EX), num('years', 'Number of years', '5', 'years', 'Fractions are fine, e.g. 1.5')],
+  fields: [num('monthly', 'Monthly deposit', '5000', 'rupee'), num('rate', 'Yearly interest rate', '7', 'percent', EX), num('years', 'Number of years', '5', 'years', 'Whole months only, e.g. 1.5 years or 18 months', undefined, undefined, YM)],
   compute: (v) => {
     const r = need(v, [{ id: 'monthly', label: 'Monthly deposit' }, { id: 'rate', label: 'Interest rate' }, { id: 'years', label: 'Years' }])
     if (!r.ok) return r
+    if (rateBad(r.n.rate!)) return { error: RATE_ERR, field: 'rate' }
     if (negative(r.n)) return { error: 'Use positive numbers' }
-    const months = r.n.years!.times(12)
-    if (!months.isInteger() || months.lt(1)) return { error: 'Years must come to whole months, e.g. 1, 1.5 or 2.25' }
-    if (months.gt(720)) return { error: 'Use 60 years or fewer' }
-    const n = months.toNumber()
+    const unit = unitOf(YEARS_YM, v)
+    const months = toWholeMonths(r.n.years!, unit === 'months' ? 'months' : 'years')
+    if (months === null) return { error: 'Time must come to whole months', field: 'years' }
+    if (months > 720) return { error: 'Use 60 years or fewer', field: 'years' }
+    const n = months
     const m = rd(r.n.monthly!, r.n.rate!, n)
-    const yearRows: YearRow[] = []
-    for (let y = 1; y * 12 <= n; y++) yearRows.push({ year: y, invested: r.n.monthly!.times(y * 12), value: rd(r.n.monthly!, r.n.rate!, y * 12) })
+    // A row at the end of each year, then one for the last months when the plan stops part way through a year.
+    const ends = Array.from({ length: Math.floor(n / 12) }, (_, i) => (i + 1) * 12)
+    if (n % 12 !== 0) ends.push(n)
+    const yearRows: GrowRow[] = ends.map((k) => ({
+      cell: k % 12 === 0 ? new D(k / 12) : `Month ${k}`,
+      label: k % 12 === 0 ? `Y${k / 12}` : `M${k}`,
+      invested: r.n.monthly!.times(k),
+      value: rd(r.n.monthly!, r.n.rate!, k),
+    }))
     const invested = r.n.monthly!.times(n)
     return {
       rows: [
@@ -300,7 +383,7 @@ const rdSpec: ToolSpec = {
         { label: 'Deposited', value: invested, fmt: 'money' },
         { label: 'Interest earned', value: m.minus(invested), fmt: 'money' },
       ],
-      ...(yearRows.length > 0 ? growth(yearRows) : {}),
+      ...growth(yearRows),
       formula: ['M = Σ R × (1 + r ÷ 400)^(k ÷ 3), k = 1 … months', `R = ${s(r.n.monthly!)}, r = ${s(r.n.rate!)}, ${n} months`],
       note: 'Compounded every quarter, as Indian banks and India Post do. Your bank’s rate may differ.',
     }
@@ -341,7 +424,7 @@ const ppfSpec: ToolSpec = {
         { label: 'Deposited', value: last.invested, fmt: 'money' },
         { label: 'Tax-free gain', value: last.value.minus(last.invested), fmt: 'money' },
       ],
-      ...growth(rows, 'Balance'),
+      ...growth(rows.map(yearRow), 'Balance'),
       formula: ['Each year: balance = (balance + deposit) × (1 + r ÷ 100)', `(balance + ${s(r.n.yearly!)}) × (1 + ${s(r.n.rate!)} ÷ 100), ${y} times`],
       note: `Deposit by 5 April each year to earn that year’s full interest. Locked for 15 years from the end of the year you open it, and extendable in 5-year blocks; limits as of ${PPF.confirmed} (PPF Scheme 2019), and the rate changes every quarter so one rate is an estimate.`,
     }
@@ -430,7 +513,7 @@ const epfSpec: ToolSpec = {
         { label: 'Contributed', value: last.invested, fmt: 'money' },
         { label: 'Interest', value: last.value.minus(last.invested), fmt: 'money' },
       ],
-      ...growth(rows, 'Balance'),
+      ...growth(rows.map(yearRow), 'Balance'),
       formula: [
         'Monthly into EPF = basic × your % + (basic × employer % − pension part); interest = rate ÷ 12 on each month’s balance, added yearly',
         `Year 1: ${s(r.n.basic!.times(r.n.emp!).div(100))} + (${s(r.n.basic!.times(r.n.er!).div(100))} − ${s(eps)}) a month`,
@@ -450,28 +533,31 @@ const inflationSpec: ToolSpec = {
     num('amount', 'Amount', '100000', 'rupee'),
     num('infl', 'General inflation', '6', 'percent', EX),
     num('medical', 'Medical inflation', '10', 'percent', 'Usually higher than general. Example rate, enter your own; blank hides the medical lines'),
-    num('years', 'Number of years', '10', 'years'),
+    num('years', 'Number of years', '10', 'years', 'Fractions are fine, e.g. 1.5, or switch to months', undefined, undefined, YM),
     num('ret', 'Your yearly return', '', 'percent', 'To see the return after inflation', true),
   ],
   compute: (v) => {
     const r = need(v, [{ id: 'amount', label: 'Amount' }, { id: 'infl', label: 'Inflation' }, { id: 'years', label: 'Years' }])
     if (!r.ok) return r
-    if (negative(r.n)) return { error: 'Use positive numbers' }
     const junk = junkOptional(v, [{ id: 'ret', label: 'Your yearly return' }, { id: 'medical', label: 'Medical inflation' }])
     if (junk) return junk
-    const f = new D(1).plus(r.n.infl!.div(100)).pow(r.n.years!)
-    const ret = parseNum(v.ret)
     const med = parseNum(v.medical)
-    if (med?.isNegative()) return { error: 'Use positive numbers' }
+    if (rateBad(r.n.infl!) || (med && rateBad(med))) return { error: 'Enter a yearly inflation rate from 0 to 100%', field: rateBad(r.n.infl!) ? 'infl' : 'medical' }
+    if (negative(r.n)) return { error: 'Use positive numbers' }
+    const unit = unitOf(YEARS_YM, v)
+    const t = toYears(r.n.years!, unit)
+    if (t.gt(100)) return { error: 'Use 100 years or fewer', field: 'years' }
+    const f = new D(1).plus(r.n.infl!.div(100)).pow(t)
+    const ret = parseNum(v.ret)
     const rows: Output['rows'] = [
       { label: 'Future cost of the same thing', value: r.n.amount!.times(f), fmt: 'money', main: true },
       { label: 'Future amount, in today’s money', value: r.n.amount!.div(f), fmt: 'money' },
     ]
-    const formula = ['Future cost = A × (1 + inflation)^years; today’s value = A ÷ (1 + inflation)^years', `${s(r.n.amount!)} × ${s(f, 6)}`]
+    const formula = ['Future cost = A × (1 + inflation)^years; today’s value = A ÷ (1 + inflation)^years', `${s(r.n.amount!)} × ${s(f, 6)}`, ...timeLine(r.n.years!, unit, t)]
     if (med) {
-      const fm = new D(1).plus(med.div(100)).pow(r.n.years!)
+      const fm = new D(1).plus(med.div(100)).pow(t)
       rows.splice(2, 0, { label: 'Future cost if it is medical', value: r.n.amount!.times(fm), fmt: 'money' })
-      formula.push(`Medical: ${s(r.n.amount!)} × (1 + ${s(med)} ÷ 100)^${s(r.n.years!)} = ${s(r.n.amount!.times(fm))}`)
+      formula.push(`Medical: ${s(r.n.amount!)} × (1 + ${s(med)} ÷ 100)^${tShow(r.n.years!, unit, t)} = ${s(r.n.amount!.times(fm))}`)
     }
     if (ret) {
       rows.push({ label: 'Return after inflation, a year', value: new D(1).plus(ret.div(100)).div(new D(1).plus(r.n.infl!.div(100))).minus(1).times(100), fmt: 'percent' })
@@ -501,7 +587,7 @@ const returnSpec: ToolSpec = {
     },
     { ...num('start', 'Starting value', '100000', 'rupee'), visibleIf: (v) => v.mode !== 'xirr' } as Field,
     { ...num('end', 'Ending value', '200000', 'rupee'), visibleIf: (v) => v.mode !== 'xirr' } as Field,
-    { ...num('years', 'Number of years', '6', 'years'), visibleIf: (v) => v.mode !== 'xirr' } as Field,
+    { ...num('years', 'Number of years', '6', 'years', 'Years or months, e.g. 18 months', undefined, undefined, YM), visibleIf: (v) => v.mode !== 'xirr' } as Field,
     {
       id: 'flows', label: 'Money in and out', kind: 'rows', min: 2, max: 50,
       hint: 'Money you put in is negative; money you get back is positive',
@@ -531,14 +617,16 @@ const returnSpec: ToolSpec = {
     }
     const r = need(v, [{ id: 'start', label: 'Start value' }, { id: 'end', label: 'End value' }, { id: 'years', label: 'Years' }])
     if (!r.ok) return r
-    const c = cagr(r.n.start!, r.n.end!, r.n.years!)
-    if (c === null) return { error: r.n.years!.lte(0) ? 'Enter years more than zero' : 'Start value must be more than zero, end value zero or more' }
+    const unit = unitOf(YEARS_YM, v)
+    const t = toYears(r.n.years!, unit)
+    const c = cagr(r.n.start!, r.n.end!, t)
+    if (c === null) return { error: t.lte(0) ? 'Enter years more than zero' : 'Start value must be more than zero, end value zero or more' }
     return {
       rows: [
         { label: 'Yearly growth (CAGR)', value: c, fmt: 'percent', main: true },
         { label: 'Total growth', value: r.n.end!.div(r.n.start!).minus(1).times(100), fmt: 'percent' },
       ],
-      formula: ['CAGR = (end ÷ start)^(1 ÷ years) − 1', `(${s(r.n.end!)} ÷ ${s(r.n.start!)})^(1 ÷ ${s(r.n.years!)}) − 1`],
+      formula: ['CAGR = (end ÷ start)^(1 ÷ years) − 1', `(${s(r.n.end!)} ÷ ${s(r.n.start!)})^(1 ÷ ${tShow(r.n.years!, unit, t)}) − 1`, ...timeLine(r.n.years!, unit, t)],
     }
   },
 }
