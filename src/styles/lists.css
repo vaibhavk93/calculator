@@ -214,7 +214,7 @@
 .item-card__num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 1.75rem;
+  font-size: min(1.75rem, 8vw);
   font-weight: 500;
   line-height: 1.15;
   overflow-wrap: anywhere;

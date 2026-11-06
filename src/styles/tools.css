@@ -902,7 +902,7 @@ textarea.field {
 .due__hero {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 2.5rem;
+  font-size: min(2.5rem, 11vw);
   font-weight: 500;
   line-height: 1.1;
   overflow-wrap: anywhere;
@@ -1054,7 +1054,7 @@ textarea.field {
 
 /* A bill row needs room for its words: below this the buttons wrap under, at the right. */
 .due--pay .due__main {
-  flex-basis: 10rem;
+  flex-basis: 8rem;
 }
 
 .due__main:active {
@@ -1129,7 +1129,7 @@ textarea.field {
 .due-card__amt {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 1.75rem;
+  font-size: min(1.75rem, 8vw);
   font-weight: 500;
   line-height: 1.15;
   overflow-wrap: anywhere;
