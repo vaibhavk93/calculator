@@ -2,6 +2,7 @@ import { INITIAL_INPUT, type InputState } from '../engine'
 import { ACCENT_NAMES, type AccentName, type ThemePreference } from '../lib/theme'
 import type { KeyValueStorage } from '../lib/storage'
 import { parseTime } from '../lib/reminders'
+import { sanitizePortfolio } from '../lib/portfolio'
 import { MAX_COUNTED_TOOLS, MAX_PINNED_TOOLS, MAX_USE_COUNT } from '../lib/toolUse'
 import { MAX_RECURRING, MAX_RULES, RULE_MAX, cleanRuleMatch, sanitizeEdits, isAccountType, isBillRepeat, isPaymentCount, isMonthKey, isSettlement, type MerchantRule, type RecurringItem } from '../lib/budget'
 import {
@@ -508,6 +509,8 @@ export function migrate(raw: unknown): PersistedData {
   // A newer app wrote this: keep what we understand, and say it is current.
   const cards = sanitizeCards(data.cards)
   const drafts = sanitizeDrafts(data.drafts)
+  // Absent before Portfolio existed: nothing, not an error. Left out of the data entirely when empty, so the file does not change for anyone who does not use it.
+  const portfolio = sanitizePortfolio(data.portfolio)
   return {
     schemaVersion: CURRENT_SCHEMA,
     settings: sanitizeSettings(data.settings),
@@ -518,6 +521,7 @@ export function migrate(raw: unknown): PersistedData {
     input: sanitizeInput(data.input),
     // Absent before the Budget tab existed: a fresh starter set, not an error.
     budget: sanitizeBudget(data.budget),
+    ...(portfolio.length > 0 ? { portfolio } : {}),
     ...(drafts ? { drafts } : {}),
   }
 }
