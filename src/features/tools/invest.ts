@@ -396,11 +396,11 @@ const ppfSpec: ToolSpec = {
   title: 'Public Provident Fund',
   blurb: 'PPF maturity, tax-free',
   category: 'invest',
-  verified: { source: 'PPF Scheme 2019 gazette (yearly limit and term)' },
+  verified: { source: 'PPF Scheme 2019 gazette (limit, term); OM F.No.1/4/2019-NS 30.09.2026 (7.1% rate)' },
   keywords: ['ppf', 'public provident fund', 'tax free', '80c', 'post office'],
   fields: [
     num('yearly', 'Yearly deposit', '150000', 'rupee', `₹${Number(PPF.minYearly).toLocaleString('en-IN')} to ₹${Number(PPF.maxYearly).toLocaleString('en-IN')} a year`),
-    num('rate', 'Yearly interest rate', EXAMPLE.ppfRate, 'percent', EX),
+    num('rate', 'Yearly interest rate', PPF.rate, 'percent', 'Official rate to 31 Dec 2026. Changes every quarter'),
     {
       id: 'years', label: 'Total years', kind: 'select', default: String(PPF.termYears),
       options: [0, 1, 2, 3, 4].map((k) => {
@@ -426,7 +426,7 @@ const ppfSpec: ToolSpec = {
       ],
       ...growth(rows.map(yearRow), 'Balance'),
       formula: ['Each year: balance = (balance + deposit) × (1 + r ÷ 100)', `(balance + ${s(r.n.yearly!)}) × (1 + ${s(r.n.rate!)} ÷ 100), ${y} times`],
-      note: `Deposit by 5 April each year to earn that year’s full interest. Locked for 15 years from the end of the year you open it, and extendable in 5-year blocks; limits as of ${PPF.confirmed} (PPF Scheme 2019), and the rate changes every quarter so one rate is an estimate.`,
+      note: `Deposit by 5 April each year to earn that year’s full interest. Locked for 15 years from the end of the year you open it, and extendable in 5-year blocks; limits from the PPF Scheme 2019 gazette. The ${PPF.rate}% rate is official to 31 Dec 2026 (${PPF.rateSource}) but is reset every quarter, so later years assume it holds.`,
     }
   },
 }
@@ -490,7 +490,7 @@ const epfSpec: ToolSpec = {
     num('rate', 'Yearly EPF interest rate', EXAMPLE.epfRate, 'percent', EX),
     num('emp', 'Your share (% of basic)', '12', 'percent', undefined, true),
     num('er', 'Employer share (% of basic)', '12', 'percent', 'Part of this goes to pension (EPS), not EPF', true),
-    num('ceiling', 'Pension wage ceiling', EXAMPLE.epsWageCeiling, 'rupee', 'Was ₹15,000, reportedly ₹25,000 from Sep 2026. Check payslip.', true, true),
+    num('ceiling', 'Pension wage ceiling', EXAMPLE.epsWageCeiling, 'rupee', '₹25,000 from 17 Sep 2026. Check your payslip.', true, true),
   ],
   compute: (v) => {
     const r = need(v, [
