@@ -117,7 +117,9 @@ try {
       await shot(page, `5-emi-chips${font}`)
       await noScroll(page, `EMI chips${tag}`)
 
-      await page.getByRole('button', { name: 'Reset inputs' }).click(); await settle(page)
+      // Reset lives behind the tool page's own "More" button now (B16), not a direct icon.
+      await page.locator('.keep__btn[aria-label="More"]').click()
+      await page.locator('.sheet .navrow', { hasText: 'Reset inputs' }).click(); await settle(page)
       check(`EMI: Reset puts the starting amount back${tag}`, (await page.locator('#f-principal').inputValue()) === '50,00,000', await page.locator('#f-principal').inputValue())
       check(`EMI: snackbar says so and offers Undo${tag}`, (await page.locator('.snack').innerText()).includes('Inputs reset') && (await page.locator('.snack .snack__link', { hasText: 'Undo' }).count()) === 1)
       await shot(page, `6-emi-reset${font}`)

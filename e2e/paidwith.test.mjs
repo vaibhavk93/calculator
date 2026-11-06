@@ -21,6 +21,7 @@ const app = await startApp()
 try {
   const { page, errors, close } = await openApp(app, { data, now })
   await tab(page, 'Budget')
+  await page.getByRole('button', { name: 'More in Budget' }).click()
   await page.getByText('Spending summary').first().click()
   const card = page.locator('section[aria-label="Paid with"]')
   await card.waitFor()

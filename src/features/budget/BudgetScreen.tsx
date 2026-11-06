@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { EmptyState } from '../../components/EmptyState'
 import { Icon } from '../../components/Icon'
+import { Sheet } from '../../components/Sheet'
 import { useApp } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
 import { limitState, monthKey, monthLabel, monthShortLabel, needsAttention, paceLeft, summarise } from '../../lib/budget'
@@ -28,6 +29,7 @@ export function BudgetScreen() {
   const [month, setMonth] = useState(() => monthKey(new Date()))
   const [page, setPage] = useState<Page>('home')
   const [showPace, setShowPace] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const [open, setOpen] = useState<{ tab: SummaryTab; categoryId: string | null }>({ tab: 'summary', categoryId: null })
   const [sheet, setSheet] = useState<SheetState>(null)
 
@@ -37,6 +39,7 @@ export function BudgetScreen() {
     setPage('home')
     setSheet(null)
     setShowPace(false)
+    setMoreOpen(false)
   }, [tabTap])
 
   useBackHandler(page !== 'home', () => setPage('home'))
@@ -169,43 +172,55 @@ export function BudgetScreen() {
           </button>
         )}
 
-        {/* Tier 3, navigation: four destinations that were four separate tinted cards, each carrying the
-            same visual weight as the content above -- collapsed into one quiet list. Reuses .navrow, the
-            same pattern Manage already uses for its own navigation. */}
-        <h2 className="group__title">More in Budget</h2>
+        {/* Tier 3, navigation: four destinations, collapsed behind one row instead of standing open on
+            the home screen all the time -- the owner's own "too many rows, too much on screen" complaint
+            about this exact screen. Progressive disclosure (NN/g), not a new visual language: the same
+            Sheet + navrow pattern already used for KeepAndShare's "More" and Notes' "Filter". */}
         <div className="group">
-          <button type="button" className="navrow tap-row" onClick={() => goSummary('summary')}>
+          <button type="button" className="navrow tap-row" onClick={() => setMoreOpen(true)}>
             <span className="row__text">
-              <span className="row__label">Spending summary</span>
-              <span className="row__hint">
-                {s.entries.length === 0
-                  ? `Nothing spent in ${monthLabel(month)}`
-                  : `Biggest: ${biggest ? `${biggest.name} ${money(biggest.spent)}` : `Uncategorised ${money(s.uncategorised)}`} · ${entriesWord(s.entries.length)}`}
-              </span>
-            </span>
-            <Icon name="chevron" size={18} className="navrow__chev" />
-          </button>
-          <button type="button" className="navrow tap-row" onClick={() => setPage('bills')}>
-            <span className="row__text">
-              <span className="row__label">Bills and subscriptions</span>
-              {bills.count > 0 && <span className="row__hint">{`${bills.count} running · about ${money(bills.perMonth)} a month = ${money(bills.perYear)} a year`}</span>}
-            </span>
-            <Icon name="chevron" size={18} className="navrow__chev" />
-          </button>
-          <button type="button" className="navrow tap-row" onClick={() => setPage('import')}>
-            <span className="row__text">
-              <span className="row__label">Add from bank messages</span>
-            </span>
-            <Icon name="chevron" size={18} className="navrow__chev" />
-          </button>
-          <button type="button" className="navrow tap-row" onClick={() => setPage('manage')}>
-            <span className="row__text">
-              <span className="row__label">Categories and cards</span>
+              <span className="row__label">More in Budget</span>
             </span>
             <Icon name="chevron" size={18} className="navrow__chev" />
           </button>
         </div>
       </div>
+      {moreOpen && (
+        <Sheet title="More in Budget" onClose={() => setMoreOpen(false)}>
+          <div className="group" aria-label="More in Budget">
+            <button type="button" className="navrow tap-row" onClick={() => { setMoreOpen(false); goSummary('summary') }}>
+              <span className="row__text">
+                <span className="row__label">Spending summary</span>
+                <span className="row__hint">
+                  {s.entries.length === 0
+                    ? `Nothing spent in ${monthLabel(month)}`
+                    : `Biggest: ${biggest ? `${biggest.name} ${money(biggest.spent)}` : `Uncategorised ${money(s.uncategorised)}`} · ${entriesWord(s.entries.length)}`}
+                </span>
+              </span>
+              <Icon name="chevron" size={18} className="navrow__chev" />
+            </button>
+            <button type="button" className="navrow tap-row" onClick={() => { setMoreOpen(false); setPage('bills') }}>
+              <span className="row__text">
+                <span className="row__label">Bills and subscriptions</span>
+                {bills.count > 0 && <span className="row__hint">{`${bills.count} running · about ${money(bills.perMonth)} a month = ${money(bills.perYear)} a year`}</span>}
+              </span>
+              <Icon name="chevron" size={18} className="navrow__chev" />
+            </button>
+            <button type="button" className="navrow tap-row" onClick={() => { setMoreOpen(false); setPage('import') }}>
+              <span className="row__text">
+                <span className="row__label">Add from bank messages</span>
+              </span>
+              <Icon name="chevron" size={18} className="navrow__chev" />
+            </button>
+            <button type="button" className="navrow tap-row" onClick={() => { setMoreOpen(false); setPage('manage') }}>
+              <span className="row__text">
+                <span className="row__label">Categories and cards</span>
+              </span>
+              <Icon name="chevron" size={18} className="navrow__chev" />
+            </button>
+          </div>
+        </Sheet>
+      )}
     </div>
     {/* sheets and pages sit at the same place in the tree as in the empty-state return above, so adding the first
         entry from inside one of them does not unmount it (that used to reset the Add from messages screen). */}

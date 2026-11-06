@@ -238,6 +238,16 @@ const scanFn = () => {
   out.clipped = out.clipped.slice(0, 5)
   return out
 }
+// The four Budget destinations sit behind "More in Budget" once anything has been spent; the empty
+// state's own action list is never behind a sheet.
+const openBudgetMore = async (p) => {
+  const more = p.getByRole('button', { name: 'More in Budget' })
+  if (await more.count()) {
+    await p.locator('.snack').waitFor({ state: 'detached', timeout: 9000 }).catch(() => {})
+    await more.click()
+    await p.locator('.sheet').waitFor()
+  }
+}
 const SCREENS = {
   calc: async () => {},
   tools: async (p) => { await tab(p, 'Tools'); await settle(p, 150) },
@@ -245,8 +255,8 @@ const SCREENS = {
   notes: async (p) => { await tab(p, 'Notes'); await settle(p, 150) },
   due: async (p) => { await tab(p, 'Due'); await settle(p, 150) },
   budget: async (p) => { await tab(p, 'Budget'); await settle(p, 150) },
-  summary: async (p) => { await tab(p, 'Budget'); await p.click('text=Spending summary'); await settle(p, 200) },
-  manage: async (p) => { await tab(p, 'Budget'); await p.click('text=Categories and cards'); await settle(p, 200) },
+  summary: async (p) => { await tab(p, 'Budget'); await openBudgetMore(p); await p.click('text=Spending summary'); await settle(p, 200) },
+  manage: async (p) => { await tab(p, 'Budget'); await openBudgetMore(p); await p.click('text=Categories and cards'); await settle(p, 200) },
   settings: async (p) => { await openSettings(p) },
   history: async (p) => { await p.click('[aria-label=History]'); await settle(p, 150) },
   addExpense: async (p) => { await tab(p, 'Budget'); await p.click('button:has-text("Add expense")'); await settle(p, 200) },
@@ -355,6 +365,7 @@ T('PF01', 'PERF', '20,000 expenses and 500 notes: boot, Budget, Spending summary
   const { page, bootMs, errors } = await open(app, { data: big() })
   const r = { boot: bootMs }
   r.budget = await timeIt(page, () => tab(page, 'Budget'), '.budget__hero')
+  await openBudgetMore(page)
   r.summary = await timeIt(page, () => page.click('text=Spending summary'), '.screen[aria-label="Spending summary"] .budget__hero')
   r.entries = await timeIt(page, () => page.locator('.screen[aria-label="Spending summary"]').getByRole('radio', { name: 'Entries', exact: true }).click(), '.budget__entry')
   const rows = await page.locator('.budget__entry').count()
@@ -429,7 +440,7 @@ T('PF04', 'RUNTIME', 'calculator: 30 rapid key presses and = taps never leave an
 // ================================================================== A. ACCESSIBILITY
 T('A01', 'A11Y', 'screen-reader words for amounts: refund and "not counted as spending" are said, not only coloured', async (app) => {
   const { page } = await open(app, { data: fullData() })
-  await tab(page, 'Budget'); await page.click('text=Spending summary'); await settle(page, 200)
+  await tab(page, 'Budget'); await openBudgetMore(page); await page.click('text=Spending summary'); await settle(page, 200)
   await page.locator('.screen[aria-label="Spending summary"]').getByRole('radio', { name: 'Entries', exact: true }).click(); await settle(page, 200)
   const all = await page.evaluate(() => [...document.querySelectorAll('.screen[aria-label="Spending summary"] .budget__entry, .screen[aria-label="Spending summary"] .budget__entry *')].map((e) => (e.getAttribute('aria-label') || '') + ' ' + (e.className?.includes?.('sr-only') ? e.textContent : '')).join(' | ') + ' || ' + document.querySelector('.screen[aria-label="Spending summary"]').innerText)
   ok(/refund of/i.test(all) || /Refund/.test(all), 'no refund wording: ' + all.slice(0, 300))
@@ -505,8 +516,8 @@ T('P03', 'PRIVACY', 'XSS: <img onerror>, <script>, javascript: and HTML in note,
   const visit = async (fn) => { await fn(); await settle(page, 250); ok(await page.evaluate(() => !window.__xss), 'a script ran: window.__xss=' + await page.evaluate(() => window.__xss)) }
   await visit(async () => {}); await visit(() => page.click('[aria-label=History]')); await visit(() => page.keyboard.press('Escape'))
   await visit(() => tab(page, 'Notes')); await visit(() => page.locator('.app__body').getByText('onerror', { exact: false }).first().click().catch(() => {})); await visit(() => page.keyboard.press('Escape'))
-  await visit(() => tab(page, 'Due')); await visit(() => tab(page, 'Budget')); await visit(() => page.click('text=Spending summary')); await visit(() => page.click('[aria-label^=Back]').catch(() => {}))
-  await visit(() => page.click('text=Categories and cards').catch(() => {}))
+  await visit(() => tab(page, 'Due')); await visit(() => tab(page, 'Budget')); await visit(() => openBudgetMore(page)); await visit(() => page.click('text=Spending summary')); await visit(() => page.click('[aria-label^=Back]').catch(() => {}))
+  await visit(() => openBudgetMore(page)); await visit(() => page.click('text=Categories and cards').catch(() => {}))
   ok(await page.locator('.app img[src="x"], .app script, .app svg[onload]').count() === 0, 'an element was created from text')
   ok(await page.evaluate(() => [...document.querySelectorAll('.app a[href^="javascript:"], .app [href^="javascript:"]')].length === 0), 'a javascript: link exists')
   ok(realErrors(errors).length === 0, errors.join(';'))

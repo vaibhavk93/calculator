@@ -48,7 +48,9 @@ try {
     await shot(page, '3-emi-chip')
     check('EMI: chip is offered', (await page.getByRole('button', { name: 'Remind me every month on the 5th', exact: true }).count()) === 1)
     const emi = (await page.locator('.result__row--main .result__value').innerText()).replace(/[^\d.]/g, '')
-    await page.getByRole('button', { name: 'Use in another tool' }).click()
+    // "Use in another tool" lives behind the tool page's own "More" button now (B16), not a direct icon.
+    await page.locator('.keep__btn[aria-label="More"]').click()
+    await page.locator('.sheet .navrow', { hasText: 'Use in another tool' }).click()
     await settle(page)
     await shot(page, '2-use-in-tools')
     check('Use in: sheet has a close and lists tools', (await page.locator('.sheet__close').count()) === 1 && (await page.locator('.sheet .pick__opt').count()) > 3)

@@ -387,7 +387,11 @@ C('T-091', 'CORNER', 'World time: the day DST starts (8 Mar 2026) and ends (1 No
 // ---- Use in another tool, suggestion chip
 C('T-100', 'POS', 'Use in another tool: EMI into Emergency fund expenses; not offered when the result is an error', async ({ page }) => {
   await open(page, 'emi'); const emi = num(await rv(page, 'Monthly EMI'))
-  await page.getByRole('button', { name: 'Use in another tool' }).click(); await settle(page)
+  // "Use in another tool" lives behind the tool page's own "More" button now (B16), not a direct icon.
+  const moreBtn = page.locator('.keep__btn[aria-label="More"]')
+  await moreBtn.scrollIntoViewIfNeeded()
+  await moreBtn.click()
+  await page.locator('.sheet .navrow', { hasText: 'Use in another tool' }).click(); await settle(page)
   await page.locator('.sheet .pick__opt', { hasText: 'Emergency fund' }).click(); await settle(page)
   await page.locator('.sheet .pick__opt').first().click(); await page.locator('.sheet__foot .btn').click(); await page.waitForSelector('.tool'); await settle(page)
   has(await page.locator('.screen__title').last().innerText(), 'Emergency fund', 'opened')
@@ -421,12 +425,14 @@ C('T-111', 'POS', 'Quick chips with the international system say +100K', async (
   ok(t.join(' ').includes('+100K') && !t.join(' ').includes('+1L'), 'chips: ' + t.join(' '))
 }, { settings: { numberSystem: 'international' } })
 C('T-112', 'POS', 'Reset puts every box back (also a blanked one and rows), Undo brings the typed values back; reload after Reset has no draft', async ({ page }) => {
+  // Reset lives behind the tool page's own "More" button now (B16), not a direct icon.
+  const reset = async () => { await page.locator('.keep__btn[aria-label="More"]').click(); await page.locator('.sheet .navrow', { hasText: 'Reset inputs' }).click() }
   await open(page, 'multi-loan'); await setRows(page, [['Z', '1', '1', '1']]); await fill(page, 'extra', '')
-  await page.getByRole('button', { name: 'Reset inputs' }).click(); await settle(page)
+  await reset(); await settle(page)
   eq(await f(page, 'extra').inputValue(), '5,000', 'extra'); eq(await page.locator('.rows__row').nth(0).locator('input.field').nth(0).inputValue(), 'Home loan', 'row')
   has(await page.locator('.snack').innerText(), 'Inputs reset'); await page.locator('.snack .snack__link').click(); await settle(page)
   eq(await page.locator('.rows__row').nth(0).locator('input.field').nth(0).inputValue(), 'Z', 'undo row'); eq(await f(page, 'extra').inputValue(), '', 'undo extra')
-  await page.getByRole('button', { name: 'Reset inputs' }).click(); await settle(page); await wait(900); eq(Object.keys((await stored(page)).drafts ?? {}).length, 0, 'draft after reset')
+  await reset(); await settle(page); await wait(900); eq(Object.keys((await stored(page)).drafts ?? {}).length, 0, 'draft after reset')
 })
 const RATE_TOOLS = SPECS.filter((s) => s.rates)
 C('T-113', 'POS', `"Rates as of" lines: shown on exactly the ${RATE_TOOLS.length} tools with a changing rate (${RATE_TOOLS.map((s) => s.id).join(', ')}), on no other tool`, async ({ page }) => {

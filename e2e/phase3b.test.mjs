@@ -20,7 +20,8 @@ try {
   {
     const data = seed({ expenses: [exp('a', '2026-11-10', '120', { note: 'Lunch', categoryId: 'c-food' }), exp('b', '2026-11-11', '300', { note: 'Cab' }), exp('c', '2026-11-12', '80', { note: 'Tea', categoryId: 'c-food' }), exp('t', '2026-11-13', '5000', { settlement: 'transfer' })] })
     const { page, errors, close } = await openApp(app, { data, now: NOW })
-    await page.locator('.budget__row', { hasText: 'Spending summary' }).click()
+    await page.getByRole('button', { name: 'More in Budget' }).click()
+    await page.getByRole('button', { name: /Spending summary/ }).click()
     await page.getByRole('radio', { name: 'Entries' }).click().catch(async () => page.locator('button', { hasText: /^Entries$/ }).click())
     await settle(page)
     await page.getByRole('button', { name: /Select entries to change their category/ }).click()
@@ -151,7 +152,9 @@ try {
     check('after a reload the calculator reopens with what was typed', back.replace(/,/g, '') === '777000', back)
     await shot(page, '8-draft-restored')
     // Reset clears it
-    await page.getByRole('button', { name: /Reset/ }).first().click()
+    // Reset lives behind the tool page's own "More" button now (B16), not a direct icon.
+    await page.locator('.keep__btn[aria-label="More"]').click()
+    await page.locator('.sheet .navrow', { hasText: 'Reset inputs' }).click()
     await page.waitForTimeout(700)
     const s2 = await stored(page)
     check('Reset clears the draft from storage', !JSON.stringify(s2.drafts ?? {}).includes('777000'), JSON.stringify(s2.drafts ?? null))

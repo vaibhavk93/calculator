@@ -69,10 +69,23 @@ const pageOf = (page, name) => page.locator(`.screen[aria-label="${name}"]`)
 // spending logged this month) or "link-btn" (the empty state's own action list, no spending yet) -- same
 // button, same destination, two different presentations. A selector pinned to one class breaks on
 // whichever seed the test happens to use. getByRole matches either.
-const toSummary = async (page) => { await page.getByRole('button', { name: /Spending summary/ }).first().click(); await pageOf(page, 'Spending summary').waitFor() }
-const toBills = async (page) => { await page.getByRole('button', { name: /Bills and subscriptions/ }).first().click(); await pageOf(page, 'Bills and subscriptions').waitFor() }
-const toManage = async (page) => { await page.getByRole('button', { name: /Categories and cards/ }).first().click(); await pageOf(page, 'Categories and cards').waitFor() }
-const toImport = async (page) => { await page.getByText('Add from bank messages').first().click(); await pageOf(page, 'Add from messages').waitFor() }
+// Only the non-empty state collapses these four behind "More in Budget" (its own row list is not behind
+// a sheet): open it only if it is actually there.
+const openMoreIfNeeded = async (page) => {
+  const more = page.getByRole('button', { name: 'More in Budget' })
+  if (await more.count()) {
+    // "More in Budget" sits higher up now that the four destinations are collapsed, which can land it
+    // under a still-showing snackbar (e.g. the backup nudge, or a just-seeded page's own first paint) --
+    // wait that out rather than let Playwright's retry-click race its 8s auto-dismiss.
+    await page.locator('.snack').waitFor({ state: 'detached', timeout: 9000 }).catch(() => {})
+    await more.click()
+    await page.locator('.sheet').waitFor()
+  }
+}
+const toSummary = async (page) => { await openMoreIfNeeded(page); await page.getByRole('button', { name: /Spending summary/ }).first().click(); await pageOf(page, 'Spending summary').waitFor() }
+const toBills = async (page) => { await openMoreIfNeeded(page); await page.getByRole('button', { name: /Bills and subscriptions/ }).first().click(); await pageOf(page, 'Bills and subscriptions').waitFor() }
+const toManage = async (page) => { await openMoreIfNeeded(page); await page.getByRole('button', { name: /Categories and cards/ }).first().click(); await pageOf(page, 'Categories and cards').waitFor() }
+const toImport = async (page) => { await openMoreIfNeeded(page); await page.getByText('Add from bank messages').first().click(); await pageOf(page, 'Add from messages').waitFor() }
 const SUM = (page) => pageOf(page, 'Spending summary')
 const entriesTab = (page) => SUM(page).getByRole('radio', { name: 'Entries', exact: true }).click()
 const chooseCat = async (page, name) => {

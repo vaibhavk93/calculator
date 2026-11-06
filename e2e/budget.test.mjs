@@ -87,8 +87,18 @@ const waitStored = async (page, pred, ms = 3000) => {
 }
 const budgetOnDisk = async (page) => (await waitStored(page, () => false, 450))?.budget
 const heroText = (page) => page.locator('.budget__hero').first().innerText()
-const toSummary = async (page) => { await page.locator('button.tap-row', { hasText: 'Spending summary' }).first().click(); await page.locator('.screen[aria-label="Spending summary"]').waitFor() }
-const toManage = async (page) => { await page.getByRole('button', { name: /Categories and cards/ }).first().click(); await page.locator('.screen[aria-label="Categories and cards"]').waitFor() }
+// The four Budget destinations sit behind one "More in Budget" row now, not open on the home screen --
+// except the empty state (zero expenses ever logged), whose own action list is never behind a sheet.
+const openMore = async (page) => {
+  const more = page.getByRole('button', { name: 'More in Budget' })
+  if (await more.count()) {
+    await page.locator('.snack').waitFor({ state: 'detached', timeout: 9000 }).catch(() => {})
+    await more.click()
+    await page.locator('.sheet').waitFor()
+  }
+}
+const toSummary = async (page) => { await openMore(page); await page.locator('button.tap-row', { hasText: 'Spending summary' }).first().click(); await page.locator('.screen[aria-label="Spending summary"]').waitFor() }
+const toManage = async (page) => { await openMore(page); await page.getByRole('button', { name: /Categories and cards/ }).first().click(); await page.locator('.screen[aria-label="Categories and cards"]').waitFor() }
 const SUM = (page) => page.locator('.screen[aria-label="Spending summary"]')
 const MAN = (page) => page.locator('.screen[aria-label="Categories and cards"]')
 const viewTab = (page, name) => SUM(page).getByRole('radio', { name, exact: true }).click()

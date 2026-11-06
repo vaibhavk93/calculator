@@ -94,6 +94,17 @@ const download = async (page, clickSel) => {
 const upload = async (page, name, text) => { await inBackup(page); await page.setInputFiles('input[type=file]', { name, mimeType: 'application/json', buffer: Buffer.from(text) }) }
 const backupOf = (data, over = {}) => JSON.stringify({ kind: 'vkcalc-backup', schemaVersion: 3, exportedAt: '2026-10-01T10:00:00.000Z', app: 'Calc', data, ...over }, null, 2)
 
+// The four Budget destinations sit behind "More in Budget" once anything has been spent; the empty
+// state's own action list is never behind a sheet.
+const openBudgetMore = async (p) => {
+  const more = p.getByRole('button', { name: 'More in Budget' })
+  if (await more.count()) {
+    await p.locator('.snack').waitFor({ state: 'detached', timeout: 9000 }).catch(() => {})
+    await more.click()
+    await p.locator('.sheet').waitFor()
+  }
+}
+
 // ------------------------------------------------------------------ navigation to each screen (used by the sweeps)
 const SCREENS = {
   calc: async () => {},
@@ -104,8 +115,8 @@ const SCREENS = {
   todo: async (p) => { await tab(p, 'Notes'); await p.locator('.seg__opt', { hasText: 'To-do' }).click(); await settle(p) },
   due: async (p) => { await tab(p, 'Due'); await settle(p) },
   budget: async (p) => { await tab(p, 'Budget'); await settle(p) },
-  summary: async (p) => { await tab(p, 'Budget'); await p.click('text=Spending summary'); await settle(p) },
-  manage: async (p) => { await tab(p, 'Budget'); await p.click('text=Categories and cards'); await settle(p) },
+  summary: async (p) => { await tab(p, 'Budget'); await openBudgetMore(p); await p.click('text=Spending summary'); await settle(p) },
+  manage: async (p) => { await tab(p, 'Budget'); await openBudgetMore(p); await p.click('text=Categories and cards'); await settle(p) },
   settings: async (p) => { await openSettings(p) },
   history: async (p) => { await openHistory(p) },
   addExpense: async (p) => { await tab(p, 'Budget'); await p.click('button:has-text("Add expense")'); await settle(p) },
@@ -650,6 +661,7 @@ T('S24', 'POS', 'Categories and cards row (in Budget) opens Manage and Back retu
   ok((await page.locator('.screen[aria-label=Settings] >> text=Categories and cards').count()) === 0, 'Settings still has the Categories and cards row')
   await page.click('[aria-label=Back]'); await settle(page, 200)
   await tab(page, 'Budget'); await settle(page, 150)
+  await openBudgetMore(page)
   await page.click('text=Categories and cards'); await settle(page, 200); ok(/Categories|Manage|limit/i.test(await body(page)), 'manage not shown')
   const backs = page.locator('[aria-label=Back]'); await backs.last().click(); await settle(page, 200)
   ok(await page.locator('.screen[aria-label="Categories and cards"]').count() === 0 && /Add expense/.test(await body(page)), 'not back on Budget')
@@ -1064,7 +1076,7 @@ for (const kind of ['long', 'rtl', 'emoji']) {
     const { page } = await open(app, { data: stressSeed(kind) }); const problems = []
     const chk = async (n) => { await settle(page, 200); const o = await overflowing(page); if (o.length) problems.push(`${n}: ${o.slice(0, 2).join(' | ')}`) }
     await tab(page, 'Notes'); await chk('notes'); await page.locator('.seg__opt', { hasText: 'To-do' }).click(); await chk('todo'); await tab(page, 'Due'); await chk('due'); await tab(page, 'Budget'); await chk('budget')
-    await page.click('text=Spending summary'); await chk('summary'); await tab(page, 'Budget'); await page.click('text=Categories and cards'); await chk('manage')
+    await openBudgetMore(page); await page.click('text=Spending summary'); await chk('summary'); await tab(page, 'Budget'); await openBudgetMore(page); await page.click('text=Categories and cards'); await chk('manage')
     await tab(page, 'Calculate'); await openHistory(page); await chk('history')
     ok(problems.length === 0, problems.join(' || '))
     if (kind === 'emoji') ok((await body(page)).includes('🧾'), 'emoji missing from the page text')
@@ -1077,7 +1089,7 @@ T('L-big', 'UI', 'numbers of 1e15 and beyond (30 digits) in budget, notes, tape 
   const { page } = await open(app, { data: d }); const problems = []
   const chk = async (n) => { await settle(page, 250); const o = await overflowing(page); if (o.length) problems.push(`${n}: ${o.slice(0, 2).join(' | ')}`); const m = (await body(page)).match(bad); if (m) problems.push(`${n}: text "${m[0]}"`) }
   await tab(page, 'Notes'); await chk('notes'); await page.click('text=Groceries'); await chk('tape'); await tab(page, 'Notes'); await tab(page, 'Due'); await chk('due')
-  await tab(page, 'Budget'); await chk('budget'); await page.click('text=Spending summary'); await chk('summary'); await tab(page, 'Budget'); await page.click('text=Categories and cards'); await chk('manage')
+  await tab(page, 'Budget'); await chk('budget'); await openBudgetMore(page); await page.click('text=Spending summary'); await chk('summary'); await tab(page, 'Budget'); await openBudgetMore(page); await page.click('text=Categories and cards'); await chk('manage')
   await tab(page, 'Calculate'); await openHistory(page); await chk('history')
   ok(problems.length === 0, problems.join(' || '))
 })
@@ -1096,7 +1108,7 @@ T('L-600h', 'UI', '600 history rows (cap 200) plus 100 named rows: History opens
 T('L-20k', 'RUNTIME', '20,000 budget entries: Budget home and summary open in under 5 s', async (app) => {
   const d = seed(); d.budget.expenses = manyExpenses(20000); const { page, errors } = await open(app, { data: d })
   let t0 = Date.now(); await tab(page, 'Budget'); await page.waitForSelector('text=/Left this month|Over budget/', { timeout: 8000 }); const a = Date.now() - t0
-  t0 = Date.now(); await page.click('text=Spending summary'); await settle(page, 100); const b = Date.now() - t0
+  t0 = Date.now(); await openBudgetMore(page); await page.click('text=Spending summary'); await settle(page, 100); const b = Date.now() - t0
   ok(a < 5000 && b < 5000, `home ${a} ms, summary ${b} ms`); ok(errors.length === 0, errors.join(';')); note(`20k entries: Budget home ${a} ms, summary ${b} ms`)
 })
 T('L-xss', 'NEG', 'HTML in titles, memo, notes and categories is shown as text, never executed', async (app) => {
