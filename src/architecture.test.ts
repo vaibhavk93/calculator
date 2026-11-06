@@ -207,3 +207,15 @@ describe('spend totals go through countsAsSpend (lib/budget.ts)', () => {
     expect(bad.map(rel)).toEqual([])
   })
 })
+
+// ---------------------------------------------------------------- modules on/off (docs/THE-PLAN.md, Phase 7)
+
+describe('"Show in the app" switches are read through lib/modules.ts only', () => {
+  // A screen that read `settings.modules` itself would hide a tab in one place and forget another.
+  // Only the helper, the store (sanitiser, defaults, types) and the tests may mention the field.
+  it('no component, feature or App.tsx reads `.modules` or `modules:` directly', () => {
+    const screens = ALL.filter((f) => /\.tsx?$/.test(f) && !isTest(f) && (['components', 'features'].includes(rel(f).split('/')[0]!) || rel(f) === 'App.tsx'))
+    const bad = screens.filter((f) => /\.modules\b|\bmodules\s*:/.test(stripComments(read(f))))
+    expect(bad.map(rel)).toEqual([])
+  })
+})

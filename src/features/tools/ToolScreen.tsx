@@ -5,6 +5,7 @@ import { PickerSelect } from '../../components/PickerSelect'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
 import { magnitudeWords, type NumberSystem } from '../../lib/format'
+import { moduleOn } from '../../lib/modules'
 import {
   defaultValues,
   exampleFieldsInUse,
@@ -513,6 +514,9 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
   const showLinkSnack = useApp((s) => s.showLinkSnack)
   const toast = useApp((s) => s.toast)
   const setTab = useApp((s) => s.setTab)
+  // "Show in the app": what is saved to Notes or Budget is not offered while that module is hidden.
+  const notesOn = useApp((s) => moduleOn(s.settings, 'notes'))
+  const budgetOn = useApp((s) => moduleOn(s.settings, 'budget'))
   // Once "More options" is open (by the user, or by itself because a field changed) it stays open.
   const [moreOpen, setMoreOpen] = useState(false)
   const [savedId, setSavedId] = useState<string | null>(card?.id ?? null)
@@ -566,7 +570,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
   const canUse = link !== null && linkTargets(ALL_TOOLS, spec.id, link.fmt, link.unit).length > 0
 
   // One "next step" chip under the result. Used or dismissed once, it never comes back. Not offered when this EMI already has a reminder.
-  const tip = ok && !(reminder && spec.id === 'emi') ? suggestionFor(spec.id, dismissedTips) : null
+  const tip = ok && notesOn && !(reminder && spec.id === 'emi') ? suggestionFor(spec.id, dismissedTips) : null
   const closeTip = () => tip && updateSettings({ dismissedTips: [...dismissedTips, tip.id] })
   const takeTip = () => {
     if (!tip) return
@@ -668,13 +672,15 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
           </>
         }
         action={
-          <button
-            type="button"
-            className="link-btn"
-            onClick={() => (ok ? setSaving(true) : toast(isError(computed) ? `${computed.error}. Then you can save it.` : 'Fill in the form first'))}
-          >
-            {saved ? 'Update' : 'Save'}
-          </button>
+          notesOn || saved ? (
+            <button
+              type="button"
+              className="link-btn"
+              onClick={() => (ok ? setSaving(true) : toast(isError(computed) ? `${computed.error}. Then you can save it.` : 'Fill in the form first'))}
+            >
+              {saved ? 'Update' : 'Save'}
+            </button>
+          ) : undefined
         }
       />
       <div className="screen__body tool" ref={bodyRef}>
@@ -702,7 +708,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
         {/* 2. Result: what it comes to. A plain card, never tinted. */}
         {ok && <Result out={computed} mainRef={mainRef} verified={spec.verified} rates={spec.rates} examples={exampleFieldsInUse(spec, values)} />}
 
-        {ok && computed.expense && computed.expense.amount.gt(0) && (
+        {ok && budgetOn && computed.expense && computed.expense.amount.gt(0) && (
           <div className="suggest">
             <button type="button" className="link-btn" onClick={() => setExpensing(true)}>Save my share to Budget</button>
           </div>
@@ -723,6 +729,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
             title={saved?.title ?? spec.title}
             text={shareBody}
             canList={listableAmount !== null}
+            notes={notesOn}
             onList={() => setListing(true)}
             onRemind={() => setReminding(true)}
             onUse={canUse && !card ? () => setUsing(true) : undefined}

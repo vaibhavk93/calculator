@@ -110,7 +110,7 @@ function useReminderNotifications() {
       ackReminder(id)
       if (action === 'paid') markPaid(id)
       else if (action === 'snooze') snooze(id, 1)
-      else setTab('due')
+      else setTab('due') // setTab sends it to Calculate when Notes and reminders is switched off; the reminder itself still rang
     })
     return () => void stop.then((f) => f())
   }, [markPaid, snooze, setTab])

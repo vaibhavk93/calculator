@@ -44,6 +44,7 @@ import {
   type ExpenseDraft,
 } from '../lib/budget'
 import { capHistory, isRawExpression, sanitizeSettings } from './persistence'
+import { startTab, tabOn } from '../lib/modules'
 import type { Values } from '../lib/tool'
 import {
   MAX_CATEGORIES,
@@ -547,7 +548,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       budget: { ...initial.budget, expenses: initial.budget.expenses.filter((e) => e.deletedAt === null || deps.now() - e.deletedAt < TRASH_DAYS * DAY) },
 
       // A chosen startup calculator opens the Tools tab with that calculator already showing.
-      tab: initial.settings.startupTool ? 'tools' : initial.settings.startupTab,
+      tab: initial.settings.startupTool ? 'tools' : startTab(initial.settings),
       nav: initial.settings.startupTool ? { ...TOOLS_HOME, tool: initial.settings.startupTool } : TOOLS_HOME,
       tabTap: 0,
       openCard: null,
@@ -1297,16 +1298,21 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         return added
       },
 
-      updateSettings: (patch) => set({ settings: sanitizeSettings({ ...get().settings, ...patch }) }),
+      // If the tab you are on was just switched off (Settings > Show in the app), go to Calculate. Nothing is deleted.
+      updateSettings: (patch) => {
+        const settings = sanitizeSettings({ ...get().settings, ...patch })
+        set(tabOn(settings, get().tab) ? { settings } : { settings, tab: 'calculate', openCard: null })
+      },
 
       setTab: (tab) => {
-        const { tab: current, tabTap } = get()
+        const { tab: current, tabTap, settings } = get()
+        if (!tabOn(settings, tab)) tab = 'calculate'
         // Tapping the tab you are already on means "take me back to its start".
         if (tab === current) return set({ overlay: 'none', tabTap: tabTap + 1, nav: tab === 'tools' ? TOOLS_HOME : get().nav })
         set({ tab, overlay: 'none' })
       },
       setNav: (patch) => set({ nav: { ...get().nav, ...patch } }),
-      showCard: (id) => set(id === null ? { openCard: null } : { openCard: id, tab: 'saved', overlay: 'none' }),
+      showCard: (id) => set(id === null ? { openCard: null } : tabOn(get().settings, 'saved') ? { openCard: id, tab: 'saved', overlay: 'none' } : { openCard: null, tab: 'calculate', overlay: 'none' }),
       setChecklist: (cardId, on) => {
         const { cards, settings } = get()
         const card = cards.find((c) => c.id === cardId && c.deletedAt === null && c.kind === 'tape')
@@ -1331,6 +1337,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
 
       restore: (data) =>
         set({
+          ...(tabOn(data.settings, get().tab) ? {} : { tab: 'calculate' as const, openCard: null }),
           input: data.input,
           selection: null,
           undoStack: [],

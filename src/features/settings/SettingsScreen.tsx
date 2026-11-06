@@ -5,6 +5,7 @@ import { ScreenHeader } from '../../components/ScreenHeader'
 import { useApp } from '../../components/StoreProvider'
 import { backupNudge, countItems } from '../../lib/backupNudge'
 import { checkReminderPermissions, ensurePermission, notificationsSupported, openExactAlarmSettings, scheduleTestReminder, type ReminderPermissions } from '../../lib/notifications'
+import { moduleOn, startTab, tabOn, withModule } from '../../lib/modules'
 import { timeLabel } from '../../lib/reminders'
 import { ACCENT_NAMES, ACCENTS } from '../../lib/theme'
 import { TABS, type CopyFormat, type Tab } from '../../store/types'
@@ -133,7 +134,7 @@ export function SettingsScreen() {
   const setOverlay = useApp((x) => x.setOverlay)
 
   // One picker for both kinds of start: a screen ("tab:saved") or a calculator ("tool:gst").
-  const opensOn = s.startupTool && ALL_TOOLS.some((t) => t.id === s.startupTool) ? `tool:${s.startupTool}` : `tab:${s.startupTab}`
+  const opensOn = s.startupTool && ALL_TOOLS.some((t) => t.id === s.startupTool) ? `tool:${s.startupTool}` : `tab:${startTab(s)}`
   const chooseOpensOn = (v: string) => {
     const [kind, id = ''] = v.split(':')
     if (kind === 'tool') update({ startupTool: id })
@@ -141,9 +142,12 @@ export function SettingsScreen() {
   }
 
   const openOptions: PickOption[] = [
-    ...TABS.map((t) => ({ value: `tab:${t}`, label: TAB_LABEL[t], group: 'Screens' })),
+    ...TABS.filter((t) => tabOn(s, t)).map((t) => ({ value: `tab:${t}`, label: TAB_LABEL[t], group: 'Screens' })),
     ...GROUPS.flatMap((g) => g.tools.map((id) => ({ value: `tool:${id}`, label: ALL_TOOLS.find((t) => t.id === id)?.title ?? id, group: g.name }))),
   ]
+
+  // Reminders on live cards. They keep ringing whether or not the Due tab is shown.
+  const ringing = useApp((x) => x.reminders.filter((r) => x.cards.some((c) => c.id === r.cardId && c.deletedAt === null)).length)
 
   const [page, setPage] = useState<'none' | 'backup' | 'tips'>('none')
   const items = useApp((x) => countItems(x))
@@ -231,6 +235,18 @@ export function SettingsScreen() {
                 { value: 'rad', label: 'Radians' },
               ]}
             />
+          </Row>
+        </Section>
+
+        <Section title="Show in the app">
+          <Row label="Budget" hint="Hidden, not deleted. Bill reminders will still ring. Switch on to get it all back.">
+            <Toggle label="Budget" checked={moduleOn(s, 'budget')} onChange={(on) => update(withModule(s, 'budget', on))} />
+          </Row>
+          <Row
+            label="Notes and reminders"
+            hint={`Hidden, not deleted. ${ringing === 0 ? 'Reminders you set will still ring.' : `${ringing} ${ringing === 1 ? 'reminder is' : 'reminders are'} set and will still ring.`}`}
+          >
+            <Toggle label="Notes and reminders" checked={moduleOn(s, 'notes')} onChange={(on) => update(withModule(s, 'notes', on))} />
           </Row>
         </Section>
 
