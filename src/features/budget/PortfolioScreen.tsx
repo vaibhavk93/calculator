@@ -155,7 +155,7 @@ export function PortfolioView({ hidden }: { hidden: boolean }) {
           </div>
           {months.map((m) => {
             const left = m.excluded.map((id) => names.get(id)).filter((n): n is string => !!n)
-            return left.length > 0 && <p key={m.month} className="budget__note networth__gap">{monthShortLabel(m.month)} leaves out {left.length > 2 ? `${left.length} holdings` : left.join(' and ')}: no value yet</p>
+            return left.length > 0 && <p key={m.month} className="budget__note networth__gap">Leaves out {left.length > 2 ? `${left.length} holdings` : left.join(' and ')} in {monthShortLabel(m.month)}: no value yet</p>
           })}
         </>
       )}

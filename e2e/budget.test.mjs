@@ -211,7 +211,8 @@ T('EM09', 'UX', 'after the first expense the empty state gives way to the month 
 })
 T('EM10', 'CORNER', 'deleting the only entry returns to the empty state and Undo brings it back', async (c) => {
   const { page } = await c.open({ budget: BASE({ expenses: [exp('2026-11-03', '100')] }) })
-  await page.getByRole('button', { name: /^Delete/ }).first().click()
+  // Budget home's recent rows have no trash any more: delete is in the entry's sheet.
+  await page.getByRole('button', { name: /^Edit/ }).first().click(); await S(page).getByRole('button', { name: 'Delete this expense' }).click()
   await page.getByText('No spending yet').waitFor()
   await page.locator('.snack').getByRole('button', { name: 'Undo' }).click()
   await page.locator('.budget__hero').waitFor()
@@ -228,12 +229,12 @@ T('EM11b', 'POS', 'over budget: label says "Over budget by", hero is red, no dup
   has(await page.locator('.budget__hero').first().getAttribute('class'), 'budget__hero--negative')
   lacks(await bodyText(page), 'Over by ₹500')
 })
-T('EM11c', 'CORNER', 'over budget in a past month says "Over budget in October 2026"; under budget keeps "Left this month" and the plain hero', async (c) => {
+T('EM11c', 'CORNER', 'over budget in a past month says "Over budget in October 2026"; under budget says "Spent this month" (the design: the hero is what was spent, the limit is in the panel) and the plain hero', async (c) => {
   const past = await c.open({ budget: BASE({ overall: '1000', expenses: [exp('2026-10-03', '1500')] }) })
   await past.page.getByRole('button', { name: 'Previous month' }).click()
   eq(await past.page.locator('.budget__sum .result__label').innerText(), 'Over budget in October 2026')
   const { page } = await c.open({ budget: BASE({ overall: '1000', expenses: [exp('2026-11-03', '400')] }) })
-  eq(await page.locator('.budget__sum .result__label').innerText(), 'Left this month')
+  eq(await page.locator('.budget__sum .result__label').innerText(), 'Spent this month')
   eq(await page.locator('.budget__hero').first().getAttribute('class'), 'budget__hero')
 })
 T('EM12', 'CORNER', 'month arrows on an empty app do not break (10 quick taps each way)', async (c) => {
@@ -767,7 +768,7 @@ T('ST11', 'UX', 'switching an entry from Card bill to Spending shows category an
 })
 T('ST12', 'UX', 'deleting a bill payment brings the card\'s Owes back up; Undo puts it back', async (c) => {
   const { page } = await c.open({ budget: SETT() })
-  await page.getByRole('button', { name: /^Delete ₹2,000 Card bill/ }).click()
+  await page.getByRole('button', { name: /^Edit ₹2,000 Card bill/ }).click(); await S(page).getByRole('button', { name: 'Delete this expense' }).click()
   await toManage(page); has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Owes ₹5,700')
   await MAN(page).getByRole('button', { name: /back/i }).first().click()
   await page.locator('.snack').getByRole('button', { name: 'Undo' }).click()

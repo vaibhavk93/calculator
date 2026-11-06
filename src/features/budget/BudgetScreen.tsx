@@ -212,7 +212,7 @@ export function BudgetScreen() {
       )}
       <div className="budget__seg">
         <Segmented<View>
-          label="Show"
+          label="Budget view"
           value={view}
           onChange={setView}
           options={[{ value: 'spending', label: 'Spending' }, { value: 'networth', label: 'Net worth' }]}
