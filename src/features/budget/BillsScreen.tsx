@@ -6,10 +6,10 @@ import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { tintStyle } from '../../components/tint'
 import { D } from '../../engine'
-import { BILL_REPEATS, type BillRepeat, type RecurringItem } from '../../lib/budget'
-import { billTotals, billWords, liveBills, validateBill } from '../../lib/recurring'
+import { BILL_REPEATS, cleanPaymentCount, type BillRepeat, type RecurringItem } from '../../lib/budget'
+import { billTotals, billWords, lastPaymentAt, liveBills, paymentsLeftText, validateBill } from '../../lib/recurring'
 import { dueLabel } from '../../lib/reminders'
-import { dayText, shortDate } from '../../lib/tasks'
+import { dayText, parseDay, shortDate } from '../../lib/tasks'
 import { Segmented } from '../settings/controls'
 import { GuardedFooter, MoneyInput, focusField, useDiscardGuard } from './formKit'
 import { ExpenseSheet } from './sheets'
@@ -41,7 +41,7 @@ export function BillsScreen({ onBack }: { onBack: () => void }) {
   const dueText = (i: RecurringItem) => {
     const at = nextOf(i)
     if (i.paused) return 'Paused: no reminder and no new entries'
-    return at === undefined ? 'No reminder is set. Tap Resume to turn it on' : `Next due ${shortDate(at)} · ${dueLabel(at, now)}`
+    return at === undefined ? 'No reminder is set. Tap Resume to turn it on' : `Next due ${shortDate(at)} · ${dueLabel(at, now)}${i.remaining !== undefined ? ` · ${paymentsLeftText(i.remaining)}` : ''}`
   }
   // Card bill reminders have no detail sheet of their own (their day is set from Categories and cards), so
   // their Pause/Resume/Stop stay here, on the row. Regular bills open BillSheet on tap, so theirs moved there
@@ -141,18 +141,25 @@ function BillSheet({ id, onClose }: { id: string; onClose: () => void }) {
   const item = liveBills(budget).find((i) => i.id === id)
   const rem = item ? reminders.find((r) => r.cardId === item.cardId) : undefined
   const showDate = !!item && !item.paused && rem !== undefined
-  const [start] = useState(() => ({ title: item?.title ?? '', amount: item?.amount ?? '', repeat: (item?.repeat ?? 'monthly') as BillRepeat, date: rem ? dayText(rem.dueAt) : '' }))
+  const [start] = useState(() => ({ title: item?.title ?? '', amount: item?.amount ?? '', repeat: (item?.repeat ?? 'monthly') as BillRepeat, date: rem ? dayText(rem.dueAt) : '', left: item?.remaining === undefined ? '' : String(item.remaining) }))
   const [title, setTitle] = useState(start.title)
   const [amount, setAmount] = useState(start.amount)
   const [repeat, setRepeat] = useState(start.repeat)
   const [date, setDate] = useState(start.date)
+  const [left, setLeft] = useState(start.left)
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [submitted, setSubmitted] = useState(false)
   const [storeError, setStoreError] = useState<string | null>(null)
-  const guard = useDiscardGuard(title !== start.title || amount !== start.amount || repeat !== start.repeat || date !== start.date, onClose)
+  const guard = useDiscardGuard(title !== start.title || amount !== start.amount || repeat !== start.repeat || date !== start.date || left !== start.left, onClose)
   if (!item) return null
 
   const errors = validateBill({ title, amount, date: showDate ? date : null })
+  const leftCount = cleanPaymentCount(left)
+  const leftError = leftCount === undefined ? 'Use a whole number from 1 to 600, or leave it empty' : undefined
+  // The date the count runs out: from the next due date shown here, so changing the date or the count changes it.
+  const nextTs = showDate ? parseDay(date) : (item.pausedDue ?? null)
+  const anchor = nextTs === null ? null : showDate && rem && date === start.date ? rem.anchorDay : new Date(nextTs).getDate()
+  const lastText = typeof leftCount === 'number' && nextTs !== null && anchor !== null ? `Last payment on ${shortDate(lastPaymentAt(nextTs, repeat, anchor, leftCount))}` : null
   const shown = (f: 'title' | 'amount' | 'date') => (submitted || touched[f] ? errors[f] : undefined)
   const touch = (f: string) => () => setTouched((t) => ({ ...t, [f]: true }))
   const aria = (f: 'title' | 'amount' | 'date') => ({ 'aria-invalid': shown(f) ? (true as const) : undefined, 'aria-describedby': shown(f) ? `bill-${f}-msg` : undefined })
@@ -161,7 +168,8 @@ function BillSheet({ id, onClose }: { id: string; onClose: () => void }) {
     setSubmitted(true)
     const first = (['title', 'amount', 'date'] as const).find((f) => errors[f])
     if (first) return focusField(`bill-${first}`)
-    if (store.getState().updateBill(id, { title, amount, repeat, ...(showDate ? { date } : {}) })) return onClose()
+    if (leftError) return focusField('bill-left')
+    if (store.getState().updateBill(id, { title, amount, repeat, remaining: leftCount ?? null, ...(showDate ? { date } : {}) })) return onClose()
     setStoreError(store.getState().notice?.text ?? 'Could not save this bill')
   }
 
@@ -201,6 +209,9 @@ function BillSheet({ id, onClose }: { id: string; onClose: () => void }) {
           ) : (
             <p className="ffield__hint">{item.paused ? 'Resume the bill to pick its next due date.' : 'There is no reminder for this bill. Resume it to turn the reminder on.'}</p>
           )}
+          <FormField label="Payments left" htmlFor="bill-left" error={submitted || left !== start.left ? leftError : undefined} hint={lastText ?? 'Leave empty if it never ends'}>
+            <input id="bill-left" className="field field--mono" inputMode="numeric" value={left} autoComplete="off" onChange={(e) => setLeft(e.target.value.replace(/\D/g, '').slice(0, 3))} aria-invalid={leftError && left !== start.left ? true : undefined} aria-describedby="bill-left-msg" />
+          </FormField>
         </div>
         <div>
           {item.paused ? (
