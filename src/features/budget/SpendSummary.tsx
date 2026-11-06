@@ -127,7 +127,7 @@ export function limitWords(state: LimitState, left: Dec, limit: Dec, money: (v: 
 }
 
 /** One entry: tap the row to edit it, the trash to remove it (the snack bar offers Undo). A bill payment or transfer says it is not spending. */
-export function EntryRow({ e, onEdit, select }: { e: BudgetExpense; onEdit: (id: string) => void; /** Set while picking several entries: the row becomes a tick box (a card bill or transfer has no category, so it cannot be ticked). */ select?: { checked: boolean; onToggle: () => void } }) {
+export function EntryRow({ e, onEdit, select, plain }: { e: BudgetExpense; onEdit: (id: string) => void; /** Budget home's plain row: signed amount on the right, no delete button. */ plain?: boolean; /** Set while picking several entries: the row becomes a tick box (a card bill or transfer has no category, so it cannot be ticked). */ select?: { checked: boolean; onToggle: () => void } }) {
   const budget = useApp((s) => s.budget)
   const remove = useApp((s) => s.deleteExpense)
   const money = useMoney()
@@ -139,6 +139,22 @@ export function EntryRow({ e, onEdit, select }: { e: BudgetExpense; onEdit: (id:
   const how = [e.mode ? modeLabel(e.mode) : '', inst ? instrumentLabel(inst) : ''].filter(Boolean).join(' · ')
   const hint = [refund ? 'Refund' : '', income ? 'Came in' : '', shortDate(e.date), how, e.settlement ? 'Not counted as spending' : '', e.note].filter(Boolean).join(' · ')
   const spoken = `${refund ? 'refund of ' : ''}${money(amount)} ${name}${e.settlement ? ', not counted as spending' : ''}`
+  if (plain) {
+    // Budget home's "Recent entries": what it was on the left, the signed amount on the right, no delete (that is in the sheet).
+    // Money in is the only green figure, and its meta line says "Money in" too, so colour is never the only signal.
+    const title = e.note || name
+    const meta = [e.note || income ? name : '', refund ? 'Refund' : '', shortDate(e.date), how, e.settlement ? 'Not counted as spending' : ''].filter(Boolean).join(' · ')
+    const sign = e.settlement ? '' : income || refund ? '+' : '−'
+    return (
+      <button type="button" className="budget__recent tap-row" aria-label={`Edit ${spoken}`} onClick={() => onEdit(e.id)}>
+        <span className="row__text">
+          <span className="row__label">{title}</span>
+          <span className="row__hint">{meta}</span>
+        </span>
+        <span className={income ? 'budget__amt budget__amt--in' : 'budget__amt'}>{sign}{money(amount)}</span>
+      </button>
+    )
+  }
   if (select && (e.settlement || income)) {
     return (
       <div className="budget__entry budget__entry--off">

@@ -4,6 +4,9 @@ export type IconName =
   | 'down'
   | 'budget'
   | 'history'
+  | 'clock'
+  | 'eye'
+  | 'eyeOff'
   | 'menu'
   | 'more'
   | 'up'
@@ -45,6 +48,25 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M3 12a9 9 0 1 0 2.6-6.4" />
       <path d="M3 4v5h5" />
       <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3.5 2" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  eyeOff: (
+    <>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M4 4l16 16" />
     </>
   ),
   menu: <path d="M4 7h16M4 12h16M4 17h10" />,
