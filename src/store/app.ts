@@ -46,7 +46,7 @@ import {
 import { capHistory, isRawExpression, sanitizeSettings } from './persistence'
 import { startTab, tabOn } from '../lib/modules'
 import { MAX_HOLDINGS, cleanHoldingAmount, cleanHoldingName, validateHolding, validateHoldingAmount, validateValueDay, type Holding, type HoldingKind } from '../lib/portfolio'
-import { withValue } from '../engine/investments/portfolio'
+import { isHoldingKind, isLiability, withValue } from '../engine/investments/portfolio'
 import { dayText } from '../lib/tasks'
 import type { Values } from '../lib/tool'
 import {
@@ -233,6 +233,8 @@ export interface AppState {
   /** A new dated value for a holding. A value on a day that already has one REPLACES it. History is never edited any other way. */
   updateHoldingValue: (id: string, d: { amount: string; date: string }) => boolean
   renameHolding: (id: string, name: string) => boolean
+  /** Moves a holding to another kind on the same side (own to own, owe to owe), so net worth never flips sign. */
+  setHoldingKind: (id: string, kind: HoldingKind) => boolean
   /** Moves a holding to Trash (it comes back with Undo, and is emptied after TRASH_DAYS). */
   deleteHolding: (id: string) => void
   /** Adds a card, account or wallet. Returns its id, or the existing one with the same name and kind. Null (with a notice) when not valid. */
@@ -1023,6 +1025,14 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         if (first) return fail(first)
         const values = withValue(h.values, { date: d.date, amount: cleanHoldingAmount(d.amount) })
         set({ portfolio: portfolio.map((x) => (x.id === id ? { ...x, values } : x)), notice: null })
+        return true
+      },
+
+      setHoldingKind: (id, kind) => {
+        const { portfolio } = get()
+        const h = portfolio.find((x) => x.id === id && x.deletedAt === null)
+        if (!h || !isHoldingKind(kind) || isLiability(kind) !== isLiability(h.kind)) return fail('Pick another kind on the same side')
+        set({ portfolio: portfolio.map((x) => (x.id === id ? { ...x, kind } : x)), notice: null })
         return true
       },
 

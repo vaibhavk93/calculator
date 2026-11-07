@@ -9,6 +9,7 @@ import { tintStyle } from '../../components/tint'
 import { D, type Dec } from '../../engine'
 import {
   ASSET_KINDS,
+  isLegacyKind,
   HOLDING_KINDS,
   LIABILITY_KINDS,
   countedHoldings,
@@ -32,8 +33,9 @@ const HIDDEN = '••••'
 const MONTH = new Intl.DateTimeFormat(DATE_LOCALE, { month: 'short' })
 type SheetState = null | { kind: 'add' } | { kind: 'edit'; id: string }
 
+/** The kinds the form offers: the old bundled groups stay valid for saved data but are not offered for new holdings. */
 const KIND_OPTIONS: PickOption[] = [
-  ...ASSET_KINDS.map((k) => ({ value: k, label: KIND_ONE[k], group: 'I own this' })),
+  ...ASSET_KINDS.filter((k) => !isLegacyKind(k)).map((k) => ({ value: k, label: KIND_ONE[k], group: 'I own this' })),
   ...LIABILITY_KINDS.map((k) => ({ value: k, label: KIND_ONE[k], group: 'I owe this' })),
 ]
 
@@ -263,10 +265,11 @@ function UpdateSheet({ id, onClose }: { id: string; onClose: () => void }) {
   const [amount, setAmount] = useState(start.amount)
   const [date, setDate] = useState(today)
   const [name, setName] = useState(start.name)
+  const [kind, setKind] = useState<string>(holding?.kind ?? '')
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [submitted, setSubmitted] = useState(false)
   const [storeError, setStoreError] = useState<string | null>(null)
-  const guard = useDiscardGuard(amount !== start.amount || date !== today || name !== start.name, onClose)
+  const guard = useDiscardGuard(amount !== start.amount || date !== today || name !== start.name || kind !== holding?.kind, onClose)
   if (!holding || !last) return null
 
   const errors = validateHolding({ name, kind: holding.kind, amount, date }, today)
@@ -274,6 +277,8 @@ function UpdateSheet({ id, onClose }: { id: string; onClose: () => void }) {
   const touch = (f: string) => () => setTouched((t) => ({ ...t, [f]: true }))
   const aria = (f: 'name' | 'amount' | 'date') => ({ 'aria-invalid': shownErr(f) ? (true as const) : undefined, 'aria-describedby': shownErr(f) ? `pfu-${f}-msg` : undefined })
   const replaces = holding.values.some((v) => v.date === date)
+  // Same side only (own to own, owe to owe), so net worth never flips sign. The current kind stays listed even if it is an old group.
+  const sameSide = KIND_OPTIONS.filter((o) => isLiability(o.value as HoldingKind) === isLiability(holding.kind)).concat(isLegacyKind(holding.kind) ? [{ value: holding.kind, label: KIND_ONE[holding.kind], group: 'I own this' }] : [])
 
   const save = () => {
     setSubmitted(true)
@@ -281,6 +286,7 @@ function UpdateSheet({ id, onClose }: { id: string; onClose: () => void }) {
     if (first) return focusField(`pfu-${first}`)
     const s = store.getState()
     if (cleanHoldingName(name) !== holding.name && !s.renameHolding(id, name)) return setStoreError(store.getState().notice?.text ?? 'Could not rename this')
+    if (kind !== holding.kind && !s.setHoldingKind(id, kind as HoldingKind)) return setStoreError(store.getState().notice?.text ?? 'Could not change the kind')
     if (s.updateHoldingValue(id, { amount, date })) return onClose()
     setStoreError(store.getState().notice?.text ?? 'Could not save this value')
   }
@@ -304,6 +310,9 @@ function UpdateSheet({ id, onClose }: { id: string; onClose: () => void }) {
           </FormField>
           <FormField label="As of" htmlFor="pfu-date" required error={shownErr('date')} hint={replaces ? 'This day already has a value. Saving replaces it' : 'The day this value is from'}>
             <input id="pfu-date" className="field field--mono field--date" type="date" max={today} aria-required="true" value={date} onChange={(e) => setDate(e.target.value)} onBlur={touch('date')} {...aria('date')} />
+          </FormField>
+          <FormField label="Kind" htmlFor="pfu-kind" hint={isLegacyKind(holding.kind) ? 'This is an old group. Pick the exact kind' : undefined}>
+            <PickerSelect id="pfu-kind" label="Kind" title="What kind is it?" value={kind} options={sameSide} onChange={setKind} />
           </FormField>
           <FormField label="Name" htmlFor="pfu-name" required error={shownErr('name')}>
             <input id="pfu-name" className="field" value={name} maxLength={60} autoComplete="off" aria-required="true" onChange={(e) => setName(e.target.value)} onBlur={touch('name')} {...aria('name')} />

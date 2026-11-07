@@ -308,3 +308,33 @@ const dateToday = () => {
   const n = new Date()
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
 }
+
+describe('Holding kinds: stocks, funds, REITs, bonds, SGB, NPS, EPF, PPF', () => {
+  const NEW_KINDS = ['stocks', 'mutual_funds', 'reits', 'bonds', 'sgb', 'nps', 'epf', 'ppf'] as const
+
+  it('every new kind can be added', () => {
+    const { get } = setup()
+    for (const kind of NEW_KINDS) expect(get().addHolding({ name: kind, kind, amount: '1000', date: TODAY })).toBe(true)
+    expect(get().portfolio.map((x) => x.kind)).toEqual([...NEW_KINDS])
+  })
+
+  it('the two old bundled kinds still load from saved data and a backup', () => {
+    const old = [h('mf', [['2026-11-01', '500']], { kind: 'stocks_mf' }), h('pf', [['2026-11-01', '700']], { kind: 'retirement' })]
+    expect(sanitizePortfolio(old).map((x) => x.kind)).toEqual(['stocks_mf', 'retirement'])
+    expect(netWorth(old).toString()).toBe('1200')
+  })
+
+  it('an old group can be moved to an exact kind, and the value stays', () => {
+    const { get } = setup([h('pf', [['2026-11-01', '700']], { kind: 'retirement' })])
+    expect(get().setHoldingKind('pf', 'ppf')).toBe(true)
+    expect(get().portfolio[0]).toMatchObject({ kind: 'ppf', values: [{ date: '2026-11-01', amount: '700' }] })
+  })
+
+  it('a move cannot cross from own to owe (net worth must not flip sign)', () => {
+    const { get } = setup([h('a', [['2026-11-01', '700']], { kind: 'bonds' }), h('l', [['2026-11-01', '90']], { kind: 'loan' })])
+    expect(get().setHoldingKind('a', 'loan')).toBe(false)
+    expect(get().setHoldingKind('l', 'bonds')).toBe(false)
+    expect(get().setHoldingKind('a', 'not-a-kind' as never)).toBe(false)
+    expect(get().portfolio.map((x) => x.kind)).toEqual(['bonds', 'loan'])
+  })
+})

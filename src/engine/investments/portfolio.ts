@@ -8,7 +8,9 @@ import { D, type Dec } from '../decimal'
  * Dates are 'YYYY-MM-DD' strings (compared as text, so no time zone can move a day).
  */
 
-export const ASSET_KINDS = ['bank', 'fd_rd', 'stocks_mf', 'gold', 'property', 'retirement', 'other'] as const
+/** Old bundled groups. Still valid so saved data and backups load; the add form no longer offers them. */
+export const LEGACY_KINDS = ['stocks_mf', 'retirement'] as const
+export const ASSET_KINDS = ['bank', 'fd_rd', 'stocks', 'mutual_funds', 'reits', 'bonds', 'sgb', 'gold', 'property', 'nps', 'epf', 'ppf', 'other', ...LEGACY_KINDS] as const
 export const LIABILITY_KINDS = ['loan', 'card_debt'] as const
 export const HOLDING_KINDS = [...ASSET_KINDS, ...LIABILITY_KINDS] as const
 export type HoldingKind = (typeof HOLDING_KINDS)[number]
@@ -32,6 +34,7 @@ export const MAX_VALUES = 120
 export const STALE_DAYS = 30
 
 export const isHoldingKind = (v: unknown): v is HoldingKind => typeof v === 'string' && (HOLDING_KINDS as readonly string[]).includes(v)
+export const isLegacyKind = (kind: HoldingKind): boolean => (LEGACY_KINDS as readonly string[]).includes(kind)
 export const isLiability = (kind: HoldingKind): boolean => (LIABILITY_KINDS as readonly string[]).includes(kind)
 
 /** A positive-or-zero plain number: the same shape as persistence's PLAIN_NUMBER, without the minus sign. */
