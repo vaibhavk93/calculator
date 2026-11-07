@@ -881,6 +881,24 @@ button.heat__cell:active {
   margin: var(--s-2) var(--s-4) 0;
 }
 
+.networth__cat {
+  margin-top: var(--s-4);
+}
+
+.networth__cathead {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 0 var(--s-4) var(--s-2);
+}
+
+.networth__catname {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
 .networth__row {
   display: flex;
   flex-wrap: wrap;

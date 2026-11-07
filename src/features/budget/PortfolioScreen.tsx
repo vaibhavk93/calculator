@@ -10,7 +10,6 @@ import { D, type Dec } from '../../engine'
 import {
   ASSET_KINDS,
   isLegacyKind,
-  HOLDING_KINDS,
   LIABILITY_KINDS,
   countedHoldings,
   isLiability,
@@ -41,7 +40,8 @@ const KIND_OPTIONS: PickOption[] = [
 
 const pctOf = (part: Dec, whole: Dec): number => (whole.isZero() ? 0 : part.div(whole).times(100).toNumber())
 /** Each kind's mark: one of the eight section inks. Identity only, never good or bad, and always next to its name. */
-const kindMark = (k: HoldingKind): CSSProperties => ({ background: `var(--tint-${(HOLDING_KINDS.indexOf(k) % 8) + 1}-ink)` })
+/** `order` is the kinds on screen right now, so two kinds the user really has never share an ink (there are 15 kinds but 8 inks). */
+const kindMark = (k: HoldingKind, order: readonly HoldingKind[]): CSSProperties => ({ background: `var(--tint-${(Math.max(0, order.indexOf(k)) % 8) + 1}-ink)` })
 
 /**
  * Net worth, inside Budget home (the "Net worth" side of its switch). A list of what you own and what you owe, each with
@@ -84,6 +84,7 @@ export function PortfolioView({ hidden }: { hidden: boolean }) {
   const oldest = oldestAsOf(live)
   const split = splitByKind(live)
   const names = new Map(live.map((h) => [h.id, h.name]))
+  const order = split.map((r) => r.kind)
   const months = monthlySeries(live, today).filter((m) => m.included > 0)
   const peak = months.reduce((a, m) => (m.total.abs().gt(a) ? m.total.abs() : a), new D(0))
   const holdings = [...live].sort((a, b) => (latestValue(b)?.date ?? '').localeCompare(latestValue(a)?.date ?? '') || a.name.localeCompare(b.name))
@@ -99,13 +100,13 @@ export function PortfolioView({ hidden }: { hidden: boolean }) {
         <span className="budget__note">{title}</span>
         {!hidden && (
           <div className="networth__split" aria-hidden="true">
-            {rows.map((r) => <span key={r.kind} style={{ ...kindMark(r.kind), width: `${pctOf(r.total, whole)}%` }} />)}
+            {rows.map((r) => <span key={r.kind} style={{ ...kindMark(r.kind, order), width: `${pctOf(r.total, whole)}%` }} />)}
           </div>
         )}
         <ul className="networth__legend">
           {rows.map((r) => (
             <li key={r.kind}>
-              <span className="networth__dot" style={kindMark(r.kind)} aria-hidden="true" />
+              <span className="networth__dot" style={kindMark(r.kind, order)} aria-hidden="true" />
               <span className="networth__kind">{KIND_LABEL[r.kind]}{hidden ? '' : ` · ${Math.round(pctOf(r.total, whole))}%`}</span>
               <span className="budget__amt">{shown(r.total)}</span>
             </li>
@@ -163,11 +164,21 @@ export function PortfolioView({ hidden }: { hidden: boolean }) {
       )}
 
       <h2 className="group__title">Holdings · tap to update</h2>
-      <div className="group" aria-label="Holdings">
-        {holdings.map((h) => (
-          <HoldingRow key={h.id} h={h} today={today} shown={shown} onOpen={() => setSheet({ kind: 'edit', id: h.id })} />
-        ))}
-      </div>
+      {/* By category (what you own first, then what you owe): the category's total, then each holding by name. */}
+      {split.map((r) => (
+        <section key={r.kind} className="networth__cat" aria-label={KIND_LABEL[r.kind]}>
+          <div className="networth__cathead">
+            <span className="networth__dot" style={kindMark(r.kind, order)} aria-hidden="true" />
+            <h3 className="networth__catname">{KIND_LABEL[r.kind]} · {holdings.filter((h) => h.kind === r.kind).length}</h3>
+            <span className="budget__amt">{r.liability && !hidden ? `−${shown(r.total)}` : shown(r.total)}</span>
+          </div>
+          <div className="group">
+            {holdings.filter((h) => h.kind === r.kind).map((h) => (
+              <HoldingRow key={h.id} h={h} order={order} today={today} shown={shown} onOpen={() => setSheet({ kind: 'edit', id: h.id })} />
+            ))}
+          </div>
+        </section>
+      ))}
       <div className="budget__add">
         <button type="button" className="btn btn--primary" onClick={() => setSheet({ kind: 'add' })}>Add</button>
       </div>
@@ -176,7 +187,7 @@ export function PortfolioView({ hidden }: { hidden: boolean }) {
   )
 }
 
-function HoldingRow({ h, today, shown, onOpen }: { h: Holding; today: string; shown: (v: Dec) => string; onOpen: () => void }) {
+function HoldingRow({ h, order, today, shown, onOpen }: { h: Holding; order: readonly HoldingKind[]; today: string; shown: (v: Dec) => string; onOpen: () => void }) {
   const v = latestValue(h)
   if (!v) return null
   const old = isOld(v.date, today)
@@ -186,10 +197,10 @@ function HoldingRow({ h, today, shown, onOpen }: { h: Holding; today: string; sh
   const amount = shown(new D(v.amount))
   return (
     <button type="button" className="networth__row tap-row" aria-label={`Update value of ${h.name}. ${kind}. ${words}`} onClick={onOpen}>
-      <span className="networth__dot" style={kindMark(h.kind)} aria-hidden="true" />
+      <span className="networth__dot" style={kindMark(h.kind, order)} aria-hidden="true" />
       <span className="row__text">
         <span className="row__label">{h.name}</span>
-        <span className="row__hint networth__age">{old && <Icon name="clock" size={14} />}{kind} · {words}</span>
+        <span className="row__hint networth__age">{old && <Icon name="clock" size={14} />}{owe ? 'you owe this · ' : ''}{words}</span>
       </span>
       <span className="budget__amt">{owe && amount !== HIDDEN ? `−${amount}` : amount}</span>
     </button>
