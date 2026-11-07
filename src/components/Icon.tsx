@@ -5,6 +5,7 @@ export type IconName =
   | 'budget'
   | 'history'
   | 'clock'
+  | 'search'
   | 'wrench'
   | 'noteDoc'
   | 'eye'
@@ -58,6 +59,12 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M3 12a9 9 0 1 0 2.6-6.4" />
       <path d="M3 4v5h5" />
       <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16 16l4.5 4.5" />
     </>
   ),
   clock: (

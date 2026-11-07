@@ -42,6 +42,7 @@ function GroupPage({ group, onBack, onOpen }: { group: ToolGroup; onBack: () => 
         }
       />
       <div className="tools__search">
+        <Icon name="search" size={20} />
         <input
           className="field"
           type="search"
@@ -104,6 +105,7 @@ export function ToolsScreen() {
         </header>
       )}
       <div className="tools__search">
+        <Icon name="search" size={20} />
         <input
           className="field"
           type="search"

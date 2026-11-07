@@ -16,11 +16,23 @@
 
 .tools__search {
   flex: none;
-  padding: var(--s-2) var(--s-4) var(--s-1);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: var(--s-2) var(--s-4) var(--s-1);
+  padding: 0 var(--s-3);
+  background: var(--raised);
+  border-radius: var(--r-md);
+  color: var(--ink-2);
 }
 
+/* The design's search is one filled box with a magnifier; the field inside drops its underline. */
 .tools__search .field {
   min-height: 44px;
+  padding: 0;
+  border-bottom: 0;
+  background: none;
+  font-size: 0.9375rem;
 }
 
 /* One tappable line: a list row on Tools home, a group page or a search result. */
