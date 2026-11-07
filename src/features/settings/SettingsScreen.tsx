@@ -11,6 +11,7 @@ import { ACCENT_NAMES, ACCENTS } from '../../lib/theme'
 import { TABS, type CopyFormat, type Tab } from '../../store/types'
 import pkg from '../../../package.json'
 import { ALL_TOOLS } from '../tools/registry'
+import { RecentTools } from '../tools/RecentTools'
 import { GROUPS } from '../tools/groups'
 import { BackupScreen } from './BackupScreen'
 import { OptionRow, Row, Segmented, Toggle } from './controls'
@@ -256,7 +257,7 @@ export function SettingsScreen() {
 
         <Section title="Behaviour">
           <Row label="Opens on">
-            <PickerSelect label="Opens on" title="Open the app on" align="end" value={opensOn} onChange={chooseOpensOn} options={openOptions} />
+            <PickerSelect label="Opens on" title="Open the app on" align="end" value={opensOn} onChange={chooseOpensOn} options={openOptions} above={(pick) => <RecentTools onPick={(id) => pick(`tool:${id}`)} />} />
           </Row>
           <Row label="Vibrate on key press">
             <Toggle label="Vibrate on key press" checked={s.haptics} onChange={(haptics) => update({ haptics })} />

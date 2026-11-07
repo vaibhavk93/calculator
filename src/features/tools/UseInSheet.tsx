@@ -7,6 +7,7 @@ import { linkTargets } from '../../lib/toolLink'
 import { formatCell } from '../../lib/toolFormat'
 import type { Dec } from '../../engine'
 import { ALL_TOOLS } from './registry'
+import { RecentTools } from './RecentTools'
 import { prefillDraft } from './ToolScreen'
 
 /**
@@ -50,6 +51,8 @@ export function UseInSheet({ fromToolId, value, text, fmt, unit, label, onClose 
         targets.length === 0 ? (
           <p className="pick__hint">No other calculator has a box this fits.</p>
         ) : (
+          <>
+          <RecentTools only={(id) => targets.some((t) => t.toolId === id)} onPick={(id) => { setToolId(id); setFieldId(null); setMissing(false) }} />
           <div className="pick__list" role="listbox" aria-label="Calculators">
             {targets.map((t) => (
               <button key={t.toolId} type="button" role="option" aria-selected={false} className="pick__opt" onClick={() => { setToolId(t.toolId); setFieldId(null); setMissing(false) }}>
@@ -61,6 +64,7 @@ export function UseInSheet({ fromToolId, value, text, fmt, unit, label, onClose 
               </button>
             ))}
           </div>
+          </>
         )
       ) : (
         <>

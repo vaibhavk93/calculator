@@ -473,8 +473,8 @@ C('T-118', 'POS', 'Legacy saved card (old tenure pair, junk unit) opens from Sav
 C('T-120', 'POS', 'Your tools: pins first (max 3, a 4th is refused), then most used (5 shown), unknown ids ignored', async ({ page }) => {
   await tab(page, 'Tools'); await page.locator('.tools__search input').fill(''); await settle(page)
   const labels = await page.locator('.tools__list .navrow__label').allInnerTexts()
-  ok((await page.locator('h2.section-head', { hasText: 'Your tools' }).count()) === 1, 'no Your tools heading')
-  const yours = await page.locator('h2.section-head', { hasText: 'Your tools' }).locator('xpath=following-sibling::*[1]').locator('.tile__label').allInnerTexts()
+  ok((await page.locator('h2.section-head', { hasText: 'Recents' }).count()) === 1, 'no Your tools heading')
+  const yours = await page.locator('h2.section-head', { hasText: 'Recents' }).locator('xpath=following-sibling::*[1]').locator('.tile__label').allInnerTexts()
   eq(yours[0], 'GST', 'pinned first'); ok(yours.length === 5, 'Your tools has ' + yours.length + ': ' + yours.join(','))
   void labels
   await open(page, 'sip'); await page.getByRole('button', { name: /^Pin SIP/ }).click(); await settle(page)

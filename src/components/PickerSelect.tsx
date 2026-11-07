@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from './Icon'
 import { Sheet } from './Sheet'
@@ -35,6 +35,7 @@ export function PickerSelect({
   onAdd,
   validateAdd,
   addLabel = 'Add new',
+  above,
 }: {
   /** What this choice is, for screen readers and the sheet title when `title` is not given. */
   label: string
@@ -57,6 +58,8 @@ export function PickerSelect({
   validateAdd?: (name: string) => string | null
   /** What the last row is called when nothing is typed, such as "Add category". */
   addLabel?: string
+  /** Something shown directly under the search box while nothing is typed (Settings: the recent calculators). Gets `pick`, which chooses a value and closes the sheet. */
+  above?: (pick: (value: string) => void) => ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
@@ -123,6 +126,7 @@ export function PickerSelect({
           spellCheck={false}
         />
       )}
+      {!typed && above?.(pick)}
       <div className="pick__list" role="listbox" aria-label={label}>
         {shown.length === 0 && !onAdd && <p className="note">Nothing matches &ldquo;{q}&rdquo;.</p>}
         {shown.map((o, i) => (

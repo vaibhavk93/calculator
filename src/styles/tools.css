@@ -54,7 +54,7 @@
   flex: none;
   max-width: 45%;
   font-size: 0.8125rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-align: right;
 }
 
@@ -159,7 +159,7 @@
 
 .tools__none {
   margin: var(--s-5) var(--s-4);
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-size: 0.9375rem;
 }
 
@@ -186,7 +186,7 @@
 
 .field-hint {
   font-size: 0.8125rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .tool__form .field-hint {
@@ -209,7 +209,7 @@
 .field-words {
   font-family: var(--font-mono);
   font-size: 0.8125rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .tool__form .field,
@@ -290,7 +290,7 @@
 
 .field-unit {
   flex: none;
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-family: var(--font-mono);
 }
 
@@ -350,18 +350,32 @@
   flex: 1 1 0;
 }
 
-/* Four or more columns do not fit side by side at 360px: two per line, the remove button beside both lines. */
+/* Four or more columns do not fit side by side at 360px: the cells fill a grid as many to a line as fit (two on a phone,
+   one at a large font), the remove button beside the whole block. */
 .rows__row--wrap {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: var(--s-3);
 }
 
-.rows__row--wrap > .icon-btn {
-  grid-column: 3;
-  grid-row: 1 / span 2;
-  align-self: center;
+.rows__cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+  align-items: end;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+/* A date in a narrow cell: a little smaller, and the picker icon closer, so the whole year shows ("10/01/2024"). */
+.rows__cell .field--date {
+  font-size: 0.875rem;
+}
+
+.rows__cell .field--date::-webkit-calendar-picker-indicator {
+  margin: 0;
+  padding: 0;
+  width: 1rem;
 }
 
 .rows__row--wrap + .rows__row--wrap {
@@ -485,8 +499,8 @@
   white-space: nowrap;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 2rem;
-  font-weight: 400;
+  font-size: 2.5rem;
+  font-weight: 500;
   line-height: 1.1;
   /* A scrolling box clips glyphs taller than its line box: pad them back in, and cancel the padding in the layout. */
   padding-block: 0.1em;
@@ -583,7 +597,7 @@
 
 .result__error {
   padding: var(--s-4);
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .result__sub {
@@ -737,7 +751,7 @@
 .save__sum {
   margin: 0;
   font-size: 0.8125rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
   overflow-wrap: anywhere;
 }
 
@@ -834,6 +848,7 @@ textarea.field {
 
 .saved__add {
   flex: none;
+  height: 40px;
   gap: var(--s-2);
   margin-left: auto;
 }
@@ -1244,6 +1259,61 @@ textarea.field {
   overflow-wrap: anywhere;
 }
 
+/* Tools home: the eight groups as a 2-column grid of flat tiles (owner decision 2026-11-07; design reference
+   ToolsHomeGrid). Columns drop to one when the text is large, so a group name never clips. The tint is only the icon stroke. */
+.gtiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: var(--s-2);
+  padding: 0 var(--s-4);
+}
+
+.gtile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--s-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--ink);
+  text-align: left;
+}
+
+.gtile:active {
+  background: var(--key-op-pressed);
+}
+
+.gtile__icon {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  background: var(--raised);
+  border-radius: var(--r-md);
+  color: var(--tint-ink);
+}
+
+.gtile__icon > .icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.gtile__name {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.gtile__count {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+
 /* A titled section: a small heading over hairline rows, no card and no wash (docs/THE-PLAN.md Block B8, the
    three tiers in docs/DESIGN-SYSTEM.md). Same look as .group__title + .group, for markup that has a body and
    non-row content (charts, notes, buttons) inside. */
@@ -1386,7 +1456,7 @@ textarea.field {
 
 .rowcard__cell dt {
   font-size: 0.75rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .rowcard__cell dd {
@@ -1460,7 +1530,7 @@ textarea.field {
 .rows__hint {
   margin: 0 0 var(--s-2);
   font-size: 0.8125rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 /* ---------------------------------------------------------------- keep and share */
@@ -1579,3 +1649,18 @@ textarea.field {
   color: var(--ink-2);
 }
 
+
+/* "More" as a word, like the design reference: easier to find than three dots. Still 44px high. */
+.due__more {
+  width: auto;
+  padding: 0 var(--s-2);
+  font-size: 0.9375rem;
+  color: var(--ink-2);
+}
+
+/* A group page's title: the group's dot, then its name. */
+.screen__title--dot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}

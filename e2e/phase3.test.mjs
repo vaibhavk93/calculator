@@ -40,7 +40,7 @@ try {
       await close()
       const late = await openApp(app, { theme: 'dark', font, now: APR2 })
       await openTool(late.page, 'ppf', 'Public Provident Fund')
-      check(`PPF after the quarter: "may have changed"${tag}`, (await checked(late.page)).some((t) => /may have changed since 2 Nov 2026\. Check the official source\./.test(t)), (await checked(late.page)).join('|'))
+      check(`PPF after the quarter: "may have changed"${tag}`, (await checked(late.page)).some((t) => /may have changed since 6 Nov 2026\. Check the official source\./.test(t)), (await checked(late.page)).join('|'))
       await late.close()
     }
 
@@ -134,7 +134,7 @@ try {
       await page.getByRole('button', { name: 'Back' }).click(); await settle(page)
       await page.locator('.tools__search input').fill('')
       await settle(page)
-      check(`Tools: "Your tools" lists Loan EMI after two opens${tag}`, (await page.locator('h2.section-head', { hasText: 'Your tools' }).count()) === 1 && (await page.locator('.tools__list .tile__label', { hasText: 'Loan EMI' }).count()) === 1)
+      check(`Tools: "Your tools" lists Loan EMI after two opens${tag}`, (await page.locator('h2.section-head', { hasText: 'Recents' }).count()) === 1 && (await page.locator('.tools__list .tile__label', { hasText: 'Loan EMI' }).count()) === 1)
       await shot(page, `8-your-tools${font}`)
       await noScroll(page, `Your tools${tag}`)
       check(`Tools: no console errors${tag}`, errors.length === 0, errors.join('|'))
