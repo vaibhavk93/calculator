@@ -5,9 +5,9 @@ import type { Tab } from '../store/types'
 
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'calculate', label: 'Calculate', icon: 'calculate' },
-  { id: 'tools', label: 'Tools', icon: 'tools' },
-  { id: 'saved', label: 'Notes', icon: 'saved' },
-  { id: 'due', label: 'Due', icon: 'due' },
+  { id: 'tools', label: 'Tools', icon: 'wrench' },
+  { id: 'saved', label: 'Notes', icon: 'noteDoc' },
+  { id: 'due', label: 'Due', icon: 'clock' },
   { id: 'budget', label: 'Budget', icon: 'budget' },
 ]
 

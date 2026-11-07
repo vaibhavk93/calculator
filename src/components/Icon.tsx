@@ -5,6 +5,8 @@ export type IconName =
   | 'budget'
   | 'history'
   | 'clock'
+  | 'wrench'
+  | 'noteDoc'
   | 'eye'
   | 'eyeOff'
   | 'menu'
@@ -105,6 +107,13 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   tools: <path d="M4 6h16M4 12h16M4 18h16" />,
+  wrench: <path d="M14.7 6.3a4 4 0 0 0-5.6 5.6L4 17l3 3 5.1-5.1a4 4 0 0 0 5.6-5.6l-2.3 2.3-2-2 2.3-2.3Z" />,
+  noteDoc: (
+    <>
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M8.5 8h7M8.5 12h7M8.5 16h4" />
+    </>
+  ),
   saved: <path d="M5 4.5h14v16l-7-4.2-7 4.2z" />,
   due: (
     <>

@@ -437,6 +437,8 @@ for (const [theme, font] of [['dark', 100], ['light', 100], ['dark', 200], ['lig
 
     await tab(page, 'Calc')
     await page.locator('[aria-label="Settings"]').click()
+    // Export notes lives on the Backup and export page since the Settings redesign.
+    await page.getByText('Backup and export', { exact: true }).click()
     await page.getByText('Export notes', { exact: true }).scrollIntoViewIfNeeded()
     await shot(page, `look-${tag}-8-settings-export`)
   }, { data: BUSY(theme), font })

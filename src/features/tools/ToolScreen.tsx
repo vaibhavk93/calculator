@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useFitText } from '../calculator/useFitText'
 import { Icon } from '../../components/Icon'
 import { PickerSelect } from '../../components/PickerSelect'
@@ -215,12 +215,15 @@ function FieldRow({ field: base, values, set, invalid, chips }: { field: Field; 
         {field.hint && <p className="rows__hint">{field.hint}</p>}
         {rows.map((row, r) => (
           <div className={field.columns.length > 3 ? 'rows__row rows__row--wrap' : 'rows__row'} key={r}>
-            {field.columns.map((col, c) => (
-              <label className="rows__cell" key={col.id}>
-                <span className="rows__cap">{col.label}</span>
-                <Input field={col} value={row[c] ?? ''} onChange={(v) => setCell(r, c, v)} />
-              </label>
-            ))}
+            {/* Four or more columns sit in their own grid: as many per line as fit, so a date never has to squeeze. */}
+            {(field.columns.length > 3 ? (kids: ReactNode) => <div className="rows__cells">{kids}</div> : (kids: ReactNode) => kids)(
+              field.columns.map((col, c) => (
+                <label className="rows__cell" key={col.id}>
+                  <span className="rows__cap">{col.label}</span>
+                  <Input field={col} value={row[c] ?? ''} onChange={(v) => setCell(r, c, v)} />
+                </label>
+              )),
+            )}
             {rows.length > field.min && (
               <button type="button" className="icon-btn" aria-label={`Remove row ${r + 1}`} title={`Remove row ${r + 1}`} onClick={() => set(field.id, rows.filter((_, i) => i !== r))}>
                 <Icon name="close" size={18} />
@@ -426,7 +429,7 @@ function HeroNumber({ row, text }: { row: ResultRow; text: string }) {
   const ref = useRef<HTMLSpanElement>(null)
   // The sizes are rem so the headline follows the system font size; the hook works in px.
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
-  useFitText(ref, text, undefined, 2 * rem, rem)
+  useFitText(ref, text, undefined, 2.5 * rem, rem)
   return (
     <span ref={ref} className={`hero__value${row.tone ? ` result__value--${row.tone}` : ''}`}>
       {valueParts(row, text)}

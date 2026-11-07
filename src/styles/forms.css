@@ -10,7 +10,7 @@
 }
 
 .screen__title {
-  font-size: 1.125rem;
+  font-size: 1.3rem;
   font-weight: 700;
 }
 
@@ -94,7 +94,7 @@
 }
 
 .ffield__hint {
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 /* An error is words first; the colour only backs them up. */
@@ -111,7 +111,7 @@
 .ffield__legend {
   margin: 0 0 var(--s-1);
   font-size: 0.75rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 /* ------------------------------------------------------------------ picker */
@@ -140,7 +140,7 @@
 }
 
 .pick__value--empty {
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .pick .icon {
@@ -213,7 +213,7 @@
 
 .pick__hint {
   font-size: 0.8125rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .pick__opt .icon {

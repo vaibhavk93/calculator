@@ -20,7 +20,7 @@
 .budget__hero {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 2rem;
+  font-size: 2.5rem;
   font-weight: 500;
   color: var(--ink);
   /* One line, always. FitHero shrinks the size to fit; if even the smallest size is too wide it scrolls, it never wraps mid-number. */
@@ -541,7 +541,7 @@ button.heat__cell:active {
 
 .budget__entry--off .budget__main--pick {
   cursor: default;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .budget__tick {
@@ -622,24 +622,38 @@ button.heat__cell:active {
   padding: 0 var(--s-4) var(--s-2);
 }
 
-.budget__seg .seg {
+/* The pill switch: a surface tray with the chosen option filled with the accent. Budget's Spending / Net worth,
+   Notes' and Due's List / Card (design reference). The options are wide, so 36px tall is still a 44px+ target. */
+.budget__seg .seg,
+.saved__view .seg,
+.due__view .seg,
+.tool__form .unit-switch .seg {
   flex-wrap: nowrap;
   gap: 0;
   padding: var(--s-1);
-  background: var(--surface);
+  background: var(--raised);
   border-radius: var(--r-md);
+  border-bottom: 0;
 }
 
-.budget__seg .seg__opt {
+.budget__seg .seg__opt,
+.saved__view .seg__opt,
+.due__view .seg__opt,
+.tool__form .unit-switch .seg__opt {
+  margin-bottom: 0;
   flex: 1 1 0;
   min-width: 0;
+  min-height: 36px;
   padding: var(--s-1) var(--s-2);
   border-bottom: 0;
   border-radius: var(--r-sm);
   overflow-wrap: anywhere;
 }
 
-.budget__seg .seg__opt[aria-checked='true'] {
+.budget__seg .seg__opt[aria-checked='true'],
+.saved__view .seg__opt[aria-checked='true'],
+.due__view .seg__opt[aria-checked='true'],
+.tool__form .unit-switch .seg__opt[aria-checked='true'] {
   background: var(--accent-fill);
   color: var(--accent-ink);
   font-weight: 600;

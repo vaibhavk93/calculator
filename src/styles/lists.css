@@ -75,7 +75,7 @@
   padding: 0 var(--s-4) var(--s-2);
   text-align: right;
   font-size: 0.8125rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .tick-wrap {
@@ -87,7 +87,7 @@
 }
 
 .tape__line--done .tape__edit {
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .tape__tools {
@@ -363,7 +363,7 @@
 
 .todo__row--done .row__label {
   text-decoration: line-through;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .todo__donehead {
@@ -439,19 +439,19 @@
 }
 
 .tri[data-state='skip'] {
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-decoration: line-through;
 }
 
 .tape__line--skip .tape__label,
 .tape__line--skip .tape__amt {
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-decoration: line-through;
 }
 
 .tape__line--done .tape__name,
 .tape__line--done .tape__amt {
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 /* A line's name renames it in place; its amount edits it in the bar below. */
@@ -481,7 +481,7 @@
 .tape__skipword {
   flex: none;
   font-size: 0.8125rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .tape__amt {

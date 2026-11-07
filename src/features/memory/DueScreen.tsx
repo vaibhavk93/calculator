@@ -106,8 +106,8 @@ export function DueScreen() {
               </button>
             )
             const moreBtn = (
-              <button type="button" className="icon-btn" aria-label={`More for ${card.title}`} title={`More for ${card.title}`} onClick={() => setMoreId(r.id)}>
-                <Icon name="more" size={20} />
+              <button type="button" className="icon-btn due__more" aria-label={`More for ${card.title}`} title={`More for ${card.title}`} onClick={() => setMoreId(r.id)}>
+                More
               </button>
             )
             const ask = askId === r.id && (

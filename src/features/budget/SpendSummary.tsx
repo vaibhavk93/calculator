@@ -76,7 +76,7 @@ export function FitHero({ text, negative }: { text: string; negative?: boolean }
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  useFitText(ref, `${text}|${width}`, undefined, rem * 2, rem)
+  useFitText(ref, `${text}|${width}`, undefined, rem * 2.5, rem)
   return <span ref={ref} className={negative ? 'budget__hero budget__hero--negative' : 'budget__hero'}>{text}</span>
 }
 
