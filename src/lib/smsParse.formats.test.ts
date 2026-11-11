@@ -49,6 +49,11 @@ const OUT: Row[] = [
   ['ICICI card, payee after the date and "on"', 'VM-ICICIB', 'INR 799.00 spent using ICICI Bank Card XX4321 on 05-Nov-26 on AMAZON. Avl Limit: INR 90,000.00. If not you, call 18002662', { amount: '799.00', last4: '4321', merchant: 'Amazon' }],
   ['ICICI debit-card ATM', 'VM-ICICIB', 'Dear Customer, Rs 5,000.00 withdrawn using ICICI Bank Debit Card XX4321 at ATM on 05-Nov-26. Avl Bal Rs 10,000.00', { amount: '5000.00', last4: '4321', mode: 'debit' }],
 
+  ['ICICI "sent via UPI from <bank> A/c ... to NAME handle": the NAME is the payee (phone-test regression)', 'VM-ICICIB', 'Rs 150.00 sent via UPI from ICICI Bank A/c *9087 to RAHUL SHARMA rahul.s@okaxis on 05-11-26. UPI Ref 631245987012. Not you? Call 18002662', { amount: '150.00', last4: '9087', merchant: 'Rahul Sharma', mode: 'upi', bank: 'ICICI Bank' }],
+  ['"paid to NAME" with no handle', 'VM-HDFCBK', 'Paid Rs.250 to Chai Point from HDFC Bank A/c XX1234. UPI Ref 312345678922', { amount: '250', last4: '1234', merchant: 'Chai Point', mode: 'upi' }],
+  ['UPI/P2A/ref/NAME (payment to an account)', 'VM-AXISBK', 'INR 90.00 debited A/c no. XX1234 05-11-26 22:30:45 UPI/P2A/312345678900/ASHA DEVI. SMS BLOCK UPI to 18001035577', { amount: '90.00', last4: '1234', merchant: 'Asha Devi', mode: 'upi' }],
+  ['trf to NAME Refno', 'AD-SBIUPI', 'Dear UPI user A/C X1234 debited by 250.0 on date 02Nov26 trf to PRIYA NAIR Refno 312345678904. If not u? call 1800111109', { amount: '250.00', last4: '1234', merchant: 'Priya Nair', bank: 'State Bank of India' }],
+
   // ---- SBI
   ['SBI account debit, transfer to a person', 'AD-SBIUPI', 'Dear SBI User, your A/c X1234 is debited by Rs.2000.00 on 05Nov26 transfer to TEST PERSON (Ref No 312345678908). If not done by you, fwd this SMS to 9223008333 & call 1800111109 -SBI', { amount: '2000.00', last4: '1234', merchant: 'Test Person', bank: 'State Bank of India' }],
   ['SBI credit card spend with a link at the end', 'VM-SBICRD', 'Rs.1299.00 spent on your SBI Credit Card ending with 4321 at AMAZON on 05/11/26. Trxn. not done by you? Report at https://sbicard.example/dispute', { amount: '1299.00', last4: '4321', merchant: 'Amazon', mode: 'credit', bank: 'State Bank of India' }],

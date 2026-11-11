@@ -73,6 +73,7 @@ call sms block stop report dispute click visit download login log password otp p
 today date time ist am pm ib dr cr sb cc
 hdfc icici sbi axis kotak yes idfc first indusind pnb canara union federal rbl standard chartered stanchart amex american express paytm hsbc bob baroda idbi bandhan
 au small finance mf ltd pvt limited india
+fd td rd mod fdr tdr term fixed recurring sweep swept matured maturity closed closure premature prematurely proceeds own self interest renewed renewal booked booking opened principal instalment installment tenure
 jan feb mar apr may jun jul aug sep oct nov dec
 `.split(/\s+/).filter(Boolean))
 

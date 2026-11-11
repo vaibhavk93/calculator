@@ -2,6 +2,9 @@ import { dayKey, instrumentFitsMode, MAX_AMOUNT, type BudgetData, type Instrumen
 import { D } from '../engine/decimal'
 import { maskText, shapeOf } from './maskText'
 import { isIgnored, senderKey, type IgnoreRule } from './smsIgnore'
+import { accountTails, DEPOSIT_KINDS, hasDeposit, natureOf, ownFromText, stripDeposit, type Direction, type Nature, type OwnContext, type OwnKind, type OwnRead } from './ownMoney'
+import { payeeKey, sameName } from './payeeKey'
+import { collapse, samePayment } from './dupes'
 
 /**
  * Reads ONE bank text message into a possible expense. Everything here runs on the phone; nothing is sent anywhere
@@ -27,6 +30,18 @@ export interface ParsedSms {
   source: InstrumentKind | null
   bank: string | null
   ref: string | null
+  /** 'out' = money left the account (every parseSms result); 'in' = money came in (only from readSms, and only for own money). Absent = 'out'. */
+  direction?: Direction
+  /** The message names a deposit account (FD, TD, RD, MOD...). Those digits are never read as a card or account. */
+  deposit?: true
+  /** The other account named in the message (last 4), when it names two. Used to spot a transfer between your own accounts. */
+  other?: string
+  /** What the words alone say about own money (ownMoney.ownFromText). Not final: `readSms` decides with what the app knows. */
+  own?: OwnRead
+  /** Set by `readSms`. */
+  nature?: Nature
+  ownKind?: OwnKind
+  ownWhy?: string
 }
 export interface SkippedSms {
   ok: false
@@ -107,7 +122,7 @@ function merchantOf(full: string): string {
   // look for the payee only in the transaction part, with links and phone numbers taken out
   const cut = TAIL.exec(full)
   const head = cut ? full.slice(0, cut.index) : full
-  const p2m = /UPI\/P2[MP]\/\d+\/((?:[A-Za-z0-9 &'\-]|\.(?=\w)){2,40})/i.exec(head)
+  const p2m = /UPI\/P2[MPA]\/\d+\/((?:[A-Za-z0-9 &'\-]|\.(?=\w)){2,40})/i.exec(head)
   if (p2m) return pretty(p2m[1]!)
   const ist = /\bIST\s+([A-Za-z_][A-Za-z0-9_ *&'.\-]{1,38}?)(?=\s+(?:avl|available|not)\b|[.;,]\s|\s*$)/i.exec(full)
   if (ist) return pretty(ist[1]!.replace(/^[_*]+|[_*]+$/g, ''))
@@ -118,9 +133,12 @@ function merchantOf(full: string): string {
 }
 
 function merchantFrom(text: string): string {
+  // "sent via UPI from <bank> A/c *1234 to RAHUL SHARMA rahul.s@okaxis": the NAME in front of the handle is the payee, better than the handle's own letters.
+  const named = /\bto\s+(?!vpa\b)([A-Za-z][A-Za-z .'\-]{1,38}?)\s+(?:vpa\s+)?[\w.\-]{2,}@[\w.]+/i.exec(text)
+  if (named && !NOT_A_MERCHANT.test(named[1]!) && /[A-Za-z]{2}/.test(named[1]!)) return pretty(named[1]!.replace(/\s+(ltd|pvt|limited)\.?$/i, ''))
   const vpa = /\b(?:to|towards)\s+(?:vpa\s+)?([\w.\-]{2,}@[\w.]+)/i.exec(text)
   if (vpa) return pretty((vpa[1] ?? '').split('@')[0]!.replace(/[._\-]?\d{6,}$/g, '').replace(/[._]+/g, ' '))
-  const p2m = /UPI\/P2[MP]\/\d+\/((?:[A-Za-z0-9 &'\-]|\.(?=\w)){2,40})/i.exec(text)
+  const p2m = /UPI\/P2[MPA]\/\d+\/((?:[A-Za-z0-9 &'\-]|\.(?=\w)){2,40})/i.exec(text)
   if (p2m) return pretty(p2m[1]!)
   const payee = /;\s*([A-Za-z0-9 .&'\-*]{2,30}?)\s+credited/i.exec(text)
   if (payee && !NOT_A_MERCHANT.test(payee[1]!)) return pretty(payee[1]!)
@@ -174,28 +192,102 @@ export function parseSms(body: string, address: string): ParsedSms | SkippedSms 
   const amount = amountOf(text)
   if (!amount) return { ok: false, reason: 'no-amount' }
 
+  // A deposit (FD, TD, RD...) account number is not a card or an account of yours: cut it out before reading the digits or the reference.
+  const plain = stripDeposit(text)
   let last4: string | null = null
   for (const re of LAST4) {
-    const m = re.exec(text)
+    const m = re.exec(plain)
     if (m?.[1]) { last4 = m[1]; break }
   }
-  const ref = /(?:ref(?:erence)?(?:\s*no\.?)?|rrn|utr|upi)[:\s./-]*(\d{9,})/i.exec(text)?.[1] ?? /\b(\d{12})\b/.exec(text)?.[1] ?? null
+  const ref = /(?:ref(?:erence)?(?:\s*no\.?)?|rrn|utr|upi)[:\s./-]*(\d{9,})/i.exec(plain)?.[1] ?? /\b(\d{12})\b/.exec(plain)?.[1] ?? null
+  const deposit = hasDeposit(text)
+  const other = accountTails(text).find((t) => !last4 || !(t === last4 || t.endsWith(last4) || last4.endsWith(t)))
+  const own = ownFromText(text, 'out')
+  const merchant = merchantOf(text)
   return {
     ok: true,
     kind: CARD_BILL.test(text) ? 'cardBill' : 'spend',
     amount,
     last4,
-    merchant: merchantOf(text),
+    // "FD Booking" is not who you paid.
+    merchant: hasDeposit(merchant) ? '' : merchant,
     mode: modeOf(text),
     source: sourceOf(text),
     bank: bankFromSender(address, text),
     ref,
+    direction: 'out',
+    ...(deposit ? { deposit: true as const } : {}),
+    ...(other ? { other } : {}),
+    ...(own ? { own } : {}),
   }
+}
+
+const CREDITED_AMOUNT = [
+  /(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d{1,2})?)\s*(?:has been |is |was |being )?(?:credited|deposited|received)/i,
+  /\bcredited\s+(?:with|by|for|to [^.]{0,40}?)\s*(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d{1,2})?)/i,
+]
+
+/**
+ * A message about money coming IN that may be your own money coming back: an FD or RD paying out, a sweep back, a transfer from your own
+ * account. Null for everything else (salary, refunds, a friend paying you), which stays "credit, not offered" as before.
+ */
+function ownCredit(body: string, address: string): ParsedSms | null {
+  const text = body.replace(/\s+/g, ' ').trim()
+  if (!text || OTP_CODE.test(text) || !CREDIT.test(text) || NOT_DONE.test(text) || REFUNDISH.test(text)) return null
+  const own = ownFromText(text, 'in')
+  const tails = accountTails(text)
+  if (!own && tails.length < 2) return null // nothing says it is yours, and there is no second account to check against your own
+  let amount: string | null = null
+  for (const re of CREDITED_AMOUNT) {
+    const m = re.exec(text)
+    const a = m ? clean(m[1] ?? '') : null
+    if (a && !BALANCE_WORDS.test(text.slice(Math.max(0, (m!.index ?? 0) - 24), m!.index ?? 0))) { amount = a; break }
+  }
+  amount ??= amountOf(text)
+  if (!amount) return null
+  const plain = stripDeposit(text)
+  let last4: string | null = null
+  for (const re of LAST4) {
+    const m = re.exec(plain)
+    if (m?.[1]) { last4 = m[1]; break }
+  }
+  const ref = /(?:ref(?:erence)?(?:\s*no\.?)?|rrn|utr|upi)[:\s./-]*(\d{9,})/i.exec(plain)?.[1] ?? /\b(\d{12})\b/.exec(plain)?.[1] ?? null
+  const other = tails.find((t) => !last4 || !(t === last4 || t.endsWith(last4) || last4.endsWith(t)))
+  return {
+    ok: true, kind: 'spend', amount, last4, merchant: '', mode: modeOf(text), source: sourceOf(text), bank: bankFromSender(address, text), ref, direction: 'in',
+    ...(hasDeposit(text) ? { deposit: true as const } : {}),
+    ...(other ? { other } : {}),
+    ...(own ? { own } : {}),
+  }
+}
+
+/**
+ * `parseSms` plus the two things the review lists need: is it spending or your own money moving (`nature`, `ownKind`, `ownWhy`), and own
+ * money that CAME IN (an FD paying out) which `parseSms` alone skips as a credit. A credit is only returned when it is own money; every
+ * other credit comes back skipped as before. `ctx` = what the app knows (saved bank accounts, what the person taught about payees).
+ */
+export function readSms(body: string, address: string, ctx: OwnContext = { instruments: [] }): ParsedSms | SkippedSms {
+  let p = parseSms(body, address)
+  if (!p.ok) {
+    if (p.reason !== 'credit') return p
+    const c = ownCredit(body, address)
+    if (!c) return p
+    p = c
+  }
+  const n = natureOf({ kind: p.kind, merchant: p.merchant, payee: payeeKey(p.merchant), other: p.other ?? null, text: p.own ?? null }, ctx)
+  if (p.direction === 'in' && n.nature !== 'ownMoney') return { ok: false, reason: 'credit' }
+  return { ...p, ...n }
 }
 
 /** A short code for "this same message or payment". Two 32-bit FNV-1a hashes, so a clash is very unlikely. Not reversible to the text. */
 export function fingerprint(p: ParsedSms, day: string): string {
-  const key = p.ref ?? `${day}|${p.amount}|${p.last4 ?? ''}|${p.merchant.toLowerCase()}`
+  return hashKey(p.ref ?? `${day}|${p.amount}|${p.last4 ?? ''}|${p.merchant.toLowerCase()}`)
+}
+
+/** What is kept of a reference number: a short hash, never the number. Two messages with the same reference have the same `refKey`. */
+export const refKeyOf = (ref: string | null | undefined): string | undefined => (ref ? hashKey(`ref|${ref}`) : undefined)
+
+function hashKey(key: string): string {
   let a = 0x811c9dc5
   let b = 0x01000193
   for (let i = 0; i < key.length; i++) {
@@ -226,7 +318,28 @@ export interface Candidate {
   sender?: string
   /** An entry with the same amount, on the same or the next day, from the same card or merchant already exists. */
   duplicateOfExisting: boolean
+  /** Spending, or your own money moving (an FD, a sweep, a transfer between your accounts, a card bill). Own money is never added without a tap. */
+  nature: Nature
+  /** Absent = 'out'. Only own money that CAME IN has 'in', and those are listed in `ScanResult.own`, never in `found`. */
+  direction?: Direction
+  ownKind?: OwnKind
+  /** Plain words for the review list ("Looks like a fixed deposit closing: the money came back to your account."). */
+  ownWhy?: string
+  /** How many messages were merged into this one (1 = none). The screen says "2 messages merged". */
+  mergedFrom: number
+  /**
+   * The fingerprints of the OTHER messages merged into this one. When this candidate is added or skipped, mark `[id, ...alsoIds]` as seen
+   * (`seenIdsOf`), or the twin message would come back on the next scan.
+   */
+  alsoIds?: string[]
+  /** A hash of the UPI or bank reference (never the number). */
+  refKey?: string
+  /** The message names a deposit account (FD, TD, RD...). */
+  deposit?: true
 }
+
+/** Every fingerprint to remember when this candidate is added or skipped. */
+export const seenIdsOf = (c: Pick<Candidate, 'id' | 'alsoIds'>): string[] => [c.id, ...(c.alsoIds ?? [])]
 
 const live = (i: PayInstrument) => i.deletedAt === null
 
@@ -262,7 +375,7 @@ export function alreadyAdded(budget: Pick<BudgetData, 'expenses'>, c: Pick<Candi
       e.income !== true &&
       new D(e.amount).eq(amount) &&
       Math.abs(dayNum(e.date) - dayNum(c.date)) <= 1 &&
-      ((c.instrumentId !== null && e.instrumentId === c.instrumentId) || (c.merchant !== '' && e.note.toLowerCase().includes(c.merchant.toLowerCase()))),
+      ((c.instrumentId !== null && e.instrumentId === c.instrumentId) || (c.merchant !== '' && (e.note.toLowerCase().includes(c.merchant.toLowerCase()) || sameName(e.note, c.merchant)))),
   )
 }
 
@@ -281,6 +394,34 @@ export interface ScanResult {
   alreadySeen: number
   /** Redacted notes on what the parser could not fully read (see ParseLogEntry). */
   log: ParseLogEntry[]
+  /**
+   * Your own money that CAME IN (an FD paying out, a sweep back, a transfer from your own account). Not spending and not income; listed apart
+   * from `found` so nothing here can be added as an expense by mistake.
+   */
+  own: Candidate[]
+  /** Masked copies (digits and names swapped, never the real text) of messages that were merged, read as own money, or named a deposit. */
+  maskedSamples: MaskedSample[]
+}
+
+export interface MaskedSample {
+  reason: 'merged' | 'ownMoney' | 'deposit'
+  /** Sender header in short form, or '<hidden sender>'. */
+  sender: string
+  template: string
+  /** Messages merged into one payment share a group number, so a reader sees which texts were taken for one payment. */
+  group?: number
+}
+
+export const MAX_SAMPLES = 60
+
+const safeSender = (address: string): string => (!/^[A-Za-z][A-Za-z0-9-]{1,14}$/.test(address) || /\d{5,}/.test(address) ? '<hidden sender>' : address)
+
+/** One block of text to copy: the masked examples, grouped. Safe to paste into a chat: see maskText.ts. */
+export function maskedSamplesText(samples: readonly MaskedSample[]): string {
+  if (samples.length === 0) return ''
+  const head = 'Masked examples (every digit and name is swapped for a look-alike; the layout is real).'
+  const rows = samples.map((s) => `[${s.reason}${s.group !== undefined ? ` #${s.group}` : ''}] ${s.sender}: ${s.template}`)
+  return [head, ...rows].join('\n')
 }
 
 /**
@@ -295,13 +436,15 @@ export function buildCandidates(
   ignored: IgnoreRule[] = [],
 ): ScanResult {
   const seen = new Set(budget.smsSeen ?? [])
-  const found: Candidate[] = []
   const skipped: Partial<Record<SkipReason, number>> = {}
   const inList = new Set<string>()
   const log: ParseLogEntry[] = []
+  const ctx: OwnContext = { instruments: budget.instruments, payeeKinds: budget.payeeKinds }
   let alreadySeen = 0
+  /** Every payment read, in message order, with the message it came from (for the masked examples only; the text is not kept). */
+  const read: { cand: Candidate; msg: InboxMessage }[] = []
   for (const m of messages) {
-    const p = parseSms(m.body, m.address)
+    const p = readSms(m.body, m.address, ctx)
     // An ignored card or sender never shows, is never logged and never counts (not even as "already seen").
     if (isIgnored(ignored, { sender: m.address, last4: p.ok ? p.last4 : null, bank: p.ok ? p.bank : null })) continue
     const note = logEntryFor(m, p, Date.now(), salt)
@@ -313,10 +456,12 @@ export function buildCandidates(
     const date = dayKey(new Date(m.date))
     const id = fingerprint(p, date)
     if (seen.has(id)) { alreadySeen++; continue }
-    // The same payment often arrives twice (bank and UPI app): keep the first.
+    // The very same message twice (same fingerprint): keep the first. A DIFFERENT message for the same payment is merged below.
     if (inList.has(id)) continue
     inList.add(id)
     const inst = matchInstrument(budget, p)
+    const isOwn = p.nature === 'ownMoney'
+    const refKey = refKeyOf(p.ref)
     const cand: Candidate = {
       id,
       date,
@@ -329,13 +474,43 @@ export function buildCandidates(
       last4: p.last4,
       ...(senderKey(m.address) ? { sender: senderKey(m.address) } : {}),
       source: p.source,
-      ...catFields(p.kind, p.merchant ? suggest(p.merchant)?.categoryId ?? null : null, () => guessCategory(budget, `${p.merchant} ${m.body}`)),
+      ...catFields(isOwn ? 'own' : p.kind, p.merchant ? suggest(p.merchant)?.categoryId ?? null : null, () => guessCategory(budget, `${p.merchant} ${m.body}`)),
       duplicateOfExisting: false,
+      nature: p.nature ?? 'spend',
+      ...(p.direction === 'in' ? { direction: 'in' as const } : {}),
+      ...(isOwn && p.ownKind ? { ownKind: p.ownKind, ownWhy: p.ownWhy } : {}),
+      mergedFrom: 1,
+      ...(refKey ? { refKey } : {}),
+      ...(p.deposit ? { deposit: true as const } : {}),
     }
-    cand.duplicateOfExisting = alreadyAdded(budget, cand)
-    found.push(cand)
+    cand.duplicateOfExisting = p.direction !== 'in' && alreadyAdded(budget, cand)
+    read.push({ cand, msg: m })
   }
-  return { found, skipped, alreadySeen, log }
+
+  // The same payment often arrives as two messages (the bank's alert and a UPI app's): merge them, keep the richest fields.
+  const absorbed = new Map<number, number[]>()
+  const merged = collapse(read.map((r) => r.cand), (survivor, gone) => absorbed.set(survivor, [...(absorbed.get(survivor) ?? []), gone]))
+  const origin = new Map<string, number>(read.map((r, i) => [r.cand.id, i]))
+
+  const found: Candidate[] = []
+  const own: Candidate[] = []
+  const samples: MaskedSample[] = []
+  const sample = (reason: MaskedSample['reason'], msg: InboxMessage, group?: number) => {
+    if (samples.length < MAX_SAMPLES) samples.push({ reason, sender: safeSender(msg.address), template: maskText(msg.body, salt), ...(group !== undefined ? { group } : {}) })
+  }
+  let group = 0
+  for (const c of merged) {
+    const at = origin.get(c.id)!
+    // Already waiting in the Inbox (or added or rejected there) under a differently worded twin message: not offered again.
+    if ((budget.inbox ?? []).some((it) => samePayment(c, it))) { alreadySeen++; continue }
+    c.duplicateOfExisting ||= c.direction !== 'in' && alreadyAdded(budget, c)
+    const members = [at, ...(absorbed.get(at) ?? [])]
+    if (members.length > 1) { group++; for (const i of members) sample('merged', read[i]!.msg, group) }
+    else if (c.nature === 'ownMoney') sample('ownMoney', read[at]!.msg)
+    else if (c.deposit) sample('deposit', read[at]!.msg)
+    ;(c.direction === 'in' ? own : found).push(c)
+  }
+  return { found, skipped, alreadySeen, log, own, maskedSamples: samples }
 }
 
 // ---------------------------------------------------------------- parser log (for improving the parser)
@@ -441,6 +616,8 @@ export interface NewInstrument {
 export function newInstruments(cands: Candidate[]): NewInstrument[] {
   const out = new Map<string, NewInstrument>()
   for (const c of cands) {
+    // An FD, TD, RD or sweep message is about a deposit: never offer its digits as a card or account to add.
+    if (c.nature === 'ownMoney' && c.ownKind && DEPOSIT_KINDS.has(c.ownKind)) continue
     if (c.instrumentId !== null || !c.bank || !c.last4 || !c.source || c.last4.length < 4) continue
     const key = `${c.bank}|${c.last4}|${c.source}`
     const cur = out.get(key)

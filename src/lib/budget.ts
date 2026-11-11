@@ -2,6 +2,7 @@ import { D, type Dec } from '../engine'
 import { decimalComma } from './decimalComma'
 import { DATE_LOCALE } from './dateLocale'
 import type { AutoLogEntry, InboxItem, LearnedPayee } from './inbox'
+import type { PayeeKind } from './payeeKey'
 
 /**
  * A budget bucket. `limit` is a plain decimal string for every month, or null for "no limit".
@@ -642,6 +643,8 @@ export interface BudgetData {
   inbox?: InboxItem[]
   /** What the app learned about payees from approvals: the category and how many times in a row. Absent: nothing learned. */
   learned?: LearnedPayee[]
+  /** What the person taught the app about who a payee is: their own account, somebody else, or a shop. Absent: nothing taught. See lib/payeeKey.ts. */
+  payeeKinds?: PayeeKind[]
   /** The last auto-added items and whether each was undone or changed. Drives the drift circuit breaker. */
   autoLog?: AutoLogEntry[]
 }

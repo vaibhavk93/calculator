@@ -171,9 +171,12 @@ export function buildStatementCandidates(
       bank: null, last4: null, source: null,
       ...catFields(p.kind, merchant ? suggest(merchant)?.categoryId ?? null : null, () => guessCategory(budget, `${merchant} ${narration}`)),
       duplicateOfExisting: false,
+      nature: p.kind === 'cardBill' ? 'ownMoney' : 'spend',
+      ...(p.kind === 'cardBill' ? { ownKind: 'cardBill' as const, ownWhy: 'Paying your own credit card bill: the spending was counted when you used the card.' } : {}),
+      mergedFrom: 1,
     }
     cand.duplicateOfExisting = alreadyAdded(budget, cand)
     out.push(cand)
   }
-  return { ok: true, result: { found: out, skipped, alreadySeen, log: [], total } }
+  return { ok: true, result: { found: out, skipped, alreadySeen, log: [], own: [], maskedSamples: [], total } }
 }

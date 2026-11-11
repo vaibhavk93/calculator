@@ -13,7 +13,10 @@ import {
 } from './budget'
 import { isIgnored, senderKey, type IgnoreRule } from './smsIgnore'
 import type { QueuedMessage, SmsQueuePort } from './smsQueue'
-import { alreadyAdded, fingerprint, guessCategory, matchInstrument, modeFor, parseSms, type SmsKind } from './smsParse'
+import { alreadyAdded, fingerprint, guessCategory, matchInstrument, modeFor, readSms, refKeyOf, type SmsKind } from './smsParse'
+import { payeeKey, payeeKindFor, type PayeeKindName } from './payeeKey'
+import type { Direction, Nature, OwnContext, OwnKind } from './ownMoney'
+import { mergeCandidates, samePayment } from './dupes'
 
 /**
  * The SMS Inbox (docs/SMS-INBOX-PLAN.md): payments caught from bank messages wait here until the person approves them.
@@ -54,7 +57,21 @@ export interface InboxItem {
   notSpend?: true
   /** When it was approved or rejected (ms). */
   resolvedAt?: number
+  /** Spending, or your own money moving. Absent (an older item) = spending. Own money is never added without a tap. */
+  nature?: Nature
+  /** Absent = 'out'. 'in' = own money that came back (an FD paying out): it can never become an expense. */
+  direction?: Direction
+  ownKind?: OwnKind
+  /** Plain words: why the app thinks it is your own money. */
+  ownWhy?: string
+  /** How many messages were merged into this item (absent or 1 = one message). */
+  mergedFrom?: number
+  /** A hash of the UPI or bank reference (never the number), so a later twin message can be recognised. */
+  refKey?: string
 }
+
+/** True for an item that is the person's own money moving, not spending. */
+export const isOwnItem = (i: Pick<InboxItem, 'nature'>): boolean => i.nature === 'ownMoney'
 
 /** What the app has learned about one payee: the category it was last tagged with, and how many times in a row. */
 export interface LearnedPayee {
@@ -83,12 +100,7 @@ const DAY_MS = 86_400_000
 
 // ---------------------------------------------------------------- payees and learning
 
-/** The short, comparable name of a payee: lower case, letters and digits, words with digits dropped (order numbers, card digits), at most 3 words. Null when too little is left. */
-export function payeeKey(merchant: string): string | null {
-  const words = merchant.toLowerCase().replace(/[^\p{L}\p{N} ]+/gu, ' ').split(/\s+/).filter((w) => w !== '' && !/\d/.test(w)).slice(0, 3)
-  const key = words.join(' ').slice(0, 40).trim()
-  return key.length >= 3 ? key : null
-}
+export { payeeKey, payeeKindFor }
 
 export const learnedFor = (budget: Pick<BudgetData, 'learned'>, key: string | null): LearnedPayee | undefined => (key === null ? undefined : (budget.learned ?? []).find((l) => l.key === key))
 
@@ -115,7 +127,7 @@ const BUSINESS_WORDS = /\b(swiggy|zomato|eatsure|dominos|mcdonalds|kfc|starbucks
  */
 export function isPerson(mode: PaymentModeId | null, merchant: string, body: string): boolean {
   if (/UPI\/P2M\//i.test(body)) return false
-  if (/UPI\/P2P\//i.test(body)) return true
+  if (/UPI\/P2[PA]\//i.test(body)) return true
   if (mode !== 'upi') return false // a card or net-banking payee is a shop, not a person
   return !BUSINESS_WORDS.test(merchant)
 }
@@ -146,10 +158,12 @@ export function suggestion(budget: BudgetData, merchant: string, hint = ''): Sug
   return guess ? { categoryId: guess, why: 'A guess from the name. Check it' } : { categoryId: null, why: '' }
 }
 
-type Candidate = Pick<InboxItem, 'kind' | 'merchant' | 'categoryId' | 'person'>
+type Candidate = Pick<InboxItem, 'kind' | 'merchant' | 'categoryId' | 'person'> & Partial<Pick<InboxItem, 'nature' | 'direction'>>
 
 /** Why a payment is not safe to add without a tap, or null when its category is one the person has confirmed enough times (AUTO_AFTER) and no rule of theirs disagrees. */
 function notConfirmed(budget: BudgetData, c: Candidate): string | null {
+  // Own money (an FD, a sweep, a transfer between your accounts, a card bill) and money in are never added on their own, however often the payee was tagged.
+  if (c.nature === 'ownMoney' || c.direction === 'in') return 'Your own money moving, not a spend'
   if (c.kind !== 'spend') return 'A card bill needs a card picked'
   if (c.person) return 'A person, not a shop'
   const l = learnedFor(budget, payeeKey(c.merchant))
@@ -238,7 +252,38 @@ export function recentlyAuto(budget: BudgetData, now: number): { item: InboxItem
 /** Re-works the suggestion of every pending item (a rule or a learned payee may have changed). */
 export function resuggest(budget: BudgetData): BudgetData {
   if (!budget.inbox?.some((i) => i.status === 'pending')) return budget
-  return { ...budget, inbox: budget.inbox.map((i) => (i.status === 'pending' && i.kind === 'spend' ? { ...i, ...suggestion(budget, i.merchant) } : i)) }
+  return { ...budget, inbox: budget.inbox.map((i) => (i.status === 'pending' && i.kind === 'spend' && !isOwnItem(i) ? { ...i, ...suggestion(budget, i.merchant) } : i)) }
+}
+
+/** What the person taught about this payee decides person-or-shop for the "never auto-added" check; otherwise the guess from the name and text. */
+const personOf = (budget: Pick<BudgetData, 'payeeKinds'>, merchant: string, guess: boolean): boolean => {
+  const taught: PayeeKindName | null = payeeKindFor(budget.payeeKinds, payeeKey(merchant))
+  return taught === 'person' ? true : taught === 'merchant' || taught === 'self' ? false : guess
+}
+
+/**
+ * The person taught the app who a payee is (see `markPayeeSelf` in the store): waiting items for that payee are re-read. "Own account" turns
+ * them into own money (a self transfer); "someone else" or "a shop" turns a self-transfer guess back into a plain spend and sets the person flag.
+ * Items already added or rejected are left alone.
+ */
+export function reclassify(budget: BudgetData): BudgetData {
+  if (!budget.inbox?.some((i) => i.status === 'pending')) return budget
+  return {
+    ...budget,
+    inbox: budget.inbox.map((i) => {
+      if (i.status !== 'pending' || i.kind !== 'spend' || i.direction === 'in') return i
+      const taught = payeeKindFor(budget.payeeKinds, payeeKey(i.merchant))
+      if (taught === 'self' && !isOwnItem(i)) return { ...i, nature: 'ownMoney' as const, ownKind: 'selfTransfer' as const, ownWhy: 'You told the app this payee is your own account.', categoryId: null, why: '', person: false }
+      if (taught === 'self') return i
+      if (taught === null) return i
+      const person = taught === 'person'
+      if (i.ownKind === 'selfTransfer') {
+        const { ownKind: _k, ownWhy: _w, ...rest } = i
+        return { ...rest, nature: 'spend' as const, ...suggestion(budget, i.merchant), person }
+      }
+      return i.person === person ? i : { ...i, person }
+    }),
+  }
 }
 
 // ---------------------------------------------------------------- draining the phone-side queue
@@ -246,6 +291,8 @@ export function resuggest(budget: BudgetData): BudgetData {
 export interface DrainPlan {
   /** New items, newest first. In Auto mode a confident one comes back already approved (`auto`, with its `entryId`). */
   items: InboxItem[]
+  /** Items already waiting in the Inbox that absorbed a twin message (`mergedFrom` went up). They replace the old ones. */
+  merged?: InboxItem[]
   /** The entries the plan adds (Auto mode only), newest first. */
   entries: BudgetExpense[]
   /** Fingerprints to remember, so a manual scan and a later drain skip them. */
@@ -260,8 +307,11 @@ export interface DrainPlan {
 
 /**
  * Turns what was waiting in the queue into inbox items. Pure: nothing is saved here and nothing is acked.
- * Not payments (OTP, offers, money in, unclear) are acked and dropped. A message seen before, or twice in this batch, is acked and skipped.
+ * Not payments (OTP, offers, money in that is not yours, unclear) are acked and dropped. A message seen before, or twice in this batch, is acked and skipped.
  * A payment you already added by hand (same amount, same or next day, same card or payee) is acked and skipped: the same rule as the manual scan.
+ * The SAME PAYMENT told by two messages (bank alert + UPI app) becomes ONE item with `mergedFrom` 2, also across drains: a twin of an item
+ * already waiting is merged into it; a twin of one already approved or rejected is dropped (see dupes.ts for every cause of duplicates).
+ * Own money (an FD, a sweep, a transfer between your own accounts, a card bill) is marked `nature: 'ownMoney'` and is never auto-added.
  */
 export function planDrain(messages: QueuedMessage[], budget: BudgetData, o: { auto: boolean; now: number; newId: () => string; ignored?: IgnoreRule[] }): DrainPlan {
   const seen = new Set(budget.smsSeen ?? [])
@@ -269,9 +319,11 @@ export function planDrain(messages: QueuedMessage[], budget: BudgetData, o: { au
   const ackIds = new Set<string>()
   const queueIds = new Set<string>()
   const items: InboxItem[] = []
+  const merged = new Map<string, InboxItem>()
   const entries: BudgetExpense[] = []
   const newSeen: string[] = []
   const inPlan = new Set<string>()
+  const ctx: OwnContext = { instruments: budget.instruments, payeeKinds: budget.payeeKinds }
   let held = 0
   let log = budget.autoLog
   const auto = o.auto && !driftTripped(budget.autoLog)
@@ -279,7 +331,7 @@ export function planDrain(messages: QueuedMessage[], budget: BudgetData, o: { au
   for (const m of messages) {
     if (queueIds.has(m.id)) continue // the same message twice in one drain: handled once, acked once
     queueIds.add(m.id)
-    const p = parseSms(m.body, m.sender)
+    const p = readSms(m.body, m.sender, ctx)
     if (!p.ok) { ackIds.add(m.id); continue }
     // Ignored card or sender: acked and dropped before anything else, so it is never stored, never a duplicate, never learned from.
     if (isIgnored(o.ignored, { sender: m.sender, last4: p.last4, bank: p.bank })) { ackIds.add(m.id); continue }
@@ -287,16 +339,45 @@ export function planDrain(messages: QueuedMessage[], budget: BudgetData, o: { au
     const id = fingerprint(p, date)
     if (seen.has(id) || inPlan.has(id)) { ackIds.add(m.id); continue }
     const inst = matchInstrument(budget, p)
-    const base = { id, date, amount: p.amount, merchant: p.merchant, kind: p.kind, mode: modeFor(p, inst), instrumentId: inst?.id ?? null, last4: p.last4, bank: p.bank }
+    const isOwn = p.nature === 'ownMoney'
+    const refKey = refKeyOf(p.ref)
+    const base = {
+      id, date, amount: p.amount, merchant: p.merchant, kind: p.kind, mode: modeFor(p, inst), instrumentId: inst?.id ?? null, last4: p.last4, bank: p.bank,
+      ...(p.direction === 'in' ? { direction: 'in' as const } : {}),
+      ...(refKey ? { refKey } : {}),
+    }
     // Checked against the entries that were there BEFORE this drain, so two real payments of one amount in one batch are not taken for one.
-    if (alreadyAdded(budget, base)) { inPlan.add(id); newSeen.push(id); ackIds.add(m.id); continue }
+    if (p.direction !== 'in' && alreadyAdded(budget, base)) { inPlan.add(id); newSeen.push(id); ackIds.add(m.id); continue }
+    const s = p.kind === 'spend' && !isOwn ? suggestion(budget, p.merchant, m.body) : { categoryId: null, why: '' }
+    const sender = senderKey(m.sender)
+    const item: InboxItem = {
+      ...base,
+      ...(sender ? { sender } : {}),
+      categoryId: s.categoryId,
+      why: s.why,
+      person: p.kind === 'spend' && !isOwn && personOf(budget, p.merchant, isPerson(base.mode, p.merchant, m.body)),
+      status: 'pending',
+      at: o.now,
+      nature: isOwn ? 'ownMoney' : 'spend',
+      ...(isOwn && p.ownKind ? { ownKind: p.ownKind, ownWhy: p.ownWhy } : {}),
+    }
+    // The same payment told by an earlier message (this drain, or an earlier one still waiting, or already dealt with)?
+    const inItems = items.findIndex((it) => samePayment(item, it))
+    const twin = inItems >= 0 ? items[inItems]! : (budget.inbox ?? []).map((it) => merged.get(it.id) ?? it).find((it) => samePayment(item, it))
+    if (twin) {
+      inPlan.add(id)
+      newSeen.push(id)
+      ackIds.add(m.id)
+      if (twin.status !== 'pending') continue // already added, rejected or auto-added: the twin message adds nothing
+      const { alsoIds: _a, ...one } = mergeCandidates(twin, item) as InboxItem & { alsoIds?: string[] }
+      if (inItems >= 0) items[inItems] = one
+      else merged.set(twin.id, one)
+      continue
+    }
     if (items.length >= room) { held++; continue } // not acked: it stays in the queue until there is room
     inPlan.add(id)
     newSeen.push(id)
     ackIds.add(m.id)
-    const s = p.kind === 'spend' ? suggestion(budget, p.merchant, m.body) : { categoryId: null, why: '' }
-    const sender = senderKey(m.sender)
-    const item: InboxItem = { ...base, ...(sender ? { sender } : {}), categoryId: s.categoryId, why: s.why, person: p.kind === 'spend' && isPerson(base.mode, p.merchant, m.body), status: 'pending', at: o.now }
     if (auto && autoAddCheck(budget, item, false, o.now).ok) {
       const entryId = o.newId()
       const note = item.merchant || (item.bank ? `${item.bank} payment` : 'Bank payment')
@@ -305,13 +386,14 @@ export function planDrain(messages: QueuedMessage[], budget: BudgetData, o: { au
       log = logAuto(log, item.id)
     } else items.unshift(item)
   }
-  return { items, entries, seen: newSeen, ackIds: [...ackIds], held, ...(log !== budget.autoLog ? { log } : {}) }
+  return { items, merged: [...merged.values()], entries, seen: newSeen, ackIds: [...ackIds], held, ...(log !== budget.autoLog ? { log } : {}) }
 }
 
 /** Puts a plan into the budget. Pure. The caller must persist the result BEFORE acking (see `drainQueue`). */
 export function applyPlan(budget: BudgetData, plan: DrainPlan, now: number): BudgetData {
-  if (plan.items.length === 0 && plan.seen.length === 0) return budget
-  const inbox = [...plan.items, ...pruneInbox(budget.inbox, now)].slice(0, MAX_INBOX)
+  if (plan.items.length === 0 && plan.seen.length === 0 && (plan.merged ?? []).length === 0) return budget
+  const swap = new Map((plan.merged ?? []).map((i) => [i.id, i]))
+  const inbox = [...plan.items, ...pruneInbox(budget.inbox, now).map((i) => swap.get(i.id) ?? i)].slice(0, MAX_INBOX)
   return {
     ...budget,
     inbox,
