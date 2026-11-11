@@ -101,6 +101,8 @@ const toSummary = async (page) => { await openMore(page); await page.locator('bu
 const toManage = async (page) => { await openMore(page); await page.getByRole('button', { name: /Categories and cards/ }).first().click(); await page.locator('.screen[aria-label="Categories and cards"]').waitFor() }
 const SUM = (page) => page.locator('.screen[aria-label="Spending summary"]')
 const MAN = (page) => page.locator('.screen[aria-label="Categories and cards"]')
+// Categories and cards is a two-state screen (design reference): the cards and accounts are on its Cards state.
+const toCards = async (page) => { await toManage(page); await MAN(page).getByRole('radio', { name: 'Cards', exact: true }).click() }
 const viewTab = (page, name) => SUM(page).getByRole('radio', { name, exact: true }).click()
 const scopeBtn = (page) => SUM(page).locator('.spend__scope[aria-label^="Showing"]')
 const pickRow = (page, label) => page.locator('.pick__opt').filter({ has: page.locator('.pick__label', { hasText: new RegExp('^' + label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$') }) })
@@ -734,24 +736,24 @@ T('ST06', 'POS', 'settlements are left out of every total: home, summary, by mod
   eq(await SUM(page).locator('section[aria-label="Biggest spends"] .budget__entry').count(), 2)
 })
 T('ST07', 'POS', 'card "Owes" = charges (credit + UPI via the card) minus bill payments', async (c) => {
-  const { page } = await c.open({ budget: SETT() }); await toManage(page)
+  const { page } = await c.open({ budget: SETT() }); await toCards(page)
   has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Owes ₹3,700')
 })
 T('ST08', 'CORNER', 'card "Paid ahead" when the bill is bigger than the charges, and "Nothing owed" at zero', async (c) => {
   const b = SETT({ extra: [exp('2026-11-07', '4000', { settlement: 'cardBill', instrumentId: 'i-neo' })] })
-  const { page } = await c.open({ budget: b }); await toManage(page)
+  const { page } = await c.open({ budget: b }); await toCards(page)
   has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Paid ₹300 ahead')
   const z = SETT({ extra: [exp('2026-11-07', '3700', { settlement: 'cardBill', instrumentId: 'i-neo' })] })
-  const o = await c.open({ budget: z }); await toManage(o.page)
+  const o = await c.open({ budget: z }); await toCards(o.page)
   has(await MAN(o.page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Nothing owed')
 })
 T('ST09', 'POS', 'Owes counts all months (charge in September, bill in November)', async (c) => {
   const b = BASE({ expenses: [exp('2026-09-02', '1000.50', { mode: 'credit', instrumentId: 'i-neo' }), exp('2026-11-05', '400.25', { settlement: 'cardBill', instrumentId: 'i-neo' })] })
-  const { page } = await c.open({ budget: b }); await toManage(page)
+  const { page } = await c.open({ budget: b }); await toCards(page)
   has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Owes ₹600.25')
 })
 T('ST10', 'ERR', 'editing a credit card (any field) keeps its bill payments attached [known B-04]', async (c) => {
-  const { page } = await c.open({ budget: SETT() }); await toManage(page)
+  const { page } = await c.open({ budget: SETT() }); await toCards(page)
   await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).click()
   await page.locator('summary', { hasText: 'More details' }).click()
   await page.locator('#inst-holder').fill('V Kumawat'); await page.getByRole('button', { name: 'Save', exact: true }).click()
@@ -769,10 +771,10 @@ T('ST11', 'UX', 'switching an entry from Card bill to Spending shows category an
 T('ST12', 'UX', 'deleting a bill payment brings the card\'s Owes back up; Undo puts it back', async (c) => {
   const { page } = await c.open({ budget: SETT() })
   await page.getByRole('button', { name: /^Edit ₹2,000 Card bill/ }).click(); await S(page).getByRole('button', { name: 'Delete this expense' }).click()
-  await toManage(page); has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Owes ₹5,700')
+  await toCards(page); has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Owes ₹5,700')
   await MAN(page).getByRole('button', { name: /back/i }).first().click()
   await page.locator('.snack').getByRole('button', { name: 'Undo' }).click()
-  await toManage(page); has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Owes ₹3,700')
+  await toCards(page); has(await MAN(page).locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Owes ₹3,700')
 })
 T('ST13', 'UX', 'a settlement edit sheet says what it is and has Save changes + Delete', async (c) => {
   const { page } = await c.open({ budget: SETT() })
