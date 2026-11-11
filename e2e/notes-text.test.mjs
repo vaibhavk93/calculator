@@ -80,7 +80,9 @@ await T('C2 Notes shows one Add control, no "New list" link, and Add offers note
   eq(await addBtn(page).count(), 1, 'one Add control')
   eq(await page.getByRole('button', { name: 'New list' }).count(), 0, 'no New list link on the page itself')
   const box = await addBtn(page).boundingBox()
-  ok(box.height >= 44 && box.width >= 44, `Add is at least 44px: ${box.width}x${box.height}`)
+  // The documented rule (CLAUDE.md, layout-contract.test.mjs) is "at least 44px in ONE direction". The design-reference pass
+  // (0698f2d, 2026-11-07) made this pill 40px tall and ~93px wide, which meets the rule. This line used to demand both.
+  ok(box.height >= 44 || box.width >= 44, `Add is at least 44px in one direction: ${box.width}x${box.height}`)
   await addBtn(page).click()
   eq(await sheet(page).count(), 1, 'one sheet')
   eq(await sheet(page).locator('.sheet__title').innerText(), 'Add', 'sheet title')
@@ -338,6 +340,8 @@ await T('C3 sharing an empty note is refused in words, not sent', async (page) =
 
 await T('C3 Export notes in Settings saves one text file named by the date with notes, lists and calculations, not to-dos or Trash', async (page) => {
   await page.locator('[aria-label="Settings"]').click()
+  // Export notes lives on the Backup and export page since the Settings redesign (the LOOK test below does the same).
+  await page.getByText('Backup and export', { exact: true }).click()
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByText('Export notes', { exact: true }).click()])
   eq(dl.suggestedFilename(), 'calc-notes-2026-11-04.txt', 'file name')
   const file = join(tmpdir(), 'calc-notes-export.txt')
@@ -355,6 +359,7 @@ await T('C3 Export notes in Settings saves one text file named by the date with 
 
 await T('C3 Export notes with nothing to export says so and makes no file', async (page) => {
   await page.locator('[aria-label="Settings"]').click()
+  await page.getByText('Backup and export', { exact: true }).click()
   let got = false
   page.on('download', () => { got = true })
   await page.getByText('Export notes', { exact: true }).click()

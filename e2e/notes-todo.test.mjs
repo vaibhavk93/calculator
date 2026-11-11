@@ -98,9 +98,10 @@ const openRaw = async (raw, o = {}) => {
 T('N01', 'POS', 'Notes empty state says what to do and has a way forward', async () => {
   const { page: p } = await open(); await notes(p)
   const t = await text(p, '.tools')
-  has(t, 'No notes yet'); has(t, 'Open calculators')
-  await p.getByRole('button', { name: 'Open calculators' }).click()
-  ok((await p.locator('.tabbar .tab[aria-current=page]').innerText()).includes('Tools'), 'Open calculators should go to Tools')
+  // Block C (2026-11-05) replaced the "Open calculators" button with one New control; the empty state now says to tap it.
+  has(t, 'No notes yet'); has(t, 'Tap New to write a note or start a list')
+  await p.getByRole('button', { name: 'New', exact: true }).click()
+  ok(await p.locator('.sheet').count() === 1, 'New should open the Add sheet')
 })
 T('N02', 'UI', 'Notes empty state fits at 360px, dark and light', async () => {
   for (const theme of ['dark', 'light']) {
