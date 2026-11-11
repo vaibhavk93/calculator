@@ -45,15 +45,17 @@ const DEBIT = /\b(debited|debit|spent|paid|sent|purchase|purchased|withdrawn|wit
 const CREDIT = /\b(credited|received|deposited|refund(?:ed)?|reversed|reversal|cashback)\b/i
 const REFUNDISH = /\b(refund(?:ed)?|reversed|reversal|cashback)\b/i
 const OTP = /\b(otp|one[- ]?time password|verification code|cvv|pin)\b/i
+/** A real one-time-code message: the code itself is in the text ("OTP for ... is 123456", "123456 is your OTP"). A debit alert that only warns "never share OTP" has no code. */
+const OTP_CODE = /\b(?:otp|one[- ]?time password|verification code)\b[^\n]{0,60}?\bis\s*:?\s*\d{4,8}\b|\b\d{4,8}\s+is\s+(?:your|the)\s+(?:otp|one[- ]?time password|verification code)\b/i
 const STRONG_DEBIT = /\b(debited|spent|withdrawn|sent|paid)\b/i
 /** "Payment of Rs 500 received on your credit card": a payment INTO the card, so not spending. */
-const RECEIPT = /\b(?:payment|amount)\b.{0,40}?\breceived\b|\breceived (?:your |a )?payment\b|\bcredited to your (?:credit )?(?:card|account|a\/c)\b/i
+const RECEIPT = /\b(?:payment|amount)\b.{0,40}?\breceived\b|\breceived (?:your |a )?payment\b|\bthank you for (?:the |your )?payment\b|\bcredited to your (?:credit )?(?:card|account|a\/c)\b/i
 const PROMO = /\b(offer|apply now|pre-?approved|click|congratulations|limited time|win |reward points|download|convert|flexi emi|into easy|t&cs?|about to|expir\w*|bonus cash|redeem)\b|https?:\/\//i
 /** Not a payment that already happened: reminders, scheduled debits, failed or declined payments, money requests. */
-const NOT_DONE = /\b(will be (?:debited|deducted|charged|auto)|to be (?:debited|deducted)|is due|are due|due (?:on|by|date)|scheduled|upcoming|reminder|failed|declined|unsuccessful|not successful|could not be|cancell?ed|requested? (?:money|payment)|collect request|has requested|pending|minimum (?:amount )?due|total (?:amount )?due)\b/i
+const NOT_DONE = /\b(will be (?:debited|deducted|charged|auto)|to be (?:debited|deducted)|is due|are due|due (?:on|by|date)|scheduled|upcoming|reminder|failed|declined|unsuccessful|not successful|could not be|cancell?ed|requested? (?:money|payment)|collect request|has requested|pending|rejected|failure|not processed|(?:will )?not be (?:debited|deducted|charged)|not (?:been )?(?:debited|deducted|charged)|(?:created|registered|set up) (?:an? )?(?:e-?)?(?:mandate|autopay|auto-pay|standing instruction)|first (?:debit|payment) (?:on|date)|minimum (?:amount )?due|total (?:amount )?due)\b/i
 /** The part of a message after these words is advice or a helpline, never the payee. */
 const TAIL = /\b(not you|if not|if this was not|to block|sms block|to report|to dispute|to stop|call \d|call us|for any|click|avl\b|available (?:bal|limit)|bal(?:ance)?:)/i
-const CARD_BILL = /\b(for (?:your |an? )?(?:[\w]+ ){0,4}credit card|credit card (?:bill|payment|outstanding)|cc (?:bill|payment)|card bill|towards (?:your )?(?:credit )?card|billdesk.*card|cred club)\b/i
+const CARD_BILL = /\b(for (?:your |an? )?(?:[\w]+ ){0,4}credit card|credit card (?:(?:no\.? )?[x*•]*\d+ )?(?:bill|payment|outstanding)|cc (?:bill|payment)|card bill|towards (?:your )?(?:credit )?card|billdesk.*card|cred club)\b/i
 
 /** "Rs.1,250.00", "INR 450", "₹99". Amounts after "avail/bal/limit" are balances, not the payment. */
 const MONEY = /(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d{1,2})?)/gi
@@ -82,8 +84,8 @@ function clean(raw: string): string | null {
 
 const LAST4 = [
   // hidden digits then a long number: the last four are the card/account tail ("XXXXX948086" -> 8086)
-  /(?:a\/c|acct?|account|card)[^\d\n]{0,25}?[x*•]+\s?\d*?(\d{4})\b/i,
-  /(?:a\/c|acct?|account|card)[^\d\n]{0,25}?[x*•]+\s?(\d{3})\b/i,
+  /(?:a\/c|\bac\b|acct?|account|card)[^\d\n]{0,25}?[x*•]+\s?\d*?(\d{4})\b/i,
+  /(?:a\/c|\bac\b|acct?|account|card)[^\d\n]{0,25}?[x*•]+\s?(\d{3})\b/i,
   // "credit card (2655)"
   /(?:card|a\/c|acct?|account)\s*\((\d{4})\)/i,
   // "from HDFC Bank A/c 7261": digits straight after the word, no x marks
@@ -103,12 +105,14 @@ const NOT_A_MERCHANT = /^(a\/c|acct|account|your|you|card|vpa|bank|ref|upi|self|
 
 function merchantOf(full: string): string {
   // look for the payee only in the transaction part, with links and phone numbers taken out
-  const p2m = /UPI\/P2[MP]\/\d+\/((?:[A-Za-z0-9 &'\-]|\.(?=\w)){2,40})/i.exec(full)
+  const cut = TAIL.exec(full)
+  const head = cut ? full.slice(0, cut.index) : full
+  const p2m = /UPI\/P2[MP]\/\d+\/((?:[A-Za-z0-9 &'\-]|\.(?=\w)){2,40})/i.exec(head)
   if (p2m) return pretty(p2m[1]!)
   const ist = /\bIST\s+([A-Za-z_][A-Za-z0-9_ *&'.\-]{1,38}?)(?=\s+(?:avl|available|not)\b|[.;,]\s|\s*$)/i.exec(full)
   if (ist) return pretty(ist[1]!.replace(/^[_*]+|[_*]+$/g, ''))
-  const cut = TAIL.exec(full)
-  const text = (cut ? full.slice(0, cut.index) : full).replace(/https?:\/\/\S+|www\.\S+/gi, ' ').replace(/\b\d{10,}\b/g, ' ')
+  // phone numbers and long ids go, but not digits glued to a UPI handle ("shop.9012345678@bank")
+  const text = head.replace(/https?:\/\/\S+|www\.\S+/gi, ' ').replace(/(^|[^\w.@])\d{10,}\b(?!@)/g, '$1 ')
   const found = merchantFrom(text)
   return /[A-Za-z]{2}/.test(found) ? found : ''
 }
@@ -120,7 +124,11 @@ function merchantFrom(text: string): string {
   if (p2m) return pretty(p2m[1]!)
   const payee = /;\s*([A-Za-z0-9 .&'\-*]{2,30}?)\s+credited/i.exec(text)
   if (payee && !NOT_A_MERCHANT.test(payee[1]!)) return pretty(payee[1]!)
-  const at = /\b(?:at|trf to|to|towards)\s+([A-Za-z_](?:[A-Za-z0-9 &'\-*_]|\.(?=\w)){1,34}?)(?=\s+(?:on|ref\w*|upi|avl|avail|not|if|call|via|dated|using|from|for|ending)\b|\s+\d|[.;,(]|\s*$)/i.exec(text)
+  // "... on 05-Nov-26 on AMAZON. Avl Limit" (ICICI card): the payee follows the date
+  const onDate = /\bon\s+\d{1,2}[-/ ][A-Za-z0-9]{2,3}[-/ ]\d{2,4}\s+on\s+((?:\d{1,3}-?)?[A-Za-z_](?:[A-Za-z0-9 &'\-*_]|\.(?=\w)){1,34}?)(?=\s+(?:avl|available|not|if|call)\b|\.(?=\s|$)|[;,(]|\s*$)/i.exec(text)
+  if (onDate) return pretty(onDate[1]!.replace(/\s+(ltd|pvt|limited)\.?$/i, ''))
+  // a payee may start with a digit ("7-Eleven", "1MG") but never be a bare number or time ("at 5 November", "at 10:15")
+  const at = /\b(?:at|trf to|to|towards)\s+((?:\d{1,3}-?)?[A-Za-z_](?:[A-Za-z0-9 &'\-*_]|\.(?=\w)){1,34}?)(?=\s+(?:on|ref\w*|upi|avl|avail|not|if|call|via|dated|using|from|for|ending)\b|\s+\d|\.(?=\s|$)|[;,(]|\s*$)/i.exec(text)
   if (at && !NOT_A_MERCHANT.test(at[1]!)) return pretty(at[1]!.replace(/^_+/, '').replace(/\s+(ltd|pvt|limited)\.?$/i, ''))
   return ''
 }
@@ -136,7 +144,7 @@ function modeOf(text: string): PaymentModeId | null {
 function sourceOf(text: string): InstrumentKind | null {
   if (/credit card|\bcc\b/i.test(text)) return 'credit'
   if (/debit card/i.test(text)) return 'debit'
-  if (/\ba\/c|\bacct?\b|\baccount\b/i.test(text)) return 'bank'
+  if (/\ba\/c|\bac\b|\bacct?\b|\baccount\b/i.test(text)) return 'bank'
   return null
 }
 
@@ -149,7 +157,7 @@ export const bankFromSender = (address: string, body = ''): string | null => {
 export function parseSms(body: string, address: string): ParsedSms | SkippedSms {
   const text = body.replace(/\s+/g, ' ').trim()
   if (!text) return { ok: false, reason: 'not-a-payment' }
-  if (OTP.test(text) && !STRONG_DEBIT.test(text)) return { ok: false, reason: 'otp' }
+  if (OTP_CODE.test(text) || (OTP.test(text) && !STRONG_DEBIT.test(text))) return { ok: false, reason: 'otp' }
 
   const d = DEBIT.exec(text)
   const c = CREDIT.exec(text)
@@ -161,7 +169,7 @@ export function parseSms(body: string, address: string): ParsedSms | SkippedSms 
   if (!d) return { ok: false, reason: 'credit' }
   // Both words present ("debited ... ; ZOMATO credited"): money went out only when the debit comes first.
   if (c && d.index > c.index) return { ok: false, reason: 'unsure' }
-  if (PROMO.test(text) && /\b(loan|offer|apply|emi)\b/i.test(text) && !/\b(a\/c|card|upi)\b/i.test(text)) return { ok: false, reason: 'not-a-payment' }
+  if (PROMO.test(text) && /\b(loan|offer|apply|emi)\b/i.test(text) && !LAST4.some((re) => re.test(text)) && !/\b\d{9,}\b/.test(text)) return { ok: false, reason: 'not-a-payment' }
 
   const amount = amountOf(text)
   if (!amount) return { ok: false, reason: 'no-amount' }
