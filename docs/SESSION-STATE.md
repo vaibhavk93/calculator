@@ -1,5 +1,12 @@
 # Session state: resume here
 
+## Round 25 (2026-11-11): the SMS Inbox and learning plan (plan only, nothing built yet)
+
+Owner asked for always-listening SMS capture, a review Inbox, and in-app learning (same payee, context like commute UPI). A critic (2026-11-11) said
+**build smaller**: no background receiver and no auto context tagging yet; Inbox on scan-on-open, exact-payee learning with Undo, measure, then decide.
+Plan: `docs/SMS-INBOX-PLAN.md` (phases 0 to 5). Phase 0 = prove the existing scan on the real phone (never done; Android 15+ "restricted settings" may block it).
+**Owner decisions pending:** always-on listening now or later; Play Store vs personal app (Play restricts SMS permissions); auto-tag after two identical confirmations.
+
 ## Round 24 (2026-11-11): Day view in Budget
 
 **Owner pain:** on a day with many transactions across card, UPI and cash, they could not later tell what happened, which route each used, and why. Smaller plan approved (no new fields, no reason chips, no notifications).

@@ -244,6 +244,10 @@ notifications** (every bill owns a Due card and a reminder), so the Budget switc
 (Calculate, Tools), not 3. Also hidden with Notes off: the Save button and the next-step chip on a calculator, "Export notes". Not hidden: reminder time and
 permission rows in Settings (reminders still ring). A "missed reminder" banner lives on Due, so it is not seen while Due is hidden.
 
+### Block H — SMS Inbox and learning *(owner, 2026-11-11; plan only, see `docs/SMS-INBOX-PLAN.md`)*
+
+Phase 0 prove the scan on the phone, 1 Day view (Done), 2 Inbox on scan-on-open, 3 exact-payee learning with Undo, 4 measure 2-4 weeks, 5 optional context hints / always-on (gated). Critic: build smaller.
+
 ### Block F — Phone truth
 
 Reminders really firing · backup/restore round-trip · TalkBack · rotation · the SMS scan window fix.
