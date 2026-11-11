@@ -9,6 +9,9 @@ import { useApp, useAppStore } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
 import { D } from '../../engine'
 import { MAX_NOTE, categoryName, instrumentLabel, modeLabel, type BudgetData } from '../../lib/budget'
+import { captureStatus } from '../../lib/captureStatus'
+import type { SmsPermission } from '../../lib/smsQueue'
+import { jumpToSettingsSection } from '../../lib/settingsJump'
 import { pendingItems, recentlyAuto, suggestionConfirmed, type InboxItem } from '../../lib/inbox'
 import { drainNow, smsPort } from '../../store/smsRuntime'
 import { CaptureExplainer } from './CaptureExplainer'
@@ -84,6 +87,7 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
   const paused = useApp((s) => s.settings.smsAutoPausedAt)
   const mode = useApp((s) => s.settings.smsMode)
   const update = useApp((s) => s.updateSettings)
+  const setOverlay = useApp((s) => s.setOverlay)
   const approve = useApp((s) => s.approveInbox)
   const approveSuggested = useApp((s) => s.approveSuggested)
   const reject = useApp((s) => s.rejectInbox)
@@ -99,6 +103,12 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
+  // What Android allows, so an empty list can say why it may stay empty.
+  const [perm, setPerm] = useState<SmsPermission | null>(null)
+  useEffect(() => {
+    const port = smsPort()
+    if (port) void port.permission().then(setPerm, () => setPerm('unavailable'))
+  }, [capture])
 
   const pending = pendingItems(budget)
   const ready = pending.filter((i) => suggestionConfirmed(budget, i))
@@ -177,7 +187,11 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="screen" role="dialog" aria-modal="true" aria-label="To review">
-      <ScreenHeader title="To review" onBack={onBack} />
+      <ScreenHeader
+        title="To review"
+        onBack={onBack}
+        action={<button type="button" className="link-btn" aria-label="Bank message settings" onClick={() => { jumpToSettingsSection('bank'); setOverlay('settings') }}>Settings</button>}
+      />
       <div className="screen__body" ref={bodyRef}>
         {paused !== null && (
           <p className="note" role="status">
@@ -186,16 +200,19 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
           </p>
         )}
         {empty ? (
-          <EmptyState
-            level="h2"
-            title={capture ? 'Nothing to review' : 'Bank payments, caught for you'}
-            action={
-              capture ? <button type="button" className="btn" onClick={() => void check()}>{busy ? 'Checking…' : 'Check for new messages'}</button>
-              : smsPort() ? <button type="button" className="btn btn--primary" onClick={() => setExplain(true)}>Capture bank messages</button> : undefined
-            }
-          >
-            {capture ? 'New bank payments show up here. Calc checks whenever you open the app. Nothing is added to your budget until you approve it.' : 'Turn on capture and Calc catches bank payments while the app is closed. They wait here until you approve them.'}
-          </EmptyState>
+          <>
+            <EmptyState
+              level="h2"
+              title={capture ? 'Nothing to review' : 'Bank payments, caught for you'}
+              action={
+                capture ? <button type="button" className="btn" onClick={() => void check()}>{busy ? 'Checking…' : 'Check for new messages'}</button>
+                : smsPort() ? <button type="button" className="btn btn--primary" onClick={() => setExplain(true)}>Capture bank messages</button> : undefined
+              }
+            >
+              {capture ? 'Bank messages are caught while Calc is closed and wait here when you open it. Nothing yet.' : 'Turn on capture and Calc catches bank payments while the app is closed. They wait here until you approve them.'}
+            </EmptyState>
+            <p className="manage__help">{captureStatus({ hasPort: smsPort() !== null, capture, mode, perm })}</p>
+          </>
         ) : (
           <>
             {pending.length > 0 && (

@@ -1,5 +1,5 @@
 import { D, type Dec } from '../engine'
-import { countsAsSpend, dayLongLabel, instrumentLabel, modeLabel, signedAmount, type BudgetData, type BudgetExpense, type ExpenseDraft } from './budget'
+import { countsAsSpend, dayKey, dayLongLabel, instrumentLabel, modeLabel, signedAmount, type BudgetData, type BudgetExpense, type ExpenseDraft } from './budget'
 
 /** One way of paying on a day, with what it spent. */
 export interface DayRoute {
@@ -85,3 +85,15 @@ export const draftWithNote = (e: BudgetExpense, note: string): ExpenseDraft => (
 
 /** "Tue 4 Nov", with the year added when it is not this year ("Tue 4 Nov 2025"). */
 export const dayTitle = (date: string, now: Date = new Date()): string => (date.slice(0, 4) === String(now.getFullYear()) ? dayLongLabel(date) : `${dayLongLabel(date)} ${date.slice(0, 4)}`)
+
+/**
+ * The days either side of `date` for the Day view's arrows. A neighbour is the next calendar day, so a quiet day is still reachable.
+ * `prev` is null at the first day anything was entered (or on it); `next` is null on today or later. Deleted entries do not count.
+ */
+export function neighbourDays(budget: Pick<BudgetData, 'expenses'>, date: string, today: string): { prev: string | null; next: string | null } {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number]
+  const step = (n: number) => dayKey(new Date(y, m - 1, d + n))
+  let first: string | null = null
+  for (const e of budget.expenses) if (e.deletedAt === null && (first === null || e.date < first)) first = e.date
+  return { prev: first !== null && date > first ? step(-1) : null, next: date < today ? step(1) : null }
+}

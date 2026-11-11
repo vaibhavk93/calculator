@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BudgetData, BudgetExpense, PayInstrument } from './budget'
-import { dayTitle, dayView, draftWithNote, entryKind, routeLabel } from './dayView'
+import { dayTitle, dayView, draftWithNote, entryKind, neighbourDays, routeLabel } from './dayView'
 
 const e = (id: string, amount: string, o: Partial<BudgetExpense> = {}): BudgetExpense => ({ id, date: '2026-11-04', amount, categoryId: null, mode: null, instrumentId: null, note: '', deletedAt: null, ...o })
 const inst = (id: string, name: string, kind: PayInstrument['kind'], last4 = ''): PayInstrument => ({ id, name, kind, network: null, bank: '', last4, rewardNote: '', deletedAt: null })
@@ -128,5 +128,20 @@ describe('dayTitle', () => {
   it('adds the year only when it is not this year', () => {
     expect(dayTitle('2026-11-04', new Date(2026, 10, 11))).toBe('Wed 4 Nov')
     expect(dayTitle('2025-11-04', new Date(2026, 10, 11))).toBe('Tue 4 Nov 2025')
+  })
+})
+
+describe('neighbourDays', () => {
+  const b = budgetOf([e('n', '5', { date: '2026-11-10' }), e('o', '5', { date: '2026-10-31' }), e('x', '5', { date: '2026-09-01', deletedAt: 1 })])
+  it('steps one calendar day either way, across a month end', () => {
+    expect(neighbourDays(b, '2026-11-01', '2026-11-15')).toEqual({ prev: '2026-10-31', next: '2026-11-02' })
+  })
+  it('has no day before the first live entry and none after today', () => {
+    expect(neighbourDays(b, '2026-10-31', '2026-11-15').prev).toBeNull()
+    expect(neighbourDays(b, '2026-11-15', '2026-11-15').next).toBeNull()
+    expect(neighbourDays(b, '2026-11-16', '2026-11-15').next).toBeNull()
+  })
+  it('has no way back when nothing was ever entered', () => {
+    expect(neighbourDays(budgetOf([]), '2026-11-15', '2026-11-15')).toEqual({ prev: null, next: null })
   })
 })

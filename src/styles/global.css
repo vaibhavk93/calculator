@@ -188,6 +188,15 @@ button:disabled {
   background: var(--key-op-pressed);
 }
 
+/* An arrow with nowhere to go (the Day view's Previous day on the first day). Quiet, and not tappable. */
+.icon-btn:disabled {
+  color: var(--ink-3);
+}
+
+.icon-btn:disabled:active {
+  background: none;
+}
+
 /* --------------------------------------------------------------- calculator */
 
 .calc {

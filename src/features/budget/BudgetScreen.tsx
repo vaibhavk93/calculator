@@ -8,6 +8,7 @@ import { D } from '../../engine'
 import { limitState, monthFlow, monthKey, monthLabel, monthShortLabel, needsAttention, paceLeft, summarise } from '../../lib/budget'
 import { pendingItems, recentlyAuto } from '../../lib/inbox'
 import { billTotals, liveBills } from '../../lib/recurring'
+import { jumpToSettingsSection } from '../../lib/settingsJump'
 import { smsPort } from '../../store/smsRuntime'
 import { useTour } from '../onboarding/useTour'
 import { Segmented } from '../settings/controls'
@@ -72,6 +73,8 @@ export function BudgetScreen() {
   const toReview = pendingItems(budget).length
   const autoRecent = recentlyAuto(budget, Date.now()).length
   const capturing = useApp((x) => x.settings.smsCapture)
+  const setOverlay = useApp((x) => x.setOverlay)
+  const bankSettings = () => { jumpToSettingsSection('bank'); setOverlay('settings') }
   const never = budget.expenses.every((e) => e.deletedAt !== null)
   const goSummary = (tab: SummaryTab, categoryId: string | null = null) => {
     setOpen({ tab, categoryId })
@@ -241,13 +244,14 @@ export function BudgetScreen() {
       </div>
 
       {view === 'spending' && tour.row}
-      {/* Quiet: one row, only when something waits (or the app added something by itself lately, so Undo is never out of reach). No badge, no notification. */}
-      {view === 'spending' && (toReview > 0 || autoRecent > 0) && (
+      {/* Quiet and always here, so the bank-message features can be found with nothing waiting: a plain ruled row, no badge, no notification.
+          Waiting or lately auto-added: say so (Undo is never out of reach). Capture on: "To review, Nothing waiting". Capture off: how to set it up. */}
+      {view === 'spending' && (
         <div className="group budget__review">
-          <button type="button" className="navrow tap-row" onClick={() => setPage('inbox')}>
+          <button type="button" className="navrow tap-row" onClick={() => (toReview > 0 || autoRecent > 0 || capturing ? setPage('inbox') : setExplain(true))}>
             <span className="row__text">
-              <span className="row__label">{toReview > 0 ? `${toReview} to review` : `${autoRecent} auto-added`}</span>
-              <span className="row__hint">{toReview > 0 ? 'Bank payments waiting for your OK' : 'Added for you lately. Check them or undo one'}</span>
+              <span className="row__label">{toReview > 0 ? `${toReview} to review` : autoRecent > 0 ? `${autoRecent} auto-added` : capturing ? 'To review' : 'Catch bank payments automatically'}</span>
+              <span className="row__hint">{toReview > 0 ? 'Bank payments waiting for your OK' : autoRecent > 0 ? 'Added for you lately. Check them or undo one' : capturing ? 'Nothing waiting' : 'Off. Tap to set it up'}</span>
             </span>
             <Icon name="chevron" size={18} className="navrow__chev" />
           </button>
@@ -264,6 +268,8 @@ export function BudgetScreen() {
               : `Biggest: ${biggest ? `${biggest.name} ${money(biggest.spent)}` : `Uncategorised ${money(s.uncategorised)}`} · ${entriesWord(s.entries.length)}`)}
             {moreRow('Bills and subscriptions', () => setPage('bills'), bills.count > 0 ? `${bills.count} running · about ${money(bills.perMonth)} a month = ${money(bills.perYear)} a year` : undefined)}
             {moreRow('Add from bank messages', () => setPage('import'))}
+            {moreRow('To review (bank messages)', () => setPage('inbox'), toReview > 0 ? `${toReview} waiting` : capturing ? 'Nothing waiting' : 'Capture is off')}
+            {moreRow('Bank message settings', bankSettings, 'Capture on or off, and what happens when a payment arrives')}
             {moreRow('Categories and cards', () => setPage('manage'))}
             {moreRow('Rules', () => setPage('rules'), rules === 0 ? 'Pick a category by merchant when adding from messages' : `${rules} ${rules === 1 ? 'rule' : 'rules'}`)}
           </div>

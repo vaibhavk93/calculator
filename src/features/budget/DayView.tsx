@@ -1,12 +1,13 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { FormField } from '../../components/FormField'
+import { Icon } from '../../components/Icon'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
 import { D } from '../../engine'
 import { MAX_NOTE, SETTLEMENT_LABEL, categoryName, dayKey, type BudgetExpense } from '../../lib/budget'
-import { dayTitle, dayView, draftWithNote, entryKind, routeLabel } from '../../lib/dayView'
+import { dayTitle, dayView, draftWithNote, entryKind, neighbourDays, routeLabel } from '../../lib/dayView'
 import { GuardedFooter, focusField, useDiscardGuard } from './formKit'
 import { ExpenseSheet } from './sheets'
 import { FitHero, useMoney } from './SpendSummary'
@@ -73,16 +74,20 @@ type SheetState = null | { edit: string | null }
  * One bare hero (the day's spend, worked out like the month total), one quiet line of per-route subtotals, then a plain ruled list.
  * Nothing is stored for it: it is a view over the entries (src/lib/dayView.ts).
  */
-export function DayView({ date, onBack }: { date: string; onBack: () => void }) {
+export function DayView({ date: opened, onBack }: { date: string; onBack: () => void }) {
   const budget = useApp((s) => s.budget)
   const money = useMoney()
+  // The arrows move through days without leaving this screen: Back always returns to where the Day view was opened from.
+  const [date, setDate] = useState(opened)
   const [sheet, setSheet] = useState<SheetState>(null)
   const [noteFor, setNoteFor] = useState<string | null>(null)
   useBackHandler(true, onBack)
 
   const v = useMemo(() => dayView(budget, date), [budget, date])
   const title = dayTitle(date)
-  const isToday = date === dayKey(new Date())
+  const today = dayKey(new Date())
+  const isToday = date === today
+  const near = neighbourDays(budget, date, today)
   const noting = noteFor === null ? undefined : v.entries.find((e) => e.id === noteFor)
   const editing = sheet?.edit == null ? undefined : budget.expenses.find((e) => e.id === sheet.edit)
 
@@ -119,7 +124,20 @@ export function DayView({ date, onBack }: { date: string; onBack: () => void }) 
 
   return (
     <div className="screen" role="dialog" aria-modal="true" aria-label={`Day: ${title}`}>
-      <ScreenHeader title={title} onBack={onBack} />
+      <ScreenHeader
+        title={title}
+        onBack={onBack}
+        icons={
+          <>
+            <button type="button" className="icon-btn" aria-label="Previous day" title="Previous day" disabled={near.prev === null} onClick={() => near.prev && setDate(near.prev)}>
+              <Icon name="back" size={20} />
+            </button>
+            <button type="button" className="icon-btn" aria-label="Next day" title="Next day" disabled={near.next === null} onClick={() => near.next && setDate(near.next)}>
+              <Icon name="chevron" size={20} />
+            </button>
+          </>
+        }
+      />
       <div className="screen__body">
         {v.entries.length === 0 ? (
           <div className="day__empty">

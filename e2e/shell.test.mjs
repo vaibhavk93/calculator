@@ -1259,7 +1259,7 @@ T('R08', 'UX', 'tab labels are not truncated at 320 px width and 200% font', asy
 })
 T('R09', 'UI', 'Settings headings, section order and the Reminders-free layout read naturally (observation of heading list)', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page)
-  const h = await page.locator('.screen h1, .screen h2').allInnerTexts(); ok(h.join('|') === 'Settings|Appearance|Numbers|Show in the app|Behaviour|Reminders|More', h.join('|'))
+  const h = await page.locator('.screen h1, .screen h2').allInnerTexts(); ok(h.join('|') === 'Settings|Bank messages|Appearance|Numbers|Show in the app|Behaviour|Reminders|More', h.join('|'))
 })
 T('R10', 'RUNTIME', 'document title, theme-color meta and html lang stay valid after a theme change', async (app) => {
   const { page } = await open(app, { data: seed() }); await openSettings(page); await page.click('[role=radio]:text-is("Light")')

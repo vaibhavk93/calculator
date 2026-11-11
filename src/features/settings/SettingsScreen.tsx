@@ -7,6 +7,7 @@ import { backupNudge, countItems } from '../../lib/backupNudge'
 import { checkReminderPermissions, ensurePermission, notificationsSupported, openExactAlarmSettings, scheduleTestReminder, type ReminderPermissions } from '../../lib/notifications'
 import { moduleOn, startTab, tabOn, withModule } from '../../lib/modules'
 import { timeLabel } from '../../lib/reminders'
+import { takeSettingsSection } from '../../lib/settingsJump'
 import { ACCENT_NAMES, ACCENTS } from '../../lib/theme'
 import { TABS, type CopyFormat, type Tab } from '../../store/types'
 import pkg from '../../../package.json'
@@ -23,10 +24,10 @@ const TAB_LABEL: Record<Tab, string> = { calculate: 'Calculate', tools: 'Tools',
 const DECIMAL_CHOICES = ['auto', ...Array.from({ length: 11 }, (_, i) => String(i))]
 
 /** One titled group of settings: a small heading over ONE flat panel of rows (docs/design-reference, Settings). */
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, children, headId }: { title: string; children: ReactNode; /** Set when another screen jumps here: the heading can then be found and focused. */ headId?: string }) {
   return (
     <section className="sect sect--settings" aria-label={title}>
-      <h2 className="sect__head">{title}</h2>
+      <h2 className="sect__head" id={headId} tabIndex={headId ? -1 : undefined}>{title}</h2>
       <div className="settings__panel">{children}</div>
     </section>
   )
@@ -159,6 +160,14 @@ export function SettingsScreen() {
   const items = useApp((x) => countItems(x))
   const nudge = backupNudge(items, s.lastBackupAt, s.backupDismissedAt, Date.now())
 
+  // Arriving from a link elsewhere ("Bank message settings"): bring that section into view and put focus on its heading.
+  useEffect(() => {
+    if (takeSettingsSection() !== 'bank') return
+    const head = document.getElementById('settings-bank')
+    head?.scrollIntoView({ block: 'start' })
+    head?.focus({ preventScroll: true })
+  }, [])
+
   return (
     <div className="screen" role="dialog" aria-modal="true" aria-label="Settings">
       <ScreenHeader title="Settings" onBack={() => setOverlay('none')} />
@@ -172,6 +181,9 @@ export function SettingsScreen() {
             </button>
           </p>
         )}
+        {/* First, so the SMS features are the first thing found here (and the target of the jump from Budget and To review). */}
+        {moduleOn(s, 'budget') && <Section title="Bank messages" headId="settings-bank"><BankMessages /></Section>}
+
         <Section title="Appearance">
           <Row label="Theme">
             <Segmented
@@ -270,8 +282,6 @@ export function SettingsScreen() {
             <Toggle label="Keep calculation history" checked={s.keepHistory} onChange={(keepHistory) => update({ keepHistory })} />
           </Row>
         </Section>
-
-        {moduleOn(s, 'budget') && <Section title="Bank messages"><BankMessages /></Section>}
 
         <ReminderSettings />
 

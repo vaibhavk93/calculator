@@ -128,10 +128,11 @@ T('IN05', 'drain: payments land in To review, OTP and offers are dropped, nothin
   await close()
 })
 
-T('IN06', 'the "N to review" row is hidden at 0, and a new message appears when the app comes back to the front', async () => {
+T('IN06', 'the review row is always on Budget home: "Nothing waiting" at zero, then "1 to review" when a new message appears as the app comes back to the front', async () => {
   const { page, close } = await open({ messages: [] })
   await settle(page)
-  eq(await page.locator('.budget__review').count(), 0, 'hidden at zero')
+  eq(await page.locator('.budget__review').count(), 1, 'one quiet row, never hidden')
+  eq((await page.locator('.budget__review').innerText()).replace(/\s+/g, ' ').trim(), 'To review Nothing waiting')
   await page.evaluate(() => window.__smsQueue.push({ id: 'late1', sender: 'VM-HDFCBK', body: 'Rs.99.00 spent on HDFC Bank Credit Card XX1234 at ZOMATO on 15-11-26. Ref 999900000001', receivedAt: Date.now() }))
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
   await page.getByRole('button', { name: '1 to review' }).waitFor()
@@ -348,7 +349,7 @@ T('IN18', 'the manual scan and the queue never count one message twice: a messag
   const swiggyEntry = { id: 'x1', date: '2026-11-15', amount: '450', categoryId: 'c-food', mode: 'credit', instrumentId: 'i-card', note: 'Swiggy', deletedAt: null }
   const { page, close } = await open({ b: budget({ expenses: [swiggyEntry] }), messages: [M(swiggy('450.00'))] })
   await settle(page)
-  eq(await page.locator('.budget__review').count(), 0, 'already in the budget: not offered')
+  eq((await page.locator('.budget__review').innerText()).replace(/\s+/g, ' ').trim(), 'To review Nothing waiting', 'already in the budget: not offered')
   eq(await queueLeft(page), 0, 'but acked')
   await close()
 })
@@ -403,6 +404,107 @@ T('IN20', 'Ignore: a card is dropped on arrival (acked, never stored), listed in
   await close()
 })
 
+const someEntry = { id: 'x0', date: '2026-11-14', amount: '5', categoryId: null, mode: null, instrumentId: null, note: 'x', deletedAt: null } // so Budget home shows More in Budget
+T('IN21', 'Budget home has a quiet row with capture OFF: "Catch bank payments automatically", Off. Tap to set it up, opens the explainer; on the web it says Android only', async () => {
+  let o = await open({ capture: false, permission: 'prompt', messages: [] })
+  const row = o.page.locator('.budget__review')
+  eq(await row.count(), 1, 'row is there with capture off')
+  eq((await row.innerText()).replace(/\s+/g, ' ').trim(), 'Catch bank payments automatically Off. Tap to set it up')
+  await row.getByRole('button').click()
+  const sheet = o.page.locator('.sheet')
+  await sheet.waitFor()
+  ok((await sheet.innerText()).includes('Capture bank messages?'), 'the explainer opened')
+  await sheet.getByRole('button', { name: 'Not now' }).click()
+  eq((await stored(o.page)).settings.smsCapture ?? false, false, 'Not now leaves it off')
+  await o.close()
+  o = await open({ capture: false, noQueue: true })
+  await o.page.locator('.budget__review').getByRole('button').click()
+  ok((await o.page.locator('.sheet').innerText()).includes('works only in the Android app'), 'web says Android only')
+  await o.close()
+})
+
+T('IN22', 'Budget home row with capture ON: "To review / Nothing waiting" opens the empty To review; with items it is "N to review"; More in Budget has both new rows', async () => {
+  let o = await open({ messages: [], b: budget({ expenses: [someEntry] }) })
+  await settle(o.page)
+  await o.page.locator('.budget__review').getByRole('button').click()
+  await REVIEW(o.page).waitFor()
+  await REVIEW(o.page).getByRole('button', { name: 'Back', exact: true }).click()
+  await o.page.getByRole('button', { name: 'More in Budget' }).click()
+  const more = o.page.locator('.sheet')
+  const t = (await more.innerText()).replace(/\s+/g, ' ')
+  for (const w of ['To review (bank messages)', 'Nothing waiting', 'Bank message settings']) ok(t.includes(w), `More in Budget lacks "${w}": ${t}`)
+  await more.getByRole('button', { name: /To review \(bank messages\)/ }).click()
+  await REVIEW(o.page).waitFor()
+  await o.close()
+  o = await open({ messages: [M(swiggy()), M(swiggy('120.00', 'ZOMATO'))], b: budget({ expenses: [someEntry] }) })
+  await settle(o.page)
+  eq((await o.page.locator('.budget__review').innerText()).replace(/\s+/g, ' ').trim(), '2 to review Bank payments waiting for your OK')
+  await o.page.getByRole('button', { name: 'More in Budget' }).click()
+  ok((await o.page.locator('.sheet').innerText()).includes('2 waiting'), 'More in Budget counts them')
+  await o.close()
+})
+
+const bankHead = (page) => page.locator('.screen[aria-label="Settings"] h2#settings-bank')
+const landedOnBank = async (page) => {
+  const sc = page.locator('.screen[aria-label="Settings"]')
+  await sc.waitFor()
+  await page.waitForTimeout(300)
+  eq(await page.evaluate(() => document.activeElement?.id), 'settings-bank', 'the Bank messages heading has focus')
+  const box = await bankHead(page).boundingBox()
+  const vh = page.viewportSize().height
+  ok(box && box.y >= 0 && box.y + box.height <= vh, `heading is in view: ${JSON.stringify(box)}`)
+  eq(await sc.locator('h2.sect__head').first().innerText(), 'Bank messages', 'it is the FIRST section')
+}
+
+T('IN23', 'jump to Settings > Bank messages from the To review header and from More in Budget: first section, scrolled into view, heading focused', async () => {
+  const { page, errors, close } = await open({ messages: [], b: budget({ expenses: [someEntry] }) })
+  await settle(page)
+  await page.locator('.budget__review').getByRole('button').click()
+  await REVIEW(page).waitFor()
+  await REVIEW(page).getByRole('button', { name: 'Bank message settings' }).click()
+  await landedOnBank(page)
+  await page.locator('.screen[aria-label="Settings"]').getByRole('button', { name: 'Back', exact: true }).click()
+  await REVIEW(page).waitFor()
+  await REVIEW(page).getByRole('button', { name: 'Back', exact: true }).click()
+  await page.getByRole('button', { name: 'More in Budget' }).click()
+  await page.locator('.sheet').getByRole('button', { name: /Bank message settings/ }).click()
+  await landedOnBank(page)
+  eq(errors, [], 'console errors')
+  await close()
+  // Opened the normal way (the gear on Calculate), nothing is focused or scrolled for it.
+  const o = await open({ messages: [], startupTab: 'calculate' })
+  await openSettings(o.page)
+  await o.page.waitForTimeout(300)
+  ok(await o.page.evaluate(() => document.activeElement?.id) !== 'settings-bank', 'a plain open does not steal focus')
+  await o.close()
+})
+
+T('IN24', 'empty To review explains how it fills and shows the state: capture on + mode, not allowed by Android, off', async () => {
+  let o = await open({ messages: [], mode: 'review' })
+  await settle(o.page)
+  await o.page.locator('.budget__review').getByRole('button').click()
+  let t = (await REVIEW(o.page).innerText()).replace(/\s+/g, ' ')
+  ok(t.includes('Bank messages are caught while Calc is closed and wait here when you open it. Nothing yet.'), 'plain how-it-fills: ' + t)
+  ok(t.includes('Capture is on. When a payment arrives: Review first.'), 'state: ' + t)
+  await o.close()
+  o = await open({ messages: [], mode: 'auto' })
+  await settle(o.page)
+  await o.page.locator('.budget__review').getByRole('button').click()
+  ok((await REVIEW(o.page).innerText()).includes('When a payment arrives: Auto-add the confident ones.'), 'auto mode named')
+  await o.close()
+  o = await open({ messages: [], permission: 'denied' })
+  await settle(o.page)
+  await o.page.locator('.budget__review').getByRole('button').click()
+  ok((await REVIEW(o.page).innerText()).replace(/\s+/g, ' ').includes('Android is not allowing it'), 'no permission is said plainly')
+  await o.close()
+  o = await open({ capture: false, permission: 'prompt', messages: [], b: budget({ expenses: [someEntry] }) })
+  await o.page.getByRole('button', { name: 'More in Budget' }).click()
+  await o.page.locator('.sheet').getByRole('button', { name: /To review \(bank messages\)/ }).click()
+  t = (await REVIEW(o.page).innerText()).replace(/\s+/g, ' ')
+  ok(t.includes('Capture is off. Calc reads no messages.'), 'off: ' + t)
+  await o.close()
+})
+
 // ------------------------------------------------------------------ runner
 const only = process.argv.slice(2)
 if (process.env.APP_URL) {
@@ -411,7 +513,7 @@ if (process.env.APP_URL) {
 } else APP = await startApp()
 let failed = 0
 for (const c of cases.filter((x) => only.length === 0 || only.some((p) => x.id.startsWith(p)))) {
-  try { await c.fn(); console.log(`PASS ${c.id} ${c.title}`) } catch (e) { failed++; console.log(`FAIL ${c.id} ${c.title} :: ${String(e.message).split('\n')[0].slice(0, 500)}`) }
+  try { await c.fn(); console.log(`PASS ${c.id} ${c.title}`) } catch (e) { failed++; console.log(`FAIL ${c.id} ${c.title} :: ${(process.env.FULL ? e.message : String(e.message).split('\n')[0].slice(0, 500))}`) }
 }
 await APP.stop()
 console.log(`\n${cases.length - failed} passed, ${failed} failed`)

@@ -180,6 +180,42 @@ T('DV10', 'search results are grouped by day too', async () => {
   await close()
 })
 
+const dayTitleOf = (page) => DV(page).locator('h1').innerText()
+T('DV11', 'Previous and Next day arrows step one day, and are disabled at the first entry and at today', async () => {
+  const { page, errors, close } = await open()
+  await openDay(page) // Sat 14 Nov
+  const prev = DV(page).getByRole('button', { name: 'Previous day' })
+  const next = DV(page).getByRole('button', { name: 'Next day' })
+  eq([await prev.isDisabled(), await next.isDisabled()], [false, false], 'both enabled mid-range')
+  await next.click()
+  eq(await dayTitleOf(page), 'Sun 15 Nov', 'next day')
+  eq(await next.isDisabled(), true, 'nothing after today')
+  ok((await DV(page).innerText()).includes('Nothing was entered for Sun 15 Nov'), 'a quiet day says so')
+  await prev.click()
+  await prev.click()
+  eq(await dayTitleOf(page), 'Fri 13 Nov', 'two steps back')
+  eq(await prev.isDisabled(), true, 'nothing before the first entry')
+  eq((await DV(page).locator('.budget__hero').innerText()).trim(), '₹77', 'that day total')
+  // Back leaves the Day view in one tap whatever day it moved to; Add starts on the day shown.
+  await DV(page).getByRole('button', { name: 'Add expense' }).click()
+  eq(await page.locator('#exp-date').inputValue(), '2026-11-13', 'Add uses the shown day')
+  await page.locator('.sheet__close').click()
+  await DV(page).getByRole('button', { name: 'Back' }).click()
+  eq(await DV(page).count(), 0, 'back is one tap')
+  eq(errors, [], 'console errors')
+  await close()
+})
+
+T('DV12', 'an entry that was auto-added from a message says "Auto-added"; others do not', async () => {
+  const b = budget([exp(DAY, '450', { mode: 'credit', instrumentId: 'i-neo', categoryId: 'c-food', note: 'Swiggy', auto: true }), exp(DAY, '60', { mode: 'cash', note: 'Chai' })])
+  const { page, close } = await open(b)
+  await openDay(page)
+  eq(await DV(page).getByText('Auto-added').count(), 1, 'exactly one entry says it')
+  ok((await DV(page).locator('.day__item', { hasText: 'Swiggy' }).innerText()).includes('Auto-added'), 'on the Swiggy row')
+  ok(!(await DV(page).locator('.day__item', { hasText: 'Chai' }).innerText()).includes('Auto-added'), 'not on the Chai row')
+  await close()
+})
+
 // ------------------------------------------------------------------ runner
 const only = process.argv.slice(2)
 if (process.env.APP_URL) {
