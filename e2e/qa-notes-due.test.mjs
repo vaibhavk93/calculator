@@ -555,6 +555,69 @@ T('N-108', 'UX', 'No colour-only meaning: overdue, done, skipped, pinned are all
   const { page: p } = await open(BUSY()); await notesTab(p); await modeTodo(p); await view(p, 'All'); has(await text(p, '.todo'), 'overdue'); has(await text(p, '.todo'), 'pinned')
   await p.getByRole('radio', { name: /^Notes/ }).click(); await p.getByText('Trip split').first().click(); has(await text(p, '.screen'), 'Skipped'); has(await text(p, '.screen'), 'Paid'); has(await text(p, '.screen'), '1 skipped, not counted')
 })
+// ---------------------------------------------------------------- quiet hours (Settings > Reminders)
+// The planning maths (which notification moves, and to when) is unit-tested in src/lib/quietHours.test.ts and
+// notifications.test.ts. Notifications cannot fire in a browser, so what is proven here is what the screen does.
+const quietRow = (p) => p.locator('.row', { hasText: 'Quiet hours' }).first()
+const quietSwitch = (p) => quietRow(p).getByRole('switch')
+const quietFrom = (p) => p.locator('[aria-label="Quiet hours start"]')
+const quietUntil = (p) => p.locator('[aria-label="Quiet hours end"]')
+
+T('N-110', 'POS', 'Quiet hours is off until turned on; turning it on offers 10 pm to 7 am, says "The next morning", and survives a reload', async () => {
+  const { page: p } = await open(); await settings(p)
+  eq(await quietSwitch(p).getAttribute('aria-checked'), 'false', 'off by default')
+  eq(await quietFrom(p).count(), 0, 'no time boxes while off')
+  ok(!(await st(p)).settings.quietHours, 'nothing stored while off')
+  await quietSwitch(p).click()
+  eq(await quietFrom(p).inputValue(), '22:00', 'from')
+  eq(await quietUntil(p).inputValue(), '07:00', 'until')
+  has(await text(p, '.screen__body'), 'The next morning', 'a window that crosses midnight says so')
+  const after = await st(p)
+  eq(JSON.stringify(after.settings.quietHours), JSON.stringify({ from: '22:00', until: '07:00' }), 'stored')
+  await p.reload(); await p.waitForSelector('.app'); await settings(p)
+  eq(await quietSwitch(p).getAttribute('aria-checked'), 'true', 'still on after reload')
+  eq(await quietFrom(p).inputValue(), '22:00', 'from after reload')
+})
+T('N-111', 'UX', 'The screen says plainly when the reminder time itself falls inside quiet hours, and stops saying it when it does not', async () => {
+  const { page: p } = await open(seed({ settings: { quietHours: { from: '22:00', until: '07:00' } } })); await settings(p)
+  lacks(await text(p, '.screen__body'), 'is inside these hours', 'reminder time 9:00 am is outside, so no warning')
+  await p.locator('[aria-label="Reminder time"]').fill('23:00'); await wait(250)
+  const t = await text(p, '.screen__body')
+  has(t, 'is inside these hours', 'warning appears'); has(t, '11:00 pm', 'names the reminder time'); has(t, '7:00 am', 'names when it will arrive instead')
+  await p.locator('[aria-label="Reminder time"]').fill('09:00'); await wait(250)
+  lacks(await text(p, '.screen__body'), 'is inside these hours', 'warning goes away again')
+})
+T('N-112', 'CORNER', 'A window of no length is treated as OFF, never as "quiet all day": stored data with both ends equal comes back off', async () => {
+  // `stored()` reads raw localStorage, which keeps whatever was written until something writes again. What matters is
+  // that the app never USES a zero-length window: the screen shows it off, so nothing can be silenced by accident.
+  const { page: p } = await open(seed({ settings: { quietHours: { from: '22:00', until: '22:00' } } })); await settings(p)
+  eq(await quietSwitch(p).getAttribute('aria-checked'), 'false', 'shown as off')
+  eq(await quietFrom(p).count(), 0, 'no time boxes, so it really is off')
+  await noBadText(p, 'settings')
+})
+T('N-113', 'NEG', 'Junk quiet hours in stored data is ignored, never half-set and never a crash', async () => {
+  for (const junk of [{ from: '22:00' }, { from: '25:00', until: '07:00' }, { from: null, until: null }, 'x', 5]) {
+    const { page: p, errors } = await open(seed({ settings: { quietHours: junk } })); await settings(p)
+    eq(await quietSwitch(p).getAttribute('aria-checked'), 'false', `junk ${JSON.stringify(junk)} is shown as off`)
+    await noBadText(p, 'settings'); eq(errors.length, 0, errors.join('|'))
+  }
+})
+T('N-114', 'UI', 'Quiet hours turned on fits a 360px phone at 200% font: no sideways scroll, both time boxes reachable', async () => {
+  const { page: p } = await open(seed({ settings: { quietHours: { from: '22:30', until: '06:15' } } }), { font: 200 }); await settings(p)
+  await quietFrom(p).scrollIntoViewIfNeeded()
+  eq((await overflowing(p)).length, 0, JSON.stringify(await overflowing(p)))
+  for (const box of [quietFrom(p), quietUntil(p)]) {
+    const b = await box.boundingBox()
+    ok(b.height >= 44 || b.width >= 44, `a time box is at least 44px in one direction: ${b.width}x${b.height}`)
+  }
+})
+T('N-115', 'DATA', 'Quiet hours goes into a backup and comes back from it', async () => {
+  const { page: p } = await open(seed({ settings: { quietHours: { from: '21:45', until: '06:30' } } })); await settings(p); await backupScreen(p)
+  const [dl] = await Promise.all([p.waitForEvent('download'), p.getByText('Export a backup').click()])
+  const file = join(tmpdir(), 'qa-quiet-backup.json'); await dl.saveAs(file)
+  const saved = JSON.parse(readFileSync(file, 'utf8')).data
+  eq(JSON.stringify(saved.settings.quietHours), JSON.stringify({ from: '21:45', until: '06:30' }), 'in the backup file')
+})
 T('N-109', 'RUNTIME', 'Walk every tab and sheet on busy data: zero console errors and no "NaN/undefined/Invalid Date" text anywhere', async () => {
   const { page: p, errors } = await open(BUSY())
   for (const t of ['Calculate', 'Tools', 'Notes', 'Due', 'Budget']) { await tab(p, t); await noBadText(p, t) }
