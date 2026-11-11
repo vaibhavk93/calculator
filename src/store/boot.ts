@@ -6,6 +6,11 @@ export interface Booted {
   store: AppStore
   /** Writes immediately. Resolves when storage has accepted the data. */
   flush: () => Promise<void>
+  /**
+   * Like flush, but says whether the data is really on disk: false when storage could not be read this session, when the write failed,
+   * or when there was nothing the app is allowed to write. The SMS drain acks the phone's queue only after this says true.
+   */
+  persist: () => Promise<boolean>
 }
 
 const SAVE_DELAY_MS = 250
@@ -27,12 +32,13 @@ export async function bootStore(storage: KeyValueStorage): Promise<Booted> {
   // storage that could not be read is never written this session; a damaged file (already copied aside) is
   // replaced only once the person has actually changed something.
   let changed = false
-  const flush = async () => {
-    if (failed === 'unreadable' || (failed === 'damaged' && !changed)) return
+  const persist = async (): Promise<boolean> => {
+    if (failed === 'unreadable' || (failed === 'damaged' && !changed)) return false
     if (timer !== undefined) clearTimeout(timer)
     timer = undefined
-    await savePersisted(storage, store.getState().snapshot())
+    return savePersisted(storage, store.getState().snapshot())
   }
+  const flush = async () => void (await persist())
 
   store.subscribe((s) => {
     const now = pick(s)
@@ -51,5 +57,5 @@ export async function bootStore(storage: KeyValueStorage): Promise<Booted> {
     window.addEventListener('pagehide', () => void flush())
   }
 
-  return { store, flush }
+  return { store, flush, persist }
 }

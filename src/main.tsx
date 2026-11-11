@@ -24,9 +24,31 @@ import { StoreProvider } from './components/StoreProvider'
 import { createStorage } from './lib/storage'
 import { applyTheme } from './lib/theme'
 import { bootStore } from './store/boot'
+import { initSmsRuntime } from './store/smsRuntime'
+import { memorySmsQueue, type QueuedMessage, type SmsPermission } from './lib/smsQueue'
+import { nativeSmsQueue } from './lib/smsQueueNative'
+
+/**
+ * The phone-side message queue: the real one on Android, none on the web. The one test hook: a browser test sets the localStorage key
+ * `vkcalc.test.smsqueue` to `{ "permission": "...", "messages": [...] }` BEFORE the app starts, and gets an in-memory queue instead (also
+ * reachable as window.__smsQueue, so the test can push a message). Nothing else reads that key; with it absent this is exactly the old behaviour.
+ */
+function smsQueueForThisRun() {
+  try {
+    const raw = localStorage.getItem('vkcalc.test.smsqueue')
+    if (raw) {
+      const t = JSON.parse(raw) as { permission?: SmsPermission; messages?: QueuedMessage[] }
+      const q = memorySmsQueue(t.messages ?? [], t.permission ?? 'granted')
+      ;(window as unknown as { __smsQueue?: unknown }).__smsQueue = q
+      return q
+    }
+  } catch { /* no hook: use the real queue */ }
+  return nativeSmsQueue()
+}
 
 async function main() {
-  const { store } = await bootStore(createStorage())
+  const { store, persist } = await bootStore(createStorage())
+  initSmsRuntime({ store, port: smsQueueForThisRun(), persist })
 
   // Colours before the first paint, so there is no flash of the wrong theme.
   const { theme, accent } = store.getState().settings

@@ -3,6 +3,7 @@ import { ACCENT_NAMES, type AccentName, type ThemePreference } from '../lib/them
 import type { KeyValueStorage } from '../lib/storage'
 import { parseTime } from '../lib/reminders'
 import { sanitizePortfolio } from '../lib/portfolio'
+import { MAX_COUNT, MAX_INBOX, MAX_LEARNED, DRIFT_WINDOW, payeeKey, type AutoLogEntry, type InboxItem, type LearnedPayee } from '../lib/inbox'
 import { MAX_COUNTED_TOOLS, MAX_PINNED_TOOLS, MAX_USE_COUNT } from '../lib/toolUse'
 import { MAX_RECURRING, MAX_RULES, RULE_MAX, cleanRuleMatch, sanitizeEdits, isAccountType, isBillRepeat, isPaymentCount, isMonthKey, isSettlement, type MerchantRule, type RecurringItem } from '../lib/budget'
 import {
@@ -125,6 +126,9 @@ export function sanitizeSettings(raw: unknown): Settings {
     notesCardView: bool(r.notesCardView, d.notesCardView),
     dueCardView: bool(r.dueCardView, d.dueCardView),
     modules: sanitizeModules(r.modules),
+    smsCapture: bool(r.smsCapture, d.smsCapture),
+    smsMode: oneOf(r.smsMode, ['review', 'auto'] as const, d.smsMode),
+    smsAutoPausedAt: stamp(r.smsAutoPausedAt),
   }
 }
 
@@ -414,13 +418,84 @@ export function sanitizeBudget(raw: unknown): BudgetData {
       // Money in is only kept when it is the ONLY kind the entry claims (settlement, then refund, win), so a damaged file cannot invent income.
       ...(income ? { income: true as const } : {}),
       ...(!income && goodId(e.recurringId) ? { recurringId: e.recurringId } : {}),
+      // Added by the app from a bank message. Only a plain spend can carry it.
+      ...(e.auto === true && !income && !settlement && e.refund !== true ? { auto: true as const } : {}),
       ...ifSet({ edits: sanitizeEdits(e.edits) }),
     })
     if (expenses.length >= MAX_EXPENSES) break
   }
   const recurring = sanitizeRecurring(raw.recurring, catIds, instById)
   const rules = sanitizeRules(raw.rules, catIds)
-  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, ...ifSet({ overallByMonth: limitMap(raw.overallByMonth) }), categories: cats, instruments, expenses, ...ifSet({ smsSeen: seenList(raw.smsSeen) }), ...(recurring.length > 0 ? { recurring } : {}), ...(rules.length > 0 ? { rules } : {}) }
+  const inbox = sanitizeInbox(raw.inbox, catIds, instById, seen)
+  const learned = sanitizeLearned(raw.learned, catIds)
+  const autoLog = sanitizeAutoLog(raw.autoLog)
+  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, ...ifSet({ overallByMonth: limitMap(raw.overallByMonth) }), categories: cats, instruments, expenses, ...ifSet({ smsSeen: seenList(raw.smsSeen) }), ...(recurring.length > 0 ? { recurring } : {}), ...(rules.length > 0 ? { rules } : {}), ...(inbox.length > 0 ? { inbox } : {}), ...(learned.length > 0 ? { learned } : {}), ...(autoLog.length > 0 ? { autoLog } : {}) }
+}
+
+const FINGERPRINT = /^[0-9a-z]{4,30}$/
+
+/**
+ * The SMS Inbox, newest first as stored. Junk, repeats and anything past the cap are dropped. Only parsed fields are ever read: if a damaged
+ * or hand-edited file carries anything else (a message body, say) it is ignored, never kept. An auto-added item must point at a real entry;
+ * a pending item points at none.
+ */
+function sanitizeInbox(raw: unknown, catIds: Set<string>, instById: Map<string, PayInstrument>, entryIds: Set<string>): InboxItem[] {
+  const out: InboxItem[] = []
+  const ids = new Set<string>()
+  for (const r of Array.isArray(raw) ? raw : []) {
+    if (!isObject(r) || typeof r.id !== 'string' || !FINGERPRINT.test(r.id) || ids.has(r.id)) continue
+    if (typeof r.date !== 'string' || !DAY_KEY.test(r.date) || !isPlainNumber(r.amount) || r.amount.startsWith('-') || !(Number(r.amount) > 0)) continue
+    const status = oneOf(r.status, ['pending', 'approved', 'rejected'] as const, 'pending')
+    const kind = r.kind === 'cardBill' ? 'cardBill' : 'spend'
+    const inst = typeof r.instrumentId === 'string' ? instById.get(r.instrumentId) : undefined
+    const entryId = status === 'approved' && goodId(r.entryId) && entryIds.has(r.entryId) ? r.entryId : undefined
+    ids.add(r.id)
+    out.push({
+      id: r.id,
+      date: r.date,
+      amount: r.amount,
+      merchant: str(r.merchant, 60).trim(),
+      kind,
+      mode: isPaymentMode(r.mode) ? r.mode : null,
+      instrumentId: inst ? inst.id : null,
+      last4: typeof r.last4 === 'string' && /^\d{3,4}$/.test(r.last4) ? r.last4 : null,
+      bank: typeof r.bank === 'string' && r.bank.trim() !== '' ? r.bank.trim().slice(0, 40) : null,
+      categoryId: typeof r.categoryId === 'string' && catIds.has(r.categoryId) ? r.categoryId : null,
+      why: str(r.why, 120).trim(),
+      person: r.person === true,
+      status,
+      at: stamp(r.at) ?? 0,
+      ...(entryId ? { entryId } : {}),
+      ...(entryId && r.auto === true ? { auto: true as const } : {}),
+      ...(status === 'rejected' && r.notSpend === true ? { notSpend: true as const } : {}),
+      ...(status !== 'pending' && stamp(r.resolvedAt) !== null ? { resolvedAt: stamp(r.resolvedAt)! } : {}),
+    })
+    if (out.length >= MAX_INBOX) break
+  }
+  return out
+}
+
+/** Learned payees, newest first. The category must have existed; the count is a whole number from 1 to the cap. */
+function sanitizeLearned(raw: unknown, catIds: Set<string>): LearnedPayee[] {
+  const out: LearnedPayee[] = []
+  const keys = new Set<string>()
+  for (const r of Array.isArray(raw) ? raw : []) {
+    if (!isObject(r) || typeof r.key !== 'string' || payeeKey(r.key) !== r.key || keys.has(r.key)) continue
+    if (typeof r.categoryId !== 'string' || !catIds.has(r.categoryId) || typeof r.count !== 'number' || !Number.isInteger(r.count) || r.count < 1) continue
+    keys.add(r.key)
+    out.push({ key: r.key, categoryId: r.categoryId, count: Math.min(r.count, MAX_COUNT), lastAt: stamp(r.lastAt) ?? 0 })
+    if (out.length >= MAX_LEARNED) break
+  }
+  return out
+}
+
+function sanitizeAutoLog(raw: unknown): AutoLogEntry[] {
+  const out: AutoLogEntry[] = []
+  for (const r of Array.isArray(raw) ? raw : []) {
+    if (isObject(r) && typeof r.id === 'string' && FINGERPRINT.test(r.id) && !out.some((x) => x.id === r.id)) out.push({ id: r.id, bad: r.bad === true })
+    if (out.length >= DRIFT_WINDOW) break
+  }
+  return out
 }
 
 /**
@@ -564,10 +639,13 @@ export async function loadPersisted(storage: KeyValueStorage): Promise<Persisted
   return (await loadChecked(storage)).data
 }
 
-export async function savePersisted(storage: KeyValueStorage, data: PersistedData): Promise<void> {
+/** Writes the data. Resolves true only when storage accepted it (the SMS drain waits for that before it lets the phone forget a message). */
+export async function savePersisted(storage: KeyValueStorage, data: PersistedData): Promise<boolean> {
   try {
     await storage.set(STORAGE_KEY, JSON.stringify(data))
+    return true
   } catch {
     /* Storage full or blocked: the app keeps working, it just won't remember. */
+    return false
   }
 }

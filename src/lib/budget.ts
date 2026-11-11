@@ -1,6 +1,7 @@
 import { D, type Dec } from '../engine'
 import { decimalComma } from './decimalComma'
 import { DATE_LOCALE } from './dateLocale'
+import type { AutoLogEntry, InboxItem, LearnedPayee } from './inbox'
 
 /**
  * A budget bucket. `limit` is a plain decimal string for every month, or null for "no limit".
@@ -504,6 +505,8 @@ export interface BudgetExpense {
   recurringId?: string
   /** What was changed after the entry was first saved (amount, date, category), oldest first, at most MAX_EDITS. A trail only: it never blocks saving. */
   edits?: ExpenseEdit[]
+  /** Added by the app from a bank message, without a tap (Auto mode). Shown as "Auto-added" until the person changes the entry. */
+  auto?: true
 }
 
 /** One change to an entry. `from` and `to` are the old and new amount ("900"), date ("2026-11-02") or category id (null for Uncategorised). */
@@ -635,6 +638,12 @@ export interface BudgetData {
   recurring?: RecurringItem[]
   /** Merchant rules, NEWEST FIRST (the first one that matches wins). Absent: none. See MerchantRule. */
   rules?: MerchantRule[]
+  /** The SMS Inbox: payments caught from bank messages (parsed fields only, never the text), newest first. Absent in older backups: empty. See lib/inbox.ts. */
+  inbox?: InboxItem[]
+  /** What the app learned about payees from approvals: the category and how many times in a row. Absent: nothing learned. */
+  learned?: LearnedPayee[]
+  /** The last auto-added items and whether each was undone or changed. Drives the drift circuit breaker. */
+  autoLog?: AutoLogEntry[]
 }
 
 /**

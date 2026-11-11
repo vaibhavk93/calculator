@@ -44,6 +44,7 @@ import {
   type ExpenseDraft,
 } from '../lib/budget'
 import { capHistory, isRawExpression, sanitizeSettings } from './persistence'
+import { applyPlan, forgetPayee, driftTripped, logBad, noteCorrection, payeeKey, pendingItems, recordConfirm, resuggest, suggestionConfirmed, type DrainPlan, type InboxItem } from '../lib/inbox'
 import { startTab, tabOn } from '../lib/modules'
 import { MAX_HOLDINGS, cleanHoldingAmount, cleanHoldingName, validateHolding, validateHoldingAmount, validateValueDay, type Holding, type HoldingKind } from '../lib/portfolio'
 import { isHoldingKind, isLiability, withValue } from '../engine/investments/portfolio'
@@ -204,6 +205,29 @@ export interface AppState {
   recategorise: (ids: string[], categoryId: string | null) => number
   /** Remembers bank messages that were added or skipped, so a later scan does not offer them again. */
   markSmsSeen: (ids: string[]) => void
+  /** Puts what the phone-side queue held into the Inbox (lib/inbox.ts planDrain). The caller must persist BEFORE it acks the queue. */
+  commitDrain: (plan: DrainPlan) => void
+  /**
+   * Approves one Inbox item: it becomes a real entry (category and note may be changed first) and the payee's tag is learned.
+   * False (and says why) when it cannot be added, so the caller can open the full sheet instead.
+   */
+  approveInbox: (id: string, change?: { categoryId?: string | null; note?: string }) => boolean
+  /** The person added the entry for this item through the full sheet (a card bill, or a fix): it becomes approved and linked to the newest entry. */
+  markInboxDone: (id: string) => void
+  /** Approves every pending item whose suggestion the person confirmed enough times (and is not a person). One Undo. Returns how many. */
+  approveSuggested: () => number
+  /** Removes an item from the Inbox ("Not a spend" or "Reject"); the snackbar offers Undo. */
+  rejectInbox: (id: string, notSpend?: boolean) => void
+  /** Undoes an auto-added entry: removes it, makes the payee start learning again, and puts the item back to pending. */
+  undoAutoAdded: (itemId: string) => void
+  /** Deletes everything waiting in the Inbox (not entries already added). Returns how many. */
+  clearInbox: () => number
+  /** Review first or Auto-add the confident ones. Choosing Auto starts its undo/change count afresh. */
+  setSmsMode: (mode: 'review' | 'auto') => void
+  /** The person changes what a learned payee is tagged with. It counts once, so it is a suggestion again until confirmed twice. */
+  setLearned: (key: string, categoryId: string) => boolean
+  /** Forgets a learned payee; the snackbar offers Undo. */
+  forgetLearned: (key: string) => void
   /** A monthly limit for one category, or null to remove it. */
   setCategoryLimit: (id: string, limit: string | null, scope?: LimitScope) => boolean
   /** One limit for everything spent in a month, or null to remove it. */
@@ -326,7 +350,7 @@ export interface StoreDeps {
   newId: () => string
 }
 
-const defaultDeps: StoreDeps = {
+export const defaultDeps: StoreDeps = {
   now: () => Date.now(),
   newId: () =>
     typeof globalThis.crypto?.randomUUID === 'function'
@@ -409,6 +433,14 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       const snackId = nextId()
       taskUndo = { snackId, run }
       set({ snack: { id: snackId, text, canUndo: true } })
+    }
+
+    /** Auto-add switches itself off when 2 or more of the last 10 entries it added were undone or changed (docs/SMS-INBOX-PLAN.md). Says why. */
+    const tripIfDrifting = (): string => {
+      const { budget, settings } = get()
+      if (settings.smsMode !== 'auto' || !driftTripped(budget.autoLog)) return ''
+      set({ settings: { ...settings, smsMode: 'review', smsAutoPausedAt: deps.now() } })
+      return 'Auto-add is off now: 2 of the last 10 payments it added were undone or changed. New payments will wait for your review.'
     }
 
     const patchBill = (id: string, change: (i: RecurringItem) => RecurringItem) => {
@@ -756,6 +788,12 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
           const edits = withEdits(x.edits, expenseChanges(x, rest, at))
           return { ...keep, ...rest, ...(settlement ? { settlement } : {}), ...(refund ? { refund: true } : {}), ...(income ? { income: true as const } : {}), ...(recurringId ? { recurringId } : {}), ...(edits ? { edits } : {}) }
         }) } })
+        // Changing what the app added by itself (not just adding a note) counts against Auto mode.
+        if (old?.auto && (!new D(old.amount).eq(new D(rest.amount)) || old.date !== rest.date || old.categoryId !== rest.categoryId || old.mode !== rest.mode || old.instrumentId !== rest.instrumentId || settlement || refund || income)) {
+          set({ budget: noteCorrection(get().budget, id) })
+          const why = tripIfDrifting()
+          if (why) get().toast(why)
+        }
         return true
       },
 
@@ -837,12 +875,126 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         set({ budget: { ...budget, smsSeen: next } })
       },
 
+      commitDrain: (plan) => {
+        set({ budget: resuggest(applyPlan(get().budget, plan, deps.now())) })
+        const why = tripIfDrifting()
+        if (why) get().toast(why)
+      },
+
+      approveInbox: (id, change) => {
+        const { budget } = get()
+        const item = (budget.inbox ?? []).find((i) => i.id === id && i.status === 'pending')
+        if (!item || item.kind !== 'spend') return false
+        const wanted = change && 'categoryId' in change ? (change.categoryId ?? null) : item.categoryId
+        const categoryId = wanted !== null && categoryUsable(budget, wanted) ? wanted : null
+        const name = item.merchant || (item.bank ? `${item.bank} payment` : 'Bank payment')
+        const extra = change?.note?.trim()
+        const instrumentId = paymentError(budget, item.mode, item.instrumentId) === null ? item.instrumentId : null
+        if (!get().addExpense({ amount: item.amount, categoryId, mode: item.mode, instrumentId, date: item.date, note: (extra ? `${name}: ${extra}` : name).slice(0, 200) })) return false
+        get().markInboxDone(id)
+        return true
+      },
+
+      markInboxDone: (id) => {
+        const b = get().budget
+        const item = (b.inbox ?? []).find((i) => i.id === id && i.status === 'pending')
+        const entry = b.expenses[0]
+        if (!item || !entry) return
+        const at = deps.now()
+        const key = payeeKey(item.merchant)
+        // Learning is plain counting: the same tag as last time is one more in a row, a different tag starts again at one.
+        const learn = item.kind === 'spend' && key && entry.categoryId && countsAsSpend(entry)
+        set({ budget: resuggest({ ...b, inbox: (b.inbox ?? []).map((i) => (i.id === id ? { ...i, status: 'approved' as const, categoryId: entry.categoryId, entryId: entry.id, resolvedAt: at } : i)), ...(learn ? { learned: recordConfirm(b.learned, key, entry.categoryId!, at) } : {}) }) })
+      },
+
+      approveSuggested: () => {
+        const before = get().budget
+        const made = new Set<string>()
+        for (const first of pendingItems(before)) {
+          const item = (get().budget.inbox ?? []).find((i) => i.id === first.id)
+          if (!item || !suggestionConfirmed(get().budget, item)) continue
+          if (get().approveInbox(item.id)) made.add(get().budget.expenses[0]!.id)
+        }
+        if (made.size === 0) return 0
+        undoable(`${made.size} ${made.size === 1 ? 'payment' : 'payments'} added`, () => {
+          const b = get().budget
+          set({ budget: resuggest({ ...b, expenses: b.expenses.filter((e) => !made.has(e.id)), learned: before.learned, inbox: (b.inbox ?? []).map((i): InboxItem => { if (!i.entryId || !made.has(i.entryId)) return i; const { entryId: _e, resolvedAt: _r, ...rest } = i; return { ...rest, status: 'pending' } }) }) })
+        })
+        return made.size
+      },
+
+      rejectInbox: (id, notSpend = false) => {
+        const { budget } = get()
+        const item = (budget.inbox ?? []).find((i) => i.id === id && i.status === 'pending')
+        if (!item) return
+        set({ budget: { ...budget, inbox: (budget.inbox ?? []).map((i) => (i.id === id ? { ...i, status: 'rejected' as const, resolvedAt: deps.now(), ...(notSpend ? { notSpend: true as const } : {}) } : i)) } })
+        undoable(notSpend ? 'Marked as not a spend' : 'Removed from review', () => {
+          const b = get().budget
+          set({ budget: { ...b, inbox: (b.inbox ?? []).map((i): InboxItem => { if (i.id !== id) return i; const { resolvedAt: _r, notSpend: _n, ...rest } = i; return { ...rest, status: 'pending' } }) } })
+        })
+      },
+
+      undoAutoAdded: (itemId) => {
+        const { budget } = get()
+        const item = (budget.inbox ?? []).find((i) => i.id === itemId && i.auto === true && i.status === 'approved')
+        if (!item) return
+        const key = payeeKey(item.merchant)
+        set({
+          budget: resuggest({
+            ...budget,
+            expenses: budget.expenses.filter((e) => e.id !== item.entryId),
+            autoLog: logBad(budget.autoLog, itemId),
+            ...(key ? { learned: forgetPayee(budget.learned, key) } : {}),
+            inbox: (budget.inbox ?? []).map((i): InboxItem => { if (i.id !== itemId) return i; const { auto: _a, entryId: _e, resolvedAt: _r, ...rest } = i; return { ...rest, status: 'pending' } }),
+          }),
+        })
+        const why = tripIfDrifting()
+        get().toast(`Undone. It is back in the list to review.${why ? ` ${why}` : ''}`)
+      },
+
+      clearInbox: () => {
+        const { budget } = get()
+        const n = pendingItems(budget).length
+        if (n > 0) set({ budget: { ...budget, inbox: (budget.inbox ?? []).filter((i) => i.status !== 'pending') } })
+        return n
+      },
+
+      setSmsMode: (mode) => {
+        const { settings, budget } = get()
+        // Choosing Auto again is a fresh start: the old undo/change count must not trip it at once.
+        set({ settings: { ...settings, smsMode: mode, smsAutoPausedAt: mode === 'auto' ? null : settings.smsAutoPausedAt }, ...(mode === 'auto' && budget.autoLog ? { budget: { ...budget, autoLog: [] } } : {}) })
+      },
+
+      setLearned: (key, categoryId) => {
+        const { budget } = get()
+        if (!categoryUsable(budget, categoryId)) return fail('Pick a category from the list')
+        const cur = (budget.learned ?? []).find((l) => l.key === key)
+        if (!cur) return false
+        set({ budget: resuggest({ ...budget, learned: [{ key, categoryId, count: 1, lastAt: deps.now() }, ...(budget.learned ?? []).filter((l) => l.key !== key)] }) })
+        return true
+      },
+
+      forgetLearned: (key) => {
+        const { budget } = get()
+        const gone = (budget.learned ?? []).find((l) => l.key === key)
+        if (!gone) return
+        const at = (budget.learned ?? []).indexOf(gone)
+        set({ budget: resuggest({ ...budget, learned: forgetPayee(budget.learned, key) }) })
+        undoable('Forgot what it learned', () => {
+          const b = get().budget
+          const cur = (b.learned ?? []).filter((l) => l.key !== key)
+          set({ budget: resuggest({ ...b, learned: [...cur.slice(0, at), gone, ...cur.slice(at)] }) })
+        })
+      },
+
       deleteExpense: (id) => {
         const { budget } = get()
         const target = budget.expenses.find((x) => x.id === id && x.deletedAt === null)
         if (!target) return
         set({ budget: { ...budget, expenses: budget.expenses.map((x) => (x.id === id ? { ...x, deletedAt: deps.now() } : x)) } })
-        undoable('Removed from your budget', () => {
+        let why = ''
+        if (target.auto) { set({ budget: noteCorrection(get().budget, id) }); why = tripIfDrifting() }
+        undoable(why ? `Removed from your budget. ${why}` : 'Removed from your budget', () => {
           const b = get().budget
           set({ budget: { ...b, expenses: b.expenses.map((x) => (x.id === id ? { ...x, deletedAt: null } : x)) } })
         })
@@ -874,8 +1026,11 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
           return 0
         }
         set({ budget: { ...budget, expenses }, notice: null })
+        const changedAuto = [...before.values()].filter((x) => x.auto).map((x) => x.id)
+        for (const eid of changedAuto) set({ budget: noteCorrection(get().budget, eid) })
+        const why = changedAuto.length > 0 ? tripIfDrifting() : ''
         const name = categoryId === null ? 'Uncategorised' : categoryName(budget, categoryId)
-        undoable(`${before.size} ${before.size === 1 ? 'entry' : 'entries'} moved to ${name}${wrongMonth > 0 ? `. ${wrongMonth} skipped: not used in their month` : ''}`, () => {
+        undoable(`${before.size} ${before.size === 1 ? 'entry' : 'entries'} moved to ${name}${wrongMonth > 0 ? `. ${wrongMonth} skipped: not used in their month` : ''}${why ? `. ${why}` : ''}`, () => {
           const b = get().budget
           set({ budget: { ...b, expenses: b.expenses.map((x) => before.get(x.id) ?? x) } })
         })

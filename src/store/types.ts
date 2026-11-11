@@ -49,6 +49,12 @@ export interface Settings {
   dueCardView: boolean
   /** "Show in the app": Budget, and Notes with Due. Off hides, never deletes. Read only through lib/modules.ts. */
   modules: Modules
+  /** "Capture bank messages" is on: the phone catches bank-style texts while the app is closed and the Inbox fills when the app opens. */
+  smsCapture: boolean
+  /** Review first (default): captured payments wait for a tap. Auto: only the ones that pass the strict test are added, flagged Auto-added. */
+  smsMode: 'review' | 'auto'
+  /** When Auto switched itself back to Review first because too many of its entries were undone or changed (ms). Null: it did not. */
+  smsAutoPausedAt: number | null
 }
 
 export type TourId = 'budget' | 'notes' | 'due'
@@ -80,6 +86,9 @@ export const DEFAULT_SETTINGS: Settings = {
   notesCardView: false,
   dueCardView: false,
   modules: { budget: true, notes: true },
+  smsCapture: false,
+  smsMode: 'review',
+  smsAutoPausedAt: null,
 }
 
 export interface HistoryEntry {

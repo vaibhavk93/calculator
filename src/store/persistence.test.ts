@@ -153,7 +153,7 @@ describe('load and save', () => {
       remove: async () => undefined,
     }
     expect(await loadPersisted(broken)).toEqual(defaultPersisted())
-    await expect(savePersisted(broken, sample())).resolves.toBeUndefined()
+    await expect(savePersisted(broken, sample())).resolves.toBe(false) // says so (the SMS drain relies on it) and never throws
   })
 })
 

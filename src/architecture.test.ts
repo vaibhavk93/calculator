@@ -219,3 +219,53 @@ describe('"Show in the app" switches are read through lib/modules.ts only', () =
     expect(bad.map(rel)).toEqual([])
   })
 })
+
+// ---------------------------------------------------------------- SMS privacy (docs/SMS-INBOX-PLAN.md section 7)
+
+describe('no message body or sender reaches a log or the console', () => {
+  const SHIPPED = ALL.filter((f) => /\.tsx?$/.test(f) && !isTest(f) && rel(f) !== 'architecture.test.ts')
+  // Words inside a quoted string are not data, but what is inside a template's ${...} is.
+  const NO_STRINGS = (code: string) =>
+    code
+      .replace(/`(?:\\.|[^`\\])*`/g, (t) => [...t.matchAll(/\$\{([^}]*)\}/g)].map((m) => m[1]).join(' '))
+      .replace(/(['"])(?:\\.|(?!\1)[^\\])*\1/g, '""')
+  const CALL = /\b(?:console|logger|log|[a-z]*[lL]ogger)\s*\.\s*(?:log|debug|info|warn|error|trace|dir|table)\s*\(/g
+  // What would carry a message: its body or sender, or a whole message object.
+  const RISKY = /\b(?:body|sender|address|receivedAt|msgs?|messages?|queued|drained|sms\w*|inbox\w*)\b/i
+
+  /** Every `console.x(...)` / `logger.x(...)` call in `code`, with its argument text (balanced brackets, strings blanked). */
+  function logCalls(code: string): string[] {
+    const clean = NO_STRINGS(code)
+    const out: string[] = []
+    for (const m of clean.matchAll(CALL)) {
+      let depth = 1
+      let i = m.index! + m[0].length
+      const start = i
+      for (; i < clean.length && depth > 0; i++) {
+        if (clean[i] === '(') depth++
+        else if (clean[i] === ')') depth--
+      }
+      out.push(clean.slice(start, i - 1))
+    }
+    return out
+  }
+
+  it('the detector sees a call that logs a body, a sender or a message (so this test cannot pass by finding nothing)', () => {
+    expect(logCalls('console.log(m.body)').some((a) => RISKY.test(a))).toBe(true)
+    expect(logCalls("logger.debug('got one', { sender: m.sender })").some((a) => RISKY.test(a))).toBe(true)
+    expect(logCalls('console.warn(`bad ${message}`)').some((a) => RISKY.test(a))).toBe(true)
+    expect(logCalls("console.log('hello')").some((a) => RISKY.test(a))).toBe(false)
+  })
+
+  it('no file under src (tests aside) passes a body, sender or message to the logger or console', () => {
+    const bad: string[] = []
+    for (const f of SHIPPED) for (const args of logCalls(stripComments(read(f)))) if (RISKY.test(args)) bad.push(`${rel(f)}: (${args.trim().slice(0, 60)})`)
+    expect(bad).toEqual([])
+  })
+
+  it('files that handle messages (queue, parser, inbox, scan) do not log at all', () => {
+    const HANDLES = /from\s+['"][^'"]*(?:smsQueue|smsParse|\/sms|\/inbox|maskText|smsRuntime)['"]/
+    const bad = SHIPPED.filter((f) => HANDLES.test(stripComments(read(f))) || /^lib\/(?:smsQueue|smsParse|sms|inbox|maskText)/.test(rel(f))).filter((f) => logCalls(stripComments(read(f))).length > 0 || /from\s+['"][^'"]*logger['"]/.test(stripComments(read(f))))
+    expect(bad.map(rel)).toEqual([])
+  })
+})
