@@ -1,5 +1,33 @@
 # Session state: resume here
 
+## Round 22 (2026-11-06/07): redesign merged, four calculators, Grid Tools home, new portfolio kinds, Wi-Fi install
+
+**Built and on the phone (installed 2026-11-07 10:23, OnePlus CPH2573, over Wi-Fi debugging):**
+- Merged the four redesign branches (Budget home Spending/Net worth, Tools home + tool page, Notes/Due/Settings, D1 money-in).
+  **Gotcha:** a builder branch had committed a `node_modules` symlink; merging it replaced the real folder with a self-pointing link.
+  Fixed (`c04a12d`, `npm ci`). Never `git add -A` in a worktree; check `git ls-files node_modules` is empty.
+- Advance-tax offer on Due is now a setting (`showAdvanceTaxOffer`, off by default; Settings > Reminders).
+- Four calculators: FD ladder, LTCG harvesting, small-savings pack (SSY/NSC/SCSS/KVP/MIS/Time Deposit), gold jewellery bill.
+  Assumptions flagged on screen and in `docs/VERIFICATION.md` (Time Deposit payout default, SGB/IGST 3%, 24K gold rate is an example).
+- Design reference pass: **Tools home is the 2-column group grid** (owner decision), "Recents" row under the search, new group
+  page (scoped search + Recents + "All tools" grid), filled search box, pill switches, ink-3 text sweep, LTCG date clip fixed.
+- Portfolio kinds: Stocks, Mutual funds, REITs and InvITs, Bonds, Sovereign gold bonds, NPS, EPF, PPF. The old bundled kinds
+  `stocks_mf` and `retirement` stay valid ("old group"); the Update sheet has a Kind field to move a holding (own-to-own, owe-to-owe).
+- Net worth > Holdings is grouped by category: heading with count and total, then each holding by name. Colours by position among kinds on screen.
+
+**Verified:** `npm run check` 3201 passed / 16 skipped, build clean, layout-contract 144/144, portfolio browser test green.
+**NOT verified:** 12 of 24 browser suites fail; only 5 were compared against the previous commit (stale/offline tests per the design agent).
+Run `npm run e2e` against `3fed36e` vs `dev` to separate old failures from new.
+
+**New owner designs not built yet** (in `docs/design-reference/screens/`): SpendingSummary, BillsAndSubscriptions, CategoriesAndCards (+Alt),
+AddFromMessages, MoreInBudget (dark + light). DueCard was updated. Portfolio.html was removed (superseded).
+
+**Open:** Notes/Due card and Net worth screens only reviewed in dark; 200% font and 360x640 only covered by layout-contract;
+other search fields (Notes, pickers) still underline style; `task_05a3f08e` "Use in another tool" navigation hang.
+
+**Phone install over Wi-Fi:** phone and Mac on the same network; the wireless port changes on every toggle/restart.
+`adb mdns services` shows the current `ip:port`, then `adb connect ip:port`, then `scripts/build-android.sh install`.
+
 ## Round 21 (2026-11-06): the other four unblocked calculators
 
 One commit each: **FD ladder** `a0b6df2`, **LTCG harvesting** `ea1a57d`, **small-savings pack** (SSY, NSC, SCSS, KVP, MIS, Post Office TD) `37b442e`, **gold jewellery bill** `9dba0c9`. Engines + tests first, then specs (`savings.ts`, `gold.ts` are new; harvesting is in `tax.ts`), rows added to `docs/VERIFICATION.md`. Rates and sources are in `investments/rates.ts` ("official to 31 Dec 2026"), the tax rules file (TDS on bank interest) and `convert/gstRates.ts` (gold).
@@ -62,8 +90,7 @@ without asking). Both commits used `--no-verify` after running `npm run check` d
 hook's failures were disk and worker-pool crashes, never the code.
 
 **Next, still open:**
-- Four more unblocked calculators: FD ladder, gold jewellery bill, LTCG harvesting, and the small-savings
-  pack (SSY/NSC/SCSS/KVP/MIS/Time Deposit -- PPF already exists, RD stays blocked).
+- (Done later the same day, see Round 22) the four calculators: FD ladder, gold jewellery bill, LTCG harvesting, small-savings pack. RD stays blocked.
 - **B12 Tools home density** -- untouched, and now partly the peer's territory.
 - `task_05a3f08e`: the pre-existing "Use in another tool" navigation hang.
 

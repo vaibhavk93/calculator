@@ -16,7 +16,7 @@ body{margin:0;background:#060606}
 .tab.active{color:#CCD539}
 .seg{all:unset;flex:1;text-align:center;padding:7px;border-radius:8px;font-size:0.8rem;color:#A4A4A4}
 .seg.active{background:#CCD539;color:#121300;font-weight:600}
-.card{all:unset;display:block;width:100%;box-sizing:border-box;background:#0D0D0D;border-radius:10px;padding:14px 16px;text-align:left;color:#F5F5F5;font-family:'IBM Plex Sans',sans-serif;cursor:pointer}
+.card{display:block;width:100%;box-sizing:border-box;background:#0D0D0D;border-radius:10px;padding:14px 16px;text-align:left;color:#F5F5F5;font-family:'IBM Plex Sans',sans-serif}
 </style>
 </helmet>
 <div style="width:390px;height:844px;background:#060606;color:#F5F5F5;font-family:'IBM Plex Sans',sans-serif;display:flex;flex-direction:column;overflow:hidden">
@@ -39,53 +39,53 @@ body{margin:0;background:#060606}
   <div style="flex:1;overflow-y:auto;padding:0 20px 20px;display:flex;flex-direction:column;gap:12px">
 
     <div style="font-size:0.76rem;color:#EF675A;font-weight:500;display:flex;align-items:center;gap:6px;margin-top:2px"><span style="width:7px;height:7px;border-radius:50%;background:#EF675A"></span>Overdue</div>
-    <button class="card">
+    <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="font-size:0.95rem;font-weight:500">Renew car insurance</div>
-        <button aria-label="More options" style="all:unset;color:#A4A4A4;font-size:0.76rem">More</button>
+        <button aria-label="More options" style="all:unset;color:#A4A4A4;font-size:0.76rem;cursor:pointer">More</button>
       </div>
       <div style="font-size:0.8rem;color:#EF675A;margin-top:6px">5 days overdue</div>
-      <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+      <button style="all:unset;display:flex;align-items:center;gap:10px;margin-top:10px;cursor:pointer" aria-label="Mark Renew car insurance done">
         <span class="chk" style="width:22px;height:22px;border-radius:50%;border:1.6px solid #818181;flex-shrink:0;display:inline-block"></span>
         <span style="font-size:0.8rem;color:#A4A4A4">Tap to mark done</span>
-      </div>
-    </button>
+      </button>
+    </div>
 
     <div style="font-size:0.76rem;color:#A4A4A4;margin-top:6px">This week</div>
-    <button class="card">
+    <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="display:flex;align-items:center;gap:7px;font-size:0.95rem;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:#7C8CF2"></span>Home loan EMI</div>
       </div>
       <div class="mono" style="font-size:1.4rem;font-weight:500;margin-top:8px">₹43,391.16</div>
       <div style="font-size:0.78rem;color:#A4A4A4;margin-top:4px">Due in 5 days</div>
-      <button style="all:unset;display:block;width:100%;text-align:center;background:#181818;border-radius:8px;padding:10px;font-size:0.82rem;font-weight:500;margin-top:12px">Mark paid</button>
-    </button>
-    <button class="card">
+      <button style="all:unset;display:block;width:100%;box-sizing:border-box;text-align:center;background:#181818;border-radius:8px;padding:10px;font-size:0.82rem;font-weight:500;margin-top:12px;cursor:pointer">Mark paid</button>
+    </div>
+    <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="display:flex;align-items:center;gap:7px;font-size:0.95rem;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:#7C8CF2"></span>Car loan EMI</div>
       </div>
       <div class="mono" style="font-size:1.4rem;font-weight:500;margin-top:8px">₹43,391.16</div>
       <div style="font-size:0.78rem;color:#A4A4A4;margin-top:4px">Due in 6 days · 2 payments left</div>
       <div style="height:5px;background:#262626;border-radius:3px;overflow:hidden;margin-top:8px"><div style="width:92%;height:100%;background:#CCD539"></div></div>
-      <button style="all:unset;display:block;width:100%;text-align:center;background:#181818;border-radius:8px;padding:10px;font-size:0.82rem;font-weight:500;margin-top:12px">Mark paid</button>
-    </button>
-    <button class="card">
+      <button style="all:unset;display:block;width:100%;box-sizing:border-box;text-align:center;background:#181818;border-radius:8px;padding:10px;font-size:0.82rem;font-weight:500;margin-top:12px;cursor:pointer">Mark paid</button>
+    </div>
+    <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="display:flex;align-items:center;gap:7px;font-size:0.95rem;font-weight:500"><span style="width:8px;height:8px;border-radius:50%;background:#D9B88A"></span>Pay credit card bill</div>
       </div>
       <div style="font-size:0.78rem;color:#A4A4A4;margin-top:8px">Monthly · due in 6 days · amount varies</div>
-      <button style="all:unset;display:block;width:100%;text-align:center;background:#181818;border-radius:8px;padding:10px;font-size:0.82rem;font-weight:500;margin-top:12px">Mark paid</button>
-    </button>
+      <button style="all:unset;display:block;width:100%;box-sizing:border-box;text-align:center;background:#181818;border-radius:8px;padding:10px;font-size:0.82rem;font-weight:500;margin-top:12px;cursor:pointer">Mark paid</button>
+    </div>
 
     <div style="font-size:0.76rem;color:#A4A4A4;margin-top:6px">Later</div>
-    <button class="card">
+    <div class="card">
       <div style="font-size:0.95rem;font-weight:500">Submit rent receipts</div>
       <div style="font-size:0.8rem;color:#A4A4A4;margin-top:6px">In 18 days</div>
-      <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+      <button style="all:unset;display:flex;align-items:center;gap:10px;margin-top:10px;cursor:pointer" aria-label="Mark Submit rent receipts done">
         <span style="width:22px;height:22px;border-radius:50%;border:1.6px solid #818181;flex-shrink:0;display:inline-block"></span>
         <span style="font-size:0.8rem;color:#A4A4A4">Tap to mark done</span>
-      </div>
-    </button>
+      </button>
+    </div>
 
   </div>
 
