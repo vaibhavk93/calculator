@@ -54,7 +54,7 @@ committed by hand as `c709f64`, and the stale browser checks as `0885c58`. See "
 |---|---|---|
 | **Findability** | SMS features easy to find; then category sections + payee clubbing in the Inbox | Findability committed (`dc57a0d`); **Inbox grouping finished by hand, `c709f64`** |
 | **Design screens** | Five restyled screens; then grouping in the manual-scan list | Screens committed; **scan grouping finished by hand, `c709f64`** |
-| **Reminders** | Survive reboot/timezone change; skip one occurrence; quiet hours | Skip committed (`c734f5c`). **Boot rescheduling and quiet hours: not in the log, check before assuming done** |
+| **Reminders** | Survive reboot/timezone change; skip one occurrence; quiet hours | **All four accounted for.** Skip `c734f5c`; quiet hours built `9836a31`; reboot and time zone were already working (see below) |
 | **Tests and docs** | Parser coverage, classify the 12 failing browser suites, docs hygiene | Parser and docs committed; **`docs/E2E-STATUS-2026-11-11.md` was never written** |
 | **Calculators** | Extra EMI, Goal SIP by date, FD maturity date, Break-even | **All four done** (`55810bb`, `c75221f`) |
 
@@ -88,12 +88,31 @@ Agents work **in place on `dev`** (no worktrees), each owning a set of files, co
 
 ---
 
+### Reminders: what was already there, and what was not (checked in code 2026-11-11)
+
+| Claim | Truth |
+|---|---|
+| **Survives a reboot** | **Already working, and not by project code** — which is why it is in no commit. `@capacitor/local-notifications` ships a `LocalNotificationRestoreReceiver` for `BOOT_COMPLETED`; confirmed merged into the app manifest in all three variants (debug, release, qa). On top of it the project adds `ReminderAlarmsPlugin.java` (counts what the phone lost, so Due can say "N reminders are back") and `reminderSync.ts` (re-syncs on every app open) |
+| **Survives a time zone change** | **Already working.** `App.tsx` re-plans on resume and `planNotifications` works the time out in the phone's current zone. 6 tests in `qaNotesDue.test.ts` really switch the process time zone (clocks going back, a 2:30 am that does not exist, snooze across a 25-hour day). **Caveat: it corrects on the NEXT app open, not the moment the zone changes.** There is no `TIMEZONE_CHANGED` receiver |
+| **Skip one occurrence** | Built, `c734f5c` |
+| **Quiet hours** | **Was genuinely missing** (every "quiet" in the codebase was the adjective). Built 2026-11-11, `9836a31` |
+
+**⚠ Remember about quiet hours:** every reminder notification already comes at one time the user chose
+(`settings.reminderTime`). There is no other source. So quiet hours only bite when that time falls inside the
+window — and then they move *every* reminder. The Settings screen says so in words; do not "simplify" that line away.
+
+**Known and not fixed:** the notifications plugin's boot receiver re-fires a reminder missed while the phone was
+off about 15 seconds after a restart — so a reboot at 2 am can buzz at 2 am. It runs before any web code, so no
+web-side plan (quiet hours included) can hold it back. Fixing it means a receiver of our own ordered ahead of it.
+
+---
+
 ## 5. What is still to do (needs no decision from the owner)
 
 | Item | Notes |
 |---|---|
 | ~~Review the agents' work and run the full check~~ | **Done 2026-11-11 13:20:** check 3685, build clean, layout-contract 216/216, smsinbox 27/27, import 21/21 |
-| Reminders agent: confirm boot rescheduling and quiet hours were actually built | Only "skip this time" is in the commit log |
+| ~~Confirm boot rescheduling and quiet hours~~ | **Done 2026-11-11.** Reboot and time zone were already working; quiet hours was genuinely missing and is now built (`9836a31`) |
 | Write `docs/E2E-STATUS-2026-11-11.md` (classify the failing browser suites) | The tests agent never got to it. notes-todo's 6 and qa-budget-new's 5 are already classified in section 6 |
 | Install on the owner's phone over Wi-Fi, then push | Section 7 |
 | Day view, due-card and design polish | Small |

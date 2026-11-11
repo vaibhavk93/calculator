@@ -1,5 +1,36 @@
 # Session state: resume here
 
+## Round 27 (2026-11-11): checked the Reminders agent's claims, built the one thing actually missing
+
+**Owner's prompts:** "check if boot rescheduling and quiet hours were built", then "yes build quiet hours".
+
+**Checked the code, not the commit log.** Three of the four claims were already true; one was not.
+
+| Claim | Truth |
+|---|---|
+| Survives a reboot | Already working, via the notifications plugin's own `BOOT_COMPLETED` receiver (confirmed in the merged manifest, all 3 variants). Not project code, hence in no commit |
+| Survives a time zone change | Already working: re-plan on resume, 6 real time-zone tests. Corrects on next app open, not instantly |
+| Skip one occurrence | Built, `c734f5c` |
+| **Quiet hours** | **Genuinely missing.** Built this round, `9836a31` |
+
+**The finding that shaped the build:** every reminder notification already arrives at one time the user chose
+(`settings.reminderTime`), and there is no other notification source. A plain "suppress during these hours"
+switch would therefore do nothing, or silence every reminder. So quiet hours **moves** a notification to the
+end of the window instead of dropping it, never past the due moment, and the screen says in words when the
+reminder time itself sits inside the window.
+
+Guards: a zero-length window is OFF, never "quiet all day" (rejected in `sanitizeQuietHours` and again in
+`inQuietHours`); heads-ups shift before the de-duplicating map, so two landing on the same morning are one
+notification, not two buzzes; the window end is built from the calendar date, so a 23/25-hour DST day is safe.
+
+**Verified:** `npm run check` 3715 / 16 skipped (was 3685), build clean, architecture gate 356, layout-contract
+216/216, `shell.test.mjs` failure list byte-identical to `3caa222` (37 both, pre-existing). Checked live at 390px.
+
+**Not fixed, flagged:** the plugin's boot receiver re-fires a missed reminder ~15s after a restart, so a 2 am
+reboot can buzz at 2 am. It runs before any web code; quiet hours cannot reach it.
+
+**Not pushed. Not on the phone.**
+
 ## Round 26 (2026-11-11): picked up the five agents' work; the unfinished grouping finished and committed
 
 **Owner's prompt:** "can you check the agents which were running? could you continue agents work from where we left?"
