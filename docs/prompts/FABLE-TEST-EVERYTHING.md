@@ -27,6 +27,10 @@ left the one job it exists for — "do the tests tell the truth?" — as a wish 
 | **A full caveats section** | Disk, the pre-commit hook, the usage limit, the proxy, `cap sync`, `npm audit` noise, and the git tracking trap. Each has already cost someone a session |
 | **Layer 5: the numbers themselves (audit)** | The biggest hole. Running the repo's own tests cannot catch a wrong formula that has a matching wrong test. `VERIFICATION.md` grades 34 calculators A to D: **22 are C or D**, meaning no outside source was ever checked. That is where a confidently wrong tax figure hides |
 | **Layer 6: dated claims (research)** | `OFFICIAL_TO = '31 Dec 2026'` in `rates.ts`. Small-savings rates go stale in about seven weeks and every screen repeats that date. A test pass that ignores expiry dates reports green on numbers that are about to be wrong |
+| **The repo's own case types, with counts** | The suites already label every case POS / NEG / UX / UI / CORNER / RUNTIME / ERR / DATA / PRIVACY / PERF. Nobody had ever asked which labels are thin. They are badly unbalanced, and the thin ones are the risky ones |
+| **"What is not tested at all"** | The highest-value question, and the prompt never asked it. Four features shipped this week have unit tests and **zero** browser cases. A feature with no test passes every suite, forever |
+| **UX as judgement, not layout** | "Screens" only meant 360px and 200% font. Tap counts, wording, error text, undo and discoverability were not asked for, and the three UX docs were never named |
+| **A definition of "risky"** | Asked for risky cases without saying what makes a case risky here: money, irreversible, privacy, data loss |
 | **A worked example of a stale doc** | `CLAUDE.md` claims the calculator logs expressions to localStorage. It does not, and two tests prove it. Handing over one confirmed example makes "verify, don't trust" concrete |
 
 Deliberately **not** added: step-by-step scaffolding. Anthropic's guide is explicit that prescriptive click-by-click
@@ -200,6 +204,72 @@ note, turn it into a reminder, pay it from the budget. Run it; those paths break
 
 **Re-verify the known-issues list.** `CLAUDE.md` has a "Known issues" section. At least one entry is already
 wrong (see below). Check each one and tell me which are still true.
+
+## Case types: which kinds of test are thin
+
+Every case in the browser suites is already labelled. Counting them today:
+
+| Label | What it means | Cases |
+|---|---|---|
+| `POS` | The happy path | 152 |
+| `UX` | Does it make sense to a person | 71 |
+| `CORNER` | Edge cases: boundaries, empty, first and last | 65 |
+| `UI` | Layout, size, contrast | 46 |
+| `RUNTIME` | Speed, large data, does it stay responsive | 46 |
+| `NEG` | Bad input, refusals, things that must NOT happen | 46 |
+| `ERR` | Error states and messages | 16 |
+| `DATA` | Saving, loading, not losing things | 6 |
+| `PRIVACY` | Nothing real leaks | 4 |
+| `PERF` | Timing | 2 |
+
+**The shape of that table is the finding.** Happy-path cases outnumber negative ones more than three to one,
+and the three smallest groups — `DATA`, `PRIVACY`, `PERF` — are the ones where being wrong costs the most.
+Tell me, per area, which labels are missing, and write a few of the missing ones where it is cheap. Follow the
+existing naming so they fit (`T('B-120', 'NEG', '...')`).
+
+**What "risky" means here**, since that is the word I care about most: anything touching **money** (a wrong
+number I would act on), anything **irreversible** (a delete, an overwrite, a restore), anything **private**
+(real message text, amounts, payee names reaching a log, a backup or an export), and anything that can **lose
+data silently** (a sanitiser quietly resetting a field, a merge collapsing two real payments into one). A risky
+case failing matters more than ten layout cases failing. Rank by that, not by count.
+
+## What is not tested at all (ask this before you run anything)
+
+A failing test is visible. **A feature with no test is invisible, and passes every suite forever.** This is the
+single most useful thing you can tell me, and no previous pass has looked.
+
+It is already true today. These shipped in the last week with unit tests but **zero** browser cases:
+
+| Feature | Unit | Browser |
+|---|---|---|
+| Quiet hours (reminders) | 2 files | **none** |
+| Skip this time (repeating reminder) | 1 file | **none** |
+| Break-even calculator | 1 file | **none** |
+| Payee kinds / "this is my own account" | 1 file | **none** |
+
+The project's own hard-won rule is that the only way to catch a real defect here has been to measure the live
+page, not to read the code. So a feature that has only ever been unit-tested is unproven, whatever its tests say.
+
+Go wider than that list: walk the recent commits and the feature list, and name everything a person can do that
+no browser case exercises. Rank by the risk definition above. Write a handful of the most valuable missing
+cases; list the rest rather than writing them all.
+
+## UI and UX: judgement, not just layout
+
+`layout-contract` proves things fit and have accessible names. It cannot tell me a screen is confusing. Use the
+project's own yardsticks — `docs/DESIGN-SYSTEM.md`, `docs/UX-GUIDELINES.md`, `docs/FORMS-AND-SHEETS.md` — and
+judge the screens you open:
+
+- **Taps and pop-ups.** How many taps to do the common thing? Does a sheet open on top of a sheet (banned)?
+- **Words.** Are errors plain ("Can't divide by zero", never `NaN`)? Does a button say what will happen, and
+  does what follows confirm it happened?
+- **Undo.** Every delete is meant to be undoable. Check the ones you meet.
+- **Discoverability.** Is the main action on a screen findable without knowing it exists?
+- **Meaning without colour.** `positive` and `negative` are the only colours allowed to mean good or bad, and
+  never as the only signal. Check a screen reader would get the same meaning in words.
+- **The basic calculator page is my quality bar.** If a screen feels worse than that page, say so and why.
+
+Say which screens you actually looked at. An opinion about a screen you did not open is worth nothing to me.
 
 ## How to run things
 
@@ -403,12 +473,17 @@ trust the numbers** — because a green suite says nothing about the second. The
 | The numbers (audit) | | | | | | |
 | Dated claims (research) | | | | | | |
 | Old-backup restore | | | | | | |
+| Risky cases (money, irreversible, privacy, data loss) | | | | | | |
 | Light theme and screen reader | | | | | | |
 | System: back, rotate, keyboard, notification tap | | | | | | |
 | Offline and scale | | | | | | |
 
-Then, for each **new** failure: what breaks, the smallest way to reproduce it, and how bad it is for someone using the
-app. Rank them — I want to know what to fix first, not an alphabetical list.
+Then **two lists, in this order**, because the second is the one nobody has ever given me:
+
+1. For each **new** failure: what breaks, the smallest way to reproduce it, and how bad it is for someone using
+   the app. Rank by risk (money, irreversible, privacy, data loss) — not alphabetically, not by count.
+2. **What has no test at all.** Every feature a person can use that no browser case touches, ranked the same way,
+   with the few you wrote marked as written and the rest marked as listed.
 
 Then: what you could not test, and why. Then, separately, every test you repaired and why it was wrong. Then the
 decisions you need from me, each with your recommendation.
