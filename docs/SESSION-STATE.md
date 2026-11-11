@@ -1,5 +1,27 @@
 # Session state: resume here
 
+## Round 26 (2026-11-11): picked up the five agents' work; the unfinished grouping finished and committed
+
+**Owner's prompt:** "can you check the agents which were running? could you continue agents work from where we left?"
+
+**No agent was still running.** The only live peer was an interactive shell session, not a background agent. Four of the five
+agents in `docs/RESUME-HERE.md` section 4 had committed; the fifth (review grouping, shared by the Findability and Design
+screens agents) had died with its work uncommitted: 9 modified files and 4 new ones.
+
+| Item | Status |
+|---|---|
+| The uncommitted grouping work (Inbox sections + payee clubbing, same for the manual scan list) | Finished and committed, `c709f64` |
+| Its own new browser test crashed: `getByRole('button', {name: 'Add all 2'})` also matched the sheet's close button, labelled "Close Add all 2" (Playwright matches a name as a substring) | Fixed with `exact: true` |
+| **Real bug: the "guess" label never showed on the scan list.** The pipeline already pre-filled a keyword category via smsParse's own `guessCategory`, but `categoryId` carried no provenance, so a guess looked like your own earlier entry | Fixed at the root: new `categoryGuessed`, set in one shared `catFields` helper that both the message scan and the statement import route through |
+| That fix exposed a second: a guess was being applied to a payment to a person, which the owner's rule forbids | Fixed, both locked by tests |
+| Three stale browser checks repaired (44px both-directions vs the documented one-direction rule; Export notes moved to Backup and export; N01's removed "Open calculators" button) | Committed, `0885c58` |
+| Verified | `npm run check` 3685 passed / 16 skipped; `npm run build` clean; `layout-contract` 216/216; `smsinbox` 27/27; `import` 21/21 |
+| Regression check against a baseline worktree at `c75221f` (worktree, not stash, per Round 12) | `notes-todo` 7 failures before, 6 after (N01 is a net fix; N20/N21/N22/N36/N43/N45 identical on both). `qa-budget-new`: B-109 now passes, the other 5 are the known pre-existing set |
+| **Not pushed.** 79 commits local. Not installed on the phone | Owner's call |
+
+**Open, carried forward:** the Reminders agent's boot rescheduling and quiet hours are not in the commit log, so do not
+assume they were built. `docs/E2E-STATUS-2026-11-11.md` was never written.
+
 ## Round 25 (2026-11-11): the SMS Inbox and learning plan (plan only, nothing built yet)
 
 Owner asked for always-listening SMS capture, a review Inbox, and in-app learning (same payee, context like commute UPI). A critic (2026-11-11) said

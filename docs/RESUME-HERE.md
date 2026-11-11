@@ -12,9 +12,9 @@ The long-term plans live in `docs/THE-PLAN.md` (everything) and `docs/SMS-INBOX-
 |---|---|
 | **App** | Calc: a personal Android calculator + budget + notes + reminders app (React, TypeScript, Vite, Capacitor). One user, the owner |
 | **Repo / branch** | `github.com/vaibhavk93/calculator`, branch `dev` (about 200 commits). Local folder: `~/Desktop/Personal/Cowork/Calculator` |
-| **Pushed to GitHub** | Up to `677e6c3` (2026-11-11 11:45). Everything after is local only until someone pushes |
+| **Pushed to GitHub** | Up to `677e6c3` (2026-11-11 11:45). **79 commits are local only**, including `c709f64`/`0885c58`. Nothing is pushed until the owner says so |
 | **On the owner's phone** | Build installed 11:44 (SMS capture, Inbox, modes, learning). OnePlus CPH2573, Android 16, installed over Wi-Fi debugging |
-| **Tests** | `npm run check` = typecheck + unit tests. About 3,600 unit tests pass. Browser tests (`e2e/`) have known pre-existing failures (section 6) |
+| **Tests** | `npm run check` = typecheck + unit tests. **3,685 pass / 16 skipped** (2026-11-11 13:20). Browser tests (`e2e/`) have known pre-existing failures (section 6) |
 
 ---
 
@@ -44,21 +44,43 @@ The long-term plans live in `docs/THE-PLAN.md` (everything) and `docs/SMS-INBOX-
 
 ---
 
-## 4. Agents running when this was written (12:27)
+## 4. Agents: all five have finished (last checked 2026-11-11 13:20)
 
-Each agent works **in place on `dev`** (no worktrees), owns a set of files, and commits with specific `git add`. None may push or install.
+**Nothing is running now.** The five agents below all stopped. Four had committed their work; the fifth (the review
+grouping, owned jointly by Findability and Design screens) died with its work uncommitted. That work was finished and
+committed by hand as `c709f64`, and the stale browser checks as `0885c58`. See "What was finished for them" below.
 
-| Agent | Task | Owns (do not edit elsewhere) | Status |
-|---|---|---|---|
-| **Findability** | Make SMS features easy to find: permanent "Bank messages" row on Budget home, entries in More in Budget, move **Bank messages to the top of Settings**, clearer empty Inbox, Day view prev/next arrows and "Auto-added" label. **Then:** category sections + payee clubbing in the Inbox | `BudgetScreen.tsx`, `SettingsScreen.tsx`, `BankMessages.tsx`, `InboxScreen.tsx`, `DayView.tsx` | Running |
-| **Design screens** | Restyled five screens to the owner's new designs. **Now:** category sections + payee clubbing in the manual-scan list | `SpendSummary.tsx`, `BillsScreen.tsx`, `ManageScreen.tsx`, `ImportScreen.tsx`, `DueScreen.tsx` (card view) | Screens done and committed; scan grouping running |
-| **Reminders** | Reminders survive reboot/timezone change; skip one occurrence; optional quiet hours | `src/lib/reminders*`, notifications, Due store code, `android/` boot receiver | Running |
-| **Tests and docs** | Bank-message parser coverage (124-row table, 9 parser fixes), classify the 12 failing browser suites, docs hygiene, privacy and Play drafts, move `@capacitor/cli` to dev dependencies | `src/lib/smsParse*`, `e2e/*`, `docs/*` | Parser, docs and drafts committed; e2e classification running |
-| **Calculators** | Extra EMI (done), Goal SIP by date (done), FD maturity date, Break-even | `src/engine/*`, `src/features/tools/*` | Two of four done |
+| Agent | Task | Status |
+|---|---|---|
+| **Findability** | SMS features easy to find; then category sections + payee clubbing in the Inbox | Findability committed (`dc57a0d`); **Inbox grouping finished by hand, `c709f64`** |
+| **Design screens** | Five restyled screens; then grouping in the manual-scan list | Screens committed; **scan grouping finished by hand, `c709f64`** |
+| **Reminders** | Survive reboot/timezone change; skip one occurrence; quiet hours | Skip committed (`c734f5c`). **Boot rescheduling and quiet hours: not in the log, check before assuming done** |
+| **Tests and docs** | Parser coverage, classify the 12 failing browser suites, docs hygiene | Parser and docs committed; **`docs/E2E-STATUS-2026-11-11.md` was never written** |
+| **Calculators** | Extra EMI, Goal SIP by date, FD maturity date, Break-even | **All four done** (`55810bb`, `c75221f`) |
 
-**Shared helpers (committed):** `src/lib/groupItems.ts` (group by category then payee), `src/lib/categoryGuess.ts` (keyword category guess), `src/lib/smsQueue.ts` (the app/phone contract), `src/lib/inbox.ts` (Inbox logic), `src/lib/smsIgnore.ts`.
+### What was finished for them (2026-11-11, `c709f64`)
+
+The grouping work was complete and `npm run check` was green, but it was never committed and had two real defects:
+
+1. **Its own new browser test could not run.** `e2e/import.test.mjs` asked for a button named "Add all 2" inside the
+   sheet, and Playwright matches a name as a *substring*: the sheet's own close button is labelled "Close Add all 2",
+   so two elements matched and the suite crashed. Fixed with `exact: true`.
+2. **The "guess" label never appeared on the scan list** (a real bug, not a test bug). The scan pipeline was already
+   pre-filling a keyword category through smsParse's own `guessCategory`, but `categoryId` recorded nothing about
+   where it came from, so a guess was indistinguishable from your own earlier entry. Candidates now carry
+   `categoryGuessed`, set in one shared helper (`catFields` in `src/lib/smsParse.ts`) that **both** the message scan
+   and the statement import go through. Fixing that exposed a second one: a guess was being applied to a payment to a
+   person, which the owner's rule forbids. Both are locked by tests.
+
+**⚠ Remember:** `categoryId` on a Candidate means "your own earlier entry **or** a keyword guess". Always read
+`categoryGuessed` alongside it. Do not add a third place that guesses a category: extend `catFields`.
+
+**Shared helpers (committed):** `src/lib/importGroups.ts` + `src/lib/inboxView.ts` (the two grouping views), `src/lib/groupItems.ts` (group by category then payee), `src/lib/categoryGuess.ts` (keyword category guess), `src/lib/smsQueue.ts` (the app/phone contract), `src/lib/inbox.ts` (Inbox logic), `src/lib/smsIgnore.ts`.
 
 ### If an agent died (usage limit, network): how to restart its task
+
+Agents work **in place on `dev`** (no worktrees), each owning a set of files, committing with specific `git add`. None may push or install.
+
 
 1. `cd ~/Desktop/Personal/Cowork/Calculator && git status --short && git log --oneline -15`.
 2. Files that are modified but not committed belong to a dead agent's unfinished work. Read them, run `npm run check`; if green, commit with specific `git add`; if red, finish or `git diff` and fix.
@@ -70,7 +92,9 @@ Each agent works **in place on `dev`** (no worktrees), owns a set of files, and 
 
 | Item | Notes |
 |---|---|
-| Review the final reports of the five agents above, then run the full check myself | `npm run check`, `npm run build`, `node e2e/layout-contract.test.mjs` |
+| ~~Review the agents' work and run the full check~~ | **Done 2026-11-11 13:20:** check 3685, build clean, layout-contract 216/216, smsinbox 27/27, import 21/21 |
+| Reminders agent: confirm boot rescheduling and quiet hours were actually built | Only "skip this time" is in the commit log |
+| Write `docs/E2E-STATUS-2026-11-11.md` (classify the failing browser suites) | The tests agent never got to it. notes-todo's 6 and qa-budget-new's 5 are already classified in section 6 |
 | Install on the owner's phone over Wi-Fi, then push | Section 7 |
 | Day view, due-card and design polish | Small |
 | Calendar view in Due, remaining underline search fields, light-theme and 200%-font review of newer screens | After the above |
