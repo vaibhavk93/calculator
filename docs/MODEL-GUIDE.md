@@ -1,6 +1,6 @@
 # Which Model to Build With
 
-**Status:** v1.0 · pricing cached 2026-10-06 — re-check before relying on exact figures
+**Status:** v1.0 · prices re-read 2026-11-11 from https://platform.claude.com/docs/en/about-claude/pricing (base input and output only; cache and batch prices not copied here) — re-check before relying on exact figures
 **Question:** can a cheaper model do the implementation work?
 
 **Short answer: yes, for most of it — and that is precisely what all the
@@ -14,7 +14,8 @@ All current models have a 1M-token context window.
 
 | Model | Model ID | Input $/1M | Output $/1M | vs Opus 5.5 |
 |---|---|---|---|---|
-| Claude Fable 5.1 | `claude-fable-5-1` | $10.00 | $50.00 | 2.5× more |
+| Claude Fable 5.2 | (ID is not on the pricing page; look it up on the models page) | $8.00 | $40.00 | 2× more |
+| Claude Fable 5.1 (older) | `claude-fable-5-1` | $10.00 | $50.00 | 2.5× more |
 | Claude Opus 5.5 | `claude-opus-5-5` | $4.00 | $20.00 | — |
 | Claude Sonnet 5.5 | `claude-sonnet-5-5` | $2.00 | $10.00 | **½ the cost** |
 | Claude Haiku 5.5 | `claude-haiku-5-5` | $0.10 | $0.50 | **1/40th** |

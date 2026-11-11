@@ -6,10 +6,10 @@ and what's broken, `docs/THE-PLAN.md` is now the live source — not this file.*
 last session's exact stopping point. The sections below (product, verification method, caveats, toolchain,
 decisions) don't change every session and are still accurate.
 
-**One-line state:** a working React + Capacitor calculator app with **60 calculators**, notes/lists/to-dos, a
+**One-line state:** a working React + Capacitor calculator app with **68 calculators**, notes/lists/to-dos, a
 **Due tab** (reminders), SMS-based expense capture, and a **Budget tab** — all on a three-tier hairline design
 system that's been applied to Budget, Due, Notes, To-do, the calculator result row and Tools home group pages
-(see `docs/THE-PLAN.md` Block B). **2529 unit tests pass (92 files)** plus 7 e2e suites (`npm run e2e`). Built and
+(see `docs/THE-PLAN.md` Block B). **3508 unit tests pass, 16 skipped (126 files)** plus 26 e2e suites (`npm run e2e`; per-suite status in `docs/E2E-STATUS-2026-11-11.md`), counted 2026-11-11 at commit f4182bf. Built and
 installed on the real phone (OnePlus, package `com.vaibhavkumawat.vkcalc`) as of this session.
 
 ## 1. What the product is
@@ -25,7 +25,7 @@ analytics, nothing leaves the device except (later) currency rates. Visible name
 |---|---|---|
 | Calculator: brackets, live preview, history (shown only from the History sheet), Paste and Copy, bordered keys | Built, tested, seen in browser | `src/features/calculator/`, `src/engine/expression/` |
 | Scientific calculator (separate screen, memory keys) | Built, seen in browser | `ScientificScreen.tsx`, opened from the top of Tools |
-| 55 calculators in 8 groups, one shared screen | Built, all open and show a result | `src/features/tools/`, `src/engine/{convert,everyday,loans,investments,tax,metrics}` |
+| 68 calculators in 8 groups, one shared screen | Built, all open and show a result | `src/features/tools/`, `src/engine/{convert,everyday,loans,investments,tax,metrics}` |
 | Tools UI: groups, search, sticky answer bar, grouped digits, "More options", tap-the-tab-to-go-back | Built, seen in browser | `ToolsScreen.tsx`, `ToolScreen.tsx`, `groups.ts` |
 | Notes tab (was "Saved"): cards, tags, pin, search, Trash 7 days with Undo | Built | `src/features/memory/` |
 | Lists with checkboxes ("2 of 5 done, ₹3,000 left"), To list, Remind me | Built, seen in browser | `TapeScreen.tsx`, `ToListSheet.tsx`, `ResultActions.tsx` |
@@ -37,7 +37,7 @@ analytics, nothing leaves the device except (later) currency rates. Visible name
 | **Budget tab** (5th tab): limit per category plus an optional overall limit, expenses by date, month switcher, Uncategorised shown, soft delete with Undo, 10 starter categories | Built 0.5.0, **unproven** | `src/features/budget/`, `src/lib/budget.ts`, `PersistedData.budget` |
 | Settings: theme, accent, number system, decimals, copying numbers, "Opens on" any calculator, reminders status, backup and restore. Sections are tinted cards | Built | `src/features/settings/` |
 
-Counts: **2529 tests in 92 files**, **60 calculators**, 8 Tools groups, 5 tabs (Calculate · Tools · Notes · Due ·
+Counts (2026-11-11, f4182bf): **3508 tests in 126 files** (16 skipped), **68 calculators**, 8 Tools groups, 5 tabs (Calculate · Tools · Notes · Due ·
 Budget), stored data schema **v3** (the budget was added without a bump: old data gets the starter categories).
 
 ## 3. What was verified, and how
@@ -45,7 +45,7 @@ Budget), stored data schema **v3** (the budget was added without a bump: old dat
 | Claim | Evidence |
 |---|---|
 | All tests pass, build succeeds | `npm run check` and `npm run build` on 2026-11-02 |
-| All 55 calculators open and show a result, no `NaN`, no console errors | Scripted sweep in a real browser (before the UI revamp) and `registry.test.ts` (after) |
+| All 68 calculators open and show a result, no `NaN`, no console errors | Scripted sweep in a real browser (before the UI revamp) and `registry.test.ts` (after) |
 | The revamped calculator, "=" behaviour, chips, split-to-list with checkboxes, Tools home, Loan EMI, Scientific, tap-the-tab-to-go-back | Looked at in a 360px browser frame after the revamp |
 | Formulas | See `docs/VERIFICATION.md`: each calculator is marked A (outside source), B (recalled source + recomputed), C (recomputed only) or D (hand-worked) |
 | App builds and installs on a OnePlus (Android 16) | Debug build installed and launched with no crash. **That was the build before the UI revamp** |

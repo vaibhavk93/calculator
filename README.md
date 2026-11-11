@@ -14,7 +14,7 @@ No ads. No account. No tracking. Works offline.
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npm run check        # typecheck + 395 unit tests
+npm run check        # typecheck + all unit tests (3508 on 2026-11-11)
 ```
 
 ### What P1 includes

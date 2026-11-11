@@ -30,13 +30,13 @@ history, not plans.
 
 | | |
 |---|---|
-| **Calculators** | **61** (HRA exemption added 2026-11-06; docs elsewhere still say 51/57/60 — those are stale) |
+| **Calculators** | **68** (counted 2026-11-11 from `ALL_TOOLS` in `src/features/tools/registry.ts` at commit f4182bf; docs elsewhere still say 51/55/57/60/61 — those are stale) |
 | **Tabs** | Calculate · Tools · Notes (+To-do) · Due · Budget |
 | **Budget** | expenses, categories + subcategories, cards/accounts, limits per month, bills & subscriptions, statement cycles, refunds, trips, heatmap, CSV export/import, bank-message scan |
 | **Notes** | saved calculations, lists (label + amount), to-dos, **plain text notes** (Block C, 2026-11-05) |
 | **Due** | reminders, lead times, repeats, advance-tax pack, battery-settings guide |
 | **Platform** | offline, no account, no analytics. Android only. Local backup file |
-| **Tests** | 2723 unit tests + 7 e2e suites |
+| **Tests** | 3508 unit tests pass, 16 skipped (126 files, `npm run check`, commit f4182bf, 2026-11-11) + 26 browser (e2e) suites; what passes and fails today: `docs/E2E-STATUS-2026-11-11.md` |
 
 **⚠ The old roadmap's status column was a whole session out of date.** Verified in code on 2026-11-04:
 every Phase 1 item and nearly every Phase 2 item it marked "Planned" is actually built — reminder time
@@ -366,17 +366,16 @@ it out. **One screen first, approved, then the sweep** — not a big-bang redesi
 
 | Item | Blocked on |
 |---|---|
-| India small-savings pack (SSY/NSC/VPF/SCSS) | 4 quarterly rates from a primary source |
-| HRA + rent receipt | Income-tax Rules text (section number, metro list, PAN threshold) |
-| FD ladder | DICGC cover limit from a primary source |
-| Gold jewellery bill | GST split — sources disagree (3% vs 3%+5%) |
-| LTCG harvesting | Exemption limit from a primary source |
+| VPF calculator (the rest of the small-savings pack is built) | Not in the registry. Not re-checked whether the old blocker (quarterly rates from a primary source) still applies |
+| Rent receipt (the HRA exemption calculator is built) | Not built. Not re-checked whether the old blocker (Income-tax Rules text) still applies |
 | Exit settlement (E8) | Labour Codes notification status + Income Tax Act text |
 | Sequence-of-returns, split charts, world-time globe | A chart-library decision |
 | Widget, Quick Settings tile, share-in, exact alarms | Native Android work |
 | iOS | A Mac with signing |
 | Multi-currency per entry | Wiring the existing rate fetch into Budget |
 | Remote rules packs (H1) | Nothing — it is just large. Every "rates stay fresh" promise assumes it |
+
+**Built since this table was written, so no longer blocked (checked in the registry 2026-11-11):** SSY, NSC and SCSS (`ssy`, `nsc`, `scss`), HRA exemption (`hra`), FD ladder (`fd-ladder`), gold jewellery bill (`gold-bill`), LTCG harvesting (`ltcg-harvest`).
 
 ---
 
