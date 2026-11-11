@@ -25,6 +25,8 @@ left the one job it exists for — "do the tests tell the truth?" — as a wish 
 | **A written output file** | `docs/E2E-STATUS-2026-11-11.md` is already an outstanding to-do in `RESUME-HERE.md`. This pass produces it anyway |
 | **"Docs are history, not orders"** | This prompt quotes failure lists that age. Without that line, a stale list becomes an instruction |
 | **A full caveats section** | Disk, the pre-commit hook, the usage limit, the proxy, `cap sync`, `npm audit` noise, and the git tracking trap. Each has already cost someone a session |
+| **Layer 5: the numbers themselves (audit)** | The biggest hole. Running the repo's own tests cannot catch a wrong formula that has a matching wrong test. `VERIFICATION.md` grades 34 calculators A to D: **22 are C or D**, meaning no outside source was ever checked. That is where a confidently wrong tax figure hides |
+| **Layer 6: dated claims (research)** | `OFFICIAL_TO = '31 Dec 2026'` in `rates.ts`. Small-savings rates go stale in about seven weeks and every screen repeats that date. A test pass that ignores expiry dates reports green on numbers that are about to be wrong |
 | **A worked example of a stale doc** | `CLAUDE.md` claims the calculator logs expressions to localStorage. It does not, and two tests prove it. Handing over one confirmed example makes "verify, don't trust" concrete |
 
 Deliberately **not** added: step-by-step scaffolding. Anthropic's guide is explicit that prescriptive click-by-click
@@ -63,6 +65,15 @@ Do not look for one. When I say "the logic underneath", I mean the three layers 
     |               |                     |                |
  vitest         vitest              node e2e/*.mjs     QA copy on
  unit tests     unit tests          + a real look      the phone
+
+      and two the test suite itself cannot see:
+
+ +--------------------------+   +--------------------------+
+ | THE NUMBERS (audit)      |   | DATED CLAIMS (research)  |
+ +--------------------------+   +--------------------------+
+  is the formula right, or      a rate or rule with an
+  just consistent with a        expiry date that has passed
+  test that is also wrong?      or is about to
 ```
 
 Money is never a JavaScript `number` (`D`/`Dec` from `src/engine`). Layering and the design bans are enforced by
@@ -75,6 +86,8 @@ Money is never a JavaScript `number` (`D`/`Dec` from `src/engine`). Layering and
 3. **Store and persistence.** Saving, loading, sanitising junk, backup and restore.
 4. **Screens.** Every tab at phone sizes, including 200% font.
 5. **Runtime on the phone.** Only if I say a phone is connected, and only the QA copy.
+6. **The numbers, and anything with an expiry date.** See "What the tests cannot see" below. Do this even if
+   you have to cut it short — a green suite hiding a wrong tax figure is the single worst outcome of this session.
 
 ## Step 1: prove the harness can fail (do this first)
 
@@ -117,6 +130,39 @@ have failures and I need to know which ones the recent code caused.
 session is busy on this machine, browser suites contend for it and get slower and less reliable — check first, and say
 so in the report if it applied. Never call a suite flaky from one run; say how many times you ran it and what you got
 each time.
+
+## What the tests cannot see (do not skip this)
+
+**A passing suite only proves the code does what a test says. It cannot prove the test is right.** Two kinds of
+wrongness are invisible to every command in this repo, and they are the two that would actually cost me money.
+
+**The numbers.** `docs/VERIFICATION.md` grades each calculator on how it was checked:
+
+| Grade | Meaning | How many |
+|---|---|---|
+| **A** | Matches an outside source — law text, regulator, published table | 10 |
+| **B** | Outside source from memory, plus a second-method recomputation | 2 |
+| **C** | Recomputed a second way only. **No outside source** | 9 |
+| **D** | Hand-worked arithmetic or calendar rules only | 13 |
+
+So **22 of 34 have never been checked against anything outside this repo**. A wrong formula with a matching
+wrong test passes forever. Do not re-derive all of them — spot-check a handful, **tax first** because that is
+where being wrong is worst, then anything handling money over long periods. For each one you check, say which
+outside source you used and update its row. Never upgrade a row on a hunch; the grades are only worth
+something if they are honest.
+
+Also confirm the three rows marked as **assumptions** still say so on screen. An assumption that quietly stops
+being labelled is worse than one that was never flagged.
+
+**Dated claims.** `src/engine/investments/rates.ts` has `OFFICIAL_TO = '31 Dec 2026'`, and screens repeat
+"official to 31 Dec 2026" in their own words. The January–March 2027 rates are announced around 30 December
+2026, so this goes stale in about seven weeks. Find every dated or "official to" claim in the engine, the
+specs and `docs/DATA-FRESHNESS.md`, and tell me which ones expire, when, and whether the screen says so
+plainly or silently implies the number still holds. **This is a report, not a fix** — do not invent a rate.
+
+**Privacy.** `src/lib/qa-privacy.test.ts` and `src/store/qa-privacy-portfolio.test.ts` exist to prove no real
+data leaks into logs, backups or exports. Run them, and say plainly whether they are real coverage or a
+formality.
 
 ## How to run things
 
@@ -301,7 +347,8 @@ I'm a product manager, not a test engineer. Lead with the outcome.
 
 # The final report
 
-Start with one paragraph: **can I trust "all tests pass" now, yes or no, and why.** Then:
+Start with one paragraph answering two things: **can I trust "all tests pass" now**, and **separately, can I
+trust the numbers** — because a green suite says nothing about the second. Then:
 
 | Layer | Ran | Passed | Failed | New | Already broken | Unsure |
 |---|---|---|---|---|---|---|
@@ -310,6 +357,8 @@ Start with one paragraph: **can I trust "all tests pass" now, yes or no, and why
 | Store and persistence | | | | | | |
 | Screens (browser) | | | | | | |
 | Runtime (phone) | | | | | | |
+| The numbers (audit) | | | | | | |
+| Dated claims (research) | | | | | | |
 
 Then, for each **new** failure: what breaks, the smallest way to reproduce it, and how bad it is for someone using the
 app. Rank them — I want to know what to fix first, not an alphabetical list.
