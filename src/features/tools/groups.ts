@@ -53,7 +53,7 @@ export const GROUPS: ToolGroup[] = [
   ]),
   group('loans', 'Loans and EMI', 5, [
     { title: 'Plan a loan', tools: ['emi', 'amortisation', 'reverse-emi'] },
-    { title: 'Change a loan', tools: ['prepayment', 'rate-change', 'balance-transfer', 'loan-compare'] },
+    { title: 'Change a loan', tools: ['prepayment', 'extra-emi', 'rate-change', 'balance-transfer', 'loan-compare'] },
     { title: 'Several loans', tools: ['multi-loan', 'runway'] },
     { title: 'Special cases', tools: ['card-emi', 'home-loan-tax', 'simple-compound', 'loan-presets'] },
   ]),

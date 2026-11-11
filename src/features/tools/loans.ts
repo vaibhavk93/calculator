@@ -19,11 +19,13 @@ import {
   type Row,
 } from '../../engine/loans/loan'
 import { legacyTermText, parseTerm, termChip } from '../../engine/loans/term'
+import { extraEmiPlan } from '../../engine/loans/extraEmi'
+import { addMonths, formatDate, parseDate, toIso } from '../../engine/everyday/dates'
 import { asScheduled, neverEnds, partPay, partPayTarget, payoffPlan, runway, type Debt } from '../../engine/loans/payoff'
 import { CARD_GST_PCT, HOME_LOAN_TAX, LOAN_RULES_AS_OF, PRESETS, RATES_AS_OF as LOAN_RATES, type LoanType } from '../../engine/loans/rules'
 import { RATES_AS_OF as GST_RATES } from '../../engine/convert/gstRates'
 import { RATES_AS_OF as TAX_RATES } from '../../engine/tax/rules.FY2026-27'
-import { toWholeMonths, toYears, unitText } from '../../engine/duration'
+import { toWholeMonths, toYears, unitText, yearsMonthsText } from '../../engine/duration'
 import { junkOptional, need, parseNum, unitKey, unitOf, type Computed, type Field, type Output, type ResultTable, type TimeUnit, type ToolSpec, type Values } from '../../lib/tool'
 
 // ---- shared fields and helpers ------------------------------------------------
@@ -240,6 +242,79 @@ const prepaySpec: ToolSpec = {
         `Interest saved = ${sum(out.base, 'interest').toFixed(2)} − ${sum(out.rows, 'interest').toFixed(2)}`,
       ],
       note: `Assumes no prepayment charge. ${ROUNDING_NOTE}`,
+    }
+  },
+}
+
+// ---- Extra EMI / part-payment planner ---------------------------------------------------------
+
+/** The first day of next month as YYYY-MM-DD, the default "first EMI on" (people start repaying soon, on the 1st or so). */
+const nextMonthStart = () => {
+  const n = new Date()
+  return toIso(new Date(Date.UTC(n.getFullYear(), n.getMonth() + 1, 1)))
+}
+const EXTRA_FIELDS = [
+  { id: 'extra', label: 'Extra paid with every EMI' },
+  { id: 'lump', label: 'Extra lump sum once a year' },
+]
+
+const extraEmiSpec: ToolSpec = {
+  id: 'extra-emi',
+  title: 'Extra EMI planner',
+  blurb: 'Pay extra each month or each year: time and interest saved',
+  category: 'loans',
+  keywords: ['extra emi', 'part payment', 'part prepayment', 'prepay every month', 'yearly prepayment', 'bonus', 'close loan early', 'months saved', 'interest saved', 'new end date'],
+  fields: [
+    principalField(),
+    rateField(),
+    termField,
+    { id: 'extra', label: 'Extra paid with every EMI', kind: 'number', unit: 'rupee', default: '5000', hint: 'On top of the EMI, every month. Leave blank for none.' },
+    { id: 'lump', label: 'Extra lump sum once a year', kind: 'number', unit: 'rupee', default: '', hint: 'Paid after every 12th EMI, like a bonus. Leave blank for none.' },
+    { id: 'firstEmi', label: 'First EMI on', kind: 'date', default: nextMonthStart(), advanced: true, hint: 'Used for the end dates. Clear it to see months only.' },
+  ],
+  compute: (v) => {
+    const l = readLoan(v)
+    if ('error' in l) return l
+    const junk = junkOptional(v, EXTRA_FIELDS)
+    if (junk) return junk
+    const extra = parseNum(v.extra) ?? new D(0)
+    const lump = parseNum(v.lump) ?? new D(0)
+    if (extra.isNegative()) return { error: "Extra monthly payment can't be negative", field: 'extra' }
+    if (lump.isNegative()) return { error: "Yearly lump sum can't be negative", field: 'lump' }
+    if (extra.isZero() && lump.isZero()) return { error: 'Enter an extra monthly amount, a yearly lump sum, or both', field: 'extra' }
+    const firstText = typeof v.firstEmi === 'string' ? v.firstEmi.trim() : ''
+    const first = firstText === '' ? null : parseDate(firstText)
+    if (firstText !== '' && !first) return { error: 'Enter the first EMI date as a real date', field: 'firstEmi' }
+    const out = extraEmiPlan(l.p, l.rate, l.n, extra, lump)
+    if (!out) return { error: 'These numbers cannot be worked out' }
+    const endOn = (months: number) => (first ? formatDate(addMonths(first, months - 1)) : null)
+    const dates: Output['rows'] = first
+      ? [
+          { label: 'Loan now ends', value: endOn(out.months)!, fmt: 'text' },
+          { label: 'Loan would have ended', value: endOn(l.n)!, fmt: 'text' },
+        ]
+      : []
+    const parts = [extra.gt(0) ? `${money(extra)} with every EMI` : '', lump.gt(0) ? `${money(lump)} after every 12th EMI` : ''].filter(Boolean).join(' and ')
+    return {
+      rows: [
+        { label: 'Interest saved', value: out.interestSaved, fmt: 'money', main: true, tone: 'positive' },
+        { label: 'Months saved', value: new D(out.monthsSaved), fmt: 'int' },
+        { label: 'New loan term', value: yearsMonthsText(out.months), fmt: 'text' },
+        { label: 'Loan term without extra', value: yearsMonthsText(l.n), fmt: 'text' },
+        ...dates,
+        { label: 'EMI (unchanged)', value: out.emi, fmt: 'money' },
+        { label: 'Interest without extra', value: sum(out.base, 'interest'), fmt: 'money' },
+        { label: 'Interest with extra', value: out.interest, fmt: 'money' },
+        { label: 'Extra you pay in all', value: out.extraPaid, fmt: 'money' },
+      ],
+      table: scheduleTable(out.rows, out.months > 36, `Revised schedule (${parts})`),
+      formula: [
+        ...emiFormula(l, out.emi),
+        'Each month: interest = balance × r; pay EMI + extra (the last month pays only what is left); balance falls by the rest',
+        lump.gt(0) ? `After every 12th EMI, if a balance is left, ${money(lump)} more is paid (or what is left, if less)` : 'No yearly lump sum',
+        `Interest saved = ${sum(out.base, 'interest').toFixed(2)} − ${out.interest.toFixed(2)}; months saved = ${l.n} − ${out.months}`,
+      ],
+      note: `Assumptions: the EMI stays the same and the loan ends sooner. The extra goes wholly against the loan amount (no prepayment charge, which some lenders add, especially on fixed-rate loans). The monthly extra starts with EMI 1; a yearly lump is paid right after EMI 12, 24 and so on. The rate stays the same, and one EMI falls on the same day each month (a month-end start moves to the last day of shorter months). ${ROUNDING_NOTE}`,
     }
   },
 }
@@ -950,6 +1025,7 @@ export const TOOLS: ToolSpec[] = [
   emiSpec,
   scheduleSpec,
   prepaySpec,
+  extraEmiSpec,
   reverseSpec,
   rateChangeSpec,
   compareSpec,

@@ -50,7 +50,7 @@ const LOAN_TOOLS = ALL_TOOLS.filter((s) => s.fields.some((f) => f.id === 'tenure
 
 describe('loan term with the Years / Months switch', () => {
   it('is on every loan tool that has the term box (and loan compare keeps its own column)', () => {
-    expect(LOAN_TOOLS.map((s) => s.id).sort()).toEqual(['amortisation', 'emi', 'home-loan-tax', 'prepayment', 'rate-change', 'reverse-emi'])
+    expect(LOAN_TOOLS.map((s) => s.id).sort()).toEqual(['amortisation', 'emi', 'extra-emi', 'home-loan-tax', 'prepayment', 'rate-change', 'reverse-emi'])
     for (const s of LOAN_TOOLS) expect(withUnits(s).map((f) => [f.id, f.units])).toEqual([['tenure', ['years', 'months']]])
     expect(withUnits(ALL_TOOLS.find((s) => s.id === 'loan-compare')!)).toEqual([])
   })
