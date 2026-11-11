@@ -18,6 +18,7 @@ import { attachInstrument, buildCandidates, logAsText, newInstruments, type Cand
 import { Row, Segmented, Toggle } from '../settings/controls'
 import { IgnoreSheet, canIgnore, type IgnoreTarget } from './IgnoreSheet'
 import { ExpenseSheet } from './sheets'
+import { ActRow, CatHead, RvMain, groupIsOpen, isOwnMoney, mergedOf, ownWhyOf, plural } from './ReviewKit'
 import { shortDate, useMoney } from './SpendSummary'
 
 const DAYS = [
@@ -25,8 +26,6 @@ const DAYS = [
   { value: '30', label: '30 days' },
   { value: '90', label: '90 days' },
 ]
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
 /**
  * "Add from messages": reads bank text messages ON THIS PHONE when the user taps Scan, lists the payments it found and lets
@@ -51,7 +50,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
   const [logCount, setLogCount] = useState(0)
   const [stmtFor, setStmtFor] = useState('')
   const [ignoring, setIgnoring] = useState<IgnoreTarget | null>(null)
-  // Payees that repeat are one row; these are the ones opened to show each payment. `club` is the Add all sheet.
+  // Payees that repeat are one row, closed when 3 or more and open when 2 (ReviewKit groupIsOpen). These are the ones the person flipped. `club` is the Add all sheet.
   const [openClubs, setOpenClubs] = useState<Set<string>>(new Set())
   const [club, setClub] = useState<{ label: string; items: Candidate[]; start: string | null; guess: boolean } | null>(null)
   const addRule = useApp((st) => st.addRule)
@@ -161,9 +160,13 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
     : ''
 
   // Name-less or bank-only names and card bills are never clubbed ("Bank payment" twice is not one payee).
-  const groups = groupByCategoryThenPayee(fresh.map((c) => ({ c, id: c.id, amount: c.amount, merchant: c.kind === 'cardBill' || isGenericPayee(c.merchant, c.bank) ? '' : c.merchant })), (v) => pickOf(v.c).categoryId)
+  const groups = groupByCategoryThenPayee(fresh.filter((c) => !isOwnMoney(c)).map((c) => ({ c, id: c.id, amount: c.amount, merchant: c.kind === 'cardBill' || isGenericPayee(c.merchant, c.bank) ? '' : c.merchant })), (v) => pickOf(v.c).categoryId)
 
-  const row = (c: Candidate, dupe = false) => {
+  const ownItems = fresh.filter(isOwnMoney)
+
+  // One payment. `kid` = it sits under a repeat payee, so the date leads (the name is already in the header above).
+  const row = (c: Candidate, o: { dupe?: boolean; kid?: boolean } = {}) => {
+    const { dupe = false, kid = false } = o
     const inst = c.instrumentId ? budget.instruments.find((i) => i.id === c.instrumentId) : undefined
     const how = [c.mode ? modeLabel(c.mode) : '', inst ? instrumentLabel(inst) : c.bank && c.last4 ? `${c.bank} ••${c.last4}` : ''].filter(Boolean).join(' · ')
     // Says why when a rule of yours chose the category, so a wrong rule is easy to spot.
@@ -171,55 +174,83 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
     const pick = pickOf(c)
     const what = c.kind === 'cardBill' ? 'Credit card bill payment' : pick.categoryId ? `${categoryName(budget, pick.categoryId)}${pick.guess ? ' · guess' : rule && rule.categoryId === c.categoryId ? ` (rule: ${rule.match})` : ''}` : 'Not sure'
     const name = c.merchant || 'Bank payment'
+    const own = isOwnMoney(c)
+    const amount = `−${money(new D(c.amount))}`
+    const meta = [kid ? '' : shortDate(c.date), how, dupe ? 'Looks like one you already added' : '', own ? ownWhyOf(c) : ''].filter(Boolean).join(' · ')
     return (
-      <div key={c.id} className="budget__entry import__row">
-        <button type="button" className="budget__main import__main tap-row" aria-label={`Review ${money(new D(c.amount))} ${name}`} onClick={() => setEdit(c)}>
-          <span className="row__label import__name">{name}</span>
-          <span className="budget__amt spend__amt import__amt">−{money(new D(c.amount))}</span>
-          <span className="row__hint import__meta">
-            <span>{[shortDate(c.date), how].filter(Boolean).join(' · ')}</span>
-            {(pick.categoryId !== null || c.kind === 'cardBill') && <span className="import__chip">{what}</span>}
-          </span>
-          {dupe && <span className="row__hint import__dupe">Looks like one you already added</span>}
-        </button>
-        <div className="import__acts">
-          <button type="button" className="btn" onClick={() => quickAdd(c)}>{dupe ? 'Add anyway' : c.kind === 'cardBill' ? 'Review' : 'Add'}</button>
-          <button type="button" className="link-btn" onClick={() => skip(c)}>{dupe ? 'Hide' : 'Skip'}</button>
-          {canIgnore({ last4: c.last4, bank: c.bank, sender: c.sender ?? null }) && (
-            <button type="button" className="link-btn" aria-label={`Ignore messages like ${money(new D(c.amount))} ${name}`} onClick={() => setIgnoring({ last4: c.last4, bank: c.bank, sender: c.sender ?? null, cardName: inst ? instrumentLabel(inst) : undefined })}>Ignore</button>
+      <div key={c.id} className="rv__item import__row">
+        <RvMain
+          hook="import__main"
+          name={kid ? shortDate(c.date) : name}
+          amount={amount}
+          meta={meta}
+          merged={mergedOf(c)}
+          chip={!kid && (pick.categoryId !== null || c.kind === 'cardBill') ? what : undefined}
+          label={`Review ${money(new D(c.amount))} ${name}`}
+          onClick={() => setEdit(c)}
+        />
+        <ActRow>
+          {own ? (
+            <>
+              <button type="button" className="btn btn--primary" onClick={() => skip(c)}>Not a spend</button>
+              <button type="button" className="btn" onClick={() => quickAdd(c)}>Add</button>
+            </>
+          ) : (
+            <>
+              <button type="button" className={dupe ? 'btn' : 'btn btn--primary'} onClick={() => quickAdd(c)}>{dupe ? 'Add anyway' : c.kind === 'cardBill' ? 'Review' : 'Add'}</button>
+              <button type="button" className="btn" aria-label={`${dupe ? 'Hide' : 'Skip'} ${money(new D(c.amount))} ${name}`} onClick={() => skip(c)}>{dupe ? 'Hide' : 'Skip'}</button>
+            </>
           )}
-        </div>
+          {canIgnore({ last4: c.last4, bank: c.bank, sender: c.sender ?? null }) && (
+            <button type="button" className="btn" aria-label={`Ignore messages like ${money(new D(c.amount))} ${name}`} onClick={() => setIgnoring({ last4: c.last4, bank: c.bank, sender: c.sender ?? null, cardName: inst ? instrumentLabel(inst) : undefined })}>Ignore</button>
+          )}
+        </ActRow>
       </div>
     )
   }
 
-  // The same payee, 2 or more times in a category: one row that opens to each payment. Add all / Skip all act on the payments inside.
+  // The same payee, 2 or more times in a category: one header row that opens to each payment. Add all / Skip all act on the payments inside.
   const clubRow = (key: string, items: Candidate[], total: Dec) => {
-    const open = openClubs.has(key)
+    const open = groupIsOpen(items.length, openClubs.has(key))
     const label = items[0]!.merchant
     const pick = pickOf(items[0]!)
     return (
-      <div key={key} className="import__club">
-        <button
-          type="button"
-          className="budget__main import__main tap-row"
-          aria-expanded={open}
-          aria-label={`${label}, ${items.length} payments, ${money(total)}. ${open ? 'Hide' : 'Show'} each payment`}
+      <div key={key} className="rv__group import__club">
+        <RvMain
+          hook="import__main"
+          name={`${label} ×${items.length}`}
+          amount={`−${money(total)}`}
+          meta={[plural(items.length, 'payment', 'payments'), pick.categoryId ? `${categoryName(budget, pick.categoryId)}${pick.guess ? ' · guess' : ''}` : '', 'each its own entry'].filter(Boolean).join(' · ')}
+          label={`${label}, ${items.length} payments, ${money(total)}. ${open ? 'Hide' : 'Show'} each payment`}
+          expanded={open}
           onClick={() => setOpenClubs((o) => { const n = new Set(o); if (n.has(key)) n.delete(key); else n.add(key); return n })}
-        >
-          <span className="row__label import__name">{label} ×{items.length}</span>
-          <span className="budget__amt spend__amt import__amt">−{money(total)}</span>
-          <Icon name="chevron" size={18} className={open ? 'tap-row__chev tap-row__chev--open' : 'tap-row__chev'} />
-          <span className="row__hint import__meta">{items.length} payments, each its own entry</span>
-        </button>
-        <div className="import__acts">
-          <button type="button" className="btn" onClick={() => (pick.categoryId !== null && !pick.guess ? addAll(items, pick.categoryId) : setClub({ label, items, start: pick.categoryId, guess: pick.guess }))}>Add all {items.length}</button>
-          <button type="button" className="link-btn" onClick={() => skipAll(items)}>Skip all</button>
-        </div>
-        {open && <div className="import__clubrows">{items.map((c) => row(c))}</div>}
+        />
+        <ActRow>
+          <button type="button" className="btn btn--primary" onClick={() => (pick.categoryId !== null && !pick.guess ? addAll(items, pick.categoryId) : setClub({ label, items, start: pick.categoryId, guess: pick.guess }))}>Add all {items.length}</button>
+          <button type="button" className="btn" onClick={() => skipAll(items)}>Skip all</button>
+        </ActRow>
+        {open && <div className="rv__kids">{[...items].sort((a, b) => b.date.localeCompare(a.date)).map((c) => row(c, { kid: true }))}</div>}
       </div>
     )
   }
+
+  const catSection = (g: (typeof groups)[number]) => (
+    <div key={g.categoryId ?? 'none'} className="rv__section">
+      <CatHead hook="import__cathead" name={g.categoryId ? categoryName(budget, g.categoryId) : 'Not sure'} meta={g.payees.length > 1 ? `${plural(g.count, 'payment', 'payments')} · ${money(g.total)}` : undefined} />
+      {g.categoryId === null && <p className="rv__hint">No category yet. Open a payment to pick one.</p>}
+      {g.payees.map((p) => (p.items.length > 1 ? clubRow(`${g.categoryId}|${p.key}`, p.items.map((v) => v.c), p.total) : row(p.items[0]!.c)))}
+    </div>
+  )
+  // Money that looks like the person's own (a move between their accounts, a refund) goes right after "Not sure" and is never added in bulk.
+  const ownSection = ownItems.length > 0 && (
+    <div key="own" className="rv__section">
+      <CatHead hook="import__cathead" name="Your own money" meta={plural(ownItems.length, 'payment', 'payments')} />
+      <p className="rv__hint">These look like moves between your own accounts. They are not counted as spending unless you add them.</p>
+      {ownItems.map((c) => row(c))}
+    </div>
+  )
+  const sectionsOut = groups.flatMap((g, i) => (i === 0 && g.categoryId === null ? [catSection(g), ownSection] : i === 0 ? [ownSection, catSection(g)] : [catSection(g)]))
+  if (groups.length === 0 && ownSection) sectionsOut.push(ownSection)
 
   return (
     <div className="screen" role="dialog" aria-modal="true" aria-label="Add from messages">
@@ -239,16 +270,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
                 </div>
               ))}
               {fresh.length === 0 && <p className="budget__none">Nothing new to add. {result.alreadySeen > 0 ? `${plural(result.alreadySeen, 'payment was', 'payments were')} handled before.` : 'No bank payments in this period.'}</p>}
-              {groups.map((g) => (
-                <div key={g.categoryId ?? 'none'} className="import__cat">
-                  <h3 className="import__cathead">
-                    <span>{g.categoryId ? categoryName(budget, g.categoryId) : 'Not sure'}</span>
-                    <span className="import__catmeta">{plural(g.count, 'payment', 'payments')} · {money(g.total)}</span>
-                  </h3>
-                  {g.categoryId === null && <p className="import__cathint">No category yet. Open a payment to pick one.</p>}
-                  {g.payees.map((p) => (p.items.length > 1 ? clubRow(`${g.categoryId}|${p.key}`, p.items.map((v) => v.c), p.total) : row(p.items[0]!.c)))}
-                </div>
-              ))}
+              {sectionsOut}
             </div>
             {(skippedText || result.alreadySeen > 0) && <p className="manage__help">Not listed: {[skippedText, result.alreadySeen > 0 ? `${plural(result.alreadySeen, 'handled before', 'handled before')}` : ''].filter(Boolean).join(' · ')}</p>}
             {dupes.length > 0 && (
@@ -256,7 +278,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
                 <button type="button" className="link-btn spend__link" aria-expanded={showDupes} onClick={() => setShowDupes((v) => !v)}>
                   {showDupes ? 'Hide' : 'Show'} {plural(dupes.length, 'that looks already added', 'that look already added')}
                 </button>
-                {showDupes && dupes.map((c) => row(c, true))}
+                {showDupes && dupes.map((c) => row(c, { dupe: true }))}
               </div>
             )}
           </section>

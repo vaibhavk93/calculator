@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { EmptyState } from '../../components/EmptyState'
 import { FormField } from '../../components/FormField'
-import { Icon } from '../../components/Icon'
 import { PickerSelect } from '../../components/PickerSelect'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { Sheet } from '../../components/Sheet'
@@ -20,9 +19,9 @@ import { CaptureExplainer } from './CaptureExplainer'
 import { IgnoreSheet, canIgnore, type IgnoreTarget } from './IgnoreSheet'
 import { GuardedFooter, categoryPickOptions, useDiscardGuard } from './formKit'
 import { ExpenseSheet } from './sheets'
+import { ActRow, CatHead, MoreSheet, RvMain, groupIsOpen, isOwnMoney, mergedOf, ownWhyOf, plural } from './ReviewKit'
 import { shortDate, useMoney } from './SpendSummary'
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 const nameOf = (i: Pick<InboxItem, 'merchant' | 'bank'>) => i.merchant || (i.bank ? `${i.bank} payment` : 'Bank payment')
 
 /** How it was paid, in words: "UPI · HDFC Salary ••1234", or the bank and digits when the card is not in your list yet. */
@@ -143,6 +142,7 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
   const [openClubs, setOpenClubs] = useState<ReadonlySet<string>>(new Set())
   const [clubSheet, setClubSheet] = useState<{ label: string; ids: string[]; total: string } | null>(null)
   const [ignoring, setIgnoring] = useState<IgnoreTarget | null>(null)
+  const [more, setMore] = useState<InboxItem | null>(null)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -154,8 +154,10 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
   }, [capture])
 
   const pending = pendingItems(budget)
-  const { sections, cardBills } = reviewSections(budget, pending)
-  const ready = pending.filter((i) => suggestionConfirmed(budget, i))
+  // Money that looks like the person's own never takes part in a bulk approve, and is listed on its own after "Not sure".
+  const ownMoney = pending.filter(isOwnMoney)
+  const { sections, cardBills } = reviewSections(budget, pending.filter((i) => !isOwnMoney(i)))
+  const ready = pending.filter((i) => !isOwnMoney(i) && suggestionConfirmed(budget, i))
   const auto = recentlyAuto(budget, Date.now())
 
   const check = async () => {
@@ -200,41 +202,52 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
     if (n === 0) toast('Nothing to approve')
   }
 
-  const row = (i: InboxItem) => {
+  const ignoreTarget = (i: InboxItem): IgnoreTarget => ({ last4: i.last4, bank: i.bank, sender: i.sender ?? null, cardName: i.instrumentId ? routeCard(budget, i.instrumentId) : undefined })
+
+  // One payment. `kid` = it sits under a repeat payee, so the date leads (the name is already in the header above).
+  const row = (i: InboxItem, kid = false) => {
     const route = routeOf(budget, i)
     const cf = categoryFor(budget, i)
     const what = i.kind === 'cardBill' ? 'Card bill, not spending' : cf.categoryId ? `${categoryName(budget, cf.categoryId)}${cf.guess ? ' · guess' : ''}` : 'No category yet'
     const name = nameOf(i)
-    const note = [i.why, i.person && mode === 'auto' ? 'Looks like a person, so it is never added without you.' : ''].filter(Boolean).join(' ')
+    const own = isOwnMoney(i)
+    // Under a repeat payee the header already says the category and why, so a payment does not repeat it.
+    const note = [own ? ownWhyOf(i) : kid ? '' : i.why, i.person && mode === 'auto' ? 'Looks like a person, so it is never added without you.' : ''].filter(Boolean).join(' ')
+    const amt = money(new D(i.amount))
+    const bill = i.kind === 'cardBill'
     return (
-      <div key={i.id} className="budget__entry import__row inbox__item">
-        <button type="button" className="budget__main tap-row" aria-label={`Change ${money(new D(i.amount))} ${name}`} onClick={() => (i.kind === 'cardBill' ? setFull(i) : setChanging(i))}>
-          <span className="budget__amt spend__amt">{money(new D(i.amount))}</span>
-          <span className="row__label">{name}</span>
-          <Icon name="chevron" size={18} className="tap-row__chev" />
-          <span className="row__hint">{[shortDate(i.date), route, what].filter(Boolean).join(' · ')}</span>
-        </button>
-        {note && <p className="inbox__why">{note}</p>}
-        <div className="inbox__acts">
-          <button type="button" className="btn btn--primary" aria-label={`${i.kind === 'cardBill' ? 'Review' : 'Approve'} ${money(new D(i.amount))} ${name}`} onClick={() => approveOne(i)}>{i.kind === 'cardBill' ? 'Review' : 'Approve'}</button>
-          {i.kind === 'spend' && <button type="button" className="btn" aria-label={`Change ${money(new D(i.amount))} ${name}`} onClick={() => setChanging(i)}>Change</button>}
-          <button type="button" className="link-btn" aria-label={`${money(new D(i.amount))} ${name} is not a spend`} onClick={() => reject(i.id, true)}>Not a spend</button>
-          <button type="button" className="link-btn link-btn--danger" aria-label={`Reject ${money(new D(i.amount))} ${name}`} onClick={() => reject(i.id)}>Reject</button>
-          {canIgnore({ last4: i.last4, bank: i.bank, sender: i.sender ?? null }) && (
-            <button type="button" className="link-btn" aria-label={`Ignore messages like ${money(new D(i.amount))} ${name}`} onClick={() => setIgnoring({ last4: i.last4, bank: i.bank, sender: i.sender ?? null, cardName: i.instrumentId ? routeCard(budget, i.instrumentId) : undefined })}>Ignore</button>
+      <div key={i.id} className="rv__item inbox__item">
+        <RvMain
+          name={kid ? shortDate(i.date) : name}
+          amount={amt}
+          meta={[kid ? '' : shortDate(i.date), route].filter(Boolean).join(' · ')}
+          merged={mergedOf(i)}
+          chip={kid ? undefined : what}
+          label={`Change ${amt} ${name}`}
+          onClick={() => (bill ? setFull(i) : setChanging(i))}
+        />
+        {note && <p className="rv__why">{note}</p>}
+        <ActRow className="inbox__acts">
+          {own ? (
+            <button type="button" className="btn btn--primary" aria-label={`${amt} ${name} is not a spend`} onClick={() => reject(i.id, true)}>Not a spend</button>
+          ) : (
+            <button type="button" className="btn btn--primary" aria-label={`${bill ? 'Review' : 'Approve'} ${amt} ${name}`} onClick={() => approveOne(i)}>{bill ? 'Review' : 'Approve'}</button>
           )}
-        </div>
+          {i.kind === 'spend' && <button type="button" className="btn" aria-label={`Change ${amt} ${name}`} onClick={() => setChanging(i)}>Change</button>}
+          <button type="button" className="btn" aria-label={`Reject ${amt} ${name}`} onClick={() => reject(i.id)}>Reject</button>
+          <button type="button" className="btn" aria-label={`More for ${amt} ${name}`} aria-haspopup="dialog" onClick={() => setMore(i)}>More</button>
+        </ActRow>
       </div>
     )
   }
 
   const toggleClub = (k: string) => setOpenClubs((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n })
 
-  /** One payee with 2 or more payments waiting: one row that expands, with Approve all and Reject all. Each payment stays its own entry. */
+  /** One payee with 2 or more payments waiting: one header row that opens (closed from 3 payments up), with Approve all and Reject all. Each payment stays its own entry. */
   const club = (g: PayeeGroup<InboxItem>, sec: CategoryGroup<InboxItem>) => {
     const k = `${sec.categoryId ?? ''}|${g.key}`
-    const isOpen = openClubs.has(k)
     const n = g.items.length
+    const isOpen = groupIsOpen(n, openClubs.has(k))
     const ids = g.items.map((i) => i.id)
     const cat = sec.categoryId
     const guess = g.items.some((i) => categoryFor(budget, i).guess)
@@ -242,22 +255,24 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
     const name = g.label || 'Bank payment'
     const total = money(g.total)
     return (
-      <div key={k} className="inbox__club">
-        <button type="button" className="budget__main tap-row" aria-expanded={isOpen} aria-label={`${name}, ${plural(n, 'payment', 'payments')}, ${total}. ${isOpen ? 'Hide' : 'Show'} them`} onClick={() => toggleClub(k)}>
-          <span className="budget__amt spend__amt">{total}</span>
-          <span className="row__label">{name} ×{n}</span>
-          <Icon name={isOpen ? 'down' : 'chevron'} size={18} className="tap-row__chev" />
-          <span className="row__hint">{[plural(n, 'payment', 'payments'), cat ? `${categoryName(budget, cat)}${guess ? ' · guess' : ''}` : 'No category yet'].join(' · ')}</span>
-        </button>
-        <div className="inbox__acts">
+      <div key={k} className="rv__group inbox__club">
+        <RvMain
+          name={`${name} ×${n}`}
+          amount={total}
+          meta={[plural(n, 'payment', 'payments'), cat ? `${categoryName(budget, cat)}${guess ? ' · guess' : ''}` : 'No category yet'].join(' · ')}
+          label={`${name}, ${plural(n, 'payment', 'payments')}, ${total}. ${isOpen ? 'Hide' : 'Show'} them`}
+          expanded={isOpen}
+          onClick={() => toggleClub(k)}
+        />
+        <ActRow>
           {cat !== null && !person ? (
             <button type="button" className="btn btn--primary" aria-label={`Approve all ${n} ${name} as ${categoryName(budget, cat)}`} onClick={() => { if (approveGroup(ids, cat) === 0) toast('Could not add these. Open them and tap Change.') }}>Approve all {n}</button>
           ) : (
             <button type="button" className="btn btn--primary" aria-label={`Choose a category for all ${n} ${name}`} onClick={() => setClubSheet({ label: name, ids, total })}>Choose category</button>
           )}
-          <button type="button" className="link-btn link-btn--danger" aria-label={`Reject all ${n} ${name}`} onClick={() => rejectGroup(ids)}>Reject all</button>
-        </div>
-        {isOpen && <div className="inbox__club-items">{g.items.map(row)}</div>}
+          <button type="button" className="btn" aria-label={`Reject all ${n} ${name}`} onClick={() => rejectGroup(ids)}>Reject all</button>
+        </ActRow>
+        {isOpen && <div className="rv__kids">{[...g.items].sort((a, b) => b.date.localeCompare(a.date)).map((i) => row(i, true))}</div>}
       </div>
     )
   }
@@ -265,12 +280,22 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
   const section = (sec: CategoryGroup<InboxItem>) => {
     const name = sec.categoryId === null ? 'Not sure' : categoryName(budget, sec.categoryId)
     return (
-      <div key={sec.categoryId ?? 'none'} role="group" aria-label={name} className="inbox__cat">
-        <h3 className="inbox__cathead"><span>{name}</span><span className="sect__count">{plural(sec.count, 'payment', 'payments')} · {money(sec.total)}</span></h3>
+      <div key={sec.categoryId ?? 'none'} role="group" aria-label={name} className="rv__section">
+        <CatHead hook="inbox__cathead" name={name} meta={sec.payees.length > 1 ? `${plural(sec.count, 'payment', 'payments')} · ${money(sec.total)}` : undefined} />
         {sec.payees.map((g) => (g.items.length > 1 ? club(g, sec) : row(g.items[0]!)))}
       </div>
     )
   }
+  const ownSection = ownMoney.length > 0 && (
+    <div key="own" role="group" aria-label="Your own money" className="rv__section">
+      <CatHead hook="inbox__cathead" name="Your own money" meta={plural(ownMoney.length, 'payment', 'payments')} />
+      <p className="rv__hint">These look like moves between your own accounts. Not a spend is the usual answer, and they are never approved in bulk.</p>
+      {ownMoney.map((i) => row(i))}
+    </div>
+  )
+  // Right after "Not sure" (which is always first when it exists).
+  const sectionsOut = sections.flatMap((sec, idx) => (idx === 0 && sec.categoryId === null ? [section(sec), ownSection] : idx === 0 ? [ownSection, section(sec)] : [section(sec)]))
+  if (sections.length === 0 && ownSection) sectionsOut.push(ownSection)
 
   const empty = pending.length === 0 && auto.length === 0
 
@@ -314,11 +339,11 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
                   </div>
                 )}
                 <div className="sect__body">
-                  {sections.map(section)}
+                  {sectionsOut}
                   {cardBills.length > 0 && (
-                    <div role="group" aria-label="Card bills" className="inbox__cat">
-                      <h3 className="inbox__cathead"><span>Card bills</span><span className="sect__count">{plural(cardBills.length, 'payment', 'payments')}</span></h3>
-                      {cardBills.map(row)}
+                    <div role="group" aria-label="Card bills" className="rv__section">
+                      <CatHead hook="inbox__cathead" name="Card bills" meta={plural(cardBills.length, 'payment', 'payments')} />
+                      {cardBills.map((i) => row(i))}
                     </div>
                   )}
                 </div>
@@ -329,15 +354,15 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
                 <h2 className="sect__head"><span>Recently auto-added</span><span className="sect__count">{auto.length}</span></h2>
                 <div className="sect__body">
                   {auto.map(({ item, entry }) => (
-                    <div key={item.id} className="budget__entry import__row">
-                      <span className="budget__main">
-                        <span className="budget__amt spend__amt">{money(new D(entry.amount))}</span>
-                        <span className="row__label">{nameOf(item)}</span>
-                        <span className="row__hint">{[shortDate(entry.date), routeOf(budget, item), categoryName(budget, entry.categoryId)].filter(Boolean).join(' · ')}</span>
-                      </span>
-                      <div className="import__acts">
-                        <button type="button" className="link-btn" aria-label={`Undo ${money(new D(entry.amount))} ${nameOf(item)}`} onClick={() => undoAuto(item.id)}>Undo</button>
+                    <div key={item.id} className="rv__item">
+                      <div className="rv__main">
+                        <span className="rv__name">{nameOf(item)}</span>
+                        <span className="rv__amt">{money(new D(entry.amount))}</span>
+                        <span className="rv__meta"><span>{[shortDate(entry.date), routeOf(budget, item), categoryName(budget, entry.categoryId)].filter(Boolean).join(' · ')}</span></span>
                       </div>
+                      <ActRow>
+                        <button type="button" className="btn" aria-label={`Undo ${money(new D(entry.amount))} ${nameOf(item)}`} onClick={() => undoAuto(item.id)}>Undo</button>
+                      </ActRow>
                     </div>
                   ))}
                 </div>
@@ -359,6 +384,14 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
         />
       )}
       {explain && <CaptureExplainer onClose={() => setExplain(false)} />}
+      {more && (
+        <MoreSheet
+          title={`More: ${nameOf(more)}`}
+          onNotSpend={() => reject(more.id, true)}
+          onIgnore={canIgnore({ last4: more.last4, bank: more.bank, sender: more.sender ?? null }) ? () => setIgnoring(ignoreTarget(more)) : undefined}
+          onClose={() => setMore(null)}
+        />
+      )}
       {ignoring && <IgnoreSheet target={ignoring} onClose={() => setIgnoring(null)} />}
     </div>
   )

@@ -529,85 +529,6 @@ button.heat__cell:active {
   flex-wrap: wrap;
 }
 
-/* A found payment (design reference, Add from messages): the name and the amount on one line, under it the date, the card and a category chip. */
-.import__main {
-  align-items: center;
-}
-
-.import__name {
-  flex: 1 1 0;
-  min-width: 0;
-  font-size: 1rem;
-  overflow-wrap: anywhere;
-}
-
-.import__amt {
-  flex: none;
-  margin-left: auto;
-  font-size: 1rem;
-}
-
-.import__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-1) var(--s-2);
-}
-
-/* The Found list in sections, one per category ("Not sure" first). */
-.import__cat {
-  margin-top: var(--s-3);
-}
-
-.import__cathead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0 var(--s-3);
-  margin: 0;
-  padding: var(--s-2) var(--s-4);
-  font-size: 0.9375rem;
-  font-weight: 700;
-}
-
-.import__catmeta {
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  font-weight: 400;
-  color: var(--ink-2);
-}
-
-.import__cathint {
-  margin: 0;
-  padding: 0 var(--s-4) var(--s-2);
-  font-size: 0.8125rem;
-  color: var(--ink-2);
-}
-
-/* A payee that repeats: one row with Add all / Skip all, opening to each payment (indented, each its own entry). */
-.import__club {
-  border-top: 1px solid var(--line);
-}
-
-.import__club > .import__main {
-  width: 100%;
-  padding-right: var(--s-4);
-}
-
-.import__clubrows {
-  margin-left: var(--s-4);
-}
-
-/* The category as a small flat tag: raised ground, no border, never the only signal (the words are in it). */
-.import__chip {
-  padding: 2px var(--s-2);
-  border-radius: var(--r-lg);
-  background: var(--raised);
-  font-size: 0.8125rem;
-  color: var(--ink-2);
-  overflow-wrap: anywhere;
-}
 .import__acts {
   display: flex;
   align-items: center;
@@ -620,6 +541,191 @@ button.heat__cell:active {
 .import__acts .btn {
   height: 44px;
 }
+
+/* ------------------------------------------------ the two review lists (ReviewKit): Add from messages, To review
+   A row: name left, amount right, small facts under. Its actions: one row of real buttons (the main one filled, the rest outlined),
+   never underlined text links. A repeat payee is one header row, its payments sit under a left hairline. */
+
+/* A category section: a small quiet label, lighter than the payee rows under it. */
+.rv__section {
+  margin-top: var(--s-5);
+}
+
+.rv__cat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 var(--s-3);
+  margin: 0;
+  padding: 0 var(--s-4) var(--s-2);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.rv__catmeta {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.rv__hint {
+  margin: 0;
+  padding: 0 var(--s-4) var(--s-2);
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+
+/* One payment, or a repeat payee's header. Every row has a hairline on top; a closed group is one row plus its actions. */
+.rv__item,
+.rv__group {
+  display: block;
+  border-top: 1px solid var(--line);
+}
+
+.rv__section > :last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.rv__main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-1) var(--s-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--s-3) var(--s-2) var(--s-2) var(--s-4);
+  text-align: left;
+}
+
+/* The amount and the chevron stay together: when the line is too narrow they drop to the next line as a pair, right-aligned. */
+.rv__end {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.rv__end > .tap-row__chev {
+  margin-left: 0;
+}
+
+.rv__name {
+  flex: 1 1 7rem;
+  min-width: 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+/* A payee that repeats reads as the heading of its payments. */
+.rv__main--group .rv__name {
+  font-weight: 600;
+}
+
+.rv__main > .rv__amt {
+  flex: none;
+  margin-left: auto;
+}
+
+.rv__amt {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1rem;
+  text-align: right;
+}
+
+.rv__meta {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-2);
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+
+.rv__meta > span {
+  overflow-wrap: anywhere;
+}
+
+/* The category as a small flat tag: raised ground, no border, never the only signal (the words are in it). */
+.rv__chip {
+  padding: 2px var(--s-2);
+  border-radius: var(--r-lg);
+  background: var(--raised);
+}
+
+.rv__why {
+  margin: 0;
+  padding: 0 var(--s-4) var(--s-2);
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+/* The payments under a repeat payee: indented under one left hairline, each its own row (date, card and amount in the same columns). */
+.rv__kids {
+  margin-left: var(--s-4);
+  border-left: 1px solid var(--line);
+}
+
+.rv__kids > .rv__item:first-child {
+  border-top: 1px solid var(--line);
+}
+
+.rv__kids > .rv__item:last-child {
+  border-bottom: 0;
+}
+
+.rv__kids .rv__main {
+  padding-left: var(--s-3);
+}
+
+.rv__kids .rv__actwrap {
+  padding-left: var(--s-3);
+  padding-right: var(--s-3);
+}
+
+/* The action buttons: one row when it fits (equal widths), else the main one on its own line and the rest in pairs.
+   The container is the wrapper, so the layout follows the room the row really has (big text, small phone), not the screen. */
+.rv__actwrap {
+  container-type: inline-size;
+  padding: var(--s-1) var(--s-4) var(--s-3);
+}
+
+.rv__acts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr));
+  gap: var(--s-2);
+}
+
+.rv__acts .btn {
+  height: auto;
+  min-height: 48px;
+  padding: var(--s-2);
+  font-size: 0.875rem;
+  color: var(--ink);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.rv__acts .btn--primary {
+  color: var(--accent-ink);
+}
+
+@container (max-width: 19rem) {
+  .rv__acts {
+    grid-template-columns: 1fr 1fr;
+  }
+  .rv__acts > :first-child,
+  .rv__acts > :last-child:nth-child(even) {
+    grid-column: 1 / -1;
+  }
+}
+
 .import__log {
   list-style: none;
   margin: 0;
@@ -1201,43 +1307,20 @@ button.heat__cell:active {
   margin-bottom: var(--s-3);
 }
 
-.inbox__why {
-  flex: 1 1 100%;
-  margin: 0;
-  padding: 0 var(--s-2) var(--s-2) var(--s-4);
-  font-size: 0.8125rem;
-  color: var(--ink-2);
-  overflow-wrap: anywhere;
-}
-
-.inbox__acts {
-  flex: 1 1 100%;
+.inbox__all {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-1) var(--s-3);
-  padding: 0 var(--s-2) var(--s-3) var(--s-4);
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s-1);
+  padding: 0 var(--s-4) var(--s-3);
 }
 
-.inbox__item .budget__main {
-  padding-bottom: var(--s-2);
-}
-
-/* A button's label may wrap at large text sizes: the box grows instead of the text spilling out of a fixed height. */
-.inbox__acts .btn,
 .inbox__all .btn {
   height: auto;
   min-height: 48px;
   padding-block: var(--s-2);
+  color: var(--ink);
   text-align: center;
-}
-
-.inbox__all {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--s-1);
-  padding: 0 var(--s-4) var(--s-3);
 }
 
 .inbox__all .manage__help {
@@ -1314,37 +1397,3 @@ button.heat__cell:active {
   list-style: decimal;
 }
 
-/* Inbox: a category section (name left, count and total right) and a payee that repeats (one row that expands). Hairlines, no boxes. */
-.inbox__cathead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s-3);
-  margin: var(--s-3) 0 0;
-  padding: var(--s-2) var(--s-4);
-  border-bottom: 1px solid var(--line);
-  font-size: 0.9375rem;
-  font-weight: 700;
-}
-
-.inbox__cathead .sect__count {
-  font-weight: 400;
-  color: var(--ink-2);
-}
-
-.inbox__club {
-  border-bottom: 1px solid var(--line);
-}
-
-.inbox__club > .budget__main {
-  width: 100%;
-}
-
-.inbox__club-items {
-  margin-left: var(--s-4);
-  border-top: 1px solid var(--line);
-}
-
-.inbox__club-items > .inbox__item:last-child {
-  border-bottom: 0;
-}
