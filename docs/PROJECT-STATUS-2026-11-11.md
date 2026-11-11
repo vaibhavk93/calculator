@@ -13,10 +13,10 @@ Plain language on purpose.
 |---|---|
 | **App** | Calc: Android calculator, budget, notes, reminders. React, TypeScript, Vite, Capacitor. One user: the owner |
 | **Repo** | `github.com/vaibhavk93/calculator`, branch `dev`. About 215 commits. Local: `~/Desktop/Personal/Cowork/Calculator` |
-| **On GitHub** | Pushed up to `26a9f8a` (2026-11-11 14:33). Later commits are local until pushed |
-| **On the phone** | Real Calc built from `26a9f8a`, installed 14:45 over Wi-Fi debugging (OnePlus CPH2573, Android 16). A separate "Calc QA" copy is also installed |
+| **On GitHub** | Pushed up to `9745d62` (2026-11-11 21:00). `dev` and `origin/dev` match |
+| **On the phone** | Real Calc built from `9745d62`, installed 20:58 over Wi-Fi debugging (OnePlus CPH2573, Android 16). A separate "Calc QA" copy is also installed (older build) |
 | **Tests** | `npm run check`: about 3,715 unit tests pass. Browser suites: `layout-contract` 216/216, `smsinbox` 27/27, `import` 21/21, `dayview` 12/12. Some older suites have failures that predate this work |
-| **In progress now** | Two agents: message logic (duplicates, FD/deposit accounts, own-money vs spend, self vs others, masked samples) and screens (clear buttons, better clubbing). Their work is uncommitted or committed locally; see `git log` |
+| **Latest work (done, installed)** | Duplicate merging across senders, FD/TD/RD never offered as accounts, own-money vs spend (FD broken, sweep, own transfer, card bill), self vs somebody else (learned), clear action buttons, tidier clubbing, "Your own money" section, "N messages merged", "Copy masked examples". Tests: 3,828 unit, smsinbox 31/31, import 51/51, layout 240/240 |
 
 ---
 
