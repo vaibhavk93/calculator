@@ -164,6 +164,43 @@ plainly or silently implies the number still holds. **This is a report, not a fi
 data leaks into logs, backups or exports. Run them, and say plainly whether they are real coverage or a
 formality.
 
+## The checks people forget (cover these explicitly)
+
+The six layers above say *where* to look. These say *what* to look for, and every one of them has been missed
+by a previous pass.
+
+**Restoring an old backup (the highest risk right now).** `schemaVersion` exists so an old backup still opens
+in a newer app. Fields are added almost every week — recently quiet hours, payee kinds, own-money flags,
+merged-message ids. **Make a backup with an older build, restore it into the current one, and check nothing is
+lost or silently reset.** Everything read from storage goes through a `sanitize*` function; a field that
+sanitises to its default instead of keeping the old value loses my data without any error. Unit tests cover
+the sanitisers, but nobody has done the real round trip.
+
+**Light theme.** Dark is what gets looked at. Several screens have only ever been reviewed in dark, by the
+project's own notes. Check both, at 360px and at 200% font.
+
+**Screen readers.** A design rule here is that colour is never the only signal — a screen reader must get the
+same meaning in words. `layout-contract` only checks that controls *have* accessible names, not that the names
+say anything useful. Walk one real flow (add an expense, review a bank message) by name alone and say whether
+it makes sense.
+
+**The system around the app.** Android back from every screen and sheet (there is a back stack in
+`src/lib/backStack.ts`), tapping the tab you are already on, rotation, the soft keyboard covering a field, and
+tapping a reminder notification to open the app. These are where a Capacitor app usually breaks, and none of
+them are covered by a unit test.
+
+**Offline and failure.** The only network call is the currency-rate fetch. Turn the network off and confirm the
+app still opens and the rate screens say something honest rather than showing a stale number as current.
+
+**Scale.** A year of expenses, a very long note, a hundred reminders. `qa-fuzz.test.ts` does some of this;
+say whether the screens survive it, not just the parsers.
+
+**Cross-feature flows.** `e2e/qa-cross.test.mjs` exists for things that span tabs — save a calculation to a
+note, turn it into a reminder, pay it from the budget. Run it; those paths break when one side changes alone.
+
+**Re-verify the known-issues list.** `CLAUDE.md` has a "Known issues" section. At least one entry is already
+wrong (see below). Check each one and tell me which are still true.
+
 ## How to run things
 
 ```bash
@@ -172,7 +209,13 @@ npm run build          # architecture gate (356), typecheck, build
 npm run e2e            # all 26 browser suites; npm run e2e:fast for the quick set
 node e2e/layout-contract.test.mjs      # phone-size layout gate, 216/216 when healthy
 node e2e/smsinbox.test.mjs             # one suite on its own
+node e2e/qa-budget-new.test.mjs B-109  # most suites take case ids as a filter
 ```
+
+The 26 suites: `answerbar`, `budget`, `calculator`, `dayview`, `import`, `layout-contract`, `modules`,
+`notes-text`, `notes-todo`, `onboarding`, `paidwith`, `phase2`, `phase3`, `phase3b`, `portfolio`,
+`qa-budget-new`, `qa-cross`, `qa-notes-due`, `qa-tools`, `reminders-lists`, `rules`, `shell`, `smsinbox`,
+`tool-hero`, `tools1`. Plus the stale `smoke.mjs`, which is not a verdict.
 
 **Browser suites need Node 22, and the default `node` here is 18.** Without this they fail in a way that looks exactly
 like a real bug:
@@ -359,6 +402,10 @@ trust the numbers** — because a green suite says nothing about the second. The
 | Runtime (phone) | | | | | | |
 | The numbers (audit) | | | | | | |
 | Dated claims (research) | | | | | | |
+| Old-backup restore | | | | | | |
+| Light theme and screen reader | | | | | | |
+| System: back, rotate, keyboard, notification tap | | | | | | |
+| Offline and scale | | | | | | |
 
 Then, for each **new** failure: what breaks, the smallest way to reproduce it, and how bad it is for someone using the
 app. Rank them — I want to know what to fix first, not an alphabetical list.
