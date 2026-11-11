@@ -19,7 +19,7 @@ import { CaptureExplainer } from './CaptureExplainer'
 import { IgnoreSheet, canIgnore, type IgnoreTarget } from './IgnoreSheet'
 import { GuardedFooter, categoryPickOptions, useDiscardGuard } from './formKit'
 import { ExpenseSheet } from './sheets'
-import { ActRow, CatHead, MoreSheet, RvMain, groupIsOpen, isOwnMoney, mergedOf, ownWhyOf, plural } from './ReviewKit'
+import { ActRow, CatHead, MoreSheet, PayeeKindChoice, RvMain, groupIsOpen, isOwnMoney, mergedOf, ownWhyOf, plural } from './ReviewKit'
 import { shortDate, useMoney } from './SpendSummary'
 
 const nameOf = (i: Pick<InboxItem, 'merchant' | 'bank'>) => i.merchant || (i.bank ? `${i.bank} payment` : 'Bank payment')
@@ -155,8 +155,7 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
 
   const pending = pendingItems(budget)
   // Money that looks like the person's own never takes part in a bulk approve, and is listed on its own after "Not sure".
-  const ownMoney = pending.filter(isOwnMoney)
-  const { sections, cardBills } = reviewSections(budget, pending.filter((i) => !isOwnMoney(i)))
+  const { sections, cardBills, own: ownMoney } = reviewSections(budget, pending)
   const ready = pending.filter((i) => !isOwnMoney(i) && suggestionConfirmed(budget, i))
   const auto = recentlyAuto(budget, Date.now())
 
@@ -215,14 +214,17 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
     const note = [own ? ownWhyOf(i) : kid ? '' : i.why, i.person && mode === 'auto' ? 'Looks like a person, so it is never added without you.' : ''].filter(Boolean).join(' ')
     const amt = money(new D(i.amount))
     const bill = i.kind === 'cardBill'
+    // Own money that CAME IN can never become an expense, so it has no Change.
+    const cameIn = i.direction === 'in'
+    const askWho = !kid && (i.person || (own && i.ownKind === 'selfTransfer'))
     return (
       <div key={i.id} className="rv__item inbox__item">
         <RvMain
           name={kid ? shortDate(i.date) : name}
-          amount={amt}
+          amount={cameIn ? `+${amt}` : amt}
           meta={[kid ? '' : shortDate(i.date), route].filter(Boolean).join(' · ')}
           merged={mergedOf(i)}
-          chip={kid ? undefined : what}
+          chip={kid || own ? undefined : what}
           label={`Change ${amt} ${name}`}
           onClick={() => (bill ? setFull(i) : setChanging(i))}
         />
@@ -233,10 +235,11 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
           ) : (
             <button type="button" className="btn btn--primary" aria-label={`${bill ? 'Review' : 'Approve'} ${amt} ${name}`} onClick={() => approveOne(i)}>{bill ? 'Review' : 'Approve'}</button>
           )}
-          {i.kind === 'spend' && <button type="button" className="btn" aria-label={`Change ${amt} ${name}`} onClick={() => setChanging(i)}>Change</button>}
+          {i.kind === 'spend' && !cameIn && <button type="button" className="btn" aria-label={`Change ${amt} ${name}`} onClick={() => setChanging(i)}>Change</button>}
           <button type="button" className="btn" aria-label={`Reject ${amt} ${name}`} onClick={() => reject(i.id)}>Reject</button>
           <button type="button" className="btn" aria-label={`More for ${amt} ${name}`} aria-haspopup="dialog" onClick={() => setMore(i)}>More</button>
         </ActRow>
+        {askWho && <PayeeKindChoice merchant={i.merchant} />}
       </div>
     )
   }
@@ -272,6 +275,7 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
           )}
           <button type="button" className="btn" aria-label={`Reject all ${n} ${name}`} onClick={() => rejectGroup(ids)}>Reject all</button>
         </ActRow>
+        {person && <PayeeKindChoice merchant={g.label} />}
         {isOpen && <div className="rv__kids">{[...g.items].sort((a, b) => b.date.localeCompare(a.date)).map((i) => row(i, true))}</div>}
       </div>
     )

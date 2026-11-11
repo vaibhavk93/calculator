@@ -14,11 +14,12 @@ import { INSTRUMENT_KINDS, categoryName, instrumentLabel, modeLabel, ruleFor, ru
 import { buildStatementCandidates } from '../../lib/statementParse'
 import { copyText } from '../../lib/device'
 import { addToParseLog, clearParseLog, loadParseLog, logSalt, readBankMessages, smsSupported } from '../../lib/sms'
-import { attachInstrument, buildCandidates, logAsText, newInstruments, type Candidate, type ParseLogEntry, type ScanResult } from '../../lib/smsParse'
+import { attachInstrument, buildCandidates, logAsText, maskedSamplesText, newInstruments, seenIdsOf, type Candidate, type ParseLogEntry, type ScanResult } from '../../lib/smsParse'
+import { payeeKey, payeeKindFor } from '../../lib/payeeKey'
 import { Row, Segmented, Toggle } from '../settings/controls'
 import { IgnoreSheet, canIgnore, type IgnoreTarget } from './IgnoreSheet'
 import { ExpenseSheet } from './sheets'
-import { ActRow, CatHead, RvMain, groupIsOpen, isOwnMoney, mergedOf, ownWhyOf, plural } from './ReviewKit'
+import { ActRow, CatHead, PayeeKindChoice, RvMain, groupIsOpen, isOwnMoney, mergedOf, ownWhyOf, plural } from './ReviewKit'
 import { shortDate, useMoney } from './SpendSummary'
 
 const DAYS = [
@@ -49,6 +50,8 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
   const [logOpen, setLogOpen] = useState(false)
   const [logCount, setLogCount] = useState(0)
   const [stmtFor, setStmtFor] = useState('')
+  // An own-money payment the person chose to count as income instead: the add sheet, opened as income.
+  const [incomeFor, setIncomeFor] = useState<Candidate | null>(null)
   const [ignoring, setIgnoring] = useState<IgnoreTarget | null>(null)
   // Payees that repeat are one row, closed when 3 or more and open when 2 (ReviewKit groupIsOpen). These are the ones the person flipped. `club` is the Add all sheet.
   const [openClubs, setOpenClubs] = useState<Set<string>>(new Set())
@@ -110,7 +113,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
 
   // The category a found payment goes under: your own history or rule, else a keyword guess onto your own categories, else none.
   const pickOf = (c: Candidate) => categoryFor(c, isPerson(c.mode, c.merchant, ''), budget.categories)
-  const drop = (id: string) => setResult((r) => (r ? { ...r, found: r.found.filter((c) => c.id !== id) } : r))
+  const drop = (id: string) => setResult((r) => (r ? { ...r, found: r.found.filter((c) => c.id !== id), own: r.own.filter((c) => c.id !== id) } : r))
   const draftOf = (c: Candidate) => ({
     amount: c.amount,
     categoryId: pickOf(c).categoryId,
@@ -123,27 +126,28 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
   // One tap adds it when everything needed is known. A card bill needs the card picked, so it opens the sheet.
   const quickAdd = (c: Candidate) => {
     if (c.kind === 'cardBill' || !add(draftOf(c))) return setEdit(c)
-    markSeen([c.id])
+    markSeen(seenIdsOf(c))
     drop(c.id)
     toast(`Added ${money(new D(c.amount))}`)
   }
-  const skip = (c: Candidate) => {
-    markSeen([c.id])
+  // A merged twin message is remembered too (seenIdsOf), so it does not come back on the next scan.
+  const skip = (c: Candidate, said = 'Skipped. It will not show again.') => {
+    markSeen(seenIdsOf(c))
     drop(c.id)
-    toast('Skipped. It will not show again.')
+    toast(said)
   }
 
-  const dropMany = (ids: Set<string>) => setResult((r) => (r ? { ...r, found: r.found.filter((c) => !ids.has(c.id)) } : r))
+  const dropMany = (ids: Set<string>) => setResult((r) => (r ? { ...r, found: r.found.filter((c) => !ids.has(c.id)), own: r.own.filter((c) => !ids.has(c.id)) } : r))
   // Add all: every payment stays its own entry (own date, own card). Nothing is summed into one.
   const addAll = (items: Candidate[], categoryId: string) => {
     const done = new Set<string>()
     for (const c of items) if (c.kind !== 'cardBill' && add({ ...draftOf(c), categoryId })) done.add(c.id)
-    markSeen([...done])
+    markSeen(items.filter((c) => done.has(c.id)).flatMap(seenIdsOf))
     dropMany(done)
     toast(`Added ${plural(done.size, 'payment', 'payments')}`)
   }
   const skipAll = (items: Candidate[]) => {
-    markSeen(items.map((c) => c.id))
+    markSeen(items.flatMap(seenIdsOf))
     dropMany(new Set(items.map((c) => c.id)))
     toast(`Skipped ${items.length}. They will not show again.`)
   }
@@ -153,7 +157,12 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
     for (const sub of budget.categories.filter((c) => c.deletedAt === null && c.parentId === top.id)) categoryChoices.push({ value: sub.id, label: categoryName(budget, sub.id) })
   }
 
-  const fresh = result?.found.filter((c) => !c.duplicateOfExisting) ?? []
+  // A payee the person has said is their own account is their own money, whatever the message looked like. Derived from the store, so Undo puts it back.
+  const asSelf = (c: Candidate): Candidate => {
+    const k = c.kind === 'spend' && c.nature !== 'ownMoney' ? payeeKey(c.merchant) : null
+    return k !== null && payeeKindFor(budget.payeeKinds, k) === 'self' ? { ...c, nature: 'ownMoney', ownKind: 'selfTransfer', ownWhy: 'You told the app this payee is your own account.' } : c
+  }
+  const fresh = (result?.found.filter((c) => !c.duplicateOfExisting) ?? []).map(asSelf)
   const dupes = result?.found.filter((c) => c.duplicateOfExisting) ?? []
   const skippedText = result
     ? [result.skipped.credit ? plural(result.skipped.credit, 'money-in message', 'money-in messages') : '', result.skipped.unsure || result.skipped['no-amount'] ? plural((result.skipped.unsure ?? 0) + (result.skipped['no-amount'] ?? 0), 'message', 'messages') + ' could not be read' : ''].filter(Boolean).join(' · ')
@@ -162,7 +171,8 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
   // Name-less or bank-only names and card bills are never clubbed ("Bank payment" twice is not one payee).
   const groups = groupByCategoryThenPayee(fresh.filter((c) => !isOwnMoney(c)).map((c) => ({ c, id: c.id, amount: c.amount, merchant: c.kind === 'cardBill' || isGenericPayee(c.merchant, c.bank) ? '' : c.merchant })), (v) => pickOf(v.c).categoryId)
 
-  const ownItems = fresh.filter(isOwnMoney)
+  // Own money that went out (in `found`) and own money that came back in (`result.own`): never added in bulk, never counted as spending.
+  const ownItems = [...fresh.filter(isOwnMoney), ...(result?.own ?? [])]
 
   // One payment. `kid` = it sits under a repeat payee, so the date leads (the name is already in the header above).
   const row = (c: Candidate, o: { dupe?: boolean; kid?: boolean } = {}) => {
@@ -175,7 +185,9 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
     const what = c.kind === 'cardBill' ? 'Credit card bill payment' : pick.categoryId ? `${categoryName(budget, pick.categoryId)}${pick.guess ? ' · guess' : rule && rule.categoryId === c.categoryId ? ` (rule: ${rule.match})` : ''}` : 'Not sure'
     const name = c.merchant || 'Bank payment'
     const own = isOwnMoney(c)
-    const amount = `−${money(new D(c.amount))}`
+    const cameIn = c.direction === 'in'
+    const amount = `${cameIn ? '+' : '−'}${money(new D(c.amount))}`
+    const askWho = !kid && !cameIn && c.kind === 'spend' && (own ? c.ownKind === 'selfTransfer' : isPerson(c.mode, c.merchant, ''))
     const meta = [kid ? '' : shortDate(c.date), how, dupe ? 'Looks like one you already added' : '', own ? ownWhyOf(c) : ''].filter(Boolean).join(' · ')
     return (
       <div key={c.id} className="rv__item import__row">
@@ -192,8 +204,8 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
         <ActRow>
           {own ? (
             <>
-              <button type="button" className="btn btn--primary" onClick={() => skip(c)}>Not a spend</button>
-              <button type="button" className="btn" onClick={() => quickAdd(c)}>Add</button>
+              <button type="button" className="btn btn--primary" aria-label={`${money(new D(c.amount))} ${name} is not a spend`} onClick={() => skip(c, 'Marked as not a spend. It will not show again.')}>Not a spend</button>
+              {cameIn ? <button type="button" className="btn" onClick={() => setIncomeFor(c)}>Count as income</button> : <button type="button" className="btn" onClick={() => quickAdd(c)}>Add</button>}
             </>
           ) : (
             <>
@@ -205,6 +217,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
             <button type="button" className="btn" aria-label={`Ignore messages like ${money(new D(c.amount))} ${name}`} onClick={() => setIgnoring({ last4: c.last4, bank: c.bank, sender: c.sender ?? null, cardName: inst ? instrumentLabel(inst) : undefined })}>Ignore</button>
           )}
         </ActRow>
+        {askWho && <PayeeKindChoice merchant={c.merchant} />}
       </div>
     )
   }
@@ -229,6 +242,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
           <button type="button" className="btn btn--primary" onClick={() => (pick.categoryId !== null && !pick.guess ? addAll(items, pick.categoryId) : setClub({ label, items, start: pick.categoryId, guess: pick.guess }))}>Add all {items.length}</button>
           <button type="button" className="btn" onClick={() => skipAll(items)}>Skip all</button>
         </ActRow>
+        {items.some((c) => isPerson(c.mode, c.merchant, '')) && <PayeeKindChoice merchant={label} />}
         {open && <div className="rv__kids">{[...items].sort((a, b) => b.date.localeCompare(a.date)).map((c) => row(c, { kid: true }))}</div>}
       </div>
     )
@@ -258,7 +272,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
       <div className="screen__body">
         {result && (
           <section className="sect" aria-label="Found">
-            <h2 className="sect__head"><span>Found</span><span className="sect__count">{fresh.length}</span></h2>
+            <h2 className="sect__head"><span>Found</span><span className="sect__count">{fresh.length + result.own.length}</span></h2>
             <div className="sect__body">
               {newInstruments(fresh).map((n) => (
                 <div key={`${n.bank}${n.last4}${n.kind}`} className="budget__entry import__row">
@@ -269,10 +283,15 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
                   <div className="import__acts"><button type="button" className="btn" onClick={() => addCard(n)}>Add to my cards</button></div>
                 </div>
               ))}
-              {fresh.length === 0 && <p className="budget__none">Nothing new to add. {result.alreadySeen > 0 ? `${plural(result.alreadySeen, 'payment was', 'payments were')} handled before.` : 'No bank payments in this period.'}</p>}
+              {fresh.length === 0 && ownItems.length === 0 && <p className="budget__none">Nothing new to add. {result.alreadySeen > 0 ? `${plural(result.alreadySeen, 'payment was', 'payments were')} handled before.` : 'No bank payments in this period.'}</p>}
               {sectionsOut}
             </div>
             {(skippedText || result.alreadySeen > 0) && <p className="manage__help">Not listed: {[skippedText, result.alreadySeen > 0 ? `${plural(result.alreadySeen, 'handled before', 'handled before')}` : ''].filter(Boolean).join(' · ')}</p>}
+            <div className="sect__body import__share">
+              <p className="manage__help">Real digits and names are swapped for look-alikes. Share this to help improve the reader. Only Scan messages collects examples: messages caught in the background do not.</p>
+              <button type="button" className="btn" disabled={result.maskedSamples.length === 0} onClick={() => void copyText(maskedSamplesText(result.maskedSamples)).then((ok) => toast(ok ? 'Masked examples copied' : 'Could not copy'))}>Copy masked examples</button>
+              {result.maskedSamples.length === 0 && <p className="manage__help">Nothing to share: no merged, own-money or deposit messages in this scan.</p>}
+            </div>
             {dupes.length > 0 && (
               <div className="sect__body">
                 <button type="button" className="link-btn spend__link" aria-expanded={showDupes} onClick={() => setShowDupes((v) => !v)}>
@@ -326,8 +345,15 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
         <ExpenseSheet
           prefill={draftOf(edit)}
           rememberAs={edit.kind === 'spend' && edit.merchant ? ruleTextFromMerchant(edit.merchant) ?? undefined : undefined}
-          onSaved={() => { markSeen([edit.id]); drop(edit.id) }}
+          onSaved={() => { markSeen(seenIdsOf(edit)); drop(edit.id) }}
           onClose={() => setEdit(null)}
+        />
+      )}
+      {incomeFor && (
+        <ExpenseSheet
+          prefill={{ amount: incomeFor.amount, date: incomeFor.date, note: incomeFor.merchant || 'Own money', income: true, instrumentId: incomeFor.instrumentId, categoryId: null, mode: null }}
+          onSaved={() => { markSeen(seenIdsOf(incomeFor)); drop(incomeFor.id) }}
+          onClose={() => setIncomeFor(null)}
         />
       )}
       {consent && (

@@ -546,6 +546,24 @@ button.heat__cell:active {
    A row: name left, amount right, small facts under. Its actions: one row of real buttons (the main one filled, the rest outlined),
    never underlined text links. A repeat payee is one header row, its payments sit under a left hairline. */
 
+/* "Copy masked examples" at the foot of the scan results: one sentence and one button. */
+.import__share {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+}
+
+.import__share .btn {
+  height: auto;
+  min-height: 48px;
+  color: var(--ink);
+}
+
+.import__share .btn:disabled {
+  color: var(--ink-3);
+}
+
 /* A category section: a small quiet label, lighter than the payee rows under it. */
 .rv__section {
   margin-top: var(--s-5);

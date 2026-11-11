@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { Icon } from '../../components/Icon'
 import { Sheet } from '../../components/Sheet'
+import { useApp } from '../../components/StoreProvider'
+import { payeeKey, payeeKindFor } from '../../lib/payeeKey'
 
 /**
  * The pieces the two review lists share: "Add from messages" (ImportScreen) and "To review" (InboxScreen).
@@ -109,15 +111,47 @@ export function MoreSheet({ title, onNotSpend, onIgnore, onClose }: { title: str
   )
 }
 
-/**
- * "Is this your own account?" for a payment to a name that could be you. Ready for the reader's counterparty check; nothing shows it yet.
- * Two outlined buttons, neither pre-picked.
- */
+/** Two outlined buttons, neither pre-picked. */
 export function OwnAccountChoice({ onOwn, onSomeone }: { onOwn: () => void; onSomeone: () => void }) {
   return (
     <ActRow>
       <button type="button" className="btn" onClick={onOwn}>This is my own account</button>
       <button type="button" className="btn" onClick={onSomeone}>Someone else</button>
     </ActRow>
+  )
+}
+
+/**
+ * "Is this payee your own account?" for a payment to a name that could be you. Reads and writes what the person has taught the app
+ * (store `markPayeeSelf`, which has its own Undo): unanswered shows the question, answered shows what was learned and a way to change it.
+ * Items from the same payee re-sort themselves (own account = your own money, not a spend).
+ */
+export function PayeeKindChoice({ merchant }: { merchant: string }) {
+  const kinds = useApp((s) => s.budget.payeeKinds)
+  const mark = useApp((s) => s.markPayeeSelf)
+  const key = payeeKey(merchant)
+  if (key === null) return null
+  const kind = payeeKindFor(kinds, key)
+  if (kind === 'self') {
+    return (
+      <>
+        <p className="rv__why">Marked as your own account.</p>
+        <ActRow><button type="button" className="btn" onClick={() => mark(key, false)}>Someone else</button></ActRow>
+      </>
+    )
+  }
+  if (kind === 'person') {
+    return (
+      <>
+        <p className="rv__why">Marked as someone else.</p>
+        <ActRow><button type="button" className="btn" onClick={() => mark(key, true)}>This is my own account</button></ActRow>
+      </>
+    )
+  }
+  return (
+    <>
+      <p className="rv__why">Is {merchant} your own account?</p>
+      <OwnAccountChoice onOwn={() => mark(key, true)} onSomeone={() => mark(key, false)} />
+    </>
   )
 }

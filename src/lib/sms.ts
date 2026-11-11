@@ -17,8 +17,24 @@ export const smsSupported = () => Capacitor.isNativePlatform()
 
 export type ScanOutcome = { ok: true; messages: InboxMessage[] } | { ok: false; reason: 'unsupported' | 'denied' | 'failed' }
 
+/**
+ * The one test hook for Scan: a browser test sets localStorage `vkcalc.test.smsscan` to a JSON list of FAKE messages ({ id, address, date, body })
+ * and Scan reads those instead of the phone. Nothing else reads that key; with it absent this is exactly the real behaviour.
+ */
+function fakeMessages(): InboxMessage[] | null {
+  try {
+    const raw = localStorage.getItem('vkcalc.test.smsscan')
+    const v = raw ? (JSON.parse(raw) as unknown) : null
+    return Array.isArray(v) ? (v as InboxMessage[]) : null
+  } catch {
+    return null
+  }
+}
+
 /** Asks for permission only when needed, then reads the last `days` days of bank-style messages. */
 export async function readBankMessages(days: number): Promise<ScanOutcome> {
+  const fake = fakeMessages()
+  if (fake) return { ok: true, messages: fake }
   if (!smsSupported()) return { ok: false, reason: 'unsupported' }
   try {
     const have = (await plugin.checkPermission()).granted || (await plugin.requestPermission()).granted
