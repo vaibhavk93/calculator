@@ -61,6 +61,10 @@ try {
     check('two Bank payment names are NOT clubbed', (await page.locator('.import__row', { hasText: 'Bank Payment' }).count()) === 2)
     check('the person is clubbed but needs a category', (await page.locator('.import__club', { hasText: 'Ravi Kumar ×2' }).count()) === 1)
     const amz = page.locator('.import__club', { hasText: 'Amazon Pay India' })
+    check('a club of 3 starts closed, a club of 2 starts open', (await amz.locator('button[aria-expanded]').first().getAttribute('aria-expanded')) === 'false' && (await page.locator('.import__club', { hasText: 'Ravi Kumar' }).locator('button[aria-expanded]').first().getAttribute('aria-expanded')) === 'true')
+    const btns = await page.locator('.rv__acts .btn').evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().width > 0).map((e) => ({ t: e.innerText.trim(), h: Math.round(e.getBoundingClientRect().height) })))
+    check('every action is a real button of 44px or more (Add, Skip, Add all, Skip all)', btns.length >= 8 && btns.every((b) => b.h >= 44) && ['Add', 'Skip', 'Add all 3', 'Skip all'].every((t) => btns.some((b) => b.t === t)), JSON.stringify(btns))
+    check('no underlined text-link actions in the list', (await page.locator('.rv__section .link-btn').count()) === 0)
     await amz.getByRole('button', { name: /3 payments/ }).click()
     check('expanding shows each payment with its own amount and says guess', (await amz.locator('.import__row').count()) === 3 && (await amz.innerText()).includes('Shopping · guess') && (await amz.innerText()).includes('₹540'))
     const ravi = page.locator('.import__club', { hasText: 'Ravi Kumar' })
@@ -82,6 +86,24 @@ try {
     check('no console errors (clubs)', errors.length === 0, errors.join('|'))
     await close()
   } finally { await app2.stop() }
+}
+
+// The same list at 200% text on a 360x640 phone: nothing sideways, no clipped label, buttons 44px+.
+{
+  const app3 = await startApp()
+  try {
+    const { page, errors, close } = await openApp(app3, { now: new Date(2026, 10, 9, 12).getTime(), width: 360, height: 640, font: 200 })
+    await tab(page, 'Budget')
+    await page.getByText('Add from bank messages').first().click()
+    await page.locator('input[type=file]').setInputFiles(csv2)
+    await page.locator('.import__cathead').first().waitFor()
+    for (const b of await page.locator('.import__club > button[aria-expanded="false"]').all()) await b.click()
+    check('200%: no sideways overflow', (await overflowing(page)).length === 0, JSON.stringify(await overflowing(page)))
+    const bs = await page.locator('.rv__acts .btn').evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().width > 0).map((e) => ({ t: e.innerText.trim(), h: Math.round(e.getBoundingClientRect().height), clipped: e.scrollWidth > e.clientWidth + 1 })))
+    check('200%: buttons 44px+ and no clipped label', bs.length >= 8 && bs.every((b) => b.h >= 44 && !b.clipped), JSON.stringify(bs.filter((b) => b.h < 44 || b.clipped)))
+    check('200%: no console errors', errors.length === 0, errors.join('|'))
+    await close()
+  } finally { await app3.stop() }
 }
 console.log(`${pass} pass, ${fail} fail`)
 process.exit(fail ? 1 : 0)

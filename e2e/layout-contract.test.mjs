@@ -15,6 +15,13 @@
 // Run:  node e2e/layout-contract.test.mjs            all screens, all sizes
 //       node e2e/layout-contract.test.mjs budget      only screens whose id contains "budget"
 import { startApp, openApp, tab } from './lib.mjs'
+import { writeFileSync, mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+// A statement with repeat payees (3 and 2), unclear names and a person, for the "Add from messages" list.
+const STMT = join(mkdtempSync(join(tmpdir(), 'calc-lc-')), 'stmt.csv')
+writeFileSync(STMT, ['Date,Narration,Withdrawal Amt.,Deposit Amt.', ...Array.from({ length: 3 }, (_, i) => `0${i + 2}/11/2026,UPI/21${i}/SWIGGY/okhdfc,${450 + i}.00,`), '05/11/2026,UPI/221/AMAZON PAY INDIA/okhdfc,899.00,', '06/11/2026,UPI/222/AMAZON PAY INDIA/okhdfc,540.00,', '07/11/2026,UPI/231/RAHUL SHARMA/rahul@okaxis,150.00,', '08/11/2026,UPI/232/RAHUL SHARMA/rahul@okaxis,2000.00,', '05/11/2026,BANK PAYMENT,320.00,', '09/11/2026,POS ZOMATO,610.00,'].join('\n'))
 
 let pass = 0
 let fail = 0
@@ -99,6 +106,8 @@ const SCREENS = [
   ['budget-day', async (p) => { await tab(p, 'Budget'); await p.locator('.budget__day').first().click(); await p.locator('.screen[aria-label^="Day:"]').waitFor() }],
   // SMS Inbox: the "N to review" row on Budget home opens it; the learned payees live on the Merchant rules screen.
   ['budget-inbox', async (p) => { await tab(p, 'Budget'); await p.getByRole('button', { name: /to review/ }).click(); await p.locator('.screen[aria-label="To review"]').waitFor() }],
+  // "Add from messages" with a statement picked: repeat payees clubbed (closed from 3), real action buttons. One club opened so the payments under it are checked too.
+  ['budget-import', async (p) => { await tab(p, 'Budget'); await p.getByRole('button', { name: 'More in Budget' }).click(); await p.locator('button.tap-row', { hasText: 'Add from bank messages' }).first().click(); await p.locator('input[type=file]').setInputFiles(STMT); await p.locator('.import__club').first().waitFor(); await p.locator('.import__club > button[aria-expanded="false"]').first().click() }],
   ['budget-learned', async (p) => { await tab(p, 'Budget'); await p.getByRole('button', { name: 'More in Budget' }).click(); await p.locator('button.tap-row', { hasText: 'Rules' }).first().click(); await p.locator('.screen[aria-label="Merchant rules"]').waitFor(); await p.locator('#learned').scrollIntoViewIfNeeded() }],
 ]
 

@@ -3,7 +3,7 @@
 // The phone-side queue is an in-memory fake handed to the app by a localStorage key read only at startup (src/main.tsx). Run: node e2e/smsinbox.test.mjs
 // "Today" is frozen at 2026-11-15 10:00 IST. Env: APP_URL=http://127.0.0.1:PORT/ uses an already served build.
 import { chromium } from 'playwright-core'
-import { startApp, openApp, stored, tab } from './lib.mjs'
+import { startApp, openApp, stored, tab, overflowing } from './lib.mjs'
 
 const NOW = new Date('2026-11-15T10:00:00+05:30').getTime()
 const cat = (id, name) => ({ id, name, limit: null, parentId: null, deletedAt: null })
@@ -31,8 +31,8 @@ const eq = (a, b, m = '') => { if (JSON.stringify(a) !== JSON.stringify(b)) thro
 
 let APP
 /** Opens the app with a captured-messages queue. `capture` seeds "Capture bank messages" as already on. */
-const open = async ({ b = budget(), messages = [], permission = 'granted', capture = true, mode = 'review', startupTab = 'budget', noQueue = false } = {}) => {
-  const o = await openApp(APP, { data: seed(b, { smsCapture: capture, smsMode: mode, startupTab }), now: NOW, smsQueue: noQueue ? null : { permission, messages } })
+const open = async ({ b = budget(), messages = [], permission = 'granted', capture = true, mode = 'review', startupTab = 'budget', noQueue = false, view = {} } = {}) => {
+  const o = await openApp(APP, { data: seed(b, { smsCapture: capture, smsMode: mode, startupTab }), now: NOW, smsQueue: noQueue ? null : { permission, messages }, ...view })
   o.page.setDefaultTimeout(5000)
   return o
 }
@@ -175,7 +175,9 @@ T('IN09', 'Reject removes it (Undo brings it back); Not a spend too; neither mak
   eq(await rows(page).count(), 1)
   await page.getByRole('button', { name: 'Undo' }).click()
   eq(await rows(page).count(), 2, 'Undo put it back')
-  await rows(page).filter({ hasText: 'Swiggy' }).getByRole('button', { name: /is not a spend/ }).click()
+  // Not a spend lives under More
+  await rows(page).filter({ hasText: 'Swiggy' }).getByRole('button', { name: /^More for/ }).click()
+  await page.locator('.sheet').getByRole('button', { name: 'Not a spend' }).click()
   await rows(page).filter({ hasText: 'Rahul' }).getByRole('button', { name: /^Reject/ }).click()
   eq(await rows(page).count(), 0)
   await settle(page)
@@ -214,7 +216,7 @@ T('IN11', 'Approve all suggested: only payees tagged the same way twice, never a
   eq(await rows(page).count(), 2, 'person and new payee still waiting')
   eq((await stored(page)).budget.expenses.length, 2)
   await page.getByRole('button', { name: 'Undo' }).click()
-  await REVIEW(page).getByRole('button', { name: /^Swiggy, 2 payments/ }).click() // the two Swiggy payments are one club again
+  // the two Swiggy payments are one club again, and a club of 2 is open by default
   eq(await rows(page).count(), 4, 'Undo took both back')
   await settle(page)
   eq((await stored(page)).budget.expenses.length, 0)
@@ -372,7 +374,9 @@ T('IN20', 'Ignore: a card is dropped on arrival (acked, never stored), listed in
   await settle(page)
   await openInbox(page)
   eq(await rows(page).count(), 2)
-  await rows(page).filter({ hasText: 'Swiggy' }).getByRole('button', { name: /^Ignore messages like/ }).click()
+  // Ignore lives under More (Not a spend and Ignore are the rare answers; Approve, Change and Reject stay on the row).
+  await rows(page).filter({ hasText: 'Swiggy' }).getByRole('button', { name: /^More for/ }).click()
+  await page.locator('.sheet').getByRole('button', { name: 'Ignore this card or sender' }).click()
   const sheet = page.locator('.sheet')
   const t = (await sheet.innerText()).replace(/\s+/g, ' ')
   for (const w of ['dropped the moment they arrive', 'not saved', 'This card', 'HDFC Regalia', 'This sender', 'HDFCBK', 'Settings, Bank messages, Ignored']) ok(t.includes(w), `ignore sheet lacks "${w}": ${t}`)
@@ -513,7 +517,8 @@ T('IN25', 'Waiting list is sections by category (Not sure first, then by total);
   const { page, errors, close } = await open({ mode: 'auto', messages: [M(swiggy('100.00', 'AMAZON PAY')), M(swiggy('200.00', 'AMAZON PAY')), M(swiggy('300.00', 'AMAZON PAY')), M(swiggy('450.00', 'SWIGGY')), M(swiggy('50.00', 'XYZ TRADERS'))] })
   await settle(page)
   await openInbox(page)
-  eq(await heads(page), ['Not sure 1 payment · ₹50', 'Shopping 3 payments · ₹600', 'Food 1 payment · ₹450'], 'sections: Not sure first, then by total')
+  // A section with one payee leaves its count and total to that payee's own row (no repeated totals).
+  eq(await heads(page), ['Not sure', 'Shopping', 'Food'], 'sections: Not sure first, then by total')
   eq((await stored(page)).budget.expenses.length, 0, 'in Auto mode a keyword guess adds nothing by itself')
   const club = clubBtn(page, 'Amazon Pay')
   const t = (await club.innerText()).replace(/\s+/g, ' ')
@@ -554,7 +559,7 @@ T('IN27', 'a UPI person payee is clubbed but has no bulk approve until a categor
   const { page, close } = await open({ messages: [M(upiPerson('150.00')), M(upiPerson('250.00'))] })
   await settle(page)
   await openInbox(page)
-  eq(await heads(page), ['Not sure 2 payments · ₹400'])
+  eq(await heads(page), ['Not sure'], 'one payee: its own row carries the count and total')
   eq(await REVIEW(page).getByRole('button', { name: /^Approve all 2/ }).count(), 0, 'no one-tap bulk approve for a person')
   await REVIEW(page).getByRole('button', { name: /^Choose a category for all 2/ }).click()
   const sheet = page.locator('.sheet')
@@ -567,6 +572,58 @@ T('IN27', 'a UPI person payee is clubbed but has no bulk approve until a categor
   await settle(page)
   const d = (await stored(page)).budget
   eq(d.expenses.map((e) => [e.amount, e.categoryId]).sort(), [['150', 'c-rent'], ['250', 'c-rent']])
+  await close()
+})
+
+// The review rows: real buttons (never underlined text links), 44px or more, clubs open/closed by size, nothing wraps sideways at 200% text.
+const REVIEW_MSGS = () => [M(swiggy('450.00')), M(swiggy('312.00')), M(swiggy('689.50')), M(swiggy('899.00', 'AMAZON PAY')), M(swiggy('540.00', 'AMAZON PAY')), M(swiggy('75.00', 'XYZ TRADERS')), M(upiPerson('150.00'))]
+const sizes = (page, sel) => page.locator(sel).evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().width > 0).map((e) => { const r = e.getBoundingClientRect(); return { t: e.innerText.trim(), h: Math.round(r.height), w: Math.round(r.width), clipped: e.scrollWidth > e.clientWidth + 1 } }))
+
+T('IN30', 'review rows: Approve / Change / Reject / More are outlined or filled buttons of 44px+, no underlined links; a club of 3 starts closed, a club of 2 open, the chevron turns', async () => {
+  const { page, errors, close } = await open({ b: budget({ learned: [learnedOf('swiggy', 2)] }), messages: REVIEW_MSGS() })
+  await settle(page)
+  await openInbox(page)
+  eq(await REVIEW(page).locator('.rv__section .link-btn').count(), 0, 'no text-link actions inside the list')
+  const sw = clubBtn(page, 'Swiggy')
+  const amz = clubBtn(page, 'Amazon Pay')
+  eq(await sw.getAttribute('aria-expanded'), 'false', 'a club of 3 starts closed')
+  eq(await amz.getAttribute('aria-expanded'), 'true', 'a club of 2 starts open')
+  ok((await amz.locator('.tap-row__chev--open').count()) === 1 && (await sw.locator('.tap-row__chev--open').count()) === 0, 'the chevron turns only on the open club')
+  const acts = await sizes(page, '.rv__acts .btn')
+  ok(acts.length >= 8, 'buttons present: ' + acts.length)
+  ok(acts.every((a) => a.h >= 44), 'every action is 44px or taller: ' + JSON.stringify(acts.filter((a) => a.h < 44)))
+  const row1 = rows(page).filter({ hasText: 'Xyz Traders' }).first()
+  eq((await row1.locator('.rv__acts .btn').allInnerTexts()).map((t) => t.trim()), ['Approve', 'Change', 'Reject', 'More'], 'one tidy row, same order on every payment')
+  await sw.click()
+  eq(await sw.getAttribute('aria-expanded'), 'true')
+  eq(await REVIEW(page).locator('.inbox__club', { hasText: 'Swiggy' }).locator('.inbox__item').count(), 3, 'opening shows the 3 payments')
+  await sw.click()
+  eq(await REVIEW(page).locator('.inbox__club', { hasText: 'Swiggy' }).locator('.inbox__item').count(), 0, 'and closing hides them')
+  await row1.getByRole('button', { name: /^More for/ }).click()
+  const sheet = page.locator('.sheet')
+  const t = (await sheet.innerText()).replace(/\s+/g, ' ')
+  for (const w of ['Not a spend', 'Ignore']) ok(t.includes(w), `More sheet lacks "${w}": ${t}`)
+  await sheet.getByRole('button', { name: 'Cancel' }).click()
+  eq(await page.locator('.sheet').count(), 0, 'More closes')
+  eq(errors, [], 'console errors')
+  await close()
+})
+
+T('IN31', 'review rows at 200% text on a 360x640 phone: nothing sideways, no clipped label, buttons stack tidily and stay 44px+', async () => {
+  const { page, errors, close } = await open({ b: budget({ learned: [learnedOf('swiggy', 2)] }), messages: REVIEW_MSGS(), view: { width: 360, height: 640, font: 200 } })
+  await settle(page)
+  await openInbox(page)
+  await clubBtn(page, 'Swiggy').click()
+  eq(await overflowing(page), [], 'no sideways overflow')
+  const acts = await sizes(page, '.rv__acts .btn')
+  ok(acts.length >= 8, 'buttons present')
+  ok(acts.every((a) => a.h >= 44 && !a.clipped), 'tall enough and not clipped: ' + JSON.stringify(acts.filter((a) => a.h < 44 || a.clipped)))
+  // The main button sits on its own line, full width (the rest go in pairs), so a row never ends in a ragged pile.
+  const first = await rows(page).first().locator('.rv__acts .btn').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width)] }))
+  ok(first.length === 4 && first[0][2] > first[1][2] && first[1][1] > first[0][1], 'main on top, wider: ' + JSON.stringify(first))
+  const names = await sizes(page, '.rv__name')
+  ok(names.every((n) => !n.clipped), 'no clipped name')
+  eq(errors, [], 'console errors')
   await close()
 })
 
