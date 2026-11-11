@@ -1,196 +1,196 @@
-# Plan: less typing. Day view, SMS Inbox, and an app that learns your tags
+# Plan: less typing. Day view, always-on SMS capture, Inbox, and an app that learns your tags
 
-Written 2026-11-11. Owner's two asks, merged into one plan, after a critic review (verdict: **build smaller**).
+First written 2026-11-11. **Updated the same day with the owner's decisions** (always-on capture, two modes, auto-tag after two
+identical confirmations with Undo, Play Store rules, masking check). A critic had said "build smaller"; the owner chose to keep
+always-on capture, so it is built WITH the safeguards the critic asked for (see section 8).
 Plain language on purpose. Terms are explained the first time they appear, and again in the glossary at the end.
 
 ---
 
 ## 1. The goal, in one line
 
-**You should not have to type what the app can already guess, and on a busy day you should be able to see what happened.**
-
-Two pains drive this:
+**You should not have to type what the app can already work out, and the budget must stay clean while it does.**
 
 | Your pain | What we build |
 |---|---|
-| "On a day with many transactions (credit card, UPI, cash) I can't tell which ones, by which route, or why." | **Day view**: one screen per day |
-| "Typing every transaction is too much work. The app should capture, learn and suggest." | **Inbox + learning**: bank messages land in a review list, and the app remembers your tags |
+| "On a busy day (card, UPI, cash) I can't tell which transactions, which route, or why." | **Day view** (built) |
+| "Typing every payment is too much work." | **Always-on capture + Inbox + learning** (being built) |
+| "If auto-adding gets one wrong, the budget drifts into a mess." | **Quality guards**: strict rules, Undo, a drift circuit breaker (section 6) |
 
 ---
 
-## 2. What you asked for, and what the plan does with it
+## 2. How it works, start to finish
 
-| You asked for | Plan | Why |
+```
+   A bank SMS arrives (app can be closed)
+                |
+                v
+   +------------------------------------------+
+   | PHONE SIDE (Android)                     |
+   | Only bank-style senders. Held encrypted, |
+   | on this phone only, until you open Calc  |
+   +--------------------+---------------------+
+                        |  you open the app
+                        v
+   +------------------------------------------+
+   | APP SIDE: read it, work out amount,      |
+   | merchant, card/UPI. Save it. THEN tell   |
+   | the phone side to forget the message     |
+   +--------------------+---------------------+
+                        |
+          +-------------+--------------+
+          v                            v
+  +----------------+      #==============================#
+  |  REVIEW FIRST  |      # * AUTO-ADD THE CONFIDENT    #
+  |  (default)     |      #==============================#
+  +-------+--------+                   |
+          |                  +---------+----------+
+          |                  v                    v
+          |         passes ALL strict       anything less
+          |         checks (section 6)      sure
+          |                  |                    |
+          |                  v                    |
+          |         added to entries,             |
+          |         marked "Auto-added",          |
+          |         one-tap Undo                  |
+          v                                       v
+  +--------------------------------------------------+
+  |  INBOX: you Approve, Change, Not a spend, Reject |
+  |  Approve  => becomes a real entry                |
+  |  Reject   => gone, never counted                 |
+  +--------------------------------------------------+
+
+   * = the mode for people who trust it   (Review first is the default)
+```
+
+**Review first (default).** Nothing becomes a real entry until you approve it. Your budget only holds what you confirmed.
+**Auto-add the confident ones.** Only payments that pass every strict check are added for you. Everything else still waits in the Inbox.
+
+---
+
+## 3. What is built and what is next
+
+| Phase | What | State |
 |---|---|---|
-| App always listens to SMS and logs each one | **Later, not first.** First: the app reads your messages when you open it and fills the Inbox | Same Inbox, same result, far fewer ways to fail or leak (see section 7) |
-| Review later: assign, mark, accept | **Yes, Phase 2** | This is the heart of the idea |
-| Remember my tag, tag the same thing next time | **Yes, Phase 3**, for the same payee (counting, no AI) | Safe and accurate |
-| Context ("UPI to a person on my office commute = Travel") | **Suggestion only, and only after we measure** (Phase 5) | The same person can be rent, a lunch split, or a loan back. A wrong tag that looks right is worse than an empty one |
-| Suggest while reviewing: "tag as Travel?" | **Yes**, one tap to accept | |
-| Reduce manual effort overall | The whole point. Success is measured (section 8) | |
+| 0 | Prove the manual **Scan messages** button on your phone | Your step: tap Scan on the installed build |
+| 1 | **Day view**: tap a day, see its spend, route totals, every entry | **Built and installed** |
+| 2 | **Always-on capture** (phone side) + **Inbox** + permission explainer | **Being built now** |
+| 3 | **Learning**: same payee, 2 identical confirmations, with Undo | **Being built now** |
+| 4 | **Measure** for 2 to 4 weeks: accepted, changed, undone | After you use it |
+| 5 | **Context hints** (time of day, UPI to a person), suggestions only | Only if Phase 4 shows they help |
 
 ---
 
-## 3. Where we are today
+## 4. The permission screen (so you always know why we ask)
 
-| Piece | State |
+Before Android's own dialog, Calc shows its own short explanation:
+
+| Section | What it says (plain words) |
 |---|---|
-| Add from bank messages (tap **Scan**, pick 7/30/90 days, review, Add) | Built. **Never proven on your phone with real messages** |
-| Remember a merchant's category | Built (merchant rules): a repeat merchant gets its old category pre-filled |
-| Message text stored? | **No.** Only a short fingerprint, so a message is not offered twice |
-| Listening in the background | **Not built, on purpose.** An earlier review set the rule "no background receiver" |
-| Day view | Being built now |
+| Why | So you don't have to type each payment |
+| What is read | Only messages from bank-style senders. Personal chats are never read. OTPs and offers are ignored |
+| Where it stays | Only on this phone. Held encrypted until you open Calc. Not backed up. Never sent anywhere. Nobody else can see it |
+| Diagnostics | Any text kept for debugging is masked (real digits and names are replaced) |
+| Control | Turn capture off any time. "Delete captured messages" button |
+| Buttons | **Allow messages** / **Not now** (Not now leaves everything else working) |
+
+Cases handled: allowed, denied (with "Open settings"), blocked by Android's **restricted settings** on newer phones (3-step help:
+App info, three dots, "Allow restricted settings", come back), and not available on the web.
 
 ---
 
-## 4. The plan, in order
-
-```
-                     START: today
-                          |
-                          v
-        +-----------------------------------+
-        |  PHASE 0  Prove the scan works    |   you + me, on your phone
-        +-----------------+-----------------+
-                          |
-                          v
-        +-----------------------------------+
-        |  PHASE 1  Day view                |   in progress
-        +-----------------+-----------------+
-                          |
-                          v
-        #===================================#
-        # * PHASE 2  Inbox (scan on open)   #   the big win
-        #===================================#
-                          |
-                          v
-        +-----------------------------------+
-        |  PHASE 3  Learning: same payee    |
-        +-----------------+-----------------+
-                          |
-                          v
-        +-----------------------------------+
-        |  PHASE 4  Measure for 2 to 4 weeks|
-        +--------+-----------------+--------+
-                 |                 |
-        enough proof?         not enough proof
-                 |                 |
-                 v                 v
-   +---------------------------+  +------------------+
-   | PHASE 5  Optional extras: |  | Stop here. Keep  |
-   | context hints, always-on  |  | it simple.       |
-   | listening                 |  +------------------+
-   +---------------------------+
-
-   * = recommended next step      # box = the biggest payoff
-```
-
----
-
-## 5. Each phase
-
-### Phase 0. Prove the scan works (small, do first)
-
-| | |
-|---|---|
-| What | Tap **Scan messages** on your phone with your real bank messages |
-| Look for | Does Android ask for the SMS permission? Is it blocked ("restricted settings" on Android 15 and later)? Are your banks' message formats read correctly? |
-| Done when | A real scan shows your real payments, with the right amounts, cards and merchants |
-| Why first | Everything else sits on top of this. It has only ever been tested on made-up messages |
-
-### Phase 1. Day view (in progress)
-
-| | |
-|---|---|
-| What you see | Tap a day. One big number (that day's spend), one line of totals per route ("UPI ₹1,200 · HDFC Credit ₹3,400 · Cash ₹150"), then every entry in the order you added it |
-| The "why" | A one-tap **Add a note** on any entry without one. No new fields, no reason chips |
-| Why no chips | The critic: a fixed list (Need, Want...) is a chore you will drop, and it doesn't hold real reasons like "Rohan's birthday dinner" |
-
-### Phase 2. The Inbox (the big win)
-
-| | |
-|---|---|
-| What | A **Review** list in Budget. Each bank message the app finds becomes one card: amount, merchant, card or UPI, date, and a suggested category |
-| Your actions | **Accept** (one tap), **Change** (pick another category, add a note), **Not a spend** (a refund, a transfer to yourself), **Ignore** |
-| When it fills | When you open the app (and on pull-to-refresh). The app reads new messages then. Nothing runs in the background |
-| Counter | A quiet "5 to review" on Budget. **No nagging notification** |
-| Safety | Same rules as today: message text is never stored, OTPs and offers are ignored, unsure messages are not offered, and the same message never appears twice |
-| Done when | A week of your real messages is reviewed in about a minute a day |
-
-### Phase 3. Learning, simple and honest
-
-No AI and no internet. The app **counts what you did** and says so.
+## 5. Learning: counting, never guessing
 
 | What the app has seen | What it does |
 |---|---|
-| A payee you tagged **once** | **Suggests** that tag next time. You tap to accept |
-| A payee you tagged the **same way twice in a row** | **Applies it automatically**, shown as "auto-tagged" with a one-tap **Undo** |
-| You undo or change an auto-tag | It **stops auto-applying** for that payee until you confirm it twice again |
-| The payee is a **person** (UPI to a name) | Shows a hint, "you usually tag this one as Rent". **Never automatic** |
+| A payee you tagged **once** | **Suggests** the same tag. You tap to accept |
+| The **same tag twice in a row** | Becomes **auto-eligible**. In Auto mode it is added for you, marked "Auto-added", with **Undo** |
+| You **undo or change** it | The count **resets**. It goes back to suggest-only until you confirm twice again |
+| The payee is a **person** (UPI to a name) | **Never auto-added.** At most a hint |
 
-Every suggestion says why: "Because you tagged this payee Food 3 times". You can see and edit the list of learned rules (this builds on the existing Merchant rules screen).
-
-### Phase 4. Measure for 2 to 4 weeks
-
-| | |
-|---|---|
-| What | The app keeps three counters on the phone: suggestions accepted, suggestions changed, auto-tags undone |
-| Why | So we decide on facts. If most suggestions are accepted, learning works |
-| Rule of thumb | Auto-tag only keeps going if undo is rare |
-
-### Phase 5. Optional extras (only if Phase 4 proves they help)
-
-| Extra | Rule |
-|---|---|
-| **Context hints** (time of day, weekday, amount, "UPI to a person") | **Suggestion only, never automatic.** Needs several matches before it appears |
-| **Always-on listening** (the app catches each SMS the moment it arrives) | Only after we decide on the Play Store question below, and only with safe draining (the app confirms it saved an entry before the queue forgets it) |
+Every suggestion says why ("You tagged Swiggy as Food twice"). "Learned payees" in Settings shows the list. You can change or forget any of them.
 
 ---
 
-## 6. Learning examples
+## 6. Quality guards (so the budget never drifts)
 
-| What happens | Result |
+An item is auto-added **only if ALL of these are true**:
+
+1. Auto mode is on.
+2. Exactly **one** of your cards or accounts matches the message.
+3. The amount and direction (money out) were read clearly.
+4. It is **not a duplicate** of an entry or an earlier message.
+5. The payee has a learned category with **two identical confirmations**.
+6. The payee is **not a person**.
+
+Plus:
+
+| Guard | How it works |
 |---|---|
-| Swiggy ₹450 | Suggest Food (you tagged Swiggy before). Accept in one tap |
-| Swiggy again, you accepted last time too | **Auto-tagged Food**, with Undo |
-| UPI to "Rahul S" ₹150 at 9 am | Hint: "usually Travel". You decide. Could be chai or a loan back |
-| UPI to "Rahul S" ₹150, you pick Food this time | The app notes the mismatch and stops the hint until you confirm again |
+| **Never the first time** | A new payee always goes to review |
+| **Undo** | One tap. It removes the entry, resets that payee's count, puts the item back in the Inbox |
+| **"Auto-added" label** | Visible in the Day view and lists, so you always know what you did not type |
+| **Drift circuit breaker** | If 2 or more of the last 10 auto-added entries were undone or edited, the app **switches itself back to Review first** and tells you why |
+| **No loss, no double count** | The phone side forgets a message only after the app has saved it. The same message can never enter twice (shared fingerprint with the manual scan) |
 
 ---
 
-## 7. Safety and privacy (these rules stay)
+## 7. Safety and privacy
 
 | Rule | Status |
 |---|---|
-| All reading and learning happens **on your phone**. Nothing is sent anywhere | Stays |
-| Message **text is never stored**. Only fields the parser read (amount, merchant, card digits, date) | Stays |
-| Only messages from **bank-style sender names** are read. Texts from people are never read | Stays |
-| Android's cloud auto-backup stays **off** | Stays |
-| Unsure messages are **not offered** (the parser fails closed) | Stays |
-| Every auto-tag can be **undone** | New |
+| Everything is read and learned **on your phone**. Nothing is sent anywhere | Stays |
+| Only **bank-style sender names** are read. Texts from people (phone numbers) are never read or kept | Stays |
+| Android cloud auto-backup stays **off**; the queue is excluded from backups | Stays |
+| **Changed:** the message text used to be "never stored". Now the phone **holds it briefly, encrypted** (Android Keystore key, app-private), until you open Calc, then deletes it the moment the app confirms it saved. Capped at 500 messages and 30 days | **Rule changed** (needed so capture works while the app is closed) |
+| No message text or sender in any log | Enforced by a test |
+| Unsure messages are not offered (the parser fails closed) | Stays |
 
-**Why always-on listening is deferred.** It breaks the earlier rule "no background receiver". It adds a second route for data to arrive, with risks of lost or double-counted messages. Phone battery managers can silently stop it, so a missed message is invisible, while a scan can always be redone. For you the Inbox looks the same either way, because you review later.
+### Masking was checked before building (2026-11-11)
+
+Ran the masking on 5 realistic bank messages (card, UPI to a person, UPI to a merchant, account transfer, card spend) with two different
+keys. **Result: every real digit, name, UPI name, date and reference changed; nothing real survived.** The only flags were a false
+alarm on the bank's own `XXXX` mask and a chance "000". Same key gives the same fake value; a different key gives a different one.
+Two small weaknesses, not blockers: fake times can come out invalid (cosmetic), and the same real value always masks the same way
+within one phone (needed so repeats stay recognisable). Raw text is not written to any log: the Android plugin has no log calls and the
+parser and import screen have none.
+
+**Two kinds of data, kept apart:** the **working data** (real amount, merchant, card) lives only on your phone so the app can show you
+your entries; the **diagnostic log** is the only place text is kept for troubleshooting, and it is masked.
 
 ---
 
-## 8. How we will know it worked
+## 8. What changed after the critic, and why
 
-| Measure | Target (a guess, not proven) |
+| Critic's objection | What we did |
 |---|---|
-| Time to review a normal day | Under a minute |
-| Suggestions you accept without changing | Most of them (we set the bar after Phase 4 data) |
-| Auto-tags you undo | Rare |
-| Days you can say "what happened and why" | Every busy day, from the Day view |
+| Always-on adds failure modes (battery managers, lost or double messages) | Built **with safeguards**: ack-after-save, shared fingerprint, atomic encrypted queue. The manual **Scan** button stays as a backup |
+| Context learning can silently corrupt the budget | **Not built.** Phase 5, suggestion only |
+| Auto-apply only for exact payee | Exactly the rule: 2 identical confirmations, never for people |
+| Prove the scan on the phone first | Phase 0, your tap on the installed build |
 
 ---
 
-## 9. Decisions only you can make
+## 9. Play Store: what Google actually says
 
-| # | Decision | Recommendation |
-|---|---|---|
-| 1 | **Always-on listening: now or later?** | **Later (Phase 5).** The Inbox does the same job without the risk |
-| 2 | **Play Store or personal app?** Google restricts SMS permissions to default messaging apps and gives exceptions case by case. Expense tracking is not a listed use, so a store build may be refused. Sources: [Google Play SMS policy](https://support.google.com/googleplay/android-developer/answer/9047303), [policy summary](https://support.google.com/googleplay/android-developer/answer/16909972) | Decide before building Phase 5. For now, build for your own phone |
-| 3 | Is **auto-tagging after two identical confirmations** right, or do you want suggestions only? | Auto after two, with Undo |
+**Corrected on 2026-11-11.** My first web search summary was wrong that expense tracking is not a listed use. Google's official page
+lists **"SMS-based money management (e.g., apps that track and manage budget)"** as an exception that can get READ_SMS and RECEIVE_SMS.
+It is **temporary, case by case, and needs Google's review and approval**.
+
+To qualify we must:
+
+| Requirement | How we meet it |
+|---|---|
+| The feature must be the app's **critical core functionality**, prominently described | Store listing and in-app text say so |
+| Fill the **Permissions Declaration Form** in Play Console, and again if the use changes | Checklist in `docs/PLAY-SMS-POLICY.md` |
+| **Prominent in-app disclosure and consent** before asking | The permission screen in section 4 |
+| A **privacy policy** | To write before any store release |
+| **No exfiltration** (a budgeting app may not share non-financial or personal SMS history) | Only bank senders; nothing leaves the phone |
+| **No sale or transfer** of the data | Nothing is transferred |
+| "No alternative method" must be true | Document why Notification access or SMS Retriever cannot do this |
+
+Source: [Google Play: Use of SMS or Call Log permission groups](https://support.google.com/googleplay/android-developer/answer/10208820).
+For now we build for your own phone (installed by cable or Wi-Fi). Store submission is a separate step.
 
 ---
 
@@ -198,11 +198,11 @@ Every suggestion says why: "Because you tagged this payee Food 3 times". You can
 
 | Risk | What we do |
 |---|---|
-| The scan has never run on real messages | Phase 0 first |
-| Android 15+ may block SMS permission for an installed-by-cable app ("restricted settings", reported by developers, not yet tested here) | Phase 0 finds out. The fix is a setting on your phone |
-| Wrong tags that look right | Auto only for the same payee, always visible, always undoable. Person payees never automatic |
-| You stop reviewing | One minute a day, no nag. If unused in weeks, we cut it |
-| Learned rules pile up | A visible, editable list of rules |
+| Phone brands (OnePlus etc.) can stop background work | The receiver is triggered by Android itself, not a background service. The manual Scan stays as a backup. We prove it on your phone |
+| Android 15+ may block SMS permission for an app not from the Play Store | The permission screen explains the 3 steps |
+| A wrong auto-added entry | Strict checks, label, Undo, circuit breaker |
+| You stop reviewing | One minute a day, no nagging. If unused, we cut it |
+| Google refuses the Play exception | The app still works on your phone. We decide then |
 
 ---
 
@@ -211,17 +211,19 @@ Every suggestion says why: "Because you tagged this payee Food 3 times". You can
 | Term | Plain meaning |
 |---|---|
 | **Payee** | Who the money went to (Swiggy, "Rahul S") |
-| **Inbox** | The review list of payments the app found |
-| **Scan on open** | The app reads your bank messages when you open it, not all day |
-| **Always-on listening** | A hidden part of the app that catches each SMS as it arrives |
-| **Receiver** | That hidden part. Android lets an app register one |
-| **Fingerprint** | A short code of a message, so the app knows it already saw it, without keeping the text |
-| **Auto-tag** | The app chose the category by itself, because of your past choices |
-| **Restricted settings** | An Android safety step that can block powerful permissions for apps not installed from the Play Store |
+| **Inbox** | The waiting room for payments the app found. Nothing there is counted yet |
+| **Receiver** | The small part of the app Android wakes when an SMS arrives, even if Calc is closed |
+| **Queue** | The encrypted holding list on your phone until you open Calc |
+| **Ack** | The app telling the phone side "saved it, you can forget it now" |
+| **Fingerprint** | A short code for a message, so it is never counted twice, without keeping the text |
+| **Auto-added** | The app added it for you after strict checks. You can Undo |
+| **Circuit breaker** | If auto-adding gets too many wrong, the app switches itself off and goes back to Review first |
+| **Masking** | Swapping real digits and names for look-alike fakes, so a diagnostic log shows layout but no real data |
+| **Restricted settings** | An Android safety step that can block powerful permissions for apps not from the Play Store |
 
 ---
 
 ## Sources
 
-- Critic reviews (2026-11-11): Day view, and SMS Inbox and learning. Both verdicts: build smaller.
-- `docs/SMS-CAPTURE.md` (the safety rules and what is built), `docs/THE-PLAN.md` section 9 (what is ruled out), `docs/BUDGET-PLAN.md`.
+- Critic reviews (2026-11-11): Day view; SMS Inbox and learning. Both said build smaller; the owner kept always-on capture with safeguards.
+- Google Play SMS policy (link above), `docs/SMS-CAPTURE.md`, `docs/THE-PLAN.md` section 9, `docs/BUDGET-PLAN.md`.
