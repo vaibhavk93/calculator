@@ -58,7 +58,7 @@ export const GROUPS: ToolGroup[] = [
     { title: 'Special cases', tools: ['card-emi', 'home-loan-tax', 'simple-compound', 'loan-presets'] },
   ]),
   group('savings', 'Savings and investing', 6, [
-    { title: 'Grow your money', tools: ['sip', 'step-up-sip', 'lumpsum', 'goal-sip'] },
+    { title: 'Grow your money', tools: ['sip', 'step-up-sip', 'lumpsum', 'goal-sip', 'goal-sip-date'] },
     { title: 'Fixed returns', tools: ['fd', 'fd-ladder', 'rd', 'ppf'] },
     { title: 'Post office schemes', tools: ['ssy', 'nsc', 'scss', 'kvp', 'mis', 'post-office-td'] },
     { title: 'Retirement', tools: ['nps', 'epf', 'swp'] },

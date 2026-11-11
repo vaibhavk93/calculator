@@ -4,8 +4,11 @@ import { fdLadder, type Rung } from '../../engine/investments/fdLadder'
 import { DICGC, KVP, MIS, NSC, OFFICIAL_TO, RATES_AS_OF as SAVINGS_AS_OF, SCSS, SMALL_SAVINGS_SOURCE, SSY, TD } from '../../engine/investments/rates'
 import { kvp, mis, nsc, scss, ssy, timeDeposit } from '../../engine/investments/smallSavings'
 import { RATES_AS_OF as TAX_AS_OF, RULES_FY2026_27 as R } from '../../engine/tax/rules.FY2026-27'
-import { growth, yearRow } from './invest'
-import { junkOptional, need, parseNum, type Field, type ResultRow, type ToolSpec } from '../../lib/tool'
+import { goalSipByMonths, monthsUntil } from '../../engine/investments/goalSip'
+import { addMonths, parseDate, toIso } from '../../engine/everyday/dates'
+import { yearsMonthsText, toWholeMonths } from '../../engine/duration'
+import { growth, yearRow, type GrowRow } from './invest'
+import { junkOptional, need, parseNum, unitOf, type Field, type ResultRow, type ToolSpec } from '../../lib/tool'
 
 /** Whole rupees grouped the Indian way, for the worked-out lines and notes. */
 /** Grouped the Indian way with 2 places by default, for the worked-out lines. */
@@ -397,4 +400,96 @@ const tdSpec: ToolSpec = {
   },
 }
 
-export const TOOLS: ToolSpec[] = [fdLadderSpec, ssySpec, nscSpec, scssSpec, kvpSpec, misSpec, tdSpec]
+// ---- Goal SIP by date ----------------------------------------------------------------------
+
+const localToday = (): Date => {
+  const n = new Date()
+  return new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()))
+}
+const GOAL_UNITS = { id: 'duration', unit: 'years' as const, units: ['years' as const, 'months' as const] }
+
+const goalDateSpec: ToolSpec = {
+  id: 'goal-sip-date',
+  title: 'Goal SIP by date',
+  blurb: 'Monthly SIP to reach a target by a date',
+  category: 'invest',
+  keywords: ['goal', 'target date', 'sip for goal', 'how much sip', 'by date', 'step up', 'house', 'education', 'wedding', 'down payment', 'retirement target'],
+  fields: [
+    { id: 'target', label: 'Target amount', kind: 'number', unit: 'rupee', default: '1000000' },
+    {
+      id: 'when',
+      label: 'I want it',
+      kind: 'select',
+      default: 'date',
+      options: [
+        { value: 'date', label: 'By a date' },
+        { value: 'duration', label: 'In some years or months' },
+      ],
+    },
+    { id: 'byDate', label: 'By this date', kind: 'date', default: toIso(addMonths(localToday(), 60)), visibleIf: (v) => v.when !== 'duration', hint: 'Months to go are counted from today. A part month counts as a full month.' },
+    { id: 'duration', label: 'Time to go', kind: 'number', unit: 'years', units: ['years', 'months'], default: '5', visibleIf: (v) => v.when === 'duration', hint: 'Whole months only. 1.5 years is 18 months.' },
+    { id: 'rate', label: 'Expected yearly return', kind: 'number', unit: 'percent', default: '12', hint: 'Example return, enter your own. Not guaranteed.' },
+    { id: 'existing', label: 'Already saved for this', kind: 'number', unit: 'rupee', default: '0', hint: 'Leave blank for none. It grows at the same return.' },
+    { id: 'stepUp', label: 'Raise the SIP every year by', kind: 'number', unit: 'percent', default: '0', advanced: true, hint: 'A yearly step-up, e.g. 10. Leave at 0 for a flat SIP.' },
+  ],
+  compute: (v) => {
+    const r = need(v, [{ id: 'target', label: 'Target amount' }, { id: 'rate', label: 'Expected return' }])
+    if (!r.ok) return r
+    const junk = junkOptional(v, [{ id: 'existing', label: 'Already saved' }, { id: 'stepUp', label: 'Yearly raise' }])
+    if (junk) return junk
+    const existing = parseNum(v.existing) ?? new D(0)
+    const step = parseNum(v.stepUp) ?? new D(0)
+    const { target, rate } = r.n as Record<string, Dec>
+    if (target!.lte(0)) return { error: 'Target amount must be more than zero', field: 'target' }
+    if (rate!.isNegative() || rate!.gt(100)) return { error: 'Enter a yearly return from 0 to 100%', field: 'rate' }
+    if (existing.isNegative()) return { error: "Already saved can't be negative", field: 'existing' }
+    if (step.isNegative() || step.gt(100)) return { error: 'Enter a yearly raise from 0 to 100%', field: 'stepUp' }
+    let months: number | null
+    if (v.when === 'duration') {
+      const t = need(v, [{ id: 'duration', label: 'Time to go' }])
+      if (!t.ok) return t
+      months = toWholeMonths(t.n.duration!, unitOf(GOAL_UNITS, v) === 'months' ? 'months' : 'years')
+      if (months === null) return { error: 'Time must come to whole months, from 1 month to 60 years', field: 'duration' }
+    } else {
+      const text = typeof v.byDate === 'string' ? v.byDate.trim() : ''
+      if (text === '') return { error: 'Pick the date you want the money by', field: 'byDate' }
+      const by = parseDate(text)
+      if (!by) return { error: 'Enter a real date', field: 'byDate' }
+      months = monthsUntil(localToday(), by)
+      if (months === null) return { error: 'Pick a date after today', field: 'byDate' }
+    }
+    if (months > 720) return { error: 'Use a date within 60 years', field: v.when === 'duration' ? 'duration' : 'byDate' }
+    const p = goalSipByMonths(target!, rate!, months, existing, step)!
+    const i = rate!.div(1200)
+    const stepped = step.gt(0)
+    const rows: GrowRow[] = p.rows.map((x) => {
+      const whole = x.months % 12 === 0
+      const grownSaved = existing.times(new D(1).plus(i).pow(x.months))
+      return { cell: whole ? new D(x.months / 12) : `Month ${x.months}`, label: whole ? `Y${x.months / 12}` : `M${x.months}`, invested: x.invested.plus(existing), value: x.value.plus(grownSaved) }
+    })
+    return {
+      rows: [
+        { label: stepped ? 'Monthly SIP to start with' : 'Monthly SIP needed', value: p.sip, fmt: 'money', main: true },
+        ...(stepped ? [{ label: 'Monthly SIP in the last year', value: p.lastSip, fmt: 'money' as const }] : []),
+        { label: 'Time to go', value: yearsMonthsText(months), fmt: 'text' },
+        { label: 'You invest in all (SIPs)', value: p.invested, fmt: 'money' },
+        { label: 'Savings so far grow to', value: p.savedGrown, fmt: 'money' },
+        { label: 'Growth earned', value: target!.minus(p.invested).minus(existing), fmt: 'money' },
+      ],
+      ...(p.sip.isZero() ? {} : growth(rows, 'Total value')),
+      formula: [
+        'i = yearly return ÷ 12 ÷ 100. Money grows every month at i. Each SIP goes in at the start of the month',
+        stepped
+          ? `SIP factor = sum of each month's SIP growing to month ${months}, with the SIP raised ${s(step)}% after every 12 months`
+          : 'SIP factor = ((1 + i)^n − 1) ÷ i × (1 + i)',
+        `Monthly SIP = (target − saved × (1 + i)^${months}) ÷ SIP factor`,
+        p.sip.isZero() ? `${s(target!)} − ${s(p.savedGrown)} is not more than zero, so no SIP is needed` : `(${s(target!)} − ${s(p.savedGrown)}) ÷ ${s(p.gap.div(p.sip), 4)} = ${s(p.sip)}`,
+      ],
+      note: p.sip.isZero()
+        ? `What you have already saved grows to ${s(p.savedGrown)} by then, which reaches the target on its own.`
+        : `Convention: everything compounds monthly at the yearly return ÷ 12 (so 12% is 12.68% over a year), and each SIP goes in at the start of the month. Money you have already saved grows the same way. Open question: the older "SIP for a goal" tool grows saved money once a year instead (12% stays 12%), so it asks for a larger SIP when you have savings; which is closer depends on how your fund compounds. Months are counted from today and a part month counts as a full month. Returns are not guaranteed.`,
+    }
+  },
+}
+
+export const TOOLS: ToolSpec[] = [fdLadderSpec, ssySpec, nscSpec, scssSpec, kvpSpec, misSpec, tdSpec, goalDateSpec]
