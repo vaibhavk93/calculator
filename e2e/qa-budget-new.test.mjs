@@ -328,10 +328,11 @@ T('B-108', 'POS', 'Add the first expense from the review list: the screen is NOT
   await page.waitForTimeout(300)
   eq(await findRows(page).count(), 1, 'the other row should still be listed')
 })
-T('B-109', 'POS', 'two identical rows on one day are both offered (no silent loss)', async (c) => {
+T('B-109', 'POS', 'two identical rows on one day are both offered (no silent loss): one club row that opens to two payments', async (c) => {
   const { page } = await c.open({ budget: BASE() }); await toImport(page)
   await pickFile(page, file('d.csv', HDR + '02/11/2026,TEA STALL,20.00,\n02/11/2026,TEA STALL,20.00,\n'))
   await page.getByText('Found').first().waitFor()
+  await page.locator('.import__club').getByRole('button', { name: /2 payments/ }).click()
   eq(await findRows(page).count(), 2)
 })
 T('B-110', 'UX', 'a row that matches an existing entry is hidden under "that looks already added", with Add anyway', async (c) => {

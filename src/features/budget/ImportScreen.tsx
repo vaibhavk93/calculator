@@ -1,18 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { ScreenHeader } from '../../components/ScreenHeader'
-import { PickerSelect } from '../../components/PickerSelect'
+import { PickerSelect, type PickOption } from '../../components/PickerSelect'
 import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
-import { D } from '../../engine'
+import { D, type Dec } from '../../engine'
 import { isIgnored } from '../../lib/smsIgnore'
+import { groupByCategoryThenPayee } from '../../lib/groupItems'
+import { categoryFor, isGenericPayee } from '../../lib/importGroups'
+import { isPerson } from '../../lib/inbox'
 import { INSTRUMENT_KINDS, categoryName, instrumentLabel, modeLabel, ruleFor, ruleTextFromMerchant, suggestFor } from '../../lib/budget'
 import { buildStatementCandidates } from '../../lib/statementParse'
 import { copyText } from '../../lib/device'
 import { addToParseLog, clearParseLog, loadParseLog, logSalt, readBankMessages, smsSupported } from '../../lib/sms'
 import { attachInstrument, buildCandidates, logAsText, newInstruments, type Candidate, type ParseLogEntry, type ScanResult } from '../../lib/smsParse'
-import { Segmented } from '../settings/controls'
+import { Row, Segmented, Toggle } from '../settings/controls'
 import { IgnoreSheet, canIgnore, type IgnoreTarget } from './IgnoreSheet'
 import { ExpenseSheet } from './sheets'
 import { shortDate, useMoney } from './SpendSummary'
@@ -48,6 +51,10 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
   const [logCount, setLogCount] = useState(0)
   const [stmtFor, setStmtFor] = useState('')
   const [ignoring, setIgnoring] = useState<IgnoreTarget | null>(null)
+  // Payees that repeat are one row; these are the ones opened to show each payment. `club` is the Add all sheet.
+  const [openClubs, setOpenClubs] = useState<Set<string>>(new Set())
+  const [club, setClub] = useState<{ label: string; items: Candidate[]; start: string | null; guess: boolean } | null>(null)
+  const addRule = useApp((st) => st.addRule)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { void loadParseLog().then((l) => setLogCount(l.length)) }, [logOpen])
@@ -102,10 +109,12 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
     toast(`Added ${instrumentLabel(inst)}`)
   }
 
+  // The category a found payment goes under: your own history or rule, else a keyword guess onto your own categories, else none.
+  const pickOf = (c: Candidate) => categoryFor(c, isPerson(c.mode, c.merchant, ''), budget.categories)
   const drop = (id: string) => setResult((r) => (r ? { ...r, found: r.found.filter((c) => c.id !== id) } : r))
   const draftOf = (c: Candidate) => ({
     amount: c.amount,
-    categoryId: c.categoryId,
+    categoryId: pickOf(c).categoryId,
     mode: c.mode,
     instrumentId: c.kind === 'cardBill' ? null : c.instrumentId,
     date: c.date,
@@ -125,18 +134,42 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
     toast('Skipped. It will not show again.')
   }
 
+  const dropMany = (ids: Set<string>) => setResult((r) => (r ? { ...r, found: r.found.filter((c) => !ids.has(c.id)) } : r))
+  // Add all: every payment stays its own entry (own date, own card). Nothing is summed into one.
+  const addAll = (items: Candidate[], categoryId: string) => {
+    const done = new Set<string>()
+    for (const c of items) if (c.kind !== 'cardBill' && add({ ...draftOf(c), categoryId })) done.add(c.id)
+    markSeen([...done])
+    dropMany(done)
+    toast(`Added ${plural(done.size, 'payment', 'payments')}`)
+  }
+  const skipAll = (items: Candidate[]) => {
+    markSeen(items.map((c) => c.id))
+    dropMany(new Set(items.map((c) => c.id)))
+    toast(`Skipped ${items.length}. They will not show again.`)
+  }
+  const categoryChoices: PickOption[] = []
+  for (const top of budget.categories.filter((c) => c.deletedAt === null && c.parentId === null)) {
+    categoryChoices.push({ value: top.id, label: top.name })
+    for (const sub of budget.categories.filter((c) => c.deletedAt === null && c.parentId === top.id)) categoryChoices.push({ value: sub.id, label: categoryName(budget, sub.id) })
+  }
+
   const fresh = result?.found.filter((c) => !c.duplicateOfExisting) ?? []
   const dupes = result?.found.filter((c) => c.duplicateOfExisting) ?? []
   const skippedText = result
     ? [result.skipped.credit ? plural(result.skipped.credit, 'money-in message', 'money-in messages') : '', result.skipped.unsure || result.skipped['no-amount'] ? plural((result.skipped.unsure ?? 0) + (result.skipped['no-amount'] ?? 0), 'message', 'messages') + ' could not be read' : ''].filter(Boolean).join(' · ')
     : ''
 
+  // Name-less or bank-only names and card bills are never clubbed ("Bank payment" twice is not one payee).
+  const groups = groupByCategoryThenPayee(fresh.map((c) => ({ c, id: c.id, amount: c.amount, merchant: c.kind === 'cardBill' || isGenericPayee(c.merchant, c.bank) ? '' : c.merchant })), (v) => pickOf(v.c).categoryId)
+
   const row = (c: Candidate, dupe = false) => {
     const inst = c.instrumentId ? budget.instruments.find((i) => i.id === c.instrumentId) : undefined
     const how = [c.mode ? modeLabel(c.mode) : '', inst ? instrumentLabel(inst) : c.bank && c.last4 ? `${c.bank} ••${c.last4}` : ''].filter(Boolean).join(' · ')
     // Says why when a rule of yours chose the category, so a wrong rule is easy to spot.
     const rule = c.kind === 'spend' && c.categoryId && c.merchant ? ruleFor(budget, c.merchant) : null
-    const what = c.kind === 'cardBill' ? 'Credit card bill payment' : c.categoryId ? `${categoryName(budget, c.categoryId)}${rule && rule.categoryId === c.categoryId ? ` (rule: ${rule.match})` : ''}` : 'Uncategorised'
+    const pick = pickOf(c)
+    const what = c.kind === 'cardBill' ? 'Credit card bill payment' : pick.categoryId ? `${categoryName(budget, pick.categoryId)}${pick.guess ? ' · guess' : rule && rule.categoryId === c.categoryId ? ` (rule: ${rule.match})` : ''}` : 'Not sure'
     const name = c.merchant || 'Bank payment'
     return (
       <div key={c.id} className="budget__entry import__row">
@@ -145,7 +178,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
           <span className="budget__amt spend__amt import__amt">−{money(new D(c.amount))}</span>
           <span className="row__hint import__meta">
             <span>{[shortDate(c.date), how].filter(Boolean).join(' · ')}</span>
-            <span className="import__chip">{what}</span>
+            {(pick.categoryId !== null || c.kind === 'cardBill') && <span className="import__chip">{what}</span>}
           </span>
           {dupe && <span className="row__hint import__dupe">Looks like one you already added</span>}
         </button>
@@ -156,6 +189,34 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
             <button type="button" className="link-btn" aria-label={`Ignore messages like ${money(new D(c.amount))} ${name}`} onClick={() => setIgnoring({ last4: c.last4, bank: c.bank, sender: c.sender ?? null, cardName: inst ? instrumentLabel(inst) : undefined })}>Ignore</button>
           )}
         </div>
+      </div>
+    )
+  }
+
+  // The same payee, 2 or more times in a category: one row that opens to each payment. Add all / Skip all act on the payments inside.
+  const clubRow = (key: string, items: Candidate[], total: Dec) => {
+    const open = openClubs.has(key)
+    const label = items[0]!.merchant
+    const pick = pickOf(items[0]!)
+    return (
+      <div key={key} className="import__club">
+        <button
+          type="button"
+          className="budget__main import__main tap-row"
+          aria-expanded={open}
+          aria-label={`${label}, ${items.length} payments, ${money(total)}. ${open ? 'Hide' : 'Show'} each payment`}
+          onClick={() => setOpenClubs((o) => { const n = new Set(o); if (n.has(key)) n.delete(key); else n.add(key); return n })}
+        >
+          <span className="row__label import__name">{label} ×{items.length}</span>
+          <span className="budget__amt spend__amt import__amt">−{money(total)}</span>
+          <Icon name="chevron" size={18} className={open ? 'tap-row__chev tap-row__chev--open' : 'tap-row__chev'} />
+          <span className="row__hint import__meta">{items.length} payments, each its own entry</span>
+        </button>
+        <div className="import__acts">
+          <button type="button" className="btn" onClick={() => (pick.categoryId !== null && !pick.guess ? addAll(items, pick.categoryId) : setClub({ label, items, start: pick.categoryId, guess: pick.guess }))}>Add all {items.length}</button>
+          <button type="button" className="link-btn" onClick={() => skipAll(items)}>Skip all</button>
+        </div>
+        {open && <div className="import__clubrows">{items.map((c) => row(c))}</div>}
       </div>
     )
   }
@@ -178,7 +239,16 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
                 </div>
               ))}
               {fresh.length === 0 && <p className="budget__none">Nothing new to add. {result.alreadySeen > 0 ? `${plural(result.alreadySeen, 'payment was', 'payments were')} handled before.` : 'No bank payments in this period.'}</p>}
-              {fresh.map((c) => row(c))}
+              {groups.map((g) => (
+                <div key={g.categoryId ?? 'none'} className="import__cat">
+                  <h3 className="import__cathead">
+                    <span>{g.categoryId ? categoryName(budget, g.categoryId) : 'Not sure'}</span>
+                    <span className="import__catmeta">{plural(g.count, 'payment', 'payments')} · {money(g.total)}</span>
+                  </h3>
+                  {g.categoryId === null && <p className="import__cathint">No category yet. Open a payment to pick one.</p>}
+                  {g.payees.map((p) => (p.items.length > 1 ? clubRow(`${g.categoryId}|${p.key}`, p.items.map((v) => v.c), p.total) : row(p.items[0]!.c)))}
+                </div>
+              ))}
             </div>
             {(skippedText || result.alreadySeen > 0) && <p className="manage__help">Not listed: {[skippedText, result.alreadySeen > 0 ? `${plural(result.alreadySeen, 'handled before', 'handled before')}` : ''].filter(Boolean).join(' · ')}</p>}
             {dupes.length > 0 && (
@@ -253,9 +323,46 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
           </ul>
         </Sheet>
       )}
+      {club && (
+        <ClubSheet
+          club={club}
+          options={categoryChoices}
+          onClose={() => setClub(null)}
+          onAdd={(categoryId, remember) => {
+            const text = ruleTextFromMerchant(club.label)
+            if (remember && text) addRule(text, categoryId)
+            addAll(club.items, categoryId)
+            setClub(null)
+          }}
+        />
+      )}
       {ignoring && <IgnoreSheet target={ignoring} onClose={() => setIgnoring(null)} onDone={(rule) => setResult((r) => (r ? { ...r, found: r.found.filter((c) => !isIgnored([rule], c)) } : r))} />}
       {logOpen && <LogSheet onClose={() => setLogOpen(false)} />}
     </div>
+  )
+}
+
+/** Add every payment of one payee under one category. A guess is shown filled in but never added without this tap. */
+function ClubSheet({ club, options, onAdd, onClose }: { club: { label: string; items: Candidate[]; start: string | null; guess: boolean }; options: PickOption[]; onAdd: (categoryId: string, remember: boolean) => void; onClose: () => void }) {
+  const [cat, setCat] = useState(club.start ?? '')
+  const [remember, setRemember] = useState(false)
+  const text = ruleTextFromMerchant(club.label)
+  const n = club.items.length
+  return (
+    <Sheet
+      title={`Add all ${n}`}
+      onClose={onClose}
+      footer={<button type="button" className="btn btn--primary" disabled={cat === ''} onClick={() => onAdd(cat, remember)}>Add all {n}</button>}
+    >
+      <p className="manage__help">{n} payments to {club.label}. Each is added as its own entry, with its own date and card.</p>
+      {club.guess && cat === club.start && <p className="manage__help">This category is a guess from the name. Check it.</p>}
+      <PickerSelect label="Category" title="Category" value={cat} placeholder="Pick a category" options={options} onChange={setCat} />
+      {text && cat !== '' && (club.guess || cat !== club.start) && (
+        <Row label="Remember this merchant" hint={`Next time, "${text}" goes to ${options.find((o) => o.value === cat)?.label ?? 'this category'}`}>
+          <Toggle label={`Remember ${text}`} checked={remember} onChange={setRemember} />
+        </Row>
+      )}
+    </Sheet>
   )
 }
 

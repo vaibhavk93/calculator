@@ -214,6 +214,7 @@ T('IN11', 'Approve all suggested: only payees tagged the same way twice, never a
   eq(await rows(page).count(), 2, 'person and new payee still waiting')
   eq((await stored(page)).budget.expenses.length, 2)
   await page.getByRole('button', { name: 'Undo' }).click()
+  await REVIEW(page).getByRole('button', { name: /^Swiggy, 2 payments/ }).click() // the two Swiggy payments are one club again
   eq(await rows(page).count(), 4, 'Undo took both back')
   await settle(page)
   eq((await stored(page)).budget.expenses.length, 0)
@@ -503,6 +504,70 @@ T('IN24', 'empty To review explains how it fills and shows the state: capture on
   t = (await REVIEW(o.page).innerText()).replace(/\s+/g, ' ')
   ok(t.includes('Capture is off. Calc reads no messages.'), 'off: ' + t)
   await o.close()
+})
+
+const heads = async (page) => (await REVIEW(page).locator('.inbox__cathead').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
+const clubBtn = (page, name) => REVIEW(page).getByRole('button', { name: new RegExp(`^${name}, \\d+ payments`) })
+
+T('IN25', 'Waiting list is sections by category (Not sure first, then by total); keyword guesses say "guess"; a payee with 2+ payments is one expandable row; nothing auto-adds from a guess', async () => {
+  const { page, errors, close } = await open({ mode: 'auto', messages: [M(swiggy('100.00', 'AMAZON PAY')), M(swiggy('200.00', 'AMAZON PAY')), M(swiggy('300.00', 'AMAZON PAY')), M(swiggy('450.00', 'SWIGGY')), M(swiggy('50.00', 'XYZ TRADERS'))] })
+  await settle(page)
+  await openInbox(page)
+  eq(await heads(page), ['Not sure 1 payment · ₹50', 'Shopping 3 payments · ₹600', 'Food 1 payment · ₹450'], 'sections: Not sure first, then by total')
+  eq((await stored(page)).budget.expenses.length, 0, 'in Auto mode a keyword guess adds nothing by itself')
+  const club = clubBtn(page, 'Amazon Pay')
+  const t = (await club.innerText()).replace(/\s+/g, ' ')
+  ok(t.includes('Amazon Pay ×3') && t.includes('₹600') && t.includes('Shopping · guess'), 'club row: ' + t)
+  eq(await club.getAttribute('aria-expanded'), 'false')
+  eq(await rows(page).count(), 2, 'only the two single payments show until the club opens')
+  ok((await rowText(page)).some((r) => r.includes('Food · guess')), 'a single keyword guess says guess')
+  await club.click()
+  eq(await rows(page).count(), 5, 'opening shows all three as their own rows')
+  eq(errors, [], 'console errors')
+  await close()
+})
+
+T('IN26', 'Approve all 4 of a payee: each its own entry in the section category, the payee learned ONCE, one Undo; Reject all removes them with one Undo', async () => {
+  const { page, close } = await open({ messages: [M(swiggy('100.00', 'AMAZON PAY')), M(swiggy('200.00', 'AMAZON PAY')), M(swiggy('300.00', 'AMAZON PAY'))] })
+  await settle(page)
+  await openInbox(page)
+  await REVIEW(page).getByRole('button', { name: /^Approve all 3 Amazon Pay as Shopping/ }).click()
+  ok(/Added 3 payments|3 payments added/.test(await toast(page)), 'toast: ' + await toast(page))
+  await settle(page)
+  let d = (await stored(page)).budget
+  eq(d.expenses.map((e) => [e.amount, e.categoryId]).sort(), [['100', 'c-shop'], ['200', 'c-shop'], ['300', 'c-shop']], 'three separate entries')
+  eq(d.learned.map((l) => [l.key, l.count]), [['amazon pay', 1]], 'one confirmation for the payee, not three')
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await settle(page)
+  d = (await stored(page)).budget
+  eq([d.expenses.length, d.learned ?? null], [0, null], 'Undo took all back and the learning too')
+  await REVIEW(page).getByRole('button', { name: 'Reject all 3 Amazon Pay' }).click()
+  await settle(page)
+  eq((await stored(page)).budget.inbox.filter((i) => i.status === 'rejected').length, 3)
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await settle(page)
+  eq((await stored(page)).budget.inbox.filter((i) => i.status === 'pending').length, 3, 'Reject all undone in one tap')
+  await close()
+})
+
+T('IN27', 'a UPI person payee is clubbed but has no bulk approve until a category is picked; an unclear name sits in Not sure', async () => {
+  const { page, close } = await open({ messages: [M(upiPerson('150.00')), M(upiPerson('250.00'))] })
+  await settle(page)
+  await openInbox(page)
+  eq(await heads(page), ['Not sure 2 payments · ₹400'])
+  eq(await REVIEW(page).getByRole('button', { name: /^Approve all 2/ }).count(), 0, 'no one-tap bulk approve for a person')
+  await REVIEW(page).getByRole('button', { name: /^Choose a category for all 2/ }).click()
+  const sheet = page.locator('.sheet')
+  await sheet.getByRole('button', { name: 'Approve all 2' }).click()
+  ok((await sheet.innerText()).includes('Pick a category first'), 'asks for a pick')
+  eq((await stored(page)).budget.expenses.length, 0, 'nothing added without a pick')
+  await page.locator('#inbox-group-cat').click()
+  await page.locator('.sheet').last().getByRole('option', { name: 'Rent' }).click()
+  await page.locator('.sheet').first().getByRole('button', { name: 'Approve all 2' }).click()
+  await settle(page)
+  const d = (await stored(page)).budget
+  eq(d.expenses.map((e) => [e.amount, e.categoryId]).sort(), [['150', 'c-rent'], ['250', 'c-rent']])
+  await close()
 })
 
 // ------------------------------------------------------------------ runner

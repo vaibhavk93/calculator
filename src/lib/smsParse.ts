@@ -218,8 +218,10 @@ export interface Candidate {
   last4: string | null
   /** What the last digits belong to (see ParsedSms.source). */
   source: InstrumentKind | null
-  /** Pre-filled from an earlier entry with the same merchant name, or null. */
+  /** Pre-filled from an earlier entry with the same merchant name, or a keyword guess, or null. */
   categoryId: string | null
+  /** True when `categoryId` is only a keyword guess, not your own earlier entry or rule. The review list says "guess" for these. */
+  categoryGuessed?: boolean
   /** The sender header in its short form ("HDFCBK"), for "Ignore this sender". Empty-less: absent when the header is not a bank-style name. */
   sender?: string
   /** An entry with the same amount, on the same or the next day, from the same card or merchant already exists. */
@@ -327,7 +329,7 @@ export function buildCandidates(
       last4: p.last4,
       ...(senderKey(m.address) ? { sender: senderKey(m.address) } : {}),
       source: p.source,
-      categoryId: p.kind === 'spend' ? ((p.merchant ? suggest(p.merchant)?.categoryId : null) ?? guessCategory(budget, `${p.merchant} ${m.body}`)) : null,
+      ...catFields(p.kind, p.merchant ? suggest(p.merchant)?.categoryId ?? null : null, () => guessCategory(budget, `${p.merchant} ${m.body}`)),
       duplicateOfExisting: false,
     }
     cand.duplicateOfExisting = alreadyAdded(budget, cand)
@@ -406,6 +408,18 @@ const CATEGORY_WORDS: [RegExp, string][] = [
 ]
 
 /** A live top-level category whose name matches the guess, or null. Never creates a category. */
+/**
+ * The category fields of a new candidate. `own` is your own earlier entry for this payee (or a rule); `keyword` is the fallback
+ * guess from words in the message. Kept in one place so both the message scan and the statement import mark a guess the same way:
+ * the review list only says "guess" when it really is one, and a guess is never enough to add a payment without a tap.
+ */
+export function catFields(kind: string, own: string | null, keyword: () => string | null): { categoryId: string | null; categoryGuessed?: boolean } {
+  if (kind !== 'spend') return { categoryId: null }
+  if (own !== null) return { categoryId: own }
+  const g = keyword()
+  return g === null ? { categoryId: null } : { categoryId: g, categoryGuessed: true }
+}
+
 export function guessCategory(budget: Pick<BudgetData, 'categories'>, text: string): string | null {
   for (const [re, name] of CATEGORY_WORDS) {
     if (!re.test(text)) continue

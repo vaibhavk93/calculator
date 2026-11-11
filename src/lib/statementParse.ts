@@ -1,7 +1,7 @@
 import { instrumentFitsMode, MAX_AMOUNT, type BudgetData } from './budget'
 import { D } from '../engine/decimal'
 import { decimalComma } from './decimalComma'
-import { alreadyAdded, fingerprint, guessCategory, modeFor, type Candidate, type ParsedSms, type ScanResult } from './smsParse'
+import { alreadyAdded, catFields, fingerprint, guessCategory, modeFor, type Candidate, type ParsedSms, type ScanResult } from './smsParse'
 
 /**
  * Reads a bank or card statement saved as CSV (picked with the file chooser: no permission needed) into the same review
@@ -169,7 +169,7 @@ export function buildStatementCandidates(
       mode: inst ? modeFor(p, inst) : p.mode === 'credit' || p.mode === 'debit' ? null : p.mode,
       instrumentId: inst && (p.mode === null || p.mode === 'upi' ? true : instrumentFitsMode(p.mode, inst)) ? inst.id : null,
       bank: null, last4: null, source: null,
-      categoryId: p.kind === 'spend' ? ((merchant ? suggest(merchant)?.categoryId : null) ?? guessCategory(budget, `${merchant} ${narration}`)) : null,
+      ...catFields(p.kind, merchant ? suggest(merchant)?.categoryId ?? null : null, () => guessCategory(budget, `${merchant} ${narration}`)),
       duplicateOfExisting: false,
     }
     cand.duplicateOfExisting = alreadyAdded(budget, cand)

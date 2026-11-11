@@ -554,6 +554,51 @@ button.heat__cell:active {
   gap: var(--s-1) var(--s-2);
 }
 
+/* The Found list in sections, one per category ("Not sure" first). */
+.import__cat {
+  margin-top: var(--s-3);
+}
+
+.import__cathead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0 var(--s-3);
+  margin: 0;
+  padding: var(--s-2) var(--s-4);
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.import__catmeta {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+.import__cathint {
+  margin: 0;
+  padding: 0 var(--s-4) var(--s-2);
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+
+/* A payee that repeats: one row with Add all / Skip all, opening to each payment (indented, each its own entry). */
+.import__club {
+  border-top: 1px solid var(--line);
+}
+
+.import__club > .import__main {
+  width: 100%;
+  padding-right: var(--s-4);
+}
+
+.import__clubrows {
+  margin-left: var(--s-4);
+}
+
 /* The category as a small flat tag: raised ground, no border, never the only signal (the words are in it). */
 .import__chip {
   padding: 2px var(--s-2);
@@ -1267,4 +1312,39 @@ button.heat__cell:active {
 .capture .capture__steps li {
   display: list-item;
   list-style: decimal;
+}
+
+/* Inbox: a category section (name left, count and total right) and a payee that repeats (one row that expands). Hairlines, no boxes. */
+.inbox__cathead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin: var(--s-3) 0 0;
+  padding: var(--s-2) var(--s-4);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.inbox__cathead .sect__count {
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+.inbox__club {
+  border-bottom: 1px solid var(--line);
+}
+
+.inbox__club > .budget__main {
+  width: 100%;
+}
+
+.inbox__club-items {
+  margin-left: var(--s-4);
+  border-top: 1px solid var(--line);
+}
+
+.inbox__club-items > .inbox__item:last-child {
+  border-bottom: 0;
 }

@@ -24,6 +24,33 @@ const make = (mode: 'review' | 'auto' = 'review') => {
 const item = (o: Partial<InboxItem> = {}): InboxItem => ({ id: `fp${++n}x`, date: '2026-11-12', amount: '450.00', merchant: 'Swiggy', kind: 'spend', mode: 'credit', instrumentId: null, last4: '1234', bank: 'HDFC Bank', categoryId: null, why: '', person: false, status: 'pending', at: NOW, ...o })
 const give = (get: () => ReturnType<ReturnType<typeof make>['store']['getState']>, items: InboxItem[]) => get().commitDrain({ items: [...items].reverse(), entries: [], seen: items.map((i) => i.id), ackIds: [], held: 0 })
 
+describe('approving or rejecting a club of one payee', () => {
+  it('Approve all: each payment its own entry in the chosen category, the payee learned ONCE, one Undo, never auto-eligible from the guess', () => {
+    const { get, card } = make()
+    const x = [item({ merchant: 'Amazon Pay', amount: '100.00', instrumentId: card }), item({ merchant: 'Amazon Pay', amount: '200.00', instrumentId: card }), item({ merchant: 'Amazon Pay', amount: '300.00', instrumentId: card })]
+    give(get, x)
+    expect(get().approveGroup(x.map((i) => i.id), SHOP)).toBe(3)
+    expect(get().budget.expenses.map((e) => [e.amount, e.categoryId, e.note]).sort()).toEqual([['100', SHOP, 'Amazon Pay'], ['200', SHOP, 'Amazon Pay'], ['300', SHOP, 'Amazon Pay']])
+    expect(get().budget.learned).toEqual([{ key: 'amazon pay', categoryId: SHOP, count: 1, lastAt: NOW }])
+    expect(get().budget.inbox!.every((i) => i.status === 'approved')).toBe(true)
+    get().undoRemoval()
+    expect(get().budget.expenses).toHaveLength(0)
+    expect(get().budget.learned).toBeUndefined()
+    expect(get().budget.inbox!.every((i) => i.status === 'pending')).toBe(true)
+  })
+  it('Approve all refuses a category that is not usable, and Reject all has one Undo', () => {
+    const { get, card } = make()
+    const x = [item({ merchant: 'Amazon Pay', instrumentId: card }), item({ merchant: 'Amazon Pay', instrumentId: card })]
+    give(get, x)
+    expect(get().approveGroup(x.map((i) => i.id), 'nope')).toBe(0)
+    expect(get().budget.expenses).toHaveLength(0)
+    expect(get().rejectGroup(x.map((i) => i.id))).toBe(2)
+    expect(get().budget.inbox!.every((i) => i.status === 'rejected')).toBe(true)
+    get().undoRemoval()
+    expect(get().budget.inbox!.every((i) => i.status === 'pending')).toBe(true)
+  })
+})
+
 describe('approve, learn, suggest', () => {
   it('Approve makes a real entry, links it, and learns the tag (1, then 2 in a row)', () => {
     const { get, card } = make()
