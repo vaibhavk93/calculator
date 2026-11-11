@@ -619,10 +619,67 @@ T('IN31', 'review rows at 200% text on a 360x640 phone: nothing sideways, no cli
   ok(acts.length >= 8, 'buttons present')
   ok(acts.every((a) => a.h >= 44 && !a.clipped), 'tall enough and not clipped: ' + JSON.stringify(acts.filter((a) => a.h < 44 || a.clipped)))
   // The main button sits on its own line, full width (the rest go in pairs), so a row never ends in a ragged pile.
-  const first = await rows(page).first().locator('.rv__acts .btn').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width)] }))
+  const first = await rows(page).filter({ hasText: 'Xyz Traders' }).first().locator('.rv__acts .btn').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width)] }))
   ok(first.length === 4 && first[0][2] > first[1][2] && first[1][1] > first[0][1], 'main on top, wider: ' + JSON.stringify(first))
   const names = await sizes(page, '.rv__name')
   ok(names.every((n) => !n.clipped), 'no clipped name')
+  eq(errors, [], 'console errors')
+  await close()
+})
+
+// Own money, merged messages and "is this your own account?" in To review, on FAKE items.
+const ownItem = (id, o) => ({ id, date: '2026-11-14', amount: '1.00', merchant: '', kind: 'spend', mode: null, instrumentId: null, last4: '3456', bank: 'SBI', categoryId: null, why: '', person: false, status: 'pending', at: 1, nature: 'ownMoney', ...o })
+const OWN_INBOX = () => [
+  ownItem('ofd0001', { amount: '52340.00', direction: 'in', ownKind: 'fdBreak', ownWhy: 'Looks like a fixed deposit closing: the money came back to your account.' }),
+  ownItem('osw0001', { amount: '20000.00', ownKind: 'sweep', ownWhy: 'Looks like money moved into a fixed deposit.' }),
+  ownItem('orahul01', { nature: 'spend', merchant: 'Rahul Sharma', mode: 'upi', instrumentId: 'i-sal', last4: '7261', bank: 'HDFC Bank', amount: '150.00', person: true }),
+  ownItem('oswiggy01', { nature: 'spend', merchant: 'Swiggy', mode: 'credit', instrumentId: 'i-card', last4: '1234', bank: 'HDFC Bank', amount: '450.00', categoryId: 'c-food', why: 'You tagged Swiggy as Food twice in a row', mergedFrom: 2 }),
+]
+
+T('IN32', 'own money: its own section after Not sure, never bulk-approved, Not a spend is the main button, a merged payment says so, the person is asked "own account or someone else" with Undo', async () => {
+  const { page, errors, close } = await open({ b: budget({ inbox: OWN_INBOX(), learned: [learnedOf('swiggy', 2)] }) })
+  await settle(page)
+  await openInbox(page)
+  eq(await heads(page), ['Not sure', 'Your own money 2 payments', 'Food'], 'Your own money sits right after Not sure')
+  const own = REVIEW(page).locator('.rv__section', { hasText: 'Your own money' })
+  const fd = own.locator('.inbox__item', { hasText: '52,340' })
+  const ft = (await fd.innerText()).replace(/\s+/g, ' ')
+  ok(ft.includes('+₹52,340') && ft.includes('fixed deposit closing'), 'FD row: ' + ft)
+  eq((await fd.locator('.rv__acts .btn').allInnerTexts()).map((t) => t.trim()), ['Not a spend', 'Reject', 'More'], 'money that came in has no Change and no Approve')
+  const sw = own.locator('.inbox__item', { hasText: '20,000' })
+  eq((await sw.locator('.rv__acts .btn').allInnerTexts()).map((t) => t.trim()), ['Not a spend', 'Change', 'Reject', 'More'], 'own money going out keeps Change, but its main button is Not a spend')
+  eq((await REVIEW(page).getByRole('button', { name: /Approve all suggested/ }).innerText()).trim(), 'Approve all suggested (1)', 'own money is never in the bulk approve')
+  ok((await rowText(page)).some((r) => r.includes('Swiggy') && r.includes('2 messages merged')), 'merged word')
+  // the person is asked
+  const rahul = rows(page).filter({ hasText: 'Rahul' })
+  eq(await rahul.getByRole('button', { name: 'This is my own account' }).count(), 1)
+  await rahul.getByRole('button', { name: 'This is my own account' }).click()
+  await settle(page)
+  ok((await toast(page)).includes('Marked as your own account'), 'snackbar: ' + await toast(page))
+  eq(await own.locator('.inbox__item', { hasText: 'Rahul' }).count(), 1, 'the payment moved under Your own money')
+  ok((await own.locator('.inbox__item', { hasText: 'Rahul' }).innerText()).includes('Marked as your own account'), 'the learned state shows')
+  eq((await stored(page)).budget.expenses.length, 0, 'nothing added')
+  await page.getByRole('button', { name: 'Undo' }).click()
+  await settle(page)
+  eq(await own.locator('.inbox__item', { hasText: 'Rahul' }).count(), 0, 'Undo put it back')
+  eq(await rows(page).filter({ hasText: 'Rahul' }).getByRole('button', { name: 'Someone else' }).count(), 1, 'and it asks again')
+  // Not a spend: nothing added, marked rejected with notSpend
+  await fd.getByRole('button', { name: /is not a spend/ }).click()
+  await settle(page)
+  const d = (await stored(page)).budget
+  eq(d.expenses.length, 0)
+  eq(d.inbox.filter((i) => i.id === 'ofd0001').map((i) => [i.status, !!i.notSpend]), [['rejected', true]])
+  eq(errors, [], 'console errors')
+  await close()
+})
+
+T('IN33', 'own money at 200% text on 360x640: nothing sideways, buttons 44px+ and not clipped', async () => {
+  const { page, errors, close } = await open({ b: budget({ inbox: OWN_INBOX(), learned: [learnedOf('swiggy', 2)] }), view: { width: 360, height: 640, font: 200 } })
+  await settle(page)
+  await openInbox(page)
+  eq(await overflowing(page), [], 'no sideways overflow')
+  const acts = await sizes(page, '.rv__acts .btn')
+  ok(acts.length >= 10 && acts.every((a) => a.h >= 44 && !a.clipped), JSON.stringify(acts.filter((a) => a.h < 44 || a.clipped)))
   eq(errors, [], 'console errors')
   await close()
 })
