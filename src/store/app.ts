@@ -44,6 +44,7 @@ import {
   type ExpenseDraft,
 } from '../lib/budget'
 import { capHistory, isRawExpression, sanitizeSettings } from './persistence'
+import { MAX_IGNORED, isIgnored, withRule, type IgnoreRule } from '../lib/smsIgnore'
 import { applyPlan, forgetPayee, driftTripped, logBad, noteCorrection, payeeKey, pendingItems, recordConfirm, resuggest, suggestionConfirmed, type DrainPlan, type InboxItem } from '../lib/inbox'
 import { startTab, tabOn } from '../lib/modules'
 import { MAX_HOLDINGS, cleanHoldingAmount, cleanHoldingName, validateHolding, validateHoldingAmount, validateValueDay, type Holding, type HoldingKind } from '../lib/portfolio'
@@ -228,6 +229,13 @@ export interface AppState {
   setLearned: (key: string, categoryId: string) => boolean
   /** Forgets a learned payee; the snackbar offers Undo. */
   forgetLearned: (key: string) => void
+  /**
+   * Ignores a card or sender from now on (lib/smsIgnore.ts) and clears what already waits in the Inbox from it. Returns how many waiting items
+   * were cleared, or null (and says why) when the list is full. The snackbar offers Undo.
+   */
+  addIgnore: (rule: IgnoreRule) => number | null
+  /** Stops ignoring a card or sender (its key). Messages dropped while it was ignored are gone for good. */
+  removeIgnore: (key: string) => void
   /** A monthly limit for one category, or null to remove it. */
   setCategoryLimit: (id: string, limit: string | null, scope?: LimitScope) => boolean
   /** One limit for everything spent in a month, or null to remove it. */
@@ -972,6 +980,26 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         if (!cur) return false
         set({ budget: resuggest({ ...budget, learned: [{ key, categoryId, count: 1, lastAt: deps.now() }, ...(budget.learned ?? []).filter((l) => l.key !== key)] }) })
         return true
+      },
+
+      addIgnore: (rule) => {
+        const { settings, budget } = get()
+        const list = withRule(settings.smsIgnored, rule)
+        if (!list) return (fail(`You can ignore up to ${MAX_IGNORED} cards and senders. Stop ignoring one first.`), null)
+        const hit = (i: InboxItem) => i.status === 'pending' && isIgnored([rule], i)
+        const cleared = new Set((budget.inbox ?? []).filter(hit).map((i) => i.id))
+        set({ settings: { ...settings, smsIgnored: list }, budget: { ...budget, inbox: (budget.inbox ?? []).filter((i) => !cleared.has(i.id)) } })
+        const gone = (budget.inbox ?? []).filter((i) => cleared.has(i.id))
+        undoable(`Ignoring ${rule.label}`, () => {
+          const s = get()
+          set({ settings: { ...s.settings, smsIgnored: s.settings.smsIgnored.filter((r) => r.key !== rule.key) }, budget: { ...s.budget, inbox: [...gone, ...(s.budget.inbox ?? [])].slice(0, 300) } })
+        })
+        return cleared.size
+      },
+
+      removeIgnore: (key) => {
+        const { settings } = get()
+        set({ settings: { ...settings, smsIgnored: settings.smsIgnored.filter((r) => r.key !== key) } })
       },
 
       forgetLearned: (key) => {

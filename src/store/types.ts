@@ -6,6 +6,7 @@ import type { AccentName, ThemePreference } from '../lib/theme'
 import type { Modules } from '../lib/modules'
 import type { Holding } from '../lib/portfolio'
 import type { Values } from '../lib/tool'
+import type { IgnoreRule } from '../lib/smsIgnore'
 
 export type Tab = 'calculate' | 'tools' | 'saved' | 'due' | 'budget'
 export const TABS: readonly Tab[] = ['calculate', 'tools', 'saved', 'due', 'budget']
@@ -55,6 +56,8 @@ export interface Settings {
   smsMode: 'review' | 'auto'
   /** When Auto switched itself back to Review first because too many of its entries were undone or changed (ms). Null: it did not. */
   smsAutoPausedAt: number | null
+  /** Cards and senders whose messages are dropped on arrival (lib/smsIgnore.ts). Newest first, at most MAX_IGNORED. */
+  smsIgnored: IgnoreRule[]
 }
 
 export type TourId = 'budget' | 'notes' | 'due'
@@ -89,6 +92,7 @@ export const DEFAULT_SETTINGS: Settings = {
   smsCapture: false,
   smsMode: 'review',
   smsAutoPausedAt: null,
+  smsIgnored: [],
 }
 
 export interface HistoryEntry {

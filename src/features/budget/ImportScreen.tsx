@@ -6,12 +6,14 @@ import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
 import { D } from '../../engine'
+import { isIgnored } from '../../lib/smsIgnore'
 import { INSTRUMENT_KINDS, categoryName, instrumentLabel, modeLabel, ruleFor, ruleTextFromMerchant, suggestFor } from '../../lib/budget'
 import { buildStatementCandidates } from '../../lib/statementParse'
 import { copyText } from '../../lib/device'
 import { addToParseLog, clearParseLog, loadParseLog, logSalt, readBankMessages, smsSupported } from '../../lib/sms'
 import { attachInstrument, buildCandidates, logAsText, newInstruments, type Candidate, type ParseLogEntry, type ScanResult } from '../../lib/smsParse'
 import { Segmented } from '../settings/controls'
+import { IgnoreSheet, canIgnore, type IgnoreTarget } from './IgnoreSheet'
 import { ExpenseSheet } from './sheets'
 import { shortDate, useMoney } from './SpendSummary'
 
@@ -45,6 +47,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
   const [logOpen, setLogOpen] = useState(false)
   const [logCount, setLogCount] = useState(0)
   const [stmtFor, setStmtFor] = useState('')
+  const [ignoring, setIgnoring] = useState<IgnoreTarget | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { void loadParseLog().then((l) => setLogCount(l.length)) }, [logOpen])
@@ -73,7 +76,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
       return
     }
     const s = store.getState()
-    const res = buildCandidates(r.messages, s.budget, (note) => ruleFor(s.budget, note) ?? suggestFor(s.budget, note), await logSalt())
+    const res = buildCandidates(r.messages, s.budget, (note) => ruleFor(s.budget, note) ?? suggestFor(s.budget, note), await logSalt(), s.settings.smsIgnored)
     setResult(res)
     void addToParseLog(res.log).then((l) => setLogCount(l.length))
     setBusy(false)
@@ -146,6 +149,9 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
         <div className="import__acts">
           <button type="button" className="btn btn--primary" onClick={() => quickAdd(c)}>{dupe ? 'Add anyway' : c.kind === 'cardBill' ? 'Review' : 'Add'}</button>
           <button type="button" className="link-btn" onClick={() => skip(c)}>{dupe ? 'Hide' : 'Skip'}</button>
+          {canIgnore({ last4: c.last4, bank: c.bank, sender: c.sender ?? null }) && (
+            <button type="button" className="link-btn" aria-label={`Ignore messages like ${money(new D(c.amount))} ${name}`} onClick={() => setIgnoring({ last4: c.last4, bank: c.bank, sender: c.sender ?? null, cardName: inst ? instrumentLabel(inst) : undefined })}>Ignore</button>
+          )}
         </div>
       </div>
     )
@@ -244,6 +250,7 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
           </ul>
         </Sheet>
       )}
+      {ignoring && <IgnoreSheet target={ignoring} onClose={() => setIgnoring(null)} onDone={(rule) => setResult((r) => (r ? { ...r, found: r.found.filter((c) => !isIgnored([rule], c)) } : r))} />}
       {logOpen && <LogSheet onClose={() => setLogOpen(false)} />}
     </div>
   )

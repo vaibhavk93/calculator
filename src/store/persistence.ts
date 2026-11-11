@@ -3,6 +3,7 @@ import { ACCENT_NAMES, type AccentName, type ThemePreference } from '../lib/them
 import type { KeyValueStorage } from '../lib/storage'
 import { parseTime } from '../lib/reminders'
 import { sanitizePortfolio } from '../lib/portfolio'
+import { MAX_IGNORED, senderKey, type IgnoreRule } from '../lib/smsIgnore'
 import { MAX_COUNT, MAX_INBOX, MAX_LEARNED, DRIFT_WINDOW, payeeKey, type AutoLogEntry, type InboxItem, type LearnedPayee } from '../lib/inbox'
 import { MAX_COUNTED_TOOLS, MAX_PINNED_TOOLS, MAX_USE_COUNT } from '../lib/toolUse'
 import { MAX_RECURRING, MAX_RULES, RULE_MAX, cleanRuleMatch, sanitizeEdits, isAccountType, isBillRepeat, isPaymentCount, isMonthKey, isSettlement, type MerchantRule, type RecurringItem } from '../lib/budget'
@@ -129,7 +130,29 @@ export function sanitizeSettings(raw: unknown): Settings {
     smsCapture: bool(r.smsCapture, d.smsCapture),
     smsMode: oneOf(r.smsMode, ['review', 'auto'] as const, d.smsMode),
     smsAutoPausedAt: stamp(r.smsAutoPausedAt),
+    smsIgnored: sanitizeIgnored(r.smsIgnored),
   }
+}
+
+/** Ignore rules, newest first. The key is rebuilt from the fields, so a hand-edited key can never match something else. */
+function sanitizeIgnored(raw: unknown): IgnoreRule[] {
+  const out: IgnoreRule[] = []
+  const keys = new Set<string>()
+  for (const r of Array.isArray(raw) ? raw : []) {
+    if (!isObject(r)) continue
+    let rule: IgnoreRule | null = null
+    if (r.kind === 'card' && typeof r.last4 === 'string' && /^\d{3,4}$/.test(r.last4)) {
+      const bank = str(r.bank, 40).trim()
+      rule = { kind: 'card', key: `card:${bank}|${r.last4}`, label: str(r.label, 60).trim() || `${bank ? `${bank} ` : ''}••${r.last4}`, last4: r.last4, bank }
+    } else if (r.kind === 'sender' && typeof r.sender === 'string' && senderKey(r.sender) === r.sender) {
+      rule = { kind: 'sender', key: `sender:${r.sender}`, label: `Messages from ${r.sender}`, sender: r.sender }
+    }
+    if (!rule || keys.has(rule.key)) continue
+    keys.add(rule.key)
+    out.push(rule)
+    if (out.length >= MAX_IGNORED) break
+  }
+  return out
 }
 
 const PLAIN_NUMBER = /^-?\d{1,110}(\.\d{1,110})?$/
@@ -462,6 +485,7 @@ function sanitizeInbox(raw: unknown, catIds: Set<string>, instById: Map<string, 
       bank: typeof r.bank === 'string' && r.bank.trim() !== '' ? r.bank.trim().slice(0, 40) : null,
       categoryId: typeof r.categoryId === 'string' && catIds.has(r.categoryId) ? r.categoryId : null,
       why: str(r.why, 120).trim(),
+      ...(typeof r.sender === 'string' && senderKey(r.sender) === r.sender ? { sender: r.sender } : {}),
       person: r.person === true,
       status,
       at: stamp(r.at) ?? 0,

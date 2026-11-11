@@ -12,6 +12,7 @@ import { MAX_NOTE, categoryName, instrumentLabel, modeLabel, type BudgetData } f
 import { pendingItems, recentlyAuto, suggestionConfirmed, type InboxItem } from '../../lib/inbox'
 import { drainNow, smsPort } from '../../store/smsRuntime'
 import { CaptureExplainer } from './CaptureExplainer'
+import { IgnoreSheet, canIgnore, type IgnoreTarget } from './IgnoreSheet'
 import { GuardedFooter, categoryPickOptions, useDiscardGuard } from './formKit'
 import { ExpenseSheet } from './sheets'
 import { shortDate, useMoney } from './SpendSummary'
@@ -23,6 +24,12 @@ const nameOf = (i: Pick<InboxItem, 'merchant' | 'bank'>) => i.merchant || (i.ban
 function routeOf(budget: BudgetData, i: Pick<InboxItem, 'mode' | 'instrumentId' | 'bank' | 'last4'>): string {
   const inst = i.instrumentId ? budget.instruments.find((x) => x.id === i.instrumentId) : undefined
   return [i.mode ? modeLabel(i.mode) : '', inst ? instrumentLabel(inst) : i.bank && i.last4 ? `${i.bank} ••${i.last4}` : ''].filter(Boolean).join(' · ')
+}
+
+/** A saved card's name, as the person knows it. */
+const routeCard = (budget: BudgetData, id: string): string | undefined => {
+  const inst = budget.instruments.find((x) => x.id === id)
+  return inst ? instrumentLabel(inst) : undefined
 }
 
 /** Pick another category and/or add a note, then approve. Same sheet rules as every form (docs/FORMS-AND-SHEETS.md). */
@@ -88,6 +95,7 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
   const [changing, setChanging] = useState<InboxItem | null>(null)
   const [full, setFull] = useState<InboxItem | null>(null)
   const [explain, setExplain] = useState(false)
+  const [ignoring, setIgnoring] = useState<IgnoreTarget | null>(null)
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -157,6 +165,9 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
           {i.kind === 'spend' && <button type="button" className="btn" aria-label={`Change ${money(new D(i.amount))} ${name}`} onClick={() => setChanging(i)}>Change</button>}
           <button type="button" className="link-btn" aria-label={`${money(new D(i.amount))} ${name} is not a spend`} onClick={() => reject(i.id, true)}>Not a spend</button>
           <button type="button" className="link-btn link-btn--danger" aria-label={`Reject ${money(new D(i.amount))} ${name}`} onClick={() => reject(i.id)}>Reject</button>
+          {canIgnore({ last4: i.last4, bank: i.bank, sender: i.sender ?? null }) && (
+            <button type="button" className="link-btn" aria-label={`Ignore messages like ${money(new D(i.amount))} ${name}`} onClick={() => setIgnoring({ last4: i.last4, bank: i.bank, sender: i.sender ?? null, cardName: i.instrumentId ? routeCard(budget, i.instrumentId) : undefined })}>Ignore</button>
+          )}
         </div>
       </div>
     )
@@ -233,6 +244,7 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
         />
       )}
       {explain && <CaptureExplainer onClose={() => setExplain(false)} />}
+      {ignoring && <IgnoreSheet target={ignoring} onClose={() => setIgnoring(null)} />}
     </div>
   )
 }

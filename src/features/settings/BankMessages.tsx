@@ -26,6 +26,8 @@ export function BankMessages() {
   const setMode = useApp((s) => s.setSmsMode)
   const clearInbox = useApp((s) => s.clearInbox)
   const toast = useApp((s) => s.toast)
+  const ignored = useApp((s) => s.settings.smsIgnored)
+  const stopIgnoring = useApp((s) => s.removeIgnore)
   const learned = useApp((s) => (s.budget.learned ?? []).length)
   const waiting = useApp((s) => (s.budget.inbox ?? []).filter((i) => i.status === 'pending').length)
 
@@ -34,6 +36,7 @@ export function BankMessages() {
   const [explain, setExplain] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [learnedOpen, setLearnedOpen] = useState(false)
+  const [ignoredOpen, setIgnoredOpen] = useState(false)
 
   useEffect(() => {
     const read = () => void (port ? port.permission().then(setPerm, () => setPerm('unavailable')) : undefined)
@@ -85,6 +88,13 @@ export function BankMessages() {
         </span>
         <Icon name="chevron" size={18} className="tap-row__chev" />
       </button>
+      <button type="button" className="row row--button tap-row" onClick={() => setIgnoredOpen(true)}>
+        <span className="row__text">
+          <span className="row__label">Ignored</span>
+          <span className="row__hint">{ignored.length === 0 ? 'Cards and senders whose messages Calc drops. You add them from To review' : `${ignored.length} ${ignored.length === 1 ? 'card or sender' : 'cards and senders'} whose messages are dropped`}</span>
+        </span>
+        <Icon name="chevron" size={18} className="tap-row__chev" />
+      </button>
       <button type="button" className="row row--button tap-row" onClick={() => setLearnedOpen(true)}>
         <span className="row__text">
           <span className="row__label">Learned payees</span>
@@ -105,6 +115,27 @@ export function BankMessages() {
           }
         >
           <p className="capture__text">This deletes every bank message Calc is holding on this phone, and the payments waiting in To review. Payments you already added stay in your budget. This cannot be undone.</p>
+        </Sheet>
+      )}
+      {ignoredOpen && (
+        <Sheet title="Ignored" onClose={() => setIgnoredOpen(false)}>
+          {ignored.length === 0 ? (
+            <p className="capture__text">Nothing is ignored. Tap Ignore on a payment in To review to drop all messages from a card or sender.</p>
+          ) : (
+            <div className="group" aria-label="Ignored cards and senders">
+              {ignored.map((r) => (
+                <div key={r.key} className="learned__item">
+                  <span className="budget__main">
+                    <span className="row__label">{r.label}</span>
+                    <span className="row__hint">{r.kind === 'card' ? 'Card: every message that names it is dropped' : 'Sender: every message from it is dropped'}</span>
+                  </span>
+                  <div className="learned__acts">
+                    <button type="button" className="link-btn" aria-label={`Stop ignoring ${r.label}`} onClick={() => stopIgnoring(r.key)}>Stop ignoring</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </Sheet>
       )}
       {learnedOpen && <RulesScreen onBack={() => setLearnedOpen(false)} toLearned />}

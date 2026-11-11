@@ -35,6 +35,7 @@ export function drainNow(): Promise<DrainResult> {
   inflight = drainQueue(port, {
     budget: () => store.getState().budget,
     auto: () => store.getState().settings.smsMode === 'auto',
+    ignored: () => store.getState().settings.smsIgnored,
     commit: (plan) => store.getState().commitDrain(plan),
     persist,
     now: () => Date.now(),

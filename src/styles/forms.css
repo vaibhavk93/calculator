@@ -56,6 +56,11 @@
 
 .sheet__foot .btn {
   width: 100%;
+  /* A long label wraps at large text sizes: the button grows instead of the text spilling out of a fixed height. */
+  height: auto;
+  min-height: 48px;
+  padding-block: var(--s-2);
+  text-align: center;
 }
 
 /* A link in a toast: bold and in the accent, so it reads as the thing to tap. */

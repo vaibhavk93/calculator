@@ -11,6 +11,7 @@ import {
   type BudgetExpense,
   type PaymentModeId,
 } from './budget'
+import { isIgnored, senderKey, type IgnoreRule } from './smsIgnore'
 import type { QueuedMessage, SmsQueuePort } from './smsQueue'
 import { alreadyAdded, fingerprint, guessCategory, matchInstrument, modeFor, parseSms, type SmsKind } from './smsParse'
 
@@ -38,6 +39,8 @@ export interface InboxItem {
   categoryId: string | null
   /** Why that category, in plain words ("You tagged Swiggy as Food twice"). Empty when there is no suggestion. */
   why: string
+  /** The sender header in its short form ("HDFCBK"), so "Ignore this sender" works from the Inbox. A bank-style name only, never a number. */
+  sender?: string
   /** UPI to what looks like a person. Never added without a tap. */
   person: boolean
   status: InboxStatus
@@ -260,7 +263,7 @@ export interface DrainPlan {
  * Not payments (OTP, offers, money in, unclear) are acked and dropped. A message seen before, or twice in this batch, is acked and skipped.
  * A payment you already added by hand (same amount, same or next day, same card or payee) is acked and skipped: the same rule as the manual scan.
  */
-export function planDrain(messages: QueuedMessage[], budget: BudgetData, o: { auto: boolean; now: number; newId: () => string }): DrainPlan {
+export function planDrain(messages: QueuedMessage[], budget: BudgetData, o: { auto: boolean; now: number; newId: () => string; ignored?: IgnoreRule[] }): DrainPlan {
   const seen = new Set(budget.smsSeen ?? [])
   const room = Math.max(0, MAX_INBOX - pruneInbox(budget.inbox, o.now).length)
   const ackIds = new Set<string>()
@@ -278,6 +281,8 @@ export function planDrain(messages: QueuedMessage[], budget: BudgetData, o: { au
     queueIds.add(m.id)
     const p = parseSms(m.body, m.sender)
     if (!p.ok) { ackIds.add(m.id); continue }
+    // Ignored card or sender: acked and dropped before anything else, so it is never stored, never a duplicate, never learned from.
+    if (isIgnored(o.ignored, { sender: m.sender, last4: p.last4, bank: p.bank })) { ackIds.add(m.id); continue }
     const date = dayKey(new Date(m.receivedAt))
     const id = fingerprint(p, date)
     if (seen.has(id) || inPlan.has(id)) { ackIds.add(m.id); continue }
@@ -290,7 +295,8 @@ export function planDrain(messages: QueuedMessage[], budget: BudgetData, o: { au
     newSeen.push(id)
     ackIds.add(m.id)
     const s = p.kind === 'spend' ? suggestion(budget, p.merchant, m.body) : { categoryId: null, why: '' }
-    const item: InboxItem = { ...base, categoryId: s.categoryId, why: s.why, person: p.kind === 'spend' && isPerson(base.mode, p.merchant, m.body), status: 'pending', at: o.now }
+    const sender = senderKey(m.sender)
+    const item: InboxItem = { ...base, ...(sender ? { sender } : {}), categoryId: s.categoryId, why: s.why, person: p.kind === 'spend' && isPerson(base.mode, p.merchant, m.body), status: 'pending', at: o.now }
     if (auto && autoAddCheck(budget, item, false, o.now).ok) {
       const entryId = o.newId()
       const note = item.merchant || (item.bank ? `${item.bank} payment` : 'Bank payment')
@@ -329,6 +335,8 @@ export interface DrainResult {
 export interface DrainIO {
   budget: () => BudgetData
   auto: () => boolean
+  /** Cards and senders to drop on arrival. */
+  ignored?: () => IgnoreRule[]
   /** Puts the plan into the app's state. */
   commit: (plan: DrainPlan) => void
   /** Resolves true only when storage has really accepted the data. */
@@ -345,7 +353,7 @@ export async function drainQueue(port: SmsQueuePort, io: DrainIO): Promise<Drain
   let messages: QueuedMessage[]
   try { messages = await port.drain() } catch { return { status: 'failed', pending: 0, auto: 0, held: 0 } }
   if (messages.length === 0) return { status: 'empty', pending: 0, auto: 0, held: 0 }
-  const plan = planDrain(messages, io.budget(), { auto: io.auto(), now: io.now(), newId: io.newId })
+  const plan = planDrain(messages, io.budget(), { auto: io.auto(), now: io.now(), newId: io.newId, ignored: io.ignored?.() })
   io.commit(plan)
   const saved = await io.persist().catch(() => false)
   const counts = { pending: plan.items.filter((i) => i.status === 'pending').length, auto: plan.entries.length, held: plan.held }

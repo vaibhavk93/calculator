@@ -1,6 +1,7 @@
 import { dayKey, instrumentFitsMode, MAX_AMOUNT, type BudgetData, type InstrumentKind, type PayInstrument, type PaymentModeId } from './budget'
 import { D } from '../engine/decimal'
 import { maskText, shapeOf } from './maskText'
+import { isIgnored, senderKey, type IgnoreRule } from './smsIgnore'
 
 /**
  * Reads ONE bank text message into a possible expense. Everything here runs on the phone; nothing is sent anywhere
@@ -211,6 +212,8 @@ export interface Candidate {
   source: InstrumentKind | null
   /** Pre-filled from an earlier entry with the same merchant name, or null. */
   categoryId: string | null
+  /** The sender header in its short form ("HDFCBK"), for "Ignore this sender". Empty-less: absent when the header is not a bank-style name. */
+  sender?: string
   /** An entry with the same amount, on the same or the next day, from the same card or merchant already exists. */
   duplicateOfExisting: boolean
 }
@@ -279,6 +282,7 @@ export function buildCandidates(
   budget: BudgetData & { smsSeen?: string[] },
   suggest: (note: string) => { categoryId: string | null } | null,
   salt = 'unsalted',
+  ignored: IgnoreRule[] = [],
 ): ScanResult {
   const seen = new Set(budget.smsSeen ?? [])
   const found: Candidate[] = []
@@ -288,6 +292,8 @@ export function buildCandidates(
   let alreadySeen = 0
   for (const m of messages) {
     const p = parseSms(m.body, m.address)
+    // An ignored card or sender never shows, is never logged and never counts (not even as "already seen").
+    if (isIgnored(ignored, { sender: m.address, last4: p.ok ? p.last4 : null, bank: p.ok ? p.bank : null })) continue
     const note = logEntryFor(m, p, Date.now(), salt)
     if (note) log.push(note)
     if (!p.ok) {
@@ -311,6 +317,7 @@ export function buildCandidates(
       instrumentId: inst?.id ?? null,
       bank: p.bank,
       last4: p.last4,
+      ...(senderKey(m.address) ? { sender: senderKey(m.address) } : {}),
       source: p.source,
       categoryId: p.kind === 'spend' ? ((p.merchant ? suggest(p.merchant)?.categoryId : null) ?? guessCategory(budget, `${p.merchant} ${m.body}`)) : null,
       duplicateOfExisting: false,
