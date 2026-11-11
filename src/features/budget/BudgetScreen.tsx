@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { EmptyState } from '../../components/EmptyState'
 import { Icon } from '../../components/Icon'
 import { Sheet } from '../../components/Sheet'
@@ -10,12 +10,13 @@ import { billTotals, liveBills } from '../../lib/recurring'
 import { useTour } from '../onboarding/useTour'
 import { Segmented } from '../settings/controls'
 import { BillsScreen } from './BillsScreen'
+import { DayView } from './DayView'
 import { ImportScreen } from './ImportScreen'
 import { ManageScreen } from './ManageScreen'
 import { PortfolioView } from './PortfolioScreen'
 import { RulesScreen } from './RulesScreen'
 import { ExpenseSheet } from './sheets'
-import { Bar, EntryRow, FitHero, MonthNav, SpendSummary, limitWords, useMoney, type SummaryTab } from './SpendSummary'
+import { Bar, DayHeader, EntryRow, FitHero, MonthNav, SpendSummary, limitWords, startsDay, useMoney, type SummaryTab } from './SpendSummary'
 
 type Page = 'home' | 'summary' | 'manage' | 'import' | 'bills' | 'rules'
 type View = 'spending' | 'networth'
@@ -42,12 +43,15 @@ export function BudgetScreen() {
   const [moreOpen, setMoreOpen] = useState(false)
   const [open, setOpen] = useState<{ tab: SummaryTab; categoryId: string | null }>({ tab: 'summary', categoryId: null })
   const [sheet, setSheet] = useState<SheetState>(null)
+  // The Day view: one day's entries, on top of whatever is open. Opened from a day heading in Recent entries or in the Entries list.
+  const [day, setDay] = useState<string | null>(null)
 
   // Tapping the Budget tab while on it goes back to this month, on the home. The view stays; amounts hide again.
   useEffect(() => {
     setMonth(monthKey(new Date()))
     setPage('home')
     setSheet(null)
+    setDay(null)
     setShowPace(false)
     setMoreOpen(false)
     setHidden(true)
@@ -74,11 +78,12 @@ export function BudgetScreen() {
   const sheets = sheet !== null && <ExpenseSheet expense={budget.expenses.find((e) => e.id === sheet.id)} onClose={() => setSheet(null)} />
   const pages = (
     <>
-      {page === 'summary' && <SpendSummary month={month} onMonth={setMonth} onBack={() => setPage('home')} onManage={() => setPage('manage')} initialTab={open.tab} initialCategory={open.categoryId} />}
+      {page === 'summary' && <SpendSummary month={month} onMonth={setMonth} onBack={() => setPage('home')} onManage={() => setPage('manage')} initialTab={open.tab} initialCategory={open.categoryId} onOpenDay={setDay} />}
       {page === 'manage' && <ManageScreen onBack={() => setPage('home')} month={month} />}
       {page === 'import' && <ImportScreen onBack={() => setPage('home')} />}
       {page === 'bills' && <BillsScreen onBack={() => setPage('home')} />}
       {page === 'rules' && <RulesScreen onBack={() => setPage('home')} />}
+      {day !== null && <DayView date={day} onBack={() => setDay(null)} />}
     </>
   )
 
@@ -159,7 +164,12 @@ export function BudgetScreen() {
       <h2 className="group__title">Recent entries</h2>
       <div className="group" aria-label="Recent entries">
         {recent.length === 0 && <p className="budget__none">Nothing spent in {monthLabel(month)}. Tap Add expense to add the first.</p>}
-        {recent.map((e) => <EntryRow key={e.id} e={e} plain onEdit={(id) => setSheet({ id })} />)}
+        {recent.map((e, i) => (
+          <Fragment key={e.id}>
+            {startsDay(recent, i) && <DayHeader date={e.date} onOpen={setDay} />}
+            <EntryRow e={e} plain onEdit={(id) => setSheet({ id })} />
+          </Fragment>
+        ))}
       </div>
       {s.entries.length > 0 && (
         <button type="button" className="link-btn spend__link" onClick={() => goSummary('entries')}>

@@ -740,6 +740,87 @@ button.heat__cell:active {
   border-bottom: 1px solid var(--line);
 }
 
+/* A day heading above that day's entries ("Tue 4 Nov"); tapping it opens the Day view. It carries the hairline between days,
+   so the first row under it does not draw a second one. */
+.budget__day {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--s-1) var(--s-4);
+  border-top: 1px solid var(--line);
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.budget__day + .budget__recent,
+.budget__day + .budget__entry {
+  border-top: 0;
+}
+
+/* Day view. */
+.day__routes {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.day__routeitem {
+  display: inline-block;
+}
+
+.day__amt {
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.day__item {
+  border-top: 1px solid var(--line);
+}
+
+.day__item > .budget__recent {
+  border-top: 0;
+}
+
+/* A row with "Add a note" under it: the note control supplies the room below, so the row does not pad twice. */
+.day__item > .budget__recent:not(:last-child) {
+  min-height: 0;
+  padding-bottom: 0;
+}
+
+.group > .day__item:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+/* The way it was paid, in words, set off from the category before it. */
+.day__route {
+  display: inline-block;
+  padding: 0 var(--s-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+}
+
+/* A quiet control under a row with no note. Not accent: there can be many on a busy day. */
+.day__note {
+  margin: 0 0 var(--s-1) var(--s-3);
+  color: var(--ink-2);
+}
+
+.group + .budget__add {
+  margin-top: var(--s-4);
+}
+
+.day__empty {
+  padding-top: var(--s-4);
+}
+
 /* Money in: the only green figure on the screen, and its line says "Money in" too. */
 .budget__amt--in {
   color: var(--positive);

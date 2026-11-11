@@ -84,6 +84,8 @@ const SCREENS = [
   ['todo', async (p) => { await tab(p, 'Notes'); await p.getByRole('radio', { name: /To-do/ }).click() }],
   ['due', async (p) => tab(p, 'Due')],
   ['budget', async (p) => tab(p, 'Budget')],
+  // The Day view: a day heading in Recent entries opens it (the seed has long notes, long names and a long card name).
+  ['budget-day', async (p) => { await tab(p, 'Budget'); await p.locator('.budget__day').first().click(); await p.locator('.screen[aria-label^="Day:"]').waitFor() }],
 ]
 
 const geomCheck = (p) =>
@@ -102,7 +104,13 @@ const geomCheck = (p) =>
       const r = el.getBoundingClientRect()
       if (r.width === 0 || r.height === 0) return false
       const cs = getComputedStyle(el)
-      return cs.visibility !== 'hidden' && cs.display !== 'none'
+      if (cs.visibility === 'hidden' || cs.display === 'none') return false
+      // A page left mounted under a full screen (Budget home under the Day view) is covered, so nobody can tap it: not part of what this screen shows.
+      if (!el.closest('.screen')) {
+        const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+        if (top && !el.contains(top) && !top.contains(el) && top.closest('.screen')) return false
+      }
+      return true
     })
 
     // LC-TARGET: at least 44px in ONE direction -- the project's own documented rule

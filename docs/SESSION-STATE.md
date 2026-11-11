@@ -1,5 +1,20 @@
 # Session state: resume here
 
+## Round 24 (2026-11-11): Day view in Budget
+
+**Owner pain:** on a day with many transactions across card, UPI and cash, they could not later tell what happened, which route each used, and why. Smaller plan approved (no new fields, no reason chips, no notifications).
+
+| Item | Status |
+|---|---|
+| `src/lib/dayView.ts` (+ test, 18 cases): `dayView(budget, 'YYYY-MM-DD')` returns spend (through `countsAsSpend`), money in, per-route subtotals, entries oldest-entered first, counts. Deleted entries excluded | Done |
+| `src/features/budget/DayView.tsx`: Back + day, one bare hero, one quiet routes line, plain ruled rows (title = note else category; second line = category + route in words), "Add a note" sheet on rows with no note, tap row = existing edit sheet, empty day = words + Add for that date | Done |
+| Reachable from a day heading in Budget home "Recent entries", in the spending summary Entries list, and in its search results. Heatmap tap still filters Entries (unchanged) | Done |
+| Message review: note is already pre-filled with the merchant (`draftOf` in ImportScreen: merchant, else "<bank> payment", else "Bank payment"). Nothing to change | Checked |
+| `e2e/dayview.test.mjs` (10 cases); `budget-day` added to `e2e/layout-contract.test.mjs` (which now ignores controls hidden under a stacked full screen) | Done |
+| `npm run check` 3219 passed / 16 skipped. `e2e/budget.test.mjs` and `e2e/qa-budget-new.test.mjs`: same failures as commit 3b11c5c (ST12, B-02 x2, B-107, B-401, known B-22/B-23); B-104/B-105 are flaky under load | Done |
+| Decisions: routes are cards by their own name, UPI/wallet/net banking as "UPI · account"; a row with no note shows only the route on line 2 (the title already is the category); an Add expense button is on every Day view, not only the empty one; recent rows on home no longer repeat the date (the heading carries it) | Decided |
+| Not built: previous/next day arrows; not pushed; not installed on the phone | Open |
+
 ## Round 23 (2026-11-11): a ready-to-paste prompt for a Fable 5.2 improvement session
 
 **Owner's prompt:** create a prompt to give Claude Fable 5.2 to improve this system, based on Anthropic's guidelines for prompting it.

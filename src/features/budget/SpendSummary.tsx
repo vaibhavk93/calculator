@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { PickOption } from '../../components/PickerSelect'
 import { Icon } from '../../components/Icon'
 import { ScreenHeader } from '../../components/ScreenHeader'
@@ -35,6 +35,7 @@ import {
   type CategoryLine,
   type LimitState,
 } from '../../lib/budget'
+import { dayTitle } from '../../lib/dayView'
 import { cardBillFor } from '../../lib/recurring'
 import { formatCell } from '../../lib/toolFormat'
 import { useFitText } from '../calculator/useFitText'
@@ -143,7 +144,8 @@ export function EntryRow({ e, onEdit, select, plain }: { e: BudgetExpense; onEdi
     // Budget home's "Recent entries": what it was on the left, the signed amount on the right, no delete (that is in the sheet).
     // Money in is the only green figure, and its meta line says "Money in" too, so colour is never the only signal.
     const title = e.note || name
-    const meta = [e.note || income ? name : '', refund ? 'Refund' : '', shortDate(e.date), how, e.settlement ? 'Not counted as spending' : ''].filter(Boolean).join(' · ')
+    // No date here: Recent entries sit under a day heading (DayHeader).
+    const meta = [e.note || income ? name : '', refund ? 'Refund' : '', how, e.settlement ? 'Not counted as spending' : ''].filter(Boolean).join(' · ')
     const sign = e.settlement ? '' : income || refund ? '+' : '−'
     return (
       <button type="button" className="budget__recent tap-row" aria-label={`Edit ${spoken}`} onClick={() => onEdit(e.id)}>
@@ -193,6 +195,19 @@ export function EntryRow({ e, onEdit, select, plain }: { e: BudgetExpense; onEdi
   )
 }
 
+/** The heading above one day's entries in a list: "Tue 4 Nov". Tapping it opens that day (DayView). */
+export function DayHeader({ date, onOpen }: { date: string; onOpen: (date: string) => void }) {
+  return (
+    <button type="button" className="budget__day tap-row" aria-label={`${dayTitle(date)}. See this day`} onClick={() => onOpen(date)}>
+      <span>{dayTitle(date)}</span>
+      <Icon name="chevron" size={18} className="tap-row__chev" />
+    </button>
+  )
+}
+
+/** True when entry `i` is the first of its day in a list that is sorted by date, so a DayHeader goes above it. */
+export const startsDay = (list: BudgetExpense[], i: number) => i === 0 || list[i - 1]!.date !== list[i]!.date
+
 function Card({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
   return (
     <section className="sect" aria-label={title}>
@@ -218,6 +233,7 @@ export function SpendSummary({
   onManage,
   initialTab = 'summary',
   initialCategory = null,
+  onOpenDay,
 }: {
   month: string
   onMonth: (m: string) => void
@@ -225,6 +241,8 @@ export function SpendSummary({
   onManage: () => void
   initialTab?: SummaryTab
   initialCategory?: string | null
+  /** Opens the Day view for a date (a screen the parent puts on top of this one). */
+  onOpenDay: (date: string) => void
 }) {
   const budget = useApp((s) => s.budget)
   const money = useMoney()
@@ -543,7 +561,12 @@ export function SpendSummary({
         <p className="budget__none" role="status">
           {found.length === 0 ? `Nothing matches "${needle}" in any month.` : `${entriesWord(found.length)} match "${needle}" in all months${foundTotal && !foundTotal.isZero() ? `, ${money(foundTotal)} in total` : ''}.`}
         </p>
-        {found.slice(0, SEARCH_SHOWN).map((e) => <EntryRow key={e.id} e={e} onEdit={setEditing} select={rowSelect(e)} />)}
+        {found.slice(0, SEARCH_SHOWN).map((e, i, shown) => (
+          <Fragment key={e.id}>
+            {startsDay(shown, i) && <DayHeader date={e.date} onOpen={onOpenDay} />}
+            <EntryRow e={e} onEdit={setEditing} select={rowSelect(e)} />
+          </Fragment>
+        ))}
         {found.length > SEARCH_SHOWN && <p className="budget__none">Showing the first {SEARCH_SHOWN}. Type more to narrow it down.</p>}
         <button type="button" className="link-btn spend__link" onClick={() => setQuery('')}>Clear search</button>
       </div>
@@ -563,7 +586,12 @@ export function SpendSummary({
           </>
         )}
         {entries.length > 1 && !selecting && <button type="button" className="link-btn spend__link" onClick={() => setSelecting(true)}>Select entries to change their category</button>}
-        {entries.map((e) => <EntryRow key={e.id} e={e} onEdit={setEditing} select={rowSelect(e)} />)}
+        {entries.map((e, i) => (
+          <Fragment key={e.id}>
+            {startsDay(entries, i) && <DayHeader date={e.date} onOpen={onOpenDay} />}
+            <EntryRow e={e} onEdit={setEditing} select={rowSelect(e)} />
+          </Fragment>
+        ))}
       </div>
     </section>
   )

@@ -173,6 +173,7 @@ critic (per the project's own rule on big suggestions) pushed back once and the 
 | D5 | Merchant rules you can see and edit | S-M |
 | D6 | Split one expense across categories | M |
 | D7 | Reimbursable / "owed back" list | M |
+| D8 | **Done 2026-11-11** Day view: tap a day (Recent entries, Entries list, search) to see that day's spend, per-route subtotals (UPI, each card, cash) and every entry in entered order, with one-tap "Add a note". No new stored fields. | M |
 
 **⚠ Do D1 and B2 before D2–D7.** Budget home is already five equal cards over one number; adding
 features before it has a hierarchy makes it worse, not better.
