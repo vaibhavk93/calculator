@@ -29,6 +29,10 @@ Capacitor for the stores. **Read the docs before writing code.**
 | Notes + To-do plan | `docs/NOTES-TODO-PLAN.md` |
 | Add from bank messages (SMS capture), its privacy rules and reader log | `docs/SMS-CAPTURE.md` |
 | **The one list of everything planned, by phase** | `docs/THE-PLAN.md` |
+| **The live work log, rules and how to restart agents from any account** | `docs/RESUME-HERE.md` |
+| Everything in one place (status, SMS capture design, decisions, mistakes) | `docs/PROJECT-STATUS-2026-11-11.md` |
+| Testing on the owner's phone safely (QA copy, fake messages, DevTools driver) | `docs/PHONE-TESTING-GUIDE.md` |
+| SMS capture plan in plain language; Play Store SMS checklist | `docs/SMS-INBOX-PLAN.md`, `docs/PLAY-SMS-POLICY.md` |
 
 ## How to work with the owner (rules they set)
 

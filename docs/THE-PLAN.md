@@ -246,7 +246,7 @@ permission rows in Settings (reminders still ring). A "missed reminder" banner l
 
 ### Block H — SMS Inbox and learning *(owner, 2026-11-11; plan only, see `docs/SMS-INBOX-PLAN.md`)*
 
-Phase 0 prove the scan on the phone, 1 Day view (Done), 2 Inbox on scan-on-open, 3 exact-payee learning with Undo, 4 measure 2-4 weeks, 5 optional context hints / always-on (gated). Critic: build smaller.
+**Status 2026-11-11:** Phase 1 Day view **Done**. Always-on capture (phone side), Inbox, Review-first and Auto-add modes, learning, drift breaker, Ignore, permission explainer, category sections and payee clubbing **built and installed** (owner kept always-on; critic had said build smaller). **In progress:** duplicate merging across senders, FD/TD/RD recognition (never offered as bank accounts), own-money vs spend (`nature`, `ownKind`), self vs somebody else (learned), masked examples, clearer buttons and clubbing. **Open:** Phase 0 with real messages (owner rescans and shares masked examples); phase 4 measuring; phase 5 context hints (suggestions only). See `docs/PROJECT-STATUS-2026-11-11.md`, `docs/SMS-INBOX-PLAN.md`, `docs/PHONE-TESTING-GUIDE.md`.
 
 ### Block F — Phone truth
 

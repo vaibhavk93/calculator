@@ -56,6 +56,13 @@ that; the claim came from reading one branch of the receiver without the guard a
 
 **Not pushed. Not on the phone.**
 
+## Round 27 (2026-11-11 afternoon): owner scanned REAL messages; phone test; everything documented
+
+**Owner feedback:** duplicates shown; many "SBI account not in your cards" (likely FD/TD numbers); wants own-money-moving (FD broken, sweep, own transfer) told apart from spend and income; self vs somebody else; Skip/Ignore not clear; clubbing "feels off". Two agents started (message logic; screens). Full table: `docs/PROJECT-STATUS-2026-11-11.md` section 7.
+**Phone test on the QA copy (fake messages):** 7 of 8 checks passed; a UPI payment to a person showed as "ICICI Bank payment" (parser regression sent to the logic agent). The permission-denied path is not yet tested (owner resetting the QA permission).
+**Documentation added:** `docs/PROJECT-STATUS-2026-11-11.md` (everything), `docs/PHONE-TESTING-GUIDE.md` (safe method, 4 mistakes to avoid), `scripts/phone-qa/` (the test scripts), `docs/RESUME-HERE.md` section 10.
+**Lessons:** never tap or screenshot the real phone; QA must be verified empty; `pm clear`, `pm grant` and `pm revoke` are refused on this phone.
+
 ## Round 26 (2026-11-11): picked up the five agents' work; the unfinished grouping finished and committed
 
 **Owner's prompt:** "can you check the agents which were running? could you continue agents work from where we left?"
