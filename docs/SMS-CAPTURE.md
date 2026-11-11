@@ -107,3 +107,10 @@ Not proven: that Google will approve this app. Check the live policy page before
 
 ## Wording changed
 "No account, almost no permissions, nothing leaves the phone" is now: **no account, nothing leaves the phone, and the only sensitive permissions (reading and receiving messages) are optional: asked when you tap Scan or turn on capture.**
+
+## Duplicates, own money, deposits (2026-11-11, all bank wordings SYNTHETIC / ASSUMED: no real message was read)
+**Why duplicates showed** (full list in the header of `src/lib/dupes.ts`): one payment sends two messages (bank alert + UPI app) with different payee text, so two fingerprints; the twin arrives in a later drain and was never compared with the Inbox item; the manual scan never looked at the Inbox; `alreadyAdded` knew only one spelling; midnight resends. Fix: `samePayment` (same direction and amount, within 1 day, then same reference, or same card/account, or one payee name inside the other, or one message with no payee; never when both have different references or are different known cards). A merged candidate has `mergedFrom` and `alsoIds` (mark all of `seenIdsOf(c)` as seen).
+**Deposit accounts** (FD, TD, RD, MOD, Fixed/Term/Recurring/Flexi Deposit, "deposit a/c"): their digits are cut out before card/account digits are read, and an FD/RD/sweep message never offers an account to add.
+**Nature** (`src/lib/ownMoney.ts`): `spend` | `moneyIn` (reserved; real credits are still not offered) | `ownMoney` with `ownKind` fdOpen, fdBreak, rd, sweep, selfTransfer, cardBill and a plain-words `ownWhy`. Own money that came in (an FD paying out) is listed in `ScanResult.own`, never in `found`. Never auto-added. Unsure = spend. A penalty, fee or TDS on a deposit stays a spend.
+**Self vs someone else:** the other account is one saved bank account, or the text says own account / to SELF, or the person taught it (`markPayeeSelf`, stored in `budget.payeeKinds`).
+**Masked examples:** `ScanResult.maskedSamples` + `maskedSamplesText()` give a pasteable block (digits and names swapped) for merged, own-money and deposit messages.
