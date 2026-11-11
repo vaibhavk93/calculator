@@ -3,6 +3,7 @@ import { setMissed, missedText } from '../../lib/delivery'
 import { useMissedReminder } from '../../components/useMissedReminder'
 import { ReliableRemindersSheet } from '../settings/ReliableRemindersSheet'
 import { Icon } from '../../components/Icon'
+import { dotStyle } from '../../components/tint'
 import { Sheet } from '../../components/Sheet'
 import { EmptyState } from '../../components/EmptyState'
 import { useApp } from '../../components/StoreProvider'
@@ -130,8 +131,8 @@ export function DueScreen() {
             return cardView ? (
               <div className="due-card" key={r.id}>
                 <div className="due-card__top">
-                  <button type="button" className="due-card__body" onClick={() => setOpenId(card.id)}>
-                    <span className="row__label">{card.title}</span>
+                  <button type="button" className="due-card__body" style={bill ? dotStyle(budget.categories, bill.categoryId) : undefined} onClick={() => setOpenId(card.id)}>
+                    <span className="row__label">{bill && <span className="catdot" aria-hidden="true" />}{card.title}</span>
                     {amount && <span className="due-card__amt">{amount}</span>}
                     {meta(false)}
                   </button>
@@ -140,8 +141,8 @@ export function DueScreen() {
                 {/* No progress bar: a bill stores only the payments LEFT, not how many there were, so "paid of total"
                     cannot be worked out honestly (a loan added half-way through would look new). */}
                 <div className="due-card__act">
-                  {doneBtn}
-                  {!pays && <span className="due-card__word" aria-hidden="true">Mark done</span>}
+                  {pays ? doneBtn : <button type="button" className="due__check" aria-label={`Done ${card.title}`} title={`Done ${card.title}`} onClick={() => markPaid(r.id)} />}
+                  {!pays && <span className="due-card__word" aria-hidden="true">Tap to mark done</span>}
                 </div>
                 {ask}
               </div>
