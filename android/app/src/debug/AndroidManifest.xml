@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- TEST ONLY (debug and qa builds, never release). Lets `adb shell am broadcast` feed a fake text into the real
+             capture path while the app is closed. android.permission.DUMP is held by the adb shell and by no ordinary
+             app, so other apps on the phone cannot use it. -->
+        <receiver
+            android:name=".SmsDebugReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
+    </application>
+</manifest>

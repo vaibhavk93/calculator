@@ -110,3 +110,7 @@ back it up, and use it for every release. Lose it and you cannot update the app.
 
 `scripts/build-android.sh qa install` installs **Calc QA** (`com.vaibhavkumawat.vkcalc.qa`) beside the real app. It has its own name, icon and empty data, so automated taps can never change real entries. Start it with
 `adb shell am start -n com.vaibhavkumawat.vkcalc.qa/com.vaibhavkumawat.vkcalc.MainActivity`. It is a `qa` build type in `android/app/build.gradle` that copies `debug` and adds `.qa` to the id. Never add a suffix to `debug`: the owner's data lives there.
+
+## JVM unit tests (the SMS capture queue)
+
+`cd android && ./gradlew testDebugUnitTest --console=plain` (same `JAVA_HOME` and `JAVA_TOOL_OPTIONS` as step 2; needs the network the first time to fetch junit). Results: `android/app/build/test-results/testDebugUnitTest/`. `SmsQueueStoreTest` covers the queue cap, 30-day expiry, duplicates, atomic writes, a bad record, the sender filter and "no logging in the capture classes".

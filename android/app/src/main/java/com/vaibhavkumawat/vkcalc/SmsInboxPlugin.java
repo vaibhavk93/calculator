@@ -20,7 +20,8 @@ import java.util.regex.Pattern;
  * Reads bank-style text messages on demand, only when the user taps "Scan messages" in Budget.
  *
  * Privacy rules enforced here, not just in the app:
- *  - No receiver, no background reading: the inbox is read once per tap.
+ *  - This class never reads in the background: the inbox is read once per tap. (Catching new messages while the app is
+ *    closed is a separate, opt-in path: SmsReceiver and SmsQueuePlugin. It uses isBankSender() below.)
  *  - Only messages whose sender is an ALPHANUMERIC header (HDFCBK, VM-ICICIB, AX-SBIUPI...) leave this class.
  *    Messages from ordinary phone numbers (people) are never read into the app.
  *  - Only the last N days, at most MAX rows. Nothing is stored or logged here.
@@ -35,6 +36,11 @@ public class SmsInboxPlugin extends Plugin {
     // (JX-HDFCBK-S is how Indian banks appear). Phone numbers are digits and "+" only.
     private static final Pattern HEADER = Pattern.compile("^(?:[A-Za-z0-9]{2}-)?[A-Za-z0-9]{3,11}(?:-[A-Za-z0-9]{1,2})?$");
     private static final Pattern HAS_LETTER = Pattern.compile(".*[A-Za-z].*");
+
+    /** The one sender rule, shared with the capture receiver (SmsReceiver): letter-style headers only, never phone numbers. */
+    static boolean isBankSender(String address) {
+        return address != null && HEADER.matcher(address).matches() && HAS_LETTER.matcher(address).matches();
+    }
 
     @PluginMethod
     public void checkPermission(PluginCall call) {
@@ -81,7 +87,7 @@ public class SmsInboxPlugin extends Plugin {
             if (c != null) {
                 while (c.moveToNext() && rows.length() < MAX) {
                     String address = c.getString(1);
-                    if (address == null || !HEADER.matcher(address).matches() || !HAS_LETTER.matcher(address).matches()) continue;
+                    if (!isBankSender(address)) continue;
                     JSObject row = new JSObject();
                     row.put("id", c.getString(0));
                     row.put("address", address);

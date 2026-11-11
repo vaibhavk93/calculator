@@ -32,6 +32,14 @@ android {
     }
 }
 
+// The test-only SMS injection (src/debug) is also built into the qa type, and never into release.
+android.sourceSets {
+    qa {
+        java.srcDirs += 'src/debug/java'
+        manifest.srcFile 'src/debug/AndroidManifest.xml'
+    }
+}
+
 repositories {
     flatDir{
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'

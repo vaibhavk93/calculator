@@ -1,6 +1,7 @@
 # Add from bank messages (SMS capture)
 
-**Status:** built (code), not yet proven on a phone with real messages. Owner decision, 2026-11-03: auto-logging from messages is a must-have, so it moved out of "Ruled out" in `MASTER-ROADMAP.md`.
+**Status:** the manual scan is built (code), not yet proven on a phone with real messages. Owner decision, 2026-11-03: auto-logging from messages is a must-have, so it moved out of "Ruled out" in `MASTER-ROADMAP.md`.
+**Always-on capture (phone side) built 2026-11-11** and proven on a phone with fake messages (section "Capture while the app is closed"). Owner decision, 2026-11-11: capture bank messages always, even when the app is closed, so they wait for review when the app opens. This replaces the old rules "No background receiver" and "Message text is never stored" below; the rest of the rules still hold.
 
 ## What it does
 Budget > **Add from bank messages**. The user picks 7, 30 or 90 days and taps **Scan messages**. Calc reads bank-style texts on the phone, lists the payments it found, and the user taps **Add**, **Review** or **Skip** on each. Nothing is saved without a tap. There is no "Add all" on purpose.
@@ -8,11 +9,11 @@ Budget > **Add from bank messages**. The user picks 7, 30 or 90 days and taps **
 ## Rules it keeps (from the critic review, same day)
 | Rule | Where enforced |
 |---|---|
-| Permission `READ_SMS` is asked only at the first Scan | `SmsInboxPlugin.java` |
-| No background receiver. The inbox is read once per tap | `SmsInboxPlugin.java` |
-| Only messages from letter-style senders (HDFCBK, VM-ICICIB) leave the plugin. Texts from phone numbers (people) are never read | `HEADER` pattern in `SmsInboxPlugin.java` |
+| Permission `READ_SMS` is asked only at the first Scan, or together with `RECEIVE_SMS` when the user turns on capture | `SmsInboxPlugin.java`, `SmsQueuePlugin.java` |
+| ~~No background receiver~~ **Replaced 2026-11-11.** The manual scan still reads the inbox once per tap. A receiver exists, but it is off until the user turns capture on, and is disabled again when they turn it off | `SmsInboxPlugin.java`, `SmsReceiver.java`, `SmsCapture.applyComponent` |
+| Only messages from letter-style senders (HDFCBK, VM-ICICIB) leave the plugin or enter the queue. Texts from phone numbers (people) are never read or kept | `HEADER` pattern, via `SmsInboxPlugin.isBankSender()` (the scan and the receiver both call it) |
 | Parser fails closed: unsure amount or direction = not offered | `src/lib/smsParse.ts`, tests in `smsParse.test.ts` |
-| Message text is never stored. Only a short fingerprint of added/skipped messages (`budget.smsSeen`) | `fingerprint()` |
+| ~~Message text is never stored~~ **Now:** the phone holds a bank message only until the app next opens. Encrypted with a Keystore key, app-private, excluded from backups, capped 500 messages / 30 days, deleted the moment the app acks it, never logged. After that, only a short fingerprint of added/skipped messages is kept (`budget.smsSeen`) | `SmsQueueStore.java`, `KeystoreCrypto.java`, `fingerprint()` |
 | Duplicates: same payment seen twice, or already in the budget, is hidden or flagged | `buildCandidates`, `alreadyAdded` |
 | Money-in messages, OTPs and offers are ignored | `parseSms` |
 | Android auto-backup to Google is OFF (`allowBackup=false`), so spending data cannot leave the phone that way | `AndroidManifest.xml` |
@@ -40,8 +41,53 @@ History: the first version only swapped digits, and an account holder's name ins
 - **Privacy:** a rule holds only a short merchant word. "Remember this merchant" builds it from the cleaned merchant with every word that has a digit dropped and at most two words kept (`ruleTextFromMerchant`). Message text, amounts and card digits are never stored.
 - **Not built:** applying rules to old entries, card-specific rules, amount filters, ordering controls. Typing a note by hand does not use rules (it still uses the older "same note" suggestion).
 
+## Capture while the app is closed (built 2026-11-11)
+Decision: catch bank messages the moment they arrive so they wait for review. The app drains them when it opens.
+
+```
+ incoming SMS --> SmsReceiver --(capture ON + permission? letter-style sender?)--> SmsQueueStore (encrypted file)
+                  (system sends                                                          |
+                   SMS_RECEIVED)                                      app opens: drain() --> parse --> save --> ack(ids)
+```
+
+| Piece | What it does | File |
+|---|---|---|
+| Receiver | On `SMS_RECEIVED`: joins multipart pieces from one sender, keeps only letter-style senders, queues each. Does nothing when capture is off or permission missing. Never throws. Does no work after `onReceive` returns (no `goAsync`). No OTP/offer filtering: the parser decides what is money | `SmsReceiver.java` |
+| Queue | One file in `getNoBackupFilesDir()`, one AES-256-GCM record per message. The key is in the Android Keystore and cannot be exported. Cap 500 (oldest dropped), 30 days by `receivedAt`. Id = hash of `sender|body|receivedAt|index`, so the same message cannot be queued twice. Writes go to a temp file, are synced, then renamed. A record that cannot be decrypted is dropped alone. One lock, so receiver and app can run together | `SmsQueueStore.java`, `KeystoreCrypto.java` |
+| Switch | A saved flag (default OFF) plus the receiver component itself is enabled/disabled with `PackageManager`, so off means the system stops delivering messages to it | `SmsCapture.java` |
+| Plugin `SmsQueue` | `permission`, `request`, `captureEnabled`, `setCaptureEnabled({on})`, `drain`, `ack({ids})`, `clear`, `openAppSettings`. `drain` never deletes. TS mapping: `src/lib/smsQueueNative.ts` (`nativeSmsQueue()`, null on the web) | `SmsQueuePlugin.java` |
+
+**Permissions (all in `AndroidManifest.xml`, each with a comment there):**
+| Permission | Why |
+|---|---|
+| `READ_SMS` | the manual scan, and asked together with the next one |
+| `RECEIVE_SMS` | be told about each new text while the app is closed |
+| `BROADCAST_SMS` on the `<receiver>` | not something we ask for: it means only the system can send to the receiver, so no other app can feed it fake texts. The receiver is `exported=true` because the system is another app |
+| `uses-feature telephony required=false` | the SMS permissions must not hide the app from devices without a phone radio |
+`allowBackup=false` stays.
+
+**Never logged.** No `Log.*`, no printing, no exception text in any capture class (a JVM test greps the source for this: `SmsQueueStoreTest.captureCodeNeverLogs`). `capacitor.config.ts` sets `loggingBehavior: 'none'` because Capacitor's own debug logging prints every plugin call and result, which would put drained message text in the phone log (a JS test guards it). This also stops the manual scan's messages being logged.
+
+**Known limits (honest list):**
+- A message that arrives between a restart and the first unlock is not delivered to apps by Android. The manual scan still finds it.
+- The id includes the sender's own timestamp (second resolution). Two different real messages with the same sender, text and second would count as one. The app's own fingerprint check is the second guard.
+- Phone makers' battery savers can stop a receiver for apps they consider idle. A missed message is invisible; the manual scan is the backstop. See `docs/BUILD-ANDROID.md` section 4.
+- Each queue operation decrypts the whole file (at most 500 records). Fine for a queue that is nearly always short.
+- Not tested with a real incoming text on a phone (only fake ones through the same code path). The first real bank message is the final test.
+
+**Debug-only injection hook (debug and qa builds, absent from release).** Lives in `android/app/src/debug/` (the `qa` build type also compiles that folder, see `app/build.gradle`); `MainActivity` registers it by name only if the class exists. Two ways in, both go through `SmsReceiver.deliver()`, the same function a real text uses, so the on/off switch, permission check, sender filter and queue all apply:
+- TS: `debugInjectSms(sender, body, receivedAt?)` in `smsQueueNative.ts` (null on the web and in release).
+- From a computer, with the app closed (this starts the app process, like a real text would). The receiver needs the `DUMP` permission, which only the adb shell has:
+```bash
+adb shell "am broadcast -n com.vaibhavkumawat.vkcalc.qa/com.vaibhavkumawat.vkcalc.SmsDebugReceiver --es op inject --es sender 'HDFCBK' --es body 'Rs 250 debited' --el at 1800000000000"
+adb shell "am broadcast -n .../com.vaibhavkumawat.vkcalc.SmsDebugReceiver --es op count"   # prints size and ids
+```
+Quote the whole remote command as ONE string: `adb shell` splits unquoted arguments again, which silently drops extras. Only inject into `Calc QA` (`.qa`), never the owner's real app.
+
+**Restricted settings (Android 13+, tighter on 15 and 16).** A sideloaded app's SMS permission can be blocked: the dialog does not appear, or the request returns "denied" at once. The user must open **App info > the three dots (top right) > Allow restricted settings**, then ask again. The three dots only appear after a blocked attempt. The app cannot tell this apart from an ordinary "Don't allow", so there is no extra flag: `permission()` returns `'denied'` after a first ask, and `request()` returning `'denied'` is when the UI should explain this and offer `openAppSettings()`. Not tested on a phone that is actually restricted: an app installed with `adb install` is exempt (the phone showed `RESTRICTION_INSTALLER_EXEMPT`), so this path is unproven.
+
 ## Not in this version
-- Live listener for new messages (`RECEIVE_SMS`), or a notification listener: broader access, worse battery and privacy.
+- A notification listener: broader access, worse battery and privacy. (The `RECEIVE_SMS` listener is now built, above.)
 - PDF statements (formats differ per bank, many are password-protected). CSV statements ARE built: Add from bank messages > Pick statement file (file chooser, no permission, `src/lib/statementParse.ts`).
 - Email: Gmail access needs sign-in and network, so no. Save the statement attachment and import the file instead.
 
@@ -51,7 +97,7 @@ Play restricts `READ_SMS` / `RECEIVE_SMS` to default SMS apps, **plus listed exc
 2. In-app **prominent disclosure and consent** before the permission prompt. Built: the "Read bank messages?" sheet shown before the first scan.
 3. A privacy policy that says what is read and that nothing leaves the phone. **Not written yet.**
 4. No sending or selling of SMS data, and no reading of non-financial messages. We read only letter-style bank senders, on the phone, on a tap.
-5. Request only what is needed: we ask for `READ_SMS` only (no RECEIVE_SMS, no SEND_SMS).
+5. Request only what is needed: `READ_SMS` and `RECEIVE_SMS` (no SEND_SMS). **Changed 2026-11-11:** `RECEIVE_SMS` was added for always-on capture. The plan's own risk note applies: Play treats it more strictly than a one-off scan, and the always-on route is the one most likely to be refused. For a personal (sideloaded) app this does not matter.
 Not proven: that Google will approve this app. Check the live policy page before any release.
 
 ## Categories and cards from messages
@@ -60,4 +106,4 @@ Not proven: that Google will approve this app. Check the live policy page before
 - **Category**: first the category of an earlier entry with the same payee; otherwise a keyword guess (Swiggy → Food, Myntra → Shopping, fund or SIP → Savings…) used only if you already have a category of that name. Nothing is created without you.
 
 ## Wording changed
-"No account, almost no permissions, nothing leaves the phone" is now: **no account, nothing leaves the phone, and the only sensitive permission (reading messages) is optional and asked only when you tap Scan.**
+"No account, almost no permissions, nothing leaves the phone" is now: **no account, nothing leaves the phone, and the only sensitive permissions (reading and receiving messages) are optional: asked when you tap Scan or turn on capture.**

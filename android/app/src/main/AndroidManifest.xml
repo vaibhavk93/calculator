@@ -26,6 +26,20 @@
 
         </activity>
 
+        <!-- Catches bank texts while the app is closed, so they wait for review. Off (enabled=false) until the user turns
+             capture on in the app; the app then enables it, and disables it again when capture is turned off.
+             exported=true is required: the system is a different app and must be able to deliver SMS_RECEIVED to it.
+             BROADCAST_SMS makes only the system (which holds it) able to send to it, so no other app can feed it fake texts. -->
+        <receiver
+            android:name=".SmsReceiver"
+            android:enabled="false"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -40,6 +54,12 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Asked only when the user taps "Scan messages" in Budget. Read on demand, never in the background. -->
+    <!-- READ_SMS: the manual "Scan messages" button reads the inbox once per tap. Also asked together with RECEIVE_SMS
+         when the user turns on capture, so one prompt covers both. -->
     <uses-permission android:name="android.permission.READ_SMS" />
+    <!-- RECEIVE_SMS: lets SmsReceiver be told about each new text while the app is closed. Only used after the user
+         turns capture on. Only letter-style bank senders are kept; the text is queued encrypted until the app opens. -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <!-- Not every device that can run the calculator has a phone radio; the SMS permissions must not hide the app from them. -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
 </manifest>
