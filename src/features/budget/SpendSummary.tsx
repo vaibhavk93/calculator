@@ -1,6 +1,7 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { PickOption } from '../../components/PickerSelect'
 import { Icon } from '../../components/Icon'
+import { dotStyle } from '../../components/tint'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useApp } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
@@ -94,9 +95,9 @@ const monthName = (key: string, style: 'long' | 'short' | 'strip') => {
 }
 
 /** A thin bar. Colour is never the only signal: the words beside it carry the same numbers. */
-export function Bar({ pct }: { pct: number }) {
+export function Bar({ pct, style }: { pct: number; style?: CSSProperties }) {
   return (
-    <div className="budget__track" aria-hidden="true">
+    <div className="budget__track" aria-hidden="true" style={style}>
       <div className="budget__fill" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
     </div>
   )
@@ -419,19 +420,19 @@ export function SpendSummary({
     const sh = share(c.spent)
     const state = everything && c.limit ? limitState(c.spent, c.limit) : null
     const words = state && c.limit && c.left ? limitWords(state, c.left, c.limit, money) : ''
+    const dot = dotStyle(budget.categories, c.id)
     return (
       <button
         key={c.id}
         type="button"
-        className={sub ? 'budget__row tap-row spend__sub' : 'budget__row tap-row'}
+        className={sub ? 'budget__row tap-row spend__cat spend__sub' : 'budget__row tap-row spend__cat'}
+        style={dot}
         aria-label={`${c.name}, ${money(c.spent)}${sh.text ? `, ${sh.text.replace('%', ' percent')}` : ''}, ${entriesWord(c.count)}${words ? `, ${words}` : ''}. Show its entries`}
         onClick={() => drill(c.id)}
       >
-        <span className="row__label">{c.name}</span>
+        <span className="row__label spend__name">{!sub && <span className="catdot" aria-hidden="true" />}{c.name}</span>
         <span className="budget__amt spend__amt">{money(c.spent)} {sh.text && <span className="spend__pct">{sh.text}</span>}</span>
-        <Icon name="chevron" size={18} className="tap-row__chev" />
         {!sub && <Bar pct={sh.pct} />}
-        <span className="budget__note">{entriesWord(c.count)}</span>
         {words && <span className={state === 'over' ? 'budget__note budget__note--over' : 'budget__note'}>{words}</span>}
       </button>
     )
@@ -445,32 +446,16 @@ export function SpendSummary({
     <>
       <section className="sect" aria-label="Total">
         <div className="budget__sum">
-          <span className="result__label">Spent in {monthWord}</span>
+          <span className="result__label">{!range && month === thisMonth ? 'Spent this month' : `Spent in ${monthWord}`}</span>
           {s.spent.isNegative() && <span className="budget__note">Refunds are more than what you spent</span>}
           <FitHero text={money(s.spent)} />
+          {cmpText && <span className="budget__note">{cmpText}</span>}
           <span className="budget__note">
             {avg ? `${money(avg.perDay)} a day (${avg.days} ${avg.days === 1 ? 'day' : 'days'}) · ` : ''}
             {entriesWord(s.entries.length)}
           </span>
-          {cmpText && <span className="budget__note">{cmpText}</span>}
         </div>
       </section>
-
-      {!cycle && (
-        <Card title="Day by day">
-          <Heatmap budget={budget} month={month} filter={scope} selected={day} onPick={pickDay} money={money} today={today} />
-        </Card>
-      )}
-
-      <Card title={cycle ? 'Last 6 cycles' : 'Last 6 months'}>
-        {newestFirst.map((t) => (
-          <div className="budget__row budget__row--plain" key={t.month} aria-current={t.month === month ? 'true' : undefined}>
-            <span className={t.month === month ? 'row__label spend__cur' : 'row__label'}>{cycle ? `Ends ${monthName(t.month, 'strip')}` : monthName(t.month, 'strip')}</span>
-            <span className="budget__amt spend__amt">{money(t.spent)}{(cycle ? cycleRange(cardDay!, t.month).to >= dayKey(today) : t.month === thisMonth) ? ' so far' : ''}</span>
-            <Bar pct={peak.isZero() ? 0 : t.spent.div(peak).times(100).toNumber()} />
-          </div>
-        ))}
-      </Card>
 
       <Card title="By category">
         {ranked.map((c) => {
@@ -489,8 +474,8 @@ export function SpendSummary({
           )
         })}
         {!s.uncategorised.isZero() && (
-          <div className="budget__row budget__row--plain">
-            <span className="row__label">Uncategorised</span>
+          <div className="budget__row budget__row--plain spend__cat" style={dotStyle(budget.categories, null)}>
+            <span className="row__label spend__name"><span className="catdot" aria-hidden="true" />Uncategorised</span>
             <span className="budget__amt spend__amt">{money(s.uncategorised)} {share(s.uncategorised).text && <span className="spend__pct">{share(s.uncategorised).text}</span>}</span>
           </div>
         )}
@@ -499,6 +484,22 @@ export function SpendSummary({
 
       <Card title="Biggest spends">
         {topEntries(s.entries, 5).map((e) => <EntryRow key={e.id} e={e} onEdit={setEditing} />)}
+      </Card>
+
+      {!cycle && (
+        <Card title="Day by day">
+          <Heatmap budget={budget} month={month} filter={scope} selected={day} onPick={pickDay} money={money} today={today} />
+        </Card>
+      )}
+
+      <Card title={cycle ? 'Last 6 cycles' : 'Last 6 months'}>
+        {newestFirst.map((t) => (
+          <div className="budget__row budget__row--plain" key={t.month} aria-current={t.month === month ? 'true' : undefined}>
+            <span className={t.month === month ? 'row__label spend__cur' : 'row__label'}>{cycle ? `Ends ${monthName(t.month, 'strip')}` : monthName(t.month, 'strip')}</span>
+            <span className="budget__amt spend__amt">{money(t.spent)}{(cycle ? cycleRange(cardDay!, t.month).to >= dayKey(today) : t.month === thisMonth) ? ' so far' : ''}</span>
+            <Bar pct={peak.isZero() ? 0 : t.spent.div(peak).times(100).toNumber()} />
+          </div>
+        ))}
       </Card>
 
       <Card title="Paid with">

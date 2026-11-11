@@ -215,6 +215,32 @@
   min-height: 48px;
 }
 
+/* A category's small colour mark (design reference: Spending summary, Categories and cards). Identity only; the name is always beside it.
+   r-lg on a 10px box is a full circle. */
+.catdot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-lg);
+  background: var(--dot, var(--ink-2));
+}
+
+/* A category row on the summary: dot and name, amount, a thin bar in the category's own colour. No chevron, no "N entries" line. */
+.spend__cat > .spend__name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.spend__cat .budget__fill {
+  background: var(--dot, var(--ink-2));
+}
+
+.spend__cat .budget__track {
+  height: 5px;
+  margin-top: var(--s-1);
+}
+
 .spend__cur {
   font-weight: 600;
 }
@@ -257,6 +283,37 @@
 
 .manage__sub {
   padding-left: calc(var(--s-4) + var(--s-5));
+}
+
+/* Categories and cards (design reference): the month's figure sits before the chevron; a card has a small colour block, not a dot. */
+.manage__amt {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  margin-left: auto;
+  color: var(--ink-2);
+  text-align: right;
+}
+
+.manage__row {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+
+.manage__row > .row__text {
+  flex: 1 1 6rem;
+}
+
+.manage__amt + .navrow__chev {
+  margin-left: 0;
+}
+
+.cardblock {
+  flex: none;
+  width: 36px;
+  height: 24px;
+  border-radius: var(--r-sm);
+  background: var(--dot, var(--ink-2));
 }
 
 .manage__kind {
@@ -471,12 +528,52 @@ button.heat__cell:active {
 .import__row {
   flex-wrap: wrap;
 }
+
+/* A found payment (design reference, Add from messages): the name and the amount on one line, under it the date, the card and a category chip. */
+.import__main {
+  align-items: center;
+}
+
+.import__name {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.import__amt {
+  flex: none;
+  margin-left: auto;
+  font-size: 1rem;
+}
+
+.import__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-2);
+}
+
+/* The category as a small flat tag: raised ground, no border, never the only signal (the words are in it). */
+.import__chip {
+  padding: 2px var(--s-2);
+  border-radius: var(--r-lg);
+  background: var(--raised);
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
 .import__acts {
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  padding: 0 0 var(--s-3) var(--s-4);
+  padding: 0 var(--s-4) var(--s-2);
   flex: 1 1 100%;
+}
+
+/* Quiet, like the rest of the list: Add is a plain outlined button here, the list has no accent button per row. */
+.import__acts .btn {
+  height: 44px;
 }
 .import__log {
   list-style: none;
@@ -516,6 +613,43 @@ button.heat__cell:active {
 /* The row inside already draws its own top hairline; two stacked read as one heavy line. */
 .bills__item > .budget__row {
   border-top: 0;
+}
+
+/* The design's Bills row: a colour dot, the name over one meta line, the monthly amount at the right. */
+.bills__row {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.bills__row > .row__text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* "Recurring spend": the hero with a small "/ mo" after it. */
+.bills__hero {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  align-self: stretch;
+}
+
+.bills__hero > .budget__hero {
+  flex: 0 1 auto;
+  align-self: auto;
+}
+
+.bills__per {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--ink-2);
+}
+
+.manage__actions .btn {
+  gap: var(--s-2);
+  color: var(--ink);
 }
 
 .bills__item:last-child {
