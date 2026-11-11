@@ -19,7 +19,7 @@ import { payeeKey, payeeKindFor } from '../../lib/payeeKey'
 import { Row, Segmented, Toggle } from '../settings/controls'
 import { IgnoreSheet, canIgnore, type IgnoreTarget } from './IgnoreSheet'
 import { ExpenseSheet } from './sheets'
-import { ActRow, CatHead, PayeeKindChoice, RvMain, groupIsOpen, isOwnMoney, mergedOf, ownWhyOf, plural } from './ReviewKit'
+import { ActRow, CatHead, PayeeKindChoice, RvMain, groupIsOpen, isOwnMoney, isOwnMoneyRow, mergedOf, ownWhyOf, plural } from './ReviewKit'
 import { shortDate, useMoney } from './SpendSummary'
 
 const DAYS = [
@@ -169,10 +169,11 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
     : ''
 
   // Name-less or bank-only names and card bills are never clubbed ("Bank payment" twice is not one payee).
-  const groups = groupByCategoryThenPayee(fresh.filter((c) => !isOwnMoney(c)).map((c) => ({ c, id: c.id, amount: c.amount, merchant: c.kind === 'cardBill' || isGenericPayee(c.merchant, c.bank) ? '' : c.merchant })), (v) => pickOf(v.c).categoryId)
+  const groups = groupByCategoryThenPayee(fresh.filter((c) => !isOwnMoneyRow(c)).map((c) => ({ c, id: c.id, amount: c.amount, merchant: c.kind === 'cardBill' || isGenericPayee(c.merchant, c.bank) ? '' : c.merchant })), (v) => pickOf(v.c).categoryId)
 
   // Own money that went out (in `found`) and own money that came back in (`result.own`): never added in bulk, never counted as spending.
-  const ownItems = [...fresh.filter(isOwnMoney), ...(result?.own ?? [])]
+  // A card bill is your own money too, but it keeps its own Review path (pick which card), so it stays in the list above.
+  const ownItems = [...fresh, ...(result?.own ?? [])].filter(isOwnMoneyRow)
 
   // One payment. `kid` = it sits under a repeat payee, so the date leads (the name is already in the header above).
   const row = (c: Candidate, o: { dupe?: boolean; kid?: boolean } = {}) => {
@@ -184,11 +185,11 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
     const pick = pickOf(c)
     const what = c.kind === 'cardBill' ? 'Credit card bill payment' : pick.categoryId ? `${categoryName(budget, pick.categoryId)}${pick.guess ? ' · guess' : rule && rule.categoryId === c.categoryId ? ` (rule: ${rule.match})` : ''}` : 'Not sure'
     const name = c.merchant || 'Bank payment'
-    const own = isOwnMoney(c)
+    const own = isOwnMoneyRow(c)
     const cameIn = c.direction === 'in'
     const amount = `${cameIn ? '+' : '−'}${money(new D(c.amount))}`
     const askWho = !kid && !cameIn && c.kind === 'spend' && (own ? c.ownKind === 'selfTransfer' : isPerson(c.mode, c.merchant, ''))
-    const meta = [kid ? '' : shortDate(c.date), how, dupe ? 'Looks like one you already added' : '', own ? ownWhyOf(c) : ''].filter(Boolean).join(' · ')
+    const meta = [kid ? '' : shortDate(c.date), how, dupe ? 'Looks like one you already added' : '', isOwnMoney(c) ? ownWhyOf(c) : ''].filter(Boolean).join(' · ')
     return (
       <div key={c.id} className="rv__item import__row">
         <RvMain

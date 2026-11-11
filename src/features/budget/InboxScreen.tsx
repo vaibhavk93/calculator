@@ -19,7 +19,7 @@ import { CaptureExplainer } from './CaptureExplainer'
 import { IgnoreSheet, canIgnore, type IgnoreTarget } from './IgnoreSheet'
 import { GuardedFooter, categoryPickOptions, useDiscardGuard } from './formKit'
 import { ExpenseSheet } from './sheets'
-import { ActRow, CatHead, MoreSheet, PayeeKindChoice, RvMain, groupIsOpen, isOwnMoney, mergedOf, ownWhyOf, plural } from './ReviewKit'
+import { ActRow, CatHead, MoreSheet, PayeeKindChoice, RvMain, groupIsOpen, isOwnMoney, isOwnMoneyRow, mergedOf, ownWhyOf, plural } from './ReviewKit'
 import { shortDate, useMoney } from './SpendSummary'
 
 const nameOf = (i: Pick<InboxItem, 'merchant' | 'bank'>) => i.merchant || (i.bank ? `${i.bank} payment` : 'Bank payment')
@@ -209,9 +209,9 @@ export function InboxScreen({ onBack }: { onBack: () => void }) {
     const cf = categoryFor(budget, i)
     const what = i.kind === 'cardBill' ? 'Card bill, not spending' : cf.categoryId ? `${categoryName(budget, cf.categoryId)}${cf.guess ? ' · guess' : ''}` : 'No category yet'
     const name = nameOf(i)
-    const own = isOwnMoney(i)
+    const own = isOwnMoneyRow(i)
     // Under a repeat payee the header already says the category and why, so a payment does not repeat it.
-    const note = [own ? ownWhyOf(i) : kid ? '' : i.why, i.person && mode === 'auto' ? 'Looks like a person, so it is never added without you.' : ''].filter(Boolean).join(' ')
+    const note = [isOwnMoney(i) ? ownWhyOf(i) : kid ? '' : i.why, i.person && mode === 'auto' ? 'Looks like a person, so it is never added without you.' : ''].filter(Boolean).join(' ')
     const amt = money(new D(i.amount))
     const bill = i.kind === 'cardBill'
     // Own money that CAME IN can never become an expense, so it has no Change.

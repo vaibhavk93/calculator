@@ -33,6 +33,13 @@ export interface ReviewExtras {
 const extras = (x: object): ReviewExtras => x as ReviewExtras
 export const isOwnMoney = (x: object): boolean => extras(x).nature === 'ownMoney'
 export const ownWhyOf = (x: object): string => (isOwnMoney(x) ? extras(x).ownWhy ?? '' : '')
+/**
+ * Own money for LAYOUT and ACTIONS, which is not the same question as `isOwnMoney`.
+ * A credit-card bill payment is your own money (the spending was counted when you used the card), and it still says so.
+ * But "Not a spend" is the wrong offer for it: it needs Review, which asks which card is being paid. So it stays in the
+ * normal list with the normal card-bill handling, and only the explanation treats it as own money.
+ */
+export const isOwnMoneyRow = (x: { kind?: string }): boolean => isOwnMoney(x) && x.kind !== 'cardBill'
 export const mergedOf = (x: object): number => { const n = extras(x).mergedFrom; return typeof n === 'number' && n > 1 ? n : 0 }
 
 /** A row of action buttons. The first is the main one. Wide: one row. Narrow (big text or a small phone): the main one on its own line, the rest in pairs. */
