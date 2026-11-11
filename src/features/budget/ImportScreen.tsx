@@ -140,14 +140,17 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
     const name = c.merchant || 'Bank payment'
     return (
       <div key={c.id} className="budget__entry import__row">
-        <button type="button" className="budget__main tap-row" aria-label={`Review ${money(new D(c.amount))} ${name}`} onClick={() => setEdit(c)}>
-          <span className="budget__amt spend__amt">{money(new D(c.amount))}</span>
-          <span className="row__label">{name}</span>
-          <Icon name="chevron" size={18} className="tap-row__chev" />
-          <span className="row__hint">{[shortDate(c.date), how, what, dupe ? 'Looks like one you already added' : ''].filter(Boolean).join(' · ')}</span>
+        <button type="button" className="budget__main import__main tap-row" aria-label={`Review ${money(new D(c.amount))} ${name}`} onClick={() => setEdit(c)}>
+          <span className="row__label import__name">{name}</span>
+          <span className="budget__amt spend__amt import__amt">−{money(new D(c.amount))}</span>
+          <span className="row__hint import__meta">
+            <span>{[shortDate(c.date), how].filter(Boolean).join(' · ')}</span>
+            <span className="import__chip">{what}</span>
+          </span>
+          {dupe && <span className="row__hint import__dupe">Looks like one you already added</span>}
         </button>
         <div className="import__acts">
-          <button type="button" className="btn btn--primary" onClick={() => quickAdd(c)}>{dupe ? 'Add anyway' : c.kind === 'cardBill' ? 'Review' : 'Add'}</button>
+          <button type="button" className="btn" onClick={() => quickAdd(c)}>{dupe ? 'Add anyway' : c.kind === 'cardBill' ? 'Review' : 'Add'}</button>
           <button type="button" className="link-btn" onClick={() => skip(c)}>{dupe ? 'Hide' : 'Skip'}</button>
           {canIgnore({ last4: c.last4, bank: c.bank, sender: c.sender ?? null }) && (
             <button type="button" className="link-btn" aria-label={`Ignore messages like ${money(new D(c.amount))} ${name}`} onClick={() => setIgnoring({ last4: c.last4, bank: c.bank, sender: c.sender ?? null, cardName: inst ? instrumentLabel(inst) : undefined })}>Ignore</button>
@@ -161,33 +164,6 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
     <div className="screen" role="dialog" aria-modal="true" aria-label="Add from messages">
       <ScreenHeader title="Add from messages" onBack={onBack} />
       <div className="screen__body">
-        <section className="sect sect--settings" aria-label="Scan">
-          <h2 className="sect__head">Find spending in bank messages</h2>
-          <div className="sect__body import__intro">
-            <p>Calc reads only messages from banks and payment apps, only when you tap Scan, only on this phone. Nothing is sent anywhere. The message text is not saved. You choose what to add.</p>
-            <Segmented label="How far back" value={days} options={DAYS} onChange={setDays} />
-            <button type="button" className="btn btn--primary" onClick={wantScan}>{busy ? 'Reading…' : smsSupported() ? 'Scan messages' : 'Scan messages (Android only)'}</button>
-            {message && <p className="import__msg" role="status">{message}</p>}
-          </div>
-        </section>
-
-        <section className="sect sect--settings" aria-label="Statement file">
-          <h2 className="sect__head">Or pick a statement file</h2>
-          <div className="sect__body import__intro">
-            <p>Download a statement as CSV from your bank or card site, then pick it here. It is read on this phone and not kept. PDF is not supported yet.</p>
-            <PickerSelect
-              label="Statement is for"
-              title="Statement is for"
-              value={stmtFor}
-              placeholder="Not sure"
-              options={[{ value: '', label: 'Not sure' }, ...budget.instruments.filter((i) => i.deletedAt === null).map((i) => ({ value: i.id, label: instrumentLabel(i), hint: i.kind === 'credit' ? 'Credit card' : i.kind === 'debit' ? 'Debit card' : i.kind === 'bank' ? 'Bank account' : 'Wallet' }))]}
-              onChange={setStmtFor}
-            />
-            <input ref={fileRef} type="file" accept=".csv,text/csv,text/plain" hidden onChange={(e) => { void onFile(e.target.files?.[0]); e.target.value = '' }} />
-            <button type="button" className="btn" onClick={() => fileRef.current?.click()}>Pick statement file</button>
-          </div>
-        </section>
-
         {result && (
           <section className="sect" aria-label="Found">
             <h2 className="sect__head"><span>Found</span><span className="sect__count">{fresh.length}</span></h2>
@@ -215,6 +191,33 @@ export function ImportScreen({ onBack }: { onBack: () => void }) {
             )}
           </section>
         )}
+
+        <section className="sect sect--settings" aria-label="Scan">
+          <h2 className="sect__head">Find spending in bank messages</h2>
+          <div className="sect__body import__intro">
+            <p>Calc reads only messages from banks and payment apps, only when you tap Scan, only on this phone. Nothing is sent anywhere. The message text is not saved. You choose what to add.</p>
+            <Segmented label="How far back" value={days} options={DAYS} onChange={setDays} />
+            <button type="button" className="btn btn--primary" onClick={wantScan}>{busy ? 'Reading…' : smsSupported() ? 'Scan messages' : 'Scan messages (Android only)'}</button>
+            {message && <p className="import__msg" role="status">{message}</p>}
+          </div>
+        </section>
+
+        <section className="sect sect--settings" aria-label="Statement file">
+          <h2 className="sect__head">Or pick a statement file</h2>
+          <div className="sect__body import__intro">
+            <p>Download a statement as CSV from your bank or card site, then pick it here. It is read on this phone and not kept. PDF is not supported yet.</p>
+            <PickerSelect
+              label="Statement is for"
+              title="Statement is for"
+              value={stmtFor}
+              placeholder="Not sure"
+              options={[{ value: '', label: 'Not sure' }, ...budget.instruments.filter((i) => i.deletedAt === null).map((i) => ({ value: i.id, label: instrumentLabel(i), hint: i.kind === 'credit' ? 'Credit card' : i.kind === 'debit' ? 'Debit card' : i.kind === 'bank' ? 'Bank account' : 'Wallet' }))]}
+              onChange={setStmtFor}
+            />
+            <input ref={fileRef} type="file" accept=".csv,text/csv,text/plain" hidden onChange={(e) => { void onFile(e.target.files?.[0]); e.target.value = '' }} />
+            <button type="button" className="btn" onClick={() => fileRef.current?.click()}>Pick statement file</button>
+          </div>
+        </section>
 
         <section className="sect sect--settings" aria-label="Reader log">
           <button type="button" className="navrow tap-row" onClick={() => setLogOpen(true)}>
