@@ -45,7 +45,8 @@ import {
 } from '../lib/budget'
 import { capHistory, isRawExpression, sanitizeSettings } from './persistence'
 import { MAX_IGNORED, isIgnored, withRule, type IgnoreRule } from '../lib/smsIgnore'
-import { applyPlan, forgetPayee, driftTripped, logBad, noteCorrection, payeeKey, pendingItems, recordConfirm, resuggest, suggestionConfirmed, type DrainPlan, type InboxItem } from '../lib/inbox'
+import { withPayeeKind } from '../lib/payeeKey'
+import { applyPlan, forgetPayee, driftTripped, logBad, noteCorrection, payeeKey, pendingItems, reclassify, recordConfirm, resuggest, suggestionConfirmed, type DrainPlan, type InboxItem } from '../lib/inbox'
 import { startTab, tabOn } from '../lib/modules'
 import { MAX_HOLDINGS, cleanHoldingAmount, cleanHoldingName, validateHolding, validateHoldingAmount, validateValueDay, type Holding, type HoldingKind } from '../lib/portfolio'
 import { isHoldingKind, isLiability, withValue } from '../engine/investments/portfolio'
@@ -236,6 +237,13 @@ export interface AppState {
   setLearned: (key: string, categoryId: string) => boolean
   /** Forgets a learned payee; the snackbar offers Undo. */
   forgetLearned: (key: string) => void
+  /**
+   * "This is my own account" (`isSelf` true) or "This is someone else" (false) for a payee (`payeeKey(merchant)`). Remembered. Items waiting
+   * in the Inbox for that payee are re-read: own account makes them own money (a self transfer, never auto-added); someone else turns a
+   * self-transfer guess back into a spend and marks it as a person. False when the key is not a payee key. One Undo.
+   * Read it back with `payeeKindFor(budget.payeeKinds, payeeKey(merchant))` ('self' | 'person' | 'merchant' | null).
+   */
+  markPayeeSelf: (payeeKey: string, isSelf: boolean) => boolean
   /**
    * Ignores a card or sender from now on (lib/smsIgnore.ts) and clears what already waits in the Inbox from it. Returns how many waiting items
    * were cleared, or null (and says why) when the list is full. The snackbar offers Undo.
@@ -901,7 +909,8 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       approveInbox: (id, change) => {
         const { budget } = get()
         const item = (budget.inbox ?? []).find((i) => i.id === id && i.status === 'pending')
-        if (!item || item.kind !== 'spend') return false
+        // Money that came IN (an FD paying out) can never become an expense.
+        if (!item || item.kind !== 'spend' || item.direction === 'in') return false
         const wanted = change && 'categoryId' in change ? (change.categoryId ?? null) : item.categoryId
         const categoryId = wanted !== null && categoryUsable(budget, wanted) ? wanted : null
         const name = item.merchant || (item.bank ? `${item.bank} payment` : 'Bank payment')
@@ -946,7 +955,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         const made = new Set<string>()
         const keys = new Set<string>()
         for (const id of ids) {
-          const item = (get().budget.inbox ?? []).find((i) => i.id === id && i.status === 'pending' && i.kind === 'spend')
+          const item = (get().budget.inbox ?? []).find((i) => i.id === id && i.status === 'pending' && i.kind === 'spend' && i.nature !== 'ownMoney')
           if (!item || !get().approveInbox(id, { categoryId })) continue
           made.add(get().budget.expenses[0]!.id)
           const key = payeeKey(item.merchant)
@@ -1060,6 +1069,18 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
           const cur = (b.learned ?? []).filter((l) => l.key !== key)
           set({ budget: resuggest({ ...b, learned: [...cur.slice(0, at), gone, ...cur.slice(at)] }) })
         })
+      },
+
+      markPayeeSelf: (key, isSelf) => {
+        const { budget } = get()
+        if (payeeKey(key) !== key) return false
+        const before = budget
+        set({ budget: reclassify({ ...budget, payeeKinds: withPayeeKind(budget.payeeKinds, key, isSelf ? 'self' : 'person', deps.now()) }) })
+        undoable(isSelf ? 'Marked as your own account' : 'Marked as someone else', () => {
+          const { payeeKinds: _k, inbox: _i, ...rest } = get().budget
+          set({ budget: { ...rest, ...(before.payeeKinds ? { payeeKinds: before.payeeKinds } : {}), ...(before.inbox ? { inbox: before.inbox } : {}) } })
+        })
+        return true
       },
 
       deleteExpense: (id) => {

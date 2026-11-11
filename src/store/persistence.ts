@@ -4,6 +4,8 @@ import type { KeyValueStorage } from '../lib/storage'
 import { parseTime } from '../lib/reminders'
 import { sanitizePortfolio } from '../lib/portfolio'
 import { MAX_IGNORED, senderKey, type IgnoreRule } from '../lib/smsIgnore'
+import { isOwnKind } from '../lib/ownMoney'
+import { MAX_PAYEE_KINDS, PAYEE_KINDS, type PayeeKind, type PayeeKindName } from '../lib/payeeKey'
 import { MAX_COUNT, MAX_INBOX, MAX_LEARNED, DRIFT_WINDOW, payeeKey, type AutoLogEntry, type InboxItem, type LearnedPayee } from '../lib/inbox'
 import { MAX_COUNTED_TOOLS, MAX_PINNED_TOOLS, MAX_USE_COUNT } from '../lib/toolUse'
 import { MAX_RECURRING, MAX_RULES, RULE_MAX, cleanRuleMatch, sanitizeEdits, isAccountType, isBillRepeat, isPaymentCount, isMonthKey, isSettlement, type MerchantRule, type RecurringItem } from '../lib/budget'
@@ -464,7 +466,8 @@ export function sanitizeBudget(raw: unknown): BudgetData {
   const inbox = sanitizeInbox(raw.inbox, catIds, instById, seen)
   const learned = sanitizeLearned(raw.learned, catIds)
   const autoLog = sanitizeAutoLog(raw.autoLog)
-  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, ...ifSet({ overallByMonth: limitMap(raw.overallByMonth) }), categories: cats, instruments, expenses, ...ifSet({ smsSeen: seenList(raw.smsSeen) }), ...(recurring.length > 0 ? { recurring } : {}), ...(rules.length > 0 ? { rules } : {}), ...(inbox.length > 0 ? { inbox } : {}), ...(learned.length > 0 ? { learned } : {}), ...(autoLog.length > 0 ? { autoLog } : {}) }
+  const payeeKinds = sanitizePayeeKinds(raw.payeeKinds)
+  return { overall: isPlainNumber(raw.overall) && !raw.overall.startsWith('-') ? raw.overall : null, ...ifSet({ overallByMonth: limitMap(raw.overallByMonth) }), categories: cats, instruments, expenses, ...ifSet({ smsSeen: seenList(raw.smsSeen) }), ...(recurring.length > 0 ? { recurring } : {}), ...(rules.length > 0 ? { rules } : {}), ...(inbox.length > 0 ? { inbox } : {}), ...(learned.length > 0 ? { learned } : {}), ...(payeeKinds.length > 0 ? { payeeKinds } : {}), ...(autoLog.length > 0 ? { autoLog } : {}) }
 }
 
 const FINGERPRINT = /^[0-9a-z]{4,30}$/
@@ -504,6 +507,11 @@ function sanitizeInbox(raw: unknown, catIds: Set<string>, instById: Map<string, 
       ...(entryId ? { entryId } : {}),
       ...(entryId && r.auto === true ? { auto: true as const } : {}),
       ...(status === 'rejected' && r.notSpend === true ? { notSpend: true as const } : {}),
+      // Own money: only a known kind, with its plain-words reason. A damaged file cannot turn an item into own money without a kind.
+      ...(r.nature === 'ownMoney' && isOwnKind(r.ownKind) ? { nature: 'ownMoney' as const, ownKind: r.ownKind, ownWhy: str(r.ownWhy, 200).trim() } : r.nature === 'spend' ? { nature: 'spend' as const } : {}),
+      ...(r.direction === 'in' && r.nature === 'ownMoney' && isOwnKind(r.ownKind) ? { direction: 'in' as const } : {}),
+      ...(typeof r.mergedFrom === 'number' && Number.isInteger(r.mergedFrom) && r.mergedFrom > 1 ? { mergedFrom: Math.min(r.mergedFrom, 20) } : {}),
+      ...(typeof r.refKey === 'string' && FINGERPRINT.test(r.refKey) ? { refKey: r.refKey } : {}),
       ...(status !== 'pending' && stamp(r.resolvedAt) !== null ? { resolvedAt: stamp(r.resolvedAt)! } : {}),
     })
     if (out.length >= MAX_INBOX) break
@@ -521,6 +529,19 @@ function sanitizeLearned(raw: unknown, catIds: Set<string>): LearnedPayee[] {
     keys.add(r.key)
     out.push({ key: r.key, categoryId: r.categoryId, count: Math.min(r.count, MAX_COUNT), lastAt: stamp(r.lastAt) ?? 0 })
     if (out.length >= MAX_LEARNED) break
+  }
+  return out
+}
+
+/** What the person taught about payees: a known kind per short payee name, newest first, capped. */
+function sanitizePayeeKinds(raw: unknown): PayeeKind[] {
+  const out: PayeeKind[] = []
+  const keys = new Set<string>()
+  for (const r of Array.isArray(raw) ? raw : []) {
+    if (!isObject(r) || typeof r.key !== 'string' || payeeKey(r.key) !== r.key || keys.has(r.key) || typeof r.kind !== 'string' || !(PAYEE_KINDS as readonly string[]).includes(r.kind)) continue
+    keys.add(r.key)
+    out.push({ key: r.key, kind: r.kind as PayeeKindName, at: stamp(r.at) ?? 0 })
+    if (out.length >= MAX_PAYEE_KINDS) break
   }
   return out
 }
