@@ -3,6 +3,8 @@ import type { DecimalSetting, NumberSystem } from '../lib/format'
 import type { BudgetData } from '../lib/budget'
 import type { Reminder, SavedCard } from '../lib/memory'
 import type { AccentName, ThemePreference } from '../lib/theme'
+import type { Modules } from '../lib/modules'
+import type { Holding } from '../lib/portfolio'
 import type { Values } from '../lib/tool'
 
 export type Tab = 'calculate' | 'tools' | 'saved' | 'due' | 'budget'
@@ -25,6 +27,8 @@ export interface Settings {
   copyFormat: CopyFormat
   /** When reminder notifications arrive, "HH:MM" (24 hour). */
   reminderTime: string
+  /** Due shows a one-tap pack of the 4 advance-tax dates only when this is on. Off by default. */
+  showAdvanceTaxOffer: boolean
   /** When a backup file was last saved from Settings, in ms. Null: never. */
   lastBackupAt: number | null
   /** When the launch reminder to back up was last shown, in ms. At most one per 14 days. */
@@ -43,6 +47,8 @@ export interface Settings {
   notesCardView: boolean
   /** Due: a grid of bordered cards instead of the hairline list. Remembered, per screen. */
   dueCardView: boolean
+  /** "Show in the app": Budget, and Notes with Due. Off hides, never deletes. Read only through lib/modules.ts. */
+  modules: Modules
 }
 
 export type TourId = 'budget' | 'notes' | 'due'
@@ -63,6 +69,7 @@ export const DEFAULT_SETTINGS: Settings = {
   keepHistory: true,
   copyFormat: 'ask',
   reminderTime: '09:00',
+  showAdvanceTaxOffer: false,
   lastBackupAt: null,
   backupNudgedAt: null,
   backupDismissedAt: null,
@@ -72,6 +79,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tours: {},
   notesCardView: false,
   dueCardView: false,
+  modules: { budget: true, notes: true },
 }
 
 export interface HistoryEntry {
@@ -130,8 +138,12 @@ export interface PersistedData {
   memory: string | null
   input: InputState
   budget: BudgetData
+  /** Portfolio: things you own or owe, each with dated values. Additive and optional: absent in old backups, which load as empty. */
+  portfolio?: Holding[]
   /** What was typed into each calculator and not saved (tool id -> its field values), so reopening one resumes it. Absent: none. At most MAX_DRAFTS. */
   drafts?: Record<string, Values>
 }
+
+export type { Holding, HoldingKind, HoldingValue } from '../lib/portfolio'
 
 export const MAX_DRAFTS = 40

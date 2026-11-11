@@ -44,6 +44,10 @@ import {
   type ExpenseDraft,
 } from '../lib/budget'
 import { capHistory, isRawExpression, sanitizeSettings } from './persistence'
+import { startTab, tabOn } from '../lib/modules'
+import { MAX_HOLDINGS, cleanHoldingAmount, cleanHoldingName, validateHolding, validateHoldingAmount, validateValueDay, type Holding, type HoldingKind } from '../lib/portfolio'
+import { isHoldingKind, isLiability, withValue } from '../engine/investments/portfolio'
+import { dayText } from '../lib/tasks'
 import type { Values } from '../lib/tool'
 import {
   MAX_CATEGORIES,
@@ -149,6 +153,8 @@ export interface AppState {
   memory: string | null
   settings: Settings
   budget: BudgetData
+  /** Portfolio: things you own or owe. Includes ones in Trash (deletedAt set); read through the engine, which skips those. */
+  portfolio: Holding[]
   /** Unsaved calculator inputs by tool id. Saved with the app, so a half-filled calculator survives a restart. */
   drafts: Record<string, Values>
 
@@ -222,6 +228,15 @@ export interface AppState {
   addRule: (match: string, categoryId: string) => boolean
   /** Removes a rule; the snackbar offers Undo, which puts it back in the same place. */
   deleteRule: (id: string) => void
+  /** Adds a holding with its first value (a day, today at most). Returns false (and says why) when something is not right. */
+  addHolding: (d: { name: string; kind: HoldingKind; amount: string; date: string }) => boolean
+  /** A new dated value for a holding. A value on a day that already has one REPLACES it. History is never edited any other way. */
+  updateHoldingValue: (id: string, d: { amount: string; date: string }) => boolean
+  renameHolding: (id: string, name: string) => boolean
+  /** Moves a holding to another kind on the same side (own to own, owe to owe), so net worth never flips sign. */
+  setHoldingKind: (id: string, kind: HoldingKind) => boolean
+  /** Moves a holding to Trash (it comes back with Undo, and is emptied after TRASH_DAYS). */
+  deleteHolding: (id: string) => void
   /** Adds a card, account or wallet. Returns its id, or the existing one with the same name and kind. Null (with a notice) when not valid. */
   addInstrument: (draft: InstrumentDraft) => string | null
   /** Changes some fields. Entries whose mode no longer accepts it lose it. False (with a notice) when not valid. */
@@ -545,9 +560,11 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       // Entries deleted more than 30 days ago are gone for good, so deleting can free room under the 20,000 cap (B-27).
       drafts: initial.drafts ?? {},
       budget: { ...initial.budget, expenses: initial.budget.expenses.filter((e) => e.deletedAt === null || deps.now() - e.deletedAt < TRASH_DAYS * DAY) },
+      // Holdings deleted more than TRASH_DAYS ago are gone for good, like Budget's entries.
+      portfolio: (initial.portfolio ?? []).filter((h) => h.deletedAt === null || deps.now() - h.deletedAt < TRASH_DAYS * DAY),
 
       // A chosen startup calculator opens the Tools tab with that calculator already showing.
-      tab: initial.settings.startupTool ? 'tools' : initial.settings.startupTab,
+      tab: initial.settings.startupTool ? 'tools' : startTab(initial.settings),
       nav: initial.settings.startupTool ? { ...TOOLS_HOME, tool: initial.settings.startupTool } : TOOLS_HOME,
       tabTap: 0,
       openCard: null,
@@ -988,6 +1005,59 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         })
       },
 
+      addHolding: (d) => {
+        const today = dayText(deps.now())
+        const bad = validateHolding(d, today)
+        const first = bad.name ?? bad.kind ?? bad.amount ?? bad.date
+        if (first) return fail(first)
+        const { portfolio } = get()
+        if (portfolio.filter((h) => h.deletedAt === null).length >= MAX_HOLDINGS) return fail(`You can keep up to ${MAX_HOLDINGS} holdings.`)
+        const holding: Holding = { id: deps.newId(), name: cleanHoldingName(d.name), kind: d.kind, deletedAt: null, values: [{ date: d.date, amount: cleanHoldingAmount(d.amount) }] }
+        set({ portfolio: [...portfolio, holding], notice: null })
+        return true
+      },
+
+      updateHoldingValue: (id, d) => {
+        const { portfolio } = get()
+        const h = portfolio.find((x) => x.id === id && x.deletedAt === null)
+        if (!h) return false
+        const first = validateHoldingAmount(d.amount) ?? validateValueDay(d.date, dayText(deps.now()))
+        if (first) return fail(first)
+        const values = withValue(h.values, { date: d.date, amount: cleanHoldingAmount(d.amount) })
+        set({ portfolio: portfolio.map((x) => (x.id === id ? { ...x, values } : x)), notice: null })
+        return true
+      },
+
+      setHoldingKind: (id, kind) => {
+        const { portfolio } = get()
+        const h = portfolio.find((x) => x.id === id && x.deletedAt === null)
+        if (!h || !isHoldingKind(kind) || isLiability(kind) !== isLiability(h.kind)) return fail('Pick another kind on the same side')
+        set({ portfolio: portfolio.map((x) => (x.id === id ? { ...x, kind } : x)), notice: null })
+        return true
+      },
+
+      renameHolding: (id, name) => {
+        const clean = cleanHoldingName(name)
+        if (!clean) return fail('Give it a name')
+        const { portfolio } = get()
+        if (!portfolio.some((x) => x.id === id && x.deletedAt === null)) return false
+        set({ portfolio: portfolio.map((x) => (x.id === id ? { ...x, name: clean } : x)) })
+        return true
+      },
+
+      deleteHolding: (id) => {
+        const { portfolio } = get()
+        const h = portfolio.find((x) => x.id === id && x.deletedAt === null)
+        if (!h) return
+        set({ portfolio: portfolio.map((x) => (x.id === id ? { ...x, deletedAt: deps.now() } : x)) })
+        undoable(`Removed "${h.name}"`, () => {
+          const cur = get().portfolio
+          // Undo cannot push past the cap: a new holding added meanwhile may have taken the room.
+          if (cur.filter((x) => x.deletedAt === null).length >= MAX_HOLDINGS) return fail(`You can keep up to ${MAX_HOLDINGS} holdings.`)
+          set({ portfolio: cur.map((x) => (x.id === id ? { ...x, deletedAt: null } : x)) })
+        })
+      },
+
       addInstrument: (draft) => {
         const r = cleanInstrument(draft)
         if (!r.ok) {
@@ -1297,16 +1367,21 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         return added
       },
 
-      updateSettings: (patch) => set({ settings: sanitizeSettings({ ...get().settings, ...patch }) }),
+      // If the tab you are on was just switched off (Settings > Show in the app), go to Calculate. Nothing is deleted.
+      updateSettings: (patch) => {
+        const settings = sanitizeSettings({ ...get().settings, ...patch })
+        set(tabOn(settings, get().tab) ? { settings } : { settings, tab: 'calculate', openCard: null })
+      },
 
       setTab: (tab) => {
-        const { tab: current, tabTap } = get()
+        const { tab: current, tabTap, settings } = get()
+        if (!tabOn(settings, tab)) tab = 'calculate'
         // Tapping the tab you are already on means "take me back to its start".
         if (tab === current) return set({ overlay: 'none', tabTap: tabTap + 1, nav: tab === 'tools' ? TOOLS_HOME : get().nav })
         set({ tab, overlay: 'none' })
       },
       setNav: (patch) => set({ nav: { ...get().nav, ...patch } }),
-      showCard: (id) => set(id === null ? { openCard: null } : { openCard: id, tab: 'saved', overlay: 'none' }),
+      showCard: (id) => set(id === null ? { openCard: null } : tabOn(get().settings, 'saved') ? { openCard: id, tab: 'saved', overlay: 'none' } : { openCard: null, tab: 'calculate', overlay: 'none' }),
       setChecklist: (cardId, on) => {
         const { cards, settings } = get()
         const card = cards.find((c) => c.id === cardId && c.deletedAt === null && c.kind === 'tape')
@@ -1331,6 +1406,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
 
       restore: (data) =>
         set({
+          ...(tabOn(data.settings, get().tab) ? {} : { tab: 'calculate' as const, openCard: null }),
           input: data.input,
           selection: null,
           undoStack: [],
@@ -1340,6 +1416,7 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
           memory: data.memory,
           settings: data.settings,
           budget: data.budget,
+          portfolio: data.portfolio ?? [],
           drafts: data.drafts ?? {},
           snack: null,
           notice: null,
@@ -1347,8 +1424,8 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         }),
 
       snapshot: () => {
-        const { input, history, cards, reminders, memory, settings, budget, drafts } = get()
-        return { schemaVersion: initial.schemaVersion, input, history, cards, reminders, memory, settings, budget, ...(Object.keys(drafts).length > 0 ? { drafts } : {}) }
+        const { input, history, cards, reminders, memory, settings, budget, portfolio, drafts } = get()
+        return { schemaVersion: initial.schemaVersion, input, history, cards, reminders, memory, settings, budget, ...(portfolio.length > 0 ? { portfolio } : {}), ...(Object.keys(drafts).length > 0 ? { drafts } : {}) }
       },
     }
   })

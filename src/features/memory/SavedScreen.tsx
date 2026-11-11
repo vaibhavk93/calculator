@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { EmptyState } from '../../components/EmptyState'
 import { Icon } from '../../components/Icon'
 import { Sheet } from '../../components/Sheet'
@@ -7,6 +7,11 @@ import { ScreenHeader } from '../../components/ScreenHeader'
 import { useBackHandler } from '../../components/useBackHandler'
 import { matchesCard, matchSnippet } from '../../lib/cardSearch'
 import { dueLabel } from '../../lib/reminders'
+import { inputLines } from '../../lib/shareText'
+import { LINE_STATE_WORD, lineState, listProgress, tapeTotal } from '../../lib/tape'
+import { formatCell } from '../../lib/toolFormat'
+import { D, type Dec } from '../../engine'
+import { ALL_TOOLS } from '../tools/registry'
 import { groupTasks, taskItems, todayCount } from '../../lib/tasks'
 import type { SavedCard } from '../../store/types'
 import { AddSheet, type AddChoice } from './AddSheet'
@@ -103,21 +108,25 @@ export function SavedScreen() {
             { value: 'todo', label: openToday > 0 ? `To-do (${openToday})` : 'To-do' },
           ]}
         />
-        <div className="saved__find">
-          <input className="field" type="search" placeholder={mode === 'todo' ? 'Search tasks' : 'Search notes'} aria-label={mode === 'todo' ? 'Search tasks' : 'Search notes'} value={query} onChange={(e) => setQuery(e.target.value)} />
-          {mode === 'notes' && (
-            <button type="button" className="icon-btn" aria-pressed={cardView} aria-label={cardView ? 'Show as a list' : 'Show as cards'} title={cardView ? 'Show as a list' : 'Show as cards'} onClick={() => setCardView({ notesCardView: !cardView })}>
-              <Icon name={cardView ? 'list' : 'grid'} size={20} />
-            </button>
-          )}
-          {/* On To-do the composer under the switch is the add, so there is no second filled button here. */}
-          {mode === 'notes' && (
+        <input className="field" type="search" placeholder={mode === 'todo' ? 'Search tasks' : 'Search notes'} aria-label={mode === 'todo' ? 'Search tasks' : 'Search notes'} value={query} onChange={(e) => setQuery(e.target.value)} />
+        {/* On To-do the composer under the switch is the add, so there is no second filled button there. */}
+        {mode === 'notes' && (
+          <div className="saved__view">
+            <Segmented
+              label="Show notes as"
+              value={cardView ? 'card' : 'list'}
+              onChange={(v) => setCardView({ notesCardView: v === 'card' })}
+              options={[
+                { value: 'list', label: 'List' },
+                { value: 'card', label: 'Card' },
+              ]}
+            />
             <button type="button" className="btn btn--primary saved__add" onClick={() => setAdding(true)}>
               <Icon name="plus" size={20} />
               <span>New</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
         {trashed.length > 0 && (
           <div className="saved__actions">
             <button type="button" className="link-btn" onClick={() => setView({ kind: 'trash' })}>Trash ({trashed.length})</button>
@@ -206,9 +215,13 @@ export function SavedScreen() {
   )
 }
 
+/** Kind is said by the section heading; the icon is a shape to scan by, never the only signal. */
+const KIND_ICON = { tool: 'calculate', tape: 'list', text: 'edit', task: 'check' } as const
+
 function CardRow({ card, due, found, onOpen, onPin }: { card: SavedCard; due: number | undefined; found: string | null; onOpen: () => void; onPin: () => void }) {
   return (
-    <div className="row row--split">
+    <div className="row row--split row--note">
+      <Icon name={KIND_ICON[card.kind]} size={20} className="row__kind" />
       <button type="button" className="row__main" onClick={onOpen}>
         <span className="row__label">{card.title}</span>
         <span className="row__hint">{card.summary || (card.kind === 'tape' ? 'Empty list' : '')}</span>
@@ -232,14 +245,69 @@ function CardRow({ card, due, found, onOpen, onPin }: { card: SavedCard; due: nu
   )
 }
 
-/** Same card, shown as a bordered tile in a 2-column grid instead of a hairline row. No tint: a border
-    only (docs/DESIGN-SYSTEM.md's "where a tint may appear" keeps colour off plain content tiles). */
+/** Card view (docs/design-reference, Notes Card): one flat card per item showing its CONTENT, not just its title.
+    A list shows its first lines and running total, a calculation its result as a number with what was typed in
+    under it, a note its first lines and how old it is. One column, the whole card opens it; the pin stays. */
 function CardTile({ card, due, found, onOpen, onPin }: { card: SavedCard; due: number | undefined; found: string | null; onOpen: () => void; onPin: () => void }) {
+  const system = useApp((s) => s.settings.numberSystem)
+  const decimals = useApp((s) => s.settings.decimals)
+  const opts = { system, decimals }
+  const money = (v: string | Dec) => formatCell(new D(v), 'money', opts)
+  let body: ReactNode = <span className="row__hint">{card.summary}</span>
+  if (card.kind === 'tape') {
+    const p = listProgress(card.lines)
+    const n = card.lines.length
+    body =
+      n === 0 ? (
+        <span className="row__hint">Empty list</span>
+      ) : (
+        <>
+          <span className="item-card__lines">
+            {card.lines.slice(0, PREVIEW_LINES).map((l) => (
+              <span key={l.id} className={l.done || l.skip ? 'item-card__line item-card__line--done' : 'item-card__line'}>
+                {card.checklist && (
+                  <span className={l.done ? 'item-card__box item-card__box--on' : 'item-card__box'} aria-hidden="true">
+                    {l.done && <Icon name="check" size={14} />}
+                  </span>
+                )}
+                {card.checklist && <span className="sr-only">{LINE_STATE_WORD[lineState(l)]}: </span>}
+                <span className="item-card__linelabel">{l.label || 'Line'}</span>
+                <span className="item-card__lineval">{money(l.value)}</span>
+              </span>
+            ))}
+          </span>
+          {n > PREVIEW_LINES && <span className="row__hint">{n - PREVIEW_LINES} more</span>}
+          <span className="item-card__total">
+            <span>Total · {card.checklist ? `${p.done} of ${p.total} done` : `${n} ${n === 1 ? 'line' : 'lines'}`}</span>
+            <span className="item-card__lineval">{money(tapeTotal(card.lines))}</span>
+          </span>
+        </>
+      )
+  } else if (card.kind === 'tool' && card.amount !== null) {
+    const spec = ALL_TOOLS.find((t) => t.id === card.toolId)
+    const typed = spec && card.inputs ? inputLines(spec.fields, card.inputs, opts).slice(0, 3).map((l) => l.text).join(' · ') : ''
+    body = (
+      <>
+        <span className="row__hint">{card.summary.split(':')[0] || 'Saved calculation'}</span>
+        <span className="item-card__num">{formatCell(new D(card.amount), card.amountFmt ?? 'money', opts)}</span>
+        {typed && <span className="row__hint">{typed}</span>}
+      </>
+    )
+  } else if (card.kind === 'text') {
+    // Without a typed title the first line IS the title: do not print it twice.
+    const text = card.note.startsWith(card.title) ? card.note.slice(card.title.length).trim() : card.note.trim()
+    body = (
+      <>
+        {text && <span className="item-card__text">{text}</span>}
+        <span className="row__hint">Note · {ageWords(card.updatedAt, Date.now())}</span>
+      </>
+    )
+  }
   return (
     <div className="item-card">
       <button type="button" className="item-card__main" onClick={onOpen}>
         <span className="row__label">{card.title}</span>
-        <span className="row__hint">{card.summary || (card.kind === 'tape' ? 'Empty list' : '')}</span>
+        {body}
         {found && <span className="row__hint row__found">{found}</span>}
         {(card.tags.length > 0 || due !== undefined) && (
           <span className="row__hint">
@@ -258,6 +326,15 @@ function CardTile({ card, due, found, onOpen, onPin }: { card: SavedCard; due: n
       </button>
     </div>
   )
+}
+
+const PREVIEW_LINES = 3
+const DAY = 86_400_000
+
+/** "today", "yesterday", "5 days ago". */
+function ageWords(at: number, now: number): string {
+  const d = Math.floor(new Date(now).setHours(0, 0, 0, 0) / DAY) - Math.floor(new Date(at).setHours(0, 0, 0, 0) / DAY)
+  return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d} days ago`
 }
 
 function TrashScreen({ onBack }: { onBack: () => void }) {

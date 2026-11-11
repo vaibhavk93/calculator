@@ -2,6 +2,7 @@ import { INITIAL_INPUT, type InputState } from '../engine'
 import { ACCENT_NAMES, type AccentName, type ThemePreference } from '../lib/theme'
 import type { KeyValueStorage } from '../lib/storage'
 import { parseTime } from '../lib/reminders'
+import { sanitizePortfolio } from '../lib/portfolio'
 import { MAX_COUNTED_TOOLS, MAX_PINNED_TOOLS, MAX_USE_COUNT } from '../lib/toolUse'
 import { MAX_RECURRING, MAX_RULES, RULE_MAX, cleanRuleMatch, sanitizeEdits, isAccountType, isBillRepeat, isPaymentCount, isMonthKey, isSettlement, type MerchantRule, type RecurringItem } from '../lib/budget'
 import {
@@ -86,6 +87,12 @@ function sanitizeTours(raw: unknown): Settings['tours'] {
   return out
 }
 
+/** A missing key is ON, and so is any junk: an old backup (or a damaged file) loads as everything on. Only a real `false` hides. */
+export function sanitizeModules(raw: unknown): Settings['modules'] {
+  const r = isObject(raw) ? raw : {}
+  return { budget: r.budget !== false, notes: r.notes !== false }
+}
+
 export function sanitizeSettings(raw: unknown): Settings {
   const r = isObject(raw) ? raw : {}
   const d = DEFAULT_SETTINGS
@@ -107,6 +114,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     keepHistory: bool(r.keepHistory, d.keepHistory),
     copyFormat: oneOf(r.copyFormat, ['ask', 'with', 'without'] as const, d.copyFormat),
     reminderTime: parseTime(r.reminderTime) ? (r.reminderTime as string) : d.reminderTime,
+    showAdvanceTaxOffer: bool(r.showAdvanceTaxOffer, d.showAdvanceTaxOffer),
     lastBackupAt: stamp(r.lastBackupAt),
     backupNudgedAt: stamp(r.backupNudgedAt),
     backupDismissedAt: stamp(r.backupDismissedAt),
@@ -116,6 +124,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     tours: sanitizeTours(r.tours),
     notesCardView: bool(r.notesCardView, d.notesCardView),
     dueCardView: bool(r.dueCardView, d.dueCardView),
+    modules: sanitizeModules(r.modules),
   }
 }
 
@@ -501,6 +510,8 @@ export function migrate(raw: unknown): PersistedData {
   // A newer app wrote this: keep what we understand, and say it is current.
   const cards = sanitizeCards(data.cards)
   const drafts = sanitizeDrafts(data.drafts)
+  // Absent before Portfolio existed: nothing, not an error. Left out of the data entirely when empty, so the file does not change for anyone who does not use it.
+  const portfolio = sanitizePortfolio(data.portfolio)
   return {
     schemaVersion: CURRENT_SCHEMA,
     settings: sanitizeSettings(data.settings),
@@ -511,6 +522,7 @@ export function migrate(raw: unknown): PersistedData {
     input: sanitizeInput(data.input),
     // Absent before the Budget tab existed: a fresh starter set, not an error.
     budget: sanitizeBudget(data.budget),
+    ...(portfolio.length > 0 ? { portfolio } : {}),
     ...(drafts ? { drafts } : {}),
   }
 }

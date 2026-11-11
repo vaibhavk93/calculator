@@ -399,7 +399,7 @@ for (const [theme, font] of [['dark', 100], ['light', 100], ['dark', 200], ['lig
     await notes(page)
     await shot(page, `look-${tag}-1-notes-home`)
     eq(await smallTargets(page, '.tools'), [], 'Notes home targets')
-    has(await page.locator('.saved__find').innerText(), 'New', 'Add control shows its word')
+    has(await page.locator('.saved__view').innerText(), 'New', 'Add control shows its word')
 
     await addBtn(page).click()
     await shot(page, `look-${tag}-2-add-sheet`)
@@ -437,6 +437,8 @@ for (const [theme, font] of [['dark', 100], ['light', 100], ['dark', 200], ['lig
 
     await tab(page, 'Calc')
     await page.locator('[aria-label="Settings"]').click()
+    // Export notes lives on the Backup and export page since the Settings redesign.
+    await page.getByText('Backup and export', { exact: true }).click()
     await page.getByText('Export notes', { exact: true }).scrollIntoViewIfNeeded()
     await shot(page, `look-${tag}-8-settings-export`)
   }, { data: BUSY(theme), font })

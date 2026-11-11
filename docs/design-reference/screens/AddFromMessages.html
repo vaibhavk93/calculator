@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Add from messages</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#060606}
+.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+.tab{all:unset;flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0 10px;color:#818181;font-size:0.65rem;font-family:'IBM Plex Sans';cursor:pointer}
+.tab.active{color:#CCD539}
+.msgrow{display:flex;align-items:flex-start;gap:12px;padding:13px 20px;border-bottom:1px solid #262626}
+.msgrow:last-child{border-bottom:none}
+.chk{all:unset;width:22px;height:22px;border-radius:5px;border:1.6px solid #818181;flex-shrink:0;cursor:pointer;margin-top:1px}
+.chk.on{background:#CCD539;border-color:#CCD539;display:flex;align-items:center;justify-content:center}
+.chip{all:unset;padding:3px 9px;border-radius:20px;background:#181818;color:#A4A4A4;font-size:0.7rem;cursor:pointer}
+</style>
+</helmet>
+<div style="width:390px;height:844px;background:#060606;color:#F5F5F5;font-family:'IBM Plex Sans',sans-serif;display:flex;flex-direction:column;overflow:hidden;position:relative">
+
+  <div style="display:flex;align-items:center;gap:8px;padding:18px 16px 10px">
+    <button aria-label="Back to Budget" style="all:unset;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#F5F5F5"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <span style="font-weight:600;font-size:1.05rem">Add from messages</span>
+  </div>
+  <div style="padding:0 20px 10px;font-size:0.82rem;color:#A4A4A4">8 transactions found in your messages · 7 selected</div>
+
+  <div style="flex:1;overflow-y:auto;padding-bottom:70px">
+
+    <div class="msgrow">
+      <button class="chk on" aria-label="Deselect Swiggy ₹450"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l5 5L19 7" stroke="#121300" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.93rem">Swiggy</div>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:5px"><span style="font-size:0.76rem;color:#818181">Today · HDFC Salary</span><button class="chip">Food</button></div>
+      </div>
+      <span class="mono" style="font-size:0.92rem;flex-shrink:0">−₹450</span>
+    </div>
+
+    <div class="msgrow">
+      <button class="chk on" aria-label="Deselect Uber ₹220"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l5 5L19 7" stroke="#121300" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.93rem">Uber</div>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:5px"><span style="font-size:0.76rem;color:#818181">Today · Tata Neo card</span><button class="chip">Travel</button></div>
+      </div>
+      <span class="mono" style="font-size:0.92rem;flex-shrink:0">−₹220</span>
+    </div>
+
+    <div class="msgrow">
+      <button class="chk on" aria-label="Deselect Zomato ₹610"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l5 5L19 7" stroke="#121300" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.93rem">Zomato</div>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:5px"><span style="font-size:0.76rem;color:#818181">Yesterday · HDFC Salary</span><button class="chip">Food</button></div>
+      </div>
+      <span class="mono" style="font-size:0.92rem;flex-shrink:0">−₹610</span>
+    </div>
+
+    <div class="msgrow">
+      <button class="chk on" aria-label="Deselect Amazon ₹1,240"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l5 5L19 7" stroke="#121300" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.93rem">Amazon</div>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:5px"><span style="font-size:0.76rem;color:#818181">Yesterday · Tata Neo card</span><button class="chip">Shopping</button></div>
+      </div>
+      <span class="mono" style="font-size:0.92rem;flex-shrink:0">−₹1,240</span>
+    </div>
+
+    <div class="msgrow">
+      <button class="chk on" aria-label="Deselect Netflix ₹499"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l5 5L19 7" stroke="#121300" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.93rem">Netflix</div>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:5px"><span style="font-size:0.76rem;color:#818181">2 days ago · Tata Neo card</span><button class="chip">Bills</button></div>
+      </div>
+      <span class="mono" style="font-size:0.92rem;flex-shrink:0">−₹499</span>
+    </div>
+
+    <div class="msgrow">
+      <button class="chk" aria-label="Select unclear transaction, ₹1,000"></button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.93rem">Unclear merchant</div>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:5px"><span style="font-size:0.76rem;color:#818181">3 days ago · HDFC Salary</span><button class="chip" style="color:#818181">Uncategorized</button></div>
+      </div>
+      <span class="mono" style="font-size:0.92rem;flex-shrink:0">−₹1,000</span>
+    </div>
+
+    <div class="msgrow">
+      <button class="chk on" aria-label="Deselect gym membership ₹1,500"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l5 5L19 7" stroke="#121300" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.93rem">Cult.fit</div>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:5px"><span style="font-size:0.76rem;color:#818181">4 days ago · HDFC Salary</span><button class="chip">Health</button></div>
+      </div>
+      <span class="mono" style="font-size:0.92rem;flex-shrink:0">−₹1,500</span>
+    </div>
+
+    <div class="msgrow">
+      <button class="chk on" aria-label="Deselect salary credit ₹90,000"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 13l5 5L19 7" stroke="#121300" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.93rem">Salary credit</div>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:5px"><span style="font-size:0.76rem;color:#818181">5 days ago · HDFC Salary</span><button class="chip">Money in</button></div>
+      </div>
+      <span class="mono" style="font-size:0.92rem;flex-shrink:0;color:#8BC48A">+₹90,000</span>
+    </div>
+
+  </div>
+
+  <div style="position:absolute;left:0;right:0;bottom:0;padding:14px 20px;background:#0D0D0D;border-top:1px solid #262626">
+    <button style="all:unset;display:block;width:100%;box-sizing:border-box;text-align:center;background:#CCD539;color:#121300;font-weight:600;border-radius:10px;padding:14px;font-size:0.92rem;cursor:pointer">Add 7 transactions</button>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

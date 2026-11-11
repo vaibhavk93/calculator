@@ -12,6 +12,7 @@ import { billForCard } from '../../lib/recurring'
 import { advanceTaxPack, afterDaysLabel, dueLabel, dueSoonTotal, groupReminders } from '../../lib/reminders'
 import type { Reminder } from '../../store/types'
 import { CardView } from './CardView'
+import { Segmented } from '../settings/controls'
 import { useTour } from '../onboarding/useTour'
 import { DATE_LOCALE } from '../../lib/dateLocale'
 
@@ -57,6 +58,7 @@ export function DueScreen() {
   const moreR = live.find((r) => r.id === moreId)
   const more = moreR ? { id: moreR.id, title: cards.find((c) => c.id === moreR.cardId)?.title ?? 'Reminder' } : null
   // The pack offer is noise once it has been taken: hide it the moment all 4 titles already exist.
+  const showPack = useApp((x) => x.settings.showAdvanceTaxOffer)
   const packDone = advanceTaxPack(now, reminderTime).every((p) => cards.some((c) => c.deletedAt === null && c.title === p.title))
 
   if (g.overdue.length + g.week.length + g.later.length === 0) {
@@ -92,14 +94,20 @@ export function DueScreen() {
             // A bill or card-bill reminder belongs to a record in Budget: paying it adds the entry, and Remove ends the bill.
             const bill = billForCard(budget, r.cardId)
             const doneWord = card.kind === 'task' && !bill ? 'Done' : 'Mark paid'
-            const checkBtn = (
-              <button type="button" className="due__check" aria-label={`${doneWord} ${card.title}`} title={`${doneWord} ${card.title}`} onClick={() => markPaid(r.id)}>
+            const pays = doneWord === 'Mark paid'
+            // A bill (or a saved amount) is paid with a worded button; a plain task keeps the round check.
+            const doneBtn = pays ? (
+              <button type="button" className="btn due__pay" aria-label={`Mark paid ${card.title}`} title={`Mark paid ${card.title}`} onClick={() => markPaid(r.id)}>
+                Mark paid
+              </button>
+            ) : (
+              <button type="button" className="due__check" aria-label={`Done ${card.title}`} title={`Done ${card.title}`} onClick={() => markPaid(r.id)}>
                 <Icon name="check" size={20} />
               </button>
             )
             const moreBtn = (
-              <button type="button" className="icon-btn" aria-label={`More for ${card.title}`} title={`More for ${card.title}`} onClick={() => setMoreId(r.id)}>
-                <Icon name="more" size={20} />
+              <button type="button" className="icon-btn due__more" aria-label={`More for ${card.title}`} title={`More for ${card.title}`} onClick={() => setMoreId(r.id)}>
+                More
               </button>
             )
             const ask = askId === r.id && (
@@ -109,36 +117,45 @@ export function DueScreen() {
                 <button type="button" className="link-btn link-btn--danger" onClick={() => { remove(r.id); setAskId(null) }}>{bill ? 'Yes, stop it' : 'Yes, remove'}</button>
               </div>
             )
-            const body = (
-              <>
-                <span className="row__label">{card.title}</span>
-                <span className={overdue ? 'row__hint due__alert' : 'row__hint'}>
-                  {dueLabel(r.dueAt, now)} · {WHEN.format(r.dueAt)}
-                  {r.afterDays ? ` · repeats ${afterDaysLabel(r.afterDays)}` : r.repeat !== 'none' ? ` · ${r.repeat}` : ''}
-                </span>
-                {card.amount !== null && <span className="due__amt">{formatCell(new D(card.amount), card.amountFmt ?? 'money', { system, decimals })}</span>}
-              </>
+            const amount = card.amount !== null ? formatCell(new D(card.amount), card.amountFmt ?? 'money', { system, decimals }) : null
+            // ONE meta line: when, how often, (in the list) how much, and how many payments are left.
+            const meta = (withAmount: boolean) => (
+              <span className={overdue ? 'row__hint due__alert' : 'row__hint'}>
+                {dueLabel(r.dueAt, now)} · {WHEN.format(r.dueAt)}
+                {r.afterDays ? ` · repeats ${afterDaysLabel(r.afterDays)}` : r.repeat !== 'none' ? ` · ${r.repeat}` : ''}
+                {withAmount && amount && <> · <span className="due__amt">{amount}</span></>}
+                {bill?.remaining ? ` · ${bill.remaining} ${bill.remaining === 1 ? 'payment' : 'payments'} left` : ''}
+              </span>
             )
             return cardView ? (
               <div className="due-card" key={r.id}>
                 <div className="due-card__top">
-                  {checkBtn}
+                  <button type="button" className="due-card__body" onClick={() => setOpenId(card.id)}>
+                    <span className="row__label">{card.title}</span>
+                    {amount && <span className="due-card__amt">{amount}</span>}
+                    {meta(false)}
+                  </button>
                   {moreBtn}
                 </div>
-                <button type="button" className="due-card__body" onClick={() => setOpenId(card.id)}>
-                  {body}
-                </button>
+                {/* No progress bar: a bill stores only the payments LEFT, not how many there were, so "paid of total"
+                    cannot be worked out honestly (a loan added half-way through would look new). */}
+                <div className="due-card__act">
+                  {doneBtn}
+                  {!pays && <span className="due-card__word" aria-hidden="true">Mark done</span>}
+                </div>
                 {ask}
               </div>
             ) : (
-              <div className="due" key={r.id}>
-                {/* One main control per row: the check. Snooze and Remove live behind "More". */}
-                {checkBtn}
-                <button type="button" className="due__main tap-row" onClick={() => setOpenId(card.id)}>
-                  <span className="row__text">{body}</span>
-                  <Icon name="chevron" size={18} className="tap-row__chev" />
+              <div className={pays ? 'due due--pay' : 'due'} key={r.id}>
+                {pays ? <Icon name="budget" size={20} className="due__icon" /> : doneBtn}
+                <button type="button" className="due__main" onClick={() => setOpenId(card.id)}>
+                  <span className="row__label">{card.title}</span>
+                  {meta(true)}
                 </button>
-                {moreBtn}
+                <span className="due__btns">
+                  {pays && doneBtn}
+                  {moreBtn}
+                </span>
                 {ask}
               </div>
             )
@@ -154,10 +171,6 @@ export function DueScreen() {
       {!open && (
         <header className="tabroot__bar">
           <h1 className="screen__title">Due</h1>
-          <span className="screen__spacer" />
-          <button type="button" className="icon-btn" aria-pressed={cardView} aria-label={cardView ? 'Show as a list' : 'Show as cards'} title={cardView ? 'Show as a list' : 'Show as cards'} onClick={() => updateSettings({ dueCardView: !cardView })}>
-            <Icon name={cardView ? 'list' : 'grid'} size={20} />
-          </button>
         </header>
       )}
       {!open && tour.row}
@@ -172,8 +185,21 @@ export function DueScreen() {
       )}
       {!total.isZero() && (
         <div className="due__total">
-          <span className="result__label">Amounts due in the next 30 days</span>
-          <span className="tape__sum">{formatCell(total, 'money', { system, decimals })}</span>
+          <span className="due__label">Amounts due in the next 30 days</span>
+          <span className="due__hero">{formatCell(total, 'money', { system, decimals })}</span>
+        </div>
+      )}
+      {!open && (
+        <div className="due__view">
+          <Segmented
+            label="Show due items as"
+            value={cardView ? 'card' : 'list'}
+            onChange={(v) => updateSettings({ dueCardView: v === 'card' })}
+            options={[
+              { value: 'list', label: 'List' },
+              { value: 'card', label: 'Card' },
+            ]}
+          />
         </div>
       )}
       <div className="tools__list">
@@ -185,7 +211,7 @@ export function DueScreen() {
             and bleed into the tab bar underneath -- a real, pre-existing bug the new layout-contract
             suite caught (confirmed against the commit before this change, identical numbers). Scrolling
             with everything else is what guarantees it is always reachable. */}
-        {!packDone && (
+        {showPack && !packDone && (
           <div className="due__pack">
             <p className="note">Advance tax is due 15 Jun, 15 Sep, 15 Dec and 15 Mar. Add all four, then edit them like any reminder.</p>
             <button type="button" className="btn" onClick={addPack}>Add a pack: advance tax</button>

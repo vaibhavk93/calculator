@@ -21,6 +21,7 @@ export function KeepAndShare({
   onRemind,
   onUse,
   onReset,
+  notes = true,
 }: {
   title: string
   text: string
@@ -32,6 +33,8 @@ export function KeepAndShare({
   onUse?: () => void
   /** Clears the calculator's inputs back to their starting values. The screen offers Undo. */
   onReset: () => void
+  /** False when Notes and reminders is switched off: no list, no reminder. */
+  notes?: boolean
 }) {
   const [msg, setMsg] = useState('')
   const [moreOpen, setMoreOpen] = useState(false)
@@ -56,8 +59,8 @@ export function KeepAndShare({
   }
 
   const more: { icon: IconName; label: string; run: () => void }[] = [
-    ...(canList ? [{ icon: 'list' as const, label: 'Add to a list', run: run(onList) }] : []),
-    { icon: 'due', label: 'Remind me', run: run(onRemind) },
+    ...(notes && canList ? [{ icon: 'list' as const, label: 'Add to a list', run: run(onList) }] : []),
+    ...(notes ? [{ icon: 'due' as const, label: 'Remind me', run: run(onRemind) }] : []),
     ...(onUse ? [{ icon: 'forward' as const, label: 'Use in another tool', run: run(onUse) }] : []),
     { icon: 'undo', label: 'Reset inputs', run: run(onReset) },
   ]

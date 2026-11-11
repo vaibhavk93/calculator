@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useFitText } from '../calculator/useFitText'
 import { Icon } from '../../components/Icon'
 import { PickerSelect } from '../../components/PickerSelect'
 import { useApp, useAppStore } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
 import { magnitudeWords, type NumberSystem } from '../../lib/format'
+import { moduleOn } from '../../lib/modules'
 import {
   defaultValues,
   exampleFieldsInUse,
@@ -183,15 +184,18 @@ function UnitSwitch({ field, values, set }: { field: Extract<Leaf, { kind: 'numb
   const raw = (values[field.id] as string) ?? ''
   const typed = field.kind === 'text' ? typedUnit(raw) : null
   return (
-    <Segmented
-      label={`Unit of ${field.label}`}
-      value={typed ?? unitOf(field, values)}
-      options={field.units!.map((u) => ({ value: u, label: UNIT_CHOICE[u] }))}
-      onChange={(u) => {
-        if (typed) set(field.id, withoutUnit(raw))
-        set(unitKey(field.id), u)
-      }}
-    />
+    // Full width under its box: the choices share the row equally.
+    <div className="unit-switch">
+      <Segmented
+        label={`Unit of ${field.label}`}
+        value={typed ?? unitOf(field, values)}
+        options={field.units!.map((u) => ({ value: u, label: UNIT_CHOICE[u] }))}
+        onChange={(u) => {
+          if (typed) set(field.id, withoutUnit(raw))
+          set(unitKey(field.id), u)
+        }}
+      />
+    </div>
   )
 }
 
@@ -211,12 +215,15 @@ function FieldRow({ field: base, values, set, invalid, chips }: { field: Field; 
         {field.hint && <p className="rows__hint">{field.hint}</p>}
         {rows.map((row, r) => (
           <div className={field.columns.length > 3 ? 'rows__row rows__row--wrap' : 'rows__row'} key={r}>
-            {field.columns.map((col, c) => (
-              <label className="rows__cell" key={col.id}>
-                <span className="rows__cap">{col.label}</span>
-                <Input field={col} value={row[c] ?? ''} onChange={(v) => setCell(r, c, v)} />
-              </label>
-            ))}
+            {/* Four or more columns sit in their own grid: as many per line as fit, so a date never has to squeeze. */}
+            {(field.columns.length > 3 ? (kids: ReactNode) => <div className="rows__cells">{kids}</div> : (kids: ReactNode) => kids)(
+              field.columns.map((col, c) => (
+                <label className="rows__cell" key={col.id}>
+                  <span className="rows__cap">{col.label}</span>
+                  <Input field={col} value={row[c] ?? ''} onChange={(v) => setCell(r, c, v)} />
+                </label>
+              )),
+            )}
             {rows.length > field.min && (
               <button type="button" className="icon-btn" aria-label={`Remove row ${r + 1}`} title={`Remove row ${r + 1}`} onClick={() => set(field.id, rows.filter((_, i) => i !== r))}>
                 <Icon name="close" size={18} />
@@ -379,6 +386,30 @@ function Chart({ chart }: { chart: ResultChart }) {
   )
 }
 
+/**
+ * Principal vs interest over the whole loan, as one bar. Only for a chart whose two series are yearly principal and
+ * interest paid (Loan EMI): adding up its own bars gives the whole-loan split, no new maths. Hidden from a screen
+ * reader: the rows above already say the totals in words.
+ */
+function SplitBar({ chart }: { chart: ResultChart }) {
+  const [p, i] = chart.series
+  if (chart.series.length !== 2 || p?.name !== 'Principal' || i?.name !== 'Interest') return null
+  const total = (s: { values: number[] }) => s.values.reduce((a, b) => a + b, 0)
+  const share = (total(p) / (total(p) + total(i) || 1)) * 100
+  return (
+    <div className="splitbar" aria-hidden="true">
+      <p className="result__sub">Principal vs interest</p>
+      <span className="splitbar__track">
+        <span className="splitbar__part" style={{ width: `${share}%` }} />
+      </span>
+      <span className="chart__legend">
+        <span><i className="splitbar__key" /> Principal</span>
+        <span><i className="splitbar__key splitbar__key--interest" /> Interest</span>
+      </span>
+    </div>
+  )
+}
+
 /** The words of a row's value: number text, then its unit (smaller, quieter), then the screen-reader line for good or bad. */
 function valueParts(row: ResultRow, text: string) {
   const unit = row.unit ? ` ${row.unit}` : ''
@@ -398,7 +429,7 @@ function HeroNumber({ row, text }: { row: ResultRow; text: string }) {
   const ref = useRef<HTMLSpanElement>(null)
   // The sizes are rem so the headline follows the system font size; the hook works in px.
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
-  useFitText(ref, text, undefined, 2 * rem, rem)
+  useFitText(ref, text, undefined, 2.5 * rem, rem)
   return (
     <span ref={ref} className={`hero__value${row.tone ? ` result__value--${row.tone}` : ''}`}>
       {valueParts(row, text)}
@@ -421,6 +452,7 @@ function Result({ out, mainRef, verified, rates, examples }: { out: Output; main
   const checked = [verified && `Checked against ${verified.source}`, rates && ratesLine(rates, Date.now())].filter(Boolean).join('. ')
   const body = (
     <>
+      {hero && rows.length > 0 && <h3 className="result__sub">Breakdown</h3>}
       {rows.map((r) => (
         <div key={r.label} className="result__row">
           <span className="result__label">{r.label}</span>
@@ -429,6 +461,7 @@ function Result({ out, mainRef, verified, rates, examples }: { out: Output; main
           </span>
         </div>
       ))}
+      {out.chart && <SplitBar chart={out.chart} />}
       {out.note && <p className="result__note">{out.note}</p>}
       {out.span && (
         // Says nothing the rows above do not: hidden from a screen reader so it is not read twice.
@@ -513,6 +546,9 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
   const showLinkSnack = useApp((s) => s.showLinkSnack)
   const toast = useApp((s) => s.toast)
   const setTab = useApp((s) => s.setTab)
+  // "Show in the app": what is saved to Notes or Budget is not offered while that module is hidden.
+  const notesOn = useApp((s) => moduleOn(s.settings, 'notes'))
+  const budgetOn = useApp((s) => moduleOn(s.settings, 'budget'))
   // Once "More options" is open (by the user, or by itself because a field changed) it stays open.
   const [moreOpen, setMoreOpen] = useState(false)
   const [savedId, setSavedId] = useState<string | null>(card?.id ?? null)
@@ -566,7 +602,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
   const canUse = link !== null && linkTargets(ALL_TOOLS, spec.id, link.fmt, link.unit).length > 0
 
   // One "next step" chip under the result. Used or dismissed once, it never comes back. Not offered when this EMI already has a reminder.
-  const tip = ok && !(reminder && spec.id === 'emi') ? suggestionFor(spec.id, dismissedTips) : null
+  const tip = ok && notesOn && !(reminder && spec.id === 'emi') ? suggestionFor(spec.id, dismissedTips) : null
   const closeTip = () => tip && updateSettings({ dismissedTips: [...dismissedTips, tip.id] })
   const takeTip = () => {
     if (!tip) return
@@ -668,18 +704,21 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
           </>
         }
         action={
-          <button
-            type="button"
-            className="link-btn"
-            onClick={() => (ok ? setSaving(true) : toast(isError(computed) ? `${computed.error}. Then you can save it.` : 'Fill in the form first'))}
-          >
-            {saved ? 'Update' : 'Save'}
-          </button>
+          notesOn || saved ? (
+            <button
+              type="button"
+              className="link-btn"
+              onClick={() => (ok ? setSaving(true) : toast(isError(computed) ? `${computed.error}. Then you can save it.` : 'Fill in the form first'))}
+            >
+              {saved ? 'Update' : 'Save'}
+            </button>
+          ) : undefined
         }
       />
       <div className="screen__body tool" ref={bodyRef}>
-        {/* 1. Edit: where you type. A tinted card. */}
-        <h2 className="section-head section-head--tint" id="inputs-head">
+        {/* 1. Edit: where you type. One flat neutral panel, because it is one bundle of controls
+            (docs/design-reference/IMPLEMENTATION-NOTES.md, "Tool page"). The heading is for screen readers. */}
+        <h2 className="sr-only" id="inputs-head">
           What you are working out
         </h2>
         <form className="tool__form inputcard" aria-labelledby="inputs-head" onSubmit={(e) => e.preventDefault()}>
@@ -702,7 +741,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
         {/* 2. Result: what it comes to. A plain card, never tinted. */}
         {ok && <Result out={computed} mainRef={mainRef} verified={spec.verified} rates={spec.rates} examples={exampleFieldsInUse(spec, values)} />}
 
-        {ok && computed.expense && computed.expense.amount.gt(0) && (
+        {ok && budgetOn && computed.expense && computed.expense.amount.gt(0) && (
           <div className="suggest">
             <button type="button" className="link-btn" onClick={() => setExpensing(true)}>Save my share to Budget</button>
           </div>
@@ -723,6 +762,7 @@ export function ToolScreen({ spec, onBack, initial, card }: { spec: ToolSpec; on
             title={saved?.title ?? spec.title}
             text={shareBody}
             canList={listableAmount !== null}
+            notes={notesOn}
             onList={() => setListing(true)}
             onRemind={() => setReminding(true)}
             onUse={canUse && !card ? () => setUsing(true) : undefined}

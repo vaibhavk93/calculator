@@ -6,6 +6,7 @@ import { useApp, useAppStore } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
 import { saveBackupFile } from '../../lib/backupFile'
 import { DATE_LOCALE } from '../../lib/dateLocale'
+import { moduleOn } from '../../lib/modules'
 import { exportableCards, notesExportText } from '../../lib/notes'
 import { backupFilename, buildBackup, parseBackup } from '../../store/backup'
 import type { PersistedData } from '../../store/types'
@@ -20,6 +21,8 @@ export function BackupScreen({ onBack }: { onBack: () => void }) {
   const update = useApp((x) => x.updateSettings)
   const showLinkSnack = useApp((x) => x.showLinkSnack)
   const toast = useApp((x) => x.toast)
+  const notesOn = useApp((x) => moduleOn(x.settings, 'notes'))
+  const budgetOn = useApp((x) => moduleOn(x.settings, 'budget'))
 
   const fileRef = useRef<HTMLInputElement>(null)
   const [backup, setBackup] = useState<Backup>({ state: 'idle' })
@@ -81,10 +84,12 @@ export function BackupScreen({ onBack }: { onBack: () => void }) {
       <div className="screen__body">
         <section className="sect sect--settings" aria-label="Backup">
           <h2 className="sect__head">Backup</h2>
+          <div className="settings__panel">
           {row('Export a backup', 'History and settings, as one file you keep', () => void exportBackup())}
-          {row('Export notes', 'Notes, lists and saved calculations as a text file. To-dos are in the full backup', () => void exportNotes())}
+          {notesOn && row('Export notes', 'Notes, lists and saved calculations as a text file. To-dos are in the full backup', () => void exportNotes())}
           {row('Restore from a backup', 'Replaces what is on this phone now', () => fileRef.current?.click())}
           <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" aria-label="Choose a backup file" tabIndex={-1} onChange={(e) => void chooseFile(e.target.files?.[0])} />
+          </div>
         </section>
 
         {backup.state === 'confirm' && (
@@ -113,10 +118,12 @@ export function BackupScreen({ onBack }: { onBack: () => void }) {
           </p>
         )}
 
-        <section className="sect sect--settings" aria-label="Export">
-          <h2 className="sect__head">Export</h2>
-          {row('Export expenses', 'Budget entries as a spreadsheet file (CSV)', () => setExportCsv(true))}
-        </section>
+        {budgetOn && (
+          <section className="sect sect--settings" aria-label="Export">
+            <h2 className="sect__head">Export</h2>
+            <div className="settings__panel">{row('Export expenses', 'Budget entries as a spreadsheet file (CSV)', () => setExportCsv(true))}</div>
+          </section>
+        )}
       </div>
       {exportCsv && <ExportSheet onClose={() => setExportCsv(false)} />}
       {folderAsk && (

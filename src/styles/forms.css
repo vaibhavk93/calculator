@@ -10,7 +10,7 @@
 }
 
 .screen__title {
-  font-size: 1.125rem;
+  font-size: 1.3rem;
   font-weight: 700;
 }
 
@@ -94,7 +94,7 @@
 }
 
 .ffield__hint {
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 /* An error is words first; the colour only backs them up. */
@@ -111,7 +111,7 @@
 .ffield__legend {
   margin: 0 0 var(--s-1);
   font-size: 0.75rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 /* ------------------------------------------------------------------ picker */
@@ -140,7 +140,7 @@
 }
 
 .pick__value--empty {
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .pick .icon {
@@ -213,7 +213,7 @@
 
 .pick__hint {
   font-size: 0.8125rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .pick__opt .icon {
@@ -228,6 +228,24 @@
 
 .sect--settings .row {
   gap: var(--s-2) var(--s-3);
+}
+
+/* Each settings section is ONE flat panel of its rows (docs/design-reference, Settings): the surface colour,
+   hairlines between rows, none above the first. Not a card inside a card: nothing in it has its own box. */
+.settings__panel {
+  margin: 0 var(--s-4);
+  background: var(--surface);
+  border-radius: var(--r-md);
+}
+
+.settings__panel > .row:first-child,
+.settings__panel > :first-child > .row:first-child {
+  border-top: 0;
+}
+
+.settings__panel .row__hint,
+.settings__panel .row__value {
+  color: var(--ink-2);
 }
 
 /* The last row of a picker that can add: a new name, typed in place. */

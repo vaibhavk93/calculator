@@ -5,11 +5,13 @@ import { ScreenHeader } from '../../components/ScreenHeader'
 import { useApp } from '../../components/StoreProvider'
 import { backupNudge, countItems } from '../../lib/backupNudge'
 import { checkReminderPermissions, ensurePermission, notificationsSupported, openExactAlarmSettings, scheduleTestReminder, type ReminderPermissions } from '../../lib/notifications'
+import { moduleOn, startTab, tabOn, withModule } from '../../lib/modules'
 import { timeLabel } from '../../lib/reminders'
 import { ACCENT_NAMES, ACCENTS } from '../../lib/theme'
 import { TABS, type CopyFormat, type Tab } from '../../store/types'
 import pkg from '../../../package.json'
 import { ALL_TOOLS } from '../tools/registry'
+import { RecentTools } from '../tools/RecentTools'
 import { GROUPS } from '../tools/groups'
 import { BackupScreen } from './BackupScreen'
 import { OptionRow, Row, Segmented, Toggle } from './controls'
@@ -19,12 +21,12 @@ import { TipsAndToursScreen } from '../onboarding/TipsAndTours'
 const TAB_LABEL: Record<Tab, string> = { calculate: 'Calculate', tools: 'Tools', saved: 'Notes', due: 'Due', budget: 'Budget' }
 const DECIMAL_CHOICES = ['auto', ...Array.from({ length: 11 }, (_, i) => String(i))]
 
-/** One titled card of settings. A hairline list under a quiet heading, no card. */
+/** One titled group of settings: a small heading over ONE flat panel of rows (docs/design-reference, Settings). */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="sect sect--settings" aria-label={title}>
       <h2 className="sect__head">{title}</h2>
-      {children}
+      <div className="settings__panel">{children}</div>
     </section>
   )
 }
@@ -81,6 +83,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0')
 /** When reminders arrive, a way to prove they do, and (on the phone) what the system allows. */
 function ReminderSettings() {
   const time = useApp((x) => x.settings.reminderTime)
+  const offer = useApp((x) => x.settings.showAdvanceTaxOffer)
   const update = useApp((x) => x.updateSettings)
   const toast = useApp((x) => x.toast)
   const [fixing, setFixing] = useState(false)
@@ -106,6 +109,9 @@ function ReminderSettings() {
           value={time}
           onChange={(e) => e.target.value && update({ reminderTime: e.target.value })}
         />
+      </Row>
+      <Row label="Advance-tax reminders offer" hint="Shows a one-tap pack of the 4 advance-tax dates on Due">
+        <Toggle label="Advance-tax reminders offer" checked={offer} onChange={(showAdvanceTaxOffer) => update({ showAdvanceTaxOffer })} />
       </Row>
       <button type="button" className="row row--button tap-row" onClick={() => void sendTest()}>
         <span className="row__text">
@@ -133,7 +139,7 @@ export function SettingsScreen() {
   const setOverlay = useApp((x) => x.setOverlay)
 
   // One picker for both kinds of start: a screen ("tab:saved") or a calculator ("tool:gst").
-  const opensOn = s.startupTool && ALL_TOOLS.some((t) => t.id === s.startupTool) ? `tool:${s.startupTool}` : `tab:${s.startupTab}`
+  const opensOn = s.startupTool && ALL_TOOLS.some((t) => t.id === s.startupTool) ? `tool:${s.startupTool}` : `tab:${startTab(s)}`
   const chooseOpensOn = (v: string) => {
     const [kind, id = ''] = v.split(':')
     if (kind === 'tool') update({ startupTool: id })
@@ -141,9 +147,12 @@ export function SettingsScreen() {
   }
 
   const openOptions: PickOption[] = [
-    ...TABS.map((t) => ({ value: `tab:${t}`, label: TAB_LABEL[t], group: 'Screens' })),
+    ...TABS.filter((t) => tabOn(s, t)).map((t) => ({ value: `tab:${t}`, label: TAB_LABEL[t], group: 'Screens' })),
     ...GROUPS.flatMap((g) => g.tools.map((id) => ({ value: `tool:${id}`, label: ALL_TOOLS.find((t) => t.id === id)?.title ?? id, group: g.name }))),
   ]
+
+  // Reminders on live cards. They keep ringing whether or not the Due tab is shown.
+  const ringing = useApp((x) => x.reminders.filter((r) => x.cards.some((c) => c.id === r.cardId && c.deletedAt === null)).length)
 
   const [page, setPage] = useState<'none' | 'backup' | 'tips'>('none')
   const items = useApp((x) => countItems(x))
@@ -234,9 +243,21 @@ export function SettingsScreen() {
           </Row>
         </Section>
 
+        <Section title="Show in the app">
+          <Row label="Budget" hint="Hidden, not deleted. Bill reminders will still ring. Switch on to get it all back.">
+            <Toggle label="Budget" checked={moduleOn(s, 'budget')} onChange={(on) => update(withModule(s, 'budget', on))} />
+          </Row>
+          <Row
+            label="Notes and reminders"
+            hint={`Hidden, not deleted. ${ringing === 0 ? 'Reminders you set will still ring.' : `${ringing} ${ringing === 1 ? 'reminder is' : 'reminders are'} set and will still ring.`}`}
+          >
+            <Toggle label="Notes and reminders" checked={moduleOn(s, 'notes')} onChange={(on) => update(withModule(s, 'notes', on))} />
+          </Row>
+        </Section>
+
         <Section title="Behaviour">
           <Row label="Opens on">
-            <PickerSelect label="Opens on" title="Open the app on" align="end" value={opensOn} onChange={chooseOpensOn} options={openOptions} />
+            <PickerSelect label="Opens on" title="Open the app on" align="end" value={opensOn} onChange={chooseOpensOn} options={openOptions} above={(pick) => <RecentTools onPick={(id) => pick(`tool:${id}`)} />} />
           </Row>
           <Row label="Vibrate on key press">
             <Toggle label="Vibrate on key press" checked={s.haptics} onChange={(haptics) => update({ haptics })} />

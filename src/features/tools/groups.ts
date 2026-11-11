@@ -38,7 +38,7 @@ export const GROUPS: ToolGroup[] = [
     { title: 'Number systems', tools: ['number-base'] },
   ]),
   group('money', 'Money and shopping', 2, [
-    { title: 'Prices and bills', tools: ['discount', 'gst', 'unit-price'] },
+    { title: 'Prices and bills', tools: ['discount', 'gst', 'unit-price', 'gold-bill'] },
     { title: 'Sharing a bill', tools: ['tip'] },
     { title: 'Foreign money', tools: ['currency'] },
   ]),
@@ -59,14 +59,16 @@ export const GROUPS: ToolGroup[] = [
   ]),
   group('savings', 'Savings and investing', 6, [
     { title: 'Grow your money', tools: ['sip', 'step-up-sip', 'lumpsum', 'goal-sip'] },
-    { title: 'Fixed returns', tools: ['fd', 'rd', 'ppf'] },
+    { title: 'Fixed returns', tools: ['fd', 'fd-ladder', 'rd', 'ppf'] },
+    { title: 'Post office schemes', tools: ['ssy', 'nsc', 'scss', 'kvp', 'mis', 'post-office-td'] },
     { title: 'Retirement', tools: ['nps', 'epf', 'swp'] },
     { title: 'Measure growth', tools: ['inflation', 'cagr-xirr'] },
     { title: 'Check your finances', tools: ['emergency-fund', 'debt-to-income', 'savings-rate'] },
   ]),
   group('tax', 'Tax and salary', 7, [
-    { title: 'Your tax', tools: ['income-tax', 'advance-tax', 'capital-gains', 'presumptive-44ada'] },
-    { title: 'Your pay', tools: ['in-hand-salary', 'gratuity'] },
+    { title: 'Your tax', tools: ['income-tax', 'advance-tax'] },
+    { title: 'Your pay', tools: ['in-hand-salary', 'hra', 'gratuity'] },
+    { title: 'Gains and freelance income', tools: ['capital-gains', 'ltcg-harvest', 'presumptive-44ada'] },
   ]),
   group('business', 'Business metrics', 8, [
     { title: 'Customers', tools: ['cac-ltv', 'cac-payback', 'retention'] },

@@ -137,12 +137,13 @@ button:disabled {
   align-items: center;
   justify-content: center;
   gap: 5px;
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-size: 0.6875rem;
 }
 
+/* The tab you are on: accent (you can act on the others), plus weight and a top line so colour is never the only signal. */
 .tab[aria-current='page'] {
-  color: var(--ink);
+  color: var(--accent);
   font-weight: 600;
 }
 
@@ -154,7 +155,7 @@ button:disabled {
   left: 20%;
   right: 20%;
   height: 2px;
-  background: var(--ink);
+  background: var(--accent);
 }
 
 .tab span {
@@ -294,7 +295,7 @@ button:disabled {
   justify-content: space-between;
   gap: var(--s-3);
   font-size: 0.8125rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .display__memory {
@@ -354,7 +355,7 @@ button:disabled {
 
 /* While typing, the big number is only a preview. "=" makes it the answer, at full strength. */
 .display__result[data-preview='true'] {
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .paste {
@@ -803,8 +804,8 @@ button:disabled {
   align-items: center;
   flex-wrap: wrap;
   gap: var(--s-1);
-  min-height: 52px;
-  padding: var(--s-1) var(--s-3) var(--s-1) var(--s-4);
+  min-height: 60px;
+  padding: var(--s-2) var(--s-3) var(--s-1) var(--s-4);
 }
 
 .screen__title {
@@ -812,7 +813,7 @@ button:disabled {
   min-width: 0;
   /* Same weight as every other screen title (forms.css: "screen title 700") -- this one was left at
      label weight (500), which read as weaker than the content below it. */
-  font-size: 1.125rem;
+  font-size: 1.3rem;
   font-weight: 700;
   /* Wraps at a large font size; a header must never cut its own title off. */
   overflow-wrap: anywhere;
@@ -869,13 +870,13 @@ button:disabled {
 
 .row__hint {
   font-size: 0.8125rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .row__value {
   font-family: var(--font-mono);
   font-size: 0.875rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .row--button {
@@ -1008,7 +1009,7 @@ button:disabled {
 .note {
   margin: var(--s-3) var(--s-4) 0;
   font-size: 0.8125rem;
-  color: var(--ink-3);
+  color: var(--ink-2);
   max-width: 44ch;
 }
 

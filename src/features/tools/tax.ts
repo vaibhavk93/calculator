@@ -3,6 +3,8 @@ import { formatDecimal } from '../../lib/format'
 import { advanceTax } from '../../engine/tax/advanceTax'
 import { capitalGains, type Asset } from '../../engine/tax/capitalGains'
 import { gratuity } from '../../engine/tax/gratuity'
+import { harvestLtcg, type Holding } from '../../engine/tax/harvest'
+import { hraExemption } from '../../engine/tax/hra'
 import { compareRegimes, inHandSalary, presumptive, type Regime, type TaxResult } from '../../engine/tax/incomeTax'
 import { RATES_AS_OF, RULES_FY2026_27 as R, taxNote, type AgeBand } from '../../engine/tax/rules.FY2026-27'
 import { yearsMonthsText } from '../../engine/duration'
@@ -444,6 +446,220 @@ const gratuitySpec: ToolSpec = {
   },
 }
 
+// ---- E9 HRA exemption (Rule 279) ------------------------------------------------------
+
+const METROS = R.hra.metroCities
+const hraSpec: ToolSpec = {
+  id: 'hra',
+  rates: RATES_AS_OF,
+  title: 'HRA exemption',
+  blurb: 'Tax-free part of your rent allowance',
+  category: 'tax',
+  verified: { source: 'Income-tax Rules 2026, Rule 279 (G.S.R. 198(E), 20 Mar 2026)' },
+  keywords: ['hra', 'house rent allowance', 'rent', 'exempt', 'landlord', 'pan', 'rule 279', '10(13a)'],
+  fields: [
+    money('basic', 'Monthly basic pay', '50000'),
+    money('hra', 'Monthly HRA received', '25000'),
+    money('rent', 'Monthly rent you pay', '20000'),
+    {
+      id: 'city',
+      label: 'Where you rent',
+      kind: 'select',
+      default: 'metro',
+      hint: `${METROS.length} cities get 50%: ${METROS.join(', ')}.`,
+      options: [
+        { value: 'metro', label: `One of the ${METROS.length} cities (50%)` },
+        { value: 'other', label: 'Anywhere else (40%)' },
+      ],
+    },
+    { ...regimeField, default: 'old', hint: 'The new regime gives no HRA exemption.' },
+    money('da', 'Monthly dearness allowance', '0', 'Only if your terms of employment provide for DA.', true),
+    {
+      id: 'months',
+      label: 'Months you paid rent',
+      kind: 'number',
+      unit: 'months',
+      default: '12',
+      hint: '1 to 12, counting only the months you lived there.',
+      advanced: true,
+    },
+  ],
+  compute: (v) => {
+    const r = need(v, [
+      { id: 'basic', label: 'Monthly basic pay' },
+      { id: 'hra', label: 'Monthly HRA received' },
+      { id: 'rent', label: 'Monthly rent' },
+    ])
+    if (!r.ok) return r
+    const junk = junkOptional(v, [
+      { id: 'da', label: 'Dearness allowance' },
+      { id: 'months', label: 'Months you paid rent' },
+    ])
+    if (junk) return junk
+    const months = parseNum(v.months) ?? new D(12)
+    if (!months.isInteger()) return { error: 'Months must be a whole number' }
+    if (months.lt(1) || months.gt(12)) return { error: 'Months you paid rent must be 1 to 12' }
+    const newRegime = v.regime === 'new'
+    const metro = v.city !== 'other'
+    const h = hraExemption(
+      { basic: r.n.basic!, da: opt(v, 'da'), hra: r.n.hra!, rent: r.n.rent!, metro, months: months.toNumber(), newRegime },
+      R,
+    )
+    if (!h) return { error: 'Amounts cannot be negative' }
+
+    const pct = metro ? R.hra.metroPct : R.hra.otherPct
+    const limbWords = {
+      actual: 'the HRA you actually received',
+      rentOverTenth: `your rent above a tenth of salary`,
+      shareOfSalary: `${pct}% of your salary`,
+    }[h.binding]
+
+    const rows: ResultRow[] = [
+      { label: 'Tax-free HRA', value: h.exempt, fmt: 'money', main: true },
+      { label: 'Taxable HRA', value: h.taxable, fmt: 'money' },
+      { label: 'HRA received', value: h.received, fmt: 'money' },
+      { label: 'Rent paid', value: h.rentPaid, fmt: 'money' },
+      { label: 'Salary counted (basic + DA)', value: h.salary, fmt: 'money' },
+    ]
+
+    const table: ResultTable = {
+      title: 'The three limits — the least one is your exemption',
+      columns: ['Rule 279(1)', 'Amount'],
+      // One fmt per column: the first column is the rule's wording, the second the money.
+      fmts: ['text', 'money'],
+      rows: [
+        ['HRA actually received', h.limbs.actual],
+        [`Rent paid − ${R.hra.rentLessSalaryPct}% of salary`, h.limbs.rentOverTenth],
+        [`${pct}% of salary`, h.limbs.shareOfSalary],
+      ],
+    }
+
+    const pan = h.landlordPanNeeded
+      ? ` Your rent is over ₹${r0(new D(R.hra.landlordPanAbove))} for the year, so your employer needs the landlord's name, address and PAN (Form 124).`
+      : ''
+    const own = ' You cannot claim this for a home you own, and rent must really be paid.'
+    const split = months.eq(12) ? '' : ' Pay or rent changed mid-year? Work out each period separately and add the tax-free parts.'
+
+    return {
+      rows,
+      table,
+      formula: newRegime
+        ? [
+            'New regime: HRA is fully taxable, there is no exemption',
+            `The old regime would have made ₹${r0(h.limbs.actual.isZero() ? ZERO : D.max(D.min(h.limbs.actual, h.limbs.rentOverTenth, h.limbs.shareOfSalary), ZERO))} of it tax-free`,
+          ]
+        : [
+            `Tax-free = least of: HRA received, rent − ${R.hra.rentLessSalaryPct}% of salary, and ${pct}% of salary`,
+            `least of ₹${r0(h.limbs.actual)}, ₹${r0(h.limbs.rentOverTenth)}, ₹${r0(h.limbs.shareOfSalary)} = ₹${r0(h.exempt)}`,
+            `Here ${limbWords} is the limit.`,
+          ],
+      note: `${NOTE} Salary here means basic pay plus DA only where your terms provide for it — no other allowance counts.${pan}${own}${split}`,
+    }
+  },
+}
+
+// ---- LTCG harvesting (ss.196-198, 2(101), 90(7)-(8)) --------------------------------------
+
+/** Today as YYYY-MM-DD in the phone's own calendar, kept inside FY 2026-27 (the only year these rules cover), the default sale date. */
+const todayIso = () => {
+  const d = new Date()
+  const t = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return t < R.fyStart ? R.fyStart : t > R.fyEnd ? R.fyEnd : t
+}
+const longDate = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+
+const harvestSpec: ToolSpec = {
+  id: 'ltcg-harvest',
+  rates: RATES_AS_OF,
+  title: 'LTCG harvesting',
+  blurb: 'Use your free ₹1.25 lakh of gains before March',
+  category: 'tax',
+  verified: { source: 'Income-tax Act 2025 ss.196-198, 2(101), 90(7)-(8) (Gazette text); Finance Act 2026' },
+  keywords: ['ltcg', 'harvest', 'harvesting', '1.25 lakh', '125000', 'equity', 'mutual fund', 'shares', 'grandfathering', 'tax free gain', 'rebalance'],
+  fields: [
+    {
+      id: 'holdings',
+      label: 'Your shares and equity funds',
+      kind: 'rows',
+      min: 1,
+      max: 8,
+      columns: [
+        { id: 'name', label: 'Name', kind: 'text' },
+        { id: 'buy', label: 'Bought on', kind: 'date' },
+        { id: 'cost', label: 'What you paid', kind: 'number', unit: 'rupee' },
+        { id: 'value', label: 'Worth now', kind: 'number', unit: 'rupee' },
+        { id: 'fmv', label: 'Worth on 31 Jan 2018', kind: 'number', unit: 'rupee' },
+      ],
+      defaultRows: [
+        ['Index fund', '2024-01-10', '100000', '160000', ''],
+        ['Flexi-cap fund', '2025-01-01', '200000', '300000', ''],
+      ],
+      hint: 'Totals for each holding. Fill the 31 Jan 2018 box only for something bought before 1 Feb 2018. Shares and equity funds count only if STT was paid.',
+    },
+    money('booked', 'Long-term gains already booked this year', '0', 'Net of long-term losses: type a minus sign for a net loss. The ₹1,25,000 is shared by all your shares and equity funds.'),
+    { id: 'sell', label: 'Sell on', kind: 'date', default: todayIso(), hint: 'Must fall in FY 2026-27 (1 Apr 2026 to 31 Mar 2027).' },
+  ],
+  compute: (v) => {
+    const junk = junkOptional(v, [{ id: 'booked', label: 'Gains already booked' }])
+    if (junk) return junk
+    const rows = Array.isArray(v.holdings) ? v.holdings : []
+    const hs: Holding[] = []
+    for (const [i, row] of rows.entries()) {
+      const [name = '', buy = '', cost = '', value = '', fmv = ''] = row
+      if ([name, buy, cost, value, fmv].every((c) => c.trim() === '')) continue
+      const label = name.trim() || `Holding ${i + 1}`
+      const c = parseNum(cost)
+      const w = parseNum(value)
+      if (!buy.trim() || !c || !w) return { error: `Fill in the date, cost and value of ${label}` }
+      if (fmv.trim() !== '' && parseNum(fmv) === null) return { error: `${label}: the 31 Jan 2018 value isn't a number` }
+      hs.push({ name: name.trim() || label, buyDate: buy.trim(), cost: c, value: w, fmv2018: parseNum(fmv) })
+    }
+    const out = harvestLtcg(hs, { sellDate: String(v.sell ?? ''), booked: opt(v, 'booked') }, R)
+    if ('error' in out) return out
+
+    const ex = r0(out.exemption)
+    const rows2: ResultRow[] = [
+      { label: 'Gain you can book tax-free now', value: out.toBook, fmt: 'money', main: true },
+      { label: 'Tax-free room left this year', value: out.headroom, fmt: 'money' },
+      { label: 'Long-term gain across your holdings', value: out.longTermAvailable, fmt: 'money' },
+      { label: `Tax you avoid later (${R.capitalGains.ltcgPct}% + cess)`, value: out.taxSavedWithCess, fmt: 'money', ...(out.taxSavedWithCess.gt(0) ? { tone: 'positive' as const } : {}) },
+    ]
+    if (out.leftOver.gt(0)) rows2.push({ label: 'Gain left for next year', value: out.leftOver, fmt: 'money' })
+
+    const table: ResultTable = {
+      title: 'What to sell, holding by holding',
+      columns: ['Holding', 'Gain', 'Book now', 'Sell worth'],
+      fmts: ['text', 'money', 'money', 'money'],
+      rows: out.holdings.map((h) => [h.name, h.gain, h.planGain, h.planSell]),
+    }
+    const waiting = out.holdings.filter((h) => h.term === 'short').map((h) => `${h.name} turns long-term on ${longDate(h.longTermFrom)}`)
+    const losses = out.holdings.filter((h) => h.term === 'long' && h.gain.isNegative())
+    const grand = out.holdings.filter((h) => h.grandfathered)
+
+    const verdict = out.headroom.isZero()
+      ? ` You have already used the ₹${ex} free this year, so any more long-term gain is taxed at ${R.capitalGains.ltcgPct}%.`
+      : out.toBook.isZero()
+        ? ' None of your holdings has a long-term gain to book yet.'
+        : ` Selling these and buying the same back lifts your cost, so this gain never meets the ${R.capitalGains.ltcgPct}% rate later.`
+    return {
+      rows: rows2,
+      table,
+      formula: [
+        `Tax-free room = ₹${ex} − gains already booked = ₹${r0(out.headroom)}`,
+        'Long-term means held more than 12 months. Gain = worth now − cost',
+        ...(grand.length ? [`Bought before 1 Feb 2018 (${grand.map((h) => h.name).join(', ')}): cost = higher of what you paid and the lower of (31 Jan 2018 value, worth now)`] : []),
+        `Tax avoided = ₹${r0(out.toBook)} × ${R.capitalGains.ltcgPct}% = ₹${r0(out.taxSaved)}, + 4% cess = ₹${r0(out.taxSavedWithCess)}`,
+      ],
+      note:
+        `The plan fills the room with long-term gains in the order you listed them, selling only part of a holding if that is all that fits.` +
+        verdict +
+        (waiting.length ? ` ${waiting.join('; ')}.` : '') +
+        (losses.length ? ` ${losses.map((h) => h.name).join(', ')} is at a long-term loss: selling it too would let you book that much more gain free.` : '') +
+        ` The tax avoided assumes you would later sell the same units above the free limit. Not included: the reduction for low other income (it can only lower your tax), surcharge, brokerage and exit loads. The ₹${ex} is per person across all shares and equity funds. ${NOTE}`,
+    }
+  },
+}
+
 // ---- E7 presumptive (44ADA) -----------------------------------------------------------
 
 const presumptiveSpec: ToolSpec = {
@@ -504,4 +720,4 @@ const presumptiveSpec: ToolSpec = {
   },
 }
 
-export const TOOLS: ToolSpec[] = [incomeTaxSpec, salarySpec, cgSpec, advanceSpec, gratuitySpec, presumptiveSpec]
+export const TOOLS: ToolSpec[] = [incomeTaxSpec, salarySpec, cgSpec, advanceSpec, gratuitySpec, hraSpec, harvestSpec, presumptiveSpec]

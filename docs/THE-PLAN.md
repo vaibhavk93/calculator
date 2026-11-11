@@ -30,7 +30,7 @@ history, not plans.
 
 | | |
 |---|---|
-| **Calculators** | **60** (docs elsewhere still say 51 or 57 — those are stale) |
+| **Calculators** | **61** (HRA exemption added 2026-11-06; docs elsewhere still say 51/57/60 — those are stale) |
 | **Tabs** | Calculate · Tools · Notes (+To-do) · Due · Budget |
 | **Budget** | expenses, categories + subcategories, cards/accounts, limits per month, bills & subscriptions, statement cycles, refunds, trips, heatmap, CSV export/import, bank-message scan |
 | **Notes** | saved calculations, lists (label + amount), to-dos, **plain text notes** (Block C, 2026-11-05) |
@@ -144,9 +144,14 @@ critic (per the project's own rule on big suggestions) pushed back once and the 
 | B6 | Fix `HistorySheet → HistoryRowSheet`: bring it in line with the picker-sheet rule already written in `FORMS-AND-SHEETS.md` — swap the view inside one sheet, or promote History to a full-screen push with the row detail as its one sheet | S | **Done** — `HistorySheet` now returns `HistoryRowSheet` in its own place instead of rendering both; `HistoryRowSheet` does the same for its own "Copy as" sheet (the same stacking bug, one level deeper, caught in the same pass). `npm run check` 2529/2529 |
 | B7 | **Finish B4/B5: apply the three-tier rule to Tools home** group pages. This is the highest-value single item here — it is the screen the owner actually spends the most time in | M | **Done** — every group page's sections converted from same-coloured tinted cards to hairline `.group` lists (confirmed in the browser: a group page was one undifferentiated colour wash, since every section inside one group shares the group's single tint — the tint never told sections apart, it just repeated). Kept: the tile grid and the small per-row colour dots (both already minimal, both explicitly sanctioned by `DESIGN-SYSTEM.md`'s "where a tint may appear" — checked, not assumed. `ToolScreen.tsx`'s own tinted input card is separately sanctioned the same way and is intentionally out of scope here |
 | B8 | Sweep the remaining `tintStyle` users for the same treatment: `SpendSummary.tsx`, `ManageScreen.tsx`, `BillsScreen.tsx`, `ImportScreen.tsx`, `ExportSheet.tsx`, `CategoryEditSheet.tsx`, `InstrumentForm.tsx`, `limits.tsx`, `SettingsScreen.tsx`, `TipsAndTours.tsx` — case by case: some tint (a calculator's own input card, a group page's section cards) is explicitly correct per `DESIGN-SYSTEM.md`'s "Where a tint may appear" and should stay; only navigation-link and plain-content cards convert | M | **Done** — one CSS change instead of ten edits: `.sect` / `.sect__head` became a bare titled group (small `ink-2` heading, hairline rows, no card), which converted Settings, Manage, Import, Bills, Spend Summary and Tips at once. The Total / Per-year figures are now bare (tier 1). Kept on purpose: the `save__card` form cards inside sheets and `ToolScreen`'s input card (sanctioned input cards). Also fixed a doubled hairline between bills. Verified: `npm run check` 2529, layout-contract 144/144, qa-budget-new and shell suites show no new failures vs HEAD (7 contrast checks now pass) |
-| B9 | **Ask, don't guess, about density/IA.** Once B6–B8 ship: a short, specific round with the owner — which screen still feels wrong, and in what way (too much to read, too many taps to get somewhere, colours/type feel busy, the 5-tab split itself). The critic's point stands: a grep-based audit cannot see visual fatigue or judge information architecture; only looking at it with the owner can | — | Planned, after B7/B8 |
+| B9 | **Ask, don't guess, about density/IA.** Once B6–B8 ship: a short, specific round with the owner — which screen still feels wrong, and in what way (too much to read, too many taps to get somewhere, colours/type feel busy, the 5-tab split itself). The critic's point stands: a grep-based audit cannot see visual fatigue or judge information architecture; only looking at it with the owner can | — | **Done** — owner's answer: Budget home and Tools felt most cluttered; Notes/Due should offer both list and card views. Researched card/carousel/bento-grid patterns first (NN/g, UX StackExchange, 2026 fintech trend pieces) before building anything — verdict: carousels/bento don't fit this app's own banned-gradient/no-shadow rules, progressive disclosure does. Led to B10/B11 below |
+| B10 | List/Card view toggle for **Notes** and **Due**, owner's choice, persisted (`settings.notesCardView`, `settings.dueCardView`) | M | **Done** 2026-11-05/06 — `CardTile`/`.due-card` reuse the same non-overlapping flex geometry as the existing row components, so the layout-contract overlap/44px checks pass unmodified. Verified in browser + `npm run check` |
+| B11 | **Budget home**: collapse the 4 pure-navigation rows (Spending summary, Bills, Add from bank messages, Categories and cards) behind one "More in Budget" row + sheet, same progressive-disclosure pattern as B4's Notes "More" | S | **Done** 2026-11-06 — cuts the always-visible row count from ~13 toward ~9. Fallout: ~25 e2e call sites across 7 files updated to open the sheet first; one new snackbar-intercepts-click timing bug found and fixed. Full account: `docs/SESSION-STATE.md` Round 19 |
+| B12 | **Tools home density** — owner's own answer to B9 named Tools as cluttered too, but it was never acted on: the earlier critic found no equivalent collapsible low-value content there the way Budget had its 4 nav rows | M | **Not started** — needs a fresh look (B7/B8 already converted Tools' cards to hairline groups; this is a *second*, distinct complaint about row count/grouping, not card styling) |
 
-**What this means for "redesign the entire app if required":** the evidence does not support a from-scratch rebuild — it would discard real, tested, now-verified-on-device work (Block A, B1–B5) to re-solve problems B7/B8 already have a proven fix for. The honest scope is: finish applying the already-working three-tier system everywhere (B7, B8), fix the one confirmed broken rule (B6), then check with the owner directly whether what's left is still wrong (B9) before considering anything larger.
+**What this means for "redesign the entire app if required":** the evidence does not support a from-scratch rebuild — it would discard real, tested, now-verified-on-device work (Block A, B1–B5) to re-solve problems B7/B8 already have a proven fix for. The honest scope is: finish applying the already-working three-tier system everywhere (B7, B8), fix the one confirmed broken rule (B6), then check with the owner directly whether what's left is still wrong (B9) before considering anything larger. **B9's answer led to B10-B12**, not a rebuild.
+
+**One pre-existing bug found while verifying B11, not fixed (out of scope, flagged separately):** "Use in another tool" picks the target calculator correctly but the final navigation never completes — confirmed broken on `dev` before any of this session's changes (`git stash` comparison). Spawned as its own background task rather than folded into B11.
 
 ### Block C — Notes becomes a real Notes tab
 
@@ -216,6 +221,13 @@ row. Hide-amounts flag (local). Cut: categories/platform/folio/note, units and g
 XIRR/invested (P2), reminders (P2). Files: `src/engine/investments/portfolio.ts`, `src/lib/portfolio.ts`, store types/persistence/app, one
 screen + sheet inside `features/budget`. Additive, schema stays 3. Waits for D1 (same store files) and for the card/list design decision.
 
+**Built (branch worktree-agent-a6463555a5fc13c7b, from dev 42e0217).** `src/engine/investments/portfolio.ts` (pure maths), `src/lib/portfolio.ts` (words, form checks,
+`sanitizePortfolio`), `portfolio?` on the stored data (schema stays 3), five actions in `app.ts`, `features/budget/PortfolioScreen.tsx` reached from "More in Budget"
+(and from the empty Budget list, or it could not be reached before the first expense). Choices: amounts hidden by default (screen state only); a value on the same day
+replaces that day; the 121st value drops the oldest; a month that lacks a holding's first value leaves it out and says so in words on that month's row; a value dated one day ahead is
+kept on load (phone in another time zone), two days ahead is dropped. Tests: `engine/investments/portfolio.test.ts`, `store/portfolio.test.ts`, `store/qa-privacy-portfolio.test.ts`,
+`src/portfolio-rules.test.ts`, browser pass `e2e/portfolio.test.mjs`. One CSS line added (`.empty > .btn { flex: none }`): the extra empty-list row squeezed the Add button to 23px at 360x640.
+
 ### Phase 7 — modules on/off (owner: build it; critic shrank it, 2026-11-05)
 
 **Two switches only: "Budget" and "Notes and reminders" (Notes + Due together). Tools is always on.** One `modules: { budget, notes }`
@@ -224,6 +236,12 @@ in settings, default on, sanitised so old backups load as everything on; one `ta
 Hide, never delete; a hidden tab falls back to Calculate when read, stored `startupTab` is never rewritten. Hides the matching calculator
 result icons and the bank-message reader. Reminders keep ringing with the Due tab hidden (hint line says so). Cut: presets, first-run
 question, inner switches, "pause reminders". To verify first: whether Budget bills schedule notifications. Size M, after the UI group.
+
+**Built (branch worktree-agent-aea3c8d23e875e665).** `src/lib/modules.ts` (`tabOn`, `moduleOn`, `startTab`, `withModule`), `sanitizeModules` in persistence, a
+"Show in the app" group in Settings, tests in `src/store/modules.test.ts`, browser pass in `e2e/modules.test.mjs`. **Verified: Budget bills DO schedule
+notifications** (every bill owns a Due card and a reminder), so the Budget switch hint says bill reminders still ring. With both switches off the bar has 2 tabs
+(Calculate, Tools), not 3. Also hidden with Notes off: the Save button and the next-step chip on a calculator, "Export notes". Not hidden: reminder time and
+permission rows in Settings (reminders still ring). A "missed reminder" banner lives on Due, so it is not seen while Due is hidden.
 
 ### Block F — Phone truth
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { useApp } from '../../components/StoreProvider'
 import { D } from '../../engine'
+import { moduleOn } from '../../lib/modules'
 import { ExpenseSheet } from '../budget/sheets'
 import { listSummary, tapeTotal } from '../../lib/tape'
 import { SaveSheet } from './SaveSheet'
@@ -27,11 +28,14 @@ export function ResultActions({ value, active }: { value: string; active: boolea
   const system = useApp((s) => s.settings.numberSystem)
   const decimals = useApp((s) => s.settings.decimals)
   const [open, setOpen] = useState<'list' | 'remind' | 'expense' | null>(null)
+  // "Show in the app": a hidden module's icon is not offered (what is already saved stays).
+  const notesOn = useApp((s) => moduleOn(s.settings, 'notes'))
+  const budgetOn = useApp((s) => moduleOn(s.settings, 'budget'))
 
   const show = active && PLAIN_NUMBER.test(value)
   // "Add expense" only for a positive amount that is still at least 1 paisa after rounding to 2 places.
   const expenseAmount = show ? new D(value).toDecimalPlaces(2).toFixed() : '0'
-  const canExpense = show && new D(expenseAmount).gt(0)
+  const canExpense = show && budgetOn && new D(expenseAmount).gt(0)
 
   const line = { id: 'one', label: '', value }
   const lines = [line]
@@ -41,12 +45,16 @@ export function ResultActions({ value, active }: { value: string; active: boolea
       <div className="result-actions" role={show ? 'group' : undefined} aria-label={show ? 'What to do with this result' : undefined}>
         {show && (
           <>
-            <button type="button" className="result-actions__btn" aria-label="Add to a list" title="Add to a list" onClick={() => setOpen('list')}>
-              <Icon name="list" size={20} />
-            </button>
-            <button type="button" className="result-actions__btn" aria-label="Remind me" title="Remind me" onClick={() => setOpen('remind')}>
-              <Icon name="due" size={20} />
-            </button>
+            {notesOn && (
+              <>
+                <button type="button" className="result-actions__btn" aria-label="Add to a list" title="Add to a list" onClick={() => setOpen('list')}>
+                  <Icon name="list" size={20} />
+                </button>
+                <button type="button" className="result-actions__btn" aria-label="Remind me" title="Remind me" onClick={() => setOpen('remind')}>
+                  <Icon name="due" size={20} />
+                </button>
+              </>
+            )}
             {canExpense && (
               <button type="button" className="result-actions__btn" aria-label="Add expense" title="Add expense" onClick={() => setOpen('expense')}>
                 <Icon name="budget" size={20} />

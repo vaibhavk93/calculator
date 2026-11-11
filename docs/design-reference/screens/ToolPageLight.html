@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tool page — Loan EMI — light</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FFFFFF}
+.mono{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+.chip{all:unset;padding:7px 12px;border-radius:20px;border:1px solid #DEDEDE;background:#F2F2F2;color:#121212;font-size:0.76rem}
+.seg{all:unset;flex:1;text-align:center;padding:8px;border-radius:8px;font-size:0.8rem;color:#525252}
+.seg.active{background:#CCD539;color:#121300;font-weight:600}
+</style>
+</helmet>
+<div style="width:390px;height:844px;background:#FFFFFF;color:#121212;font-family:'IBM Plex Sans',sans-serif;display:flex;flex-direction:column;overflow:hidden;position:relative">
+
+  <div style="display:flex;align-items:center;gap:8px;padding:18px 16px 10px">
+    <button aria-label="Back" style="all:unset;width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#121212"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <span style="display:flex;align-items:center;gap:7px;font-weight:600;font-size:1rem"><span style="width:9px;height:9px;border-radius:50%;background:#7C8CF2;display:inline-block"></span>Loan EMI</span>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:4px 20px 24px;display:flex;flex-direction:column;gap:28px">
+
+    <div style="background:#F7F7F7;border:1px solid #DEDEDE;border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:16px">
+      <div>
+        <label for="la" style="font-size:0.78rem;color:#525252">Loan amount *</label>
+        <input id="la" value="50,00,000" style="all:unset;display:block;font-family:'IBM Plex Mono';font-size:1.5rem;color:#121212;margin-top:3px;width:100%">
+        <div style="font-size:0.78rem;color:#5D5D5D;margin-top:2px">50 lakh</div>
+      </div>
+      <div style="display:flex;gap:8px"><button class="chip">+1K</button><button class="chip">+10K</button><button class="chip">+1L</button></div>
+      <div style="height:1px;background:#DEDEDE"></div>
+      <div>
+        <label for="rt" style="font-size:0.78rem;color:#525252">Interest rate (p.a.) *</label>
+        <input id="rt" value="8.5%" style="all:unset;display:block;font-family:'IBM Plex Mono';font-size:1.5rem;color:#121212;margin-top:3px;width:100%">
+      </div>
+      <div style="height:1px;background:#DEDEDE"></div>
+      <div>
+        <label for="dur" style="font-size:0.78rem;color:#525252">Duration *</label>
+        <input id="dur" value="20" style="all:unset;display:block;font-family:'IBM Plex Mono';font-size:1.5rem;color:#121212;margin-top:3px;width:100%">
+      </div>
+      <div style="display:flex;background:#F2F2F2;border-radius:10px;padding:3px">
+        <button class="seg active">Years</button><button class="seg">Months</button><button class="seg">Days</button>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+      <div style="font-size:0.82rem;color:#525252">Your EMI</div>
+      <div class="mono" style="font-size:2.7rem;font-weight:500;line-height:1">₹43,391.16</div>
+    </div>
+
+    <div>
+      <div style="font-size:0.78rem;color:#5D5D5D;margin-bottom:8px">Breakdown</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #DEDEDE"><span style="font-size:0.88rem;color:#525252">Total interest</span><span class="mono" style="font-size:0.92rem">₹54,13,878.80</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0"><span style="font-size:0.88rem;color:#525252">Total amount payable</span><span class="mono" style="font-size:0.92rem">₹1,04,13,878.80</span></div>
+    </div>
+
+    <div>
+      <div style="font-size:0.82rem;color:#525252;margin-bottom:10px">Principal vs interest</div>
+      <div style="display:flex;height:14px;border-radius:4px;overflow:hidden">
+        <div style="width:48%;background:#121212" title="Principal 48%"></div>
+        <div style="width:52%;background:#CCD539" title="Interest 52%"></div>
+      </div>
+      <div style="display:flex;gap:18px;margin-top:10px;font-size:0.76rem;color:#525252">
+        <span><span style="display:inline-block;width:8px;height:8px;background:#121212;border-radius:2px;margin-right:5px"></span>Principal — ₹50,00,000</span>
+      </div>
+      <div style="font-size:0.76rem;color:#525252;margin-top:4px"><span style="display:inline-block;width:8px;height:8px;background:#CCD539;border-radius:2px;margin-right:5px"></span>Interest — ₹54,13,878.80</div>
+    </div>
+
+    <div style="background:#F7F7F7;border:1px solid #DEDEDE;border-radius:10px;padding:14px 16px">
+      <div style="font-size:0.8rem;font-weight:600;margin-bottom:6px">How this is worked out</div>
+      <div style="font-size:0.84rem;color:#525252;line-height:1.55">EMI = P × r × (1+r)ⁿ ÷ ((1+r)ⁿ − 1), where P is principal, r the monthly rate, and n the number of months.</div>
+    </div>
+
+    <div style="font-size:0.74rem;color:#5D5D5D;line-height:1.5">For estimation only. Actual EMI depends on your lender's exact rate, processing fees and reset schedule.</div>
+
+    <div style="display:flex;gap:10px">
+      <button style="all:unset;flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#F2F2F2;border-radius:10px;padding:12px;font-size:0.85rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="1.5" stroke="#121212" stroke-width="1.6"/><path d="M5 16V5a1 1 0 0 1 1-1h11" stroke="#121212" stroke-width="1.6"/></svg>Copy</button>
+      <button style="all:unset;flex:1;display:flex;align-items:center;justify-content:center;gap:6px;background:#F2F2F2;border-radius:10px;padding:12px;font-size:0.85rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15V3m0 0 4 4m-4-4L8 7" stroke="#121212" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" stroke="#121212" stroke-width="1.6"/></svg>Share</button>
+      <button aria-label="More options" style="all:unset;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:#F2F2F2;border-radius:10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+    </div>
+
+  </div>
+
+  <div style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#F7F7F7;border-top:1px solid #DEDEDE">
+    <div style="display:flex;flex-direction:column">
+      <span style="font-size:0.68rem;color:#5D5D5D">EMI</span>
+      <span class="mono" style="font-size:1rem;font-weight:500">₹43,391.16</span>
+    </div>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 15l6-6 6 6" stroke="#525252" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+  <div style="position:absolute;top:60px;left:0;right:0;text-align:center;font-size:0.68rem;color:#B0B0B0">↑ floating answer bar — shown only once the hero has scrolled off-screen</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

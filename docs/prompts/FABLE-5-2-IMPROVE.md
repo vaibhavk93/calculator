@@ -26,7 +26,7 @@ prompt-engineering / prompting-claude-fable-5-2) and the Fable 5.1 guidance that
 ---
 
 I'm Vaibhav, the owner and only user of Calc: an Android calculator app (React, TypeScript, Vite, Capacitor) with everyday maths,
-60 calculators for loans and Indian investments and tax, notes, to-dos, reminders (the Due tab) and a budget. I want to use it every day
+60+ calculators for loans and Indian investments and tax, notes, to-dos, reminders (the Due tab) and a budget. I want to use it every day
 and later put it on the Play Store. Over many sessions, several AI models built a lot, fast. The result works, but I don't fully trust
 it: tests have reported green while failing, some e2e suites are flaky or stale, docs disagree with each other, and I still find most
 screens less good than the basic calculator page. You are the most capable model I have. I'm using you for the hard part: finding
@@ -48,7 +48,7 @@ By the end of this session I want these four things, in this priority order:
    run the app, take screenshots at 320, 360 and 412 px wide, at 100% and 200% font, in dark and light, and look at them yourself.
    Judge hierarchy, spacing, density, number of taps and pop-ups against `docs/DESIGN-SYSTEM.md`, `docs/UX-GUIDELINES.md` and
    `docs/FORMS-AND-SHEETS.md`. Fix what you can defend; for anything subjective, show me before and after screenshots and say why.
-   Tools home is the open complaint (see `docs/SESSION-STATE.md`, Rounds 17 to 19).
+   The latest redesign in `docs/design-reference/` (see `docs/SESSION-STATE.md`, Round 22) is the target; check every screen follows it.
 4. **A new session can start from the docs without reading 50 files.** There are about 50 files in `docs/`. Many are history, and some
    counts in them are stale. Make one current map: what each doc is for, which are history, and a short honest state of the app.
    Don't delete docs files; mark them.

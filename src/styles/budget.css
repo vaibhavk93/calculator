@@ -20,7 +20,7 @@
 .budget__hero {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-size: 2rem;
+  font-size: 2.5rem;
   font-weight: 500;
   color: var(--ink);
   /* One line, always. FitHero shrinks the size to fit; if even the smallest size is too wide it scrolls, it never wraps mid-number. */
@@ -541,7 +541,7 @@ button.heat__cell:active {
 
 .budget__entry--off .budget__main--pick {
   cursor: default;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 .budget__tick {
@@ -612,4 +612,324 @@ button.heat__cell:active {
 }
 .tap-row__chev--open {
   transform: rotate(90deg);
+}
+
+/* ------------------------------------------------ Budget home: Spending / Net worth (docs/design-reference, "Budget home") */
+
+/* The view switch: the shared Segmented, drawn as one two-part control across the width. */
+.budget__seg {
+  flex: none;
+  padding: 0 var(--s-4) var(--s-2);
+}
+
+/* The pill switch: a surface tray with the chosen option filled with the accent. Budget's Spending / Net worth,
+   Notes' and Due's List / Card (design reference). The options are wide, so 36px tall is still a 44px+ target. */
+.budget__seg .seg,
+.saved__view .seg,
+.due__view .seg,
+.tool__form .unit-switch .seg {
+  flex-wrap: nowrap;
+  gap: 0;
+  padding: var(--s-1);
+  background: var(--raised);
+  border-radius: var(--r-md);
+  border-bottom: 0;
+}
+
+.budget__seg .seg__opt,
+.saved__view .seg__opt,
+.due__view .seg__opt,
+.tool__form .unit-switch .seg__opt {
+  margin-bottom: 0;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 36px;
+  padding: var(--s-1) var(--s-2);
+  border-bottom: 0;
+  border-radius: var(--r-sm);
+  overflow-wrap: anywhere;
+}
+
+.budget__seg .seg__opt[aria-checked='true'],
+.saved__view .seg__opt[aria-checked='true'],
+.due__view .seg__opt[aria-checked='true'],
+.tool__form .unit-switch .seg__opt[aria-checked='true'] {
+  background: var(--accent-fill);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+/* Under the shared Budget header the empty state's title is an h2; it keeps the h1's look. */
+.budget .empty h2 {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+
+/* The one flat panel: monthly limit and "Needs attention" are one idea (how worried should you be). */
+.budget__panel {
+  margin: var(--s-2) var(--s-4) 0;
+  background: var(--surface);
+  border-radius: var(--r-md);
+}
+
+.budget__limit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+}
+
+.budget__limit-head {
+  align-self: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-1) var(--s-3);
+}
+
+.budget__limit + .budget__attention {
+  border-top: 1px solid var(--line);
+}
+
+.budget__panel-title {
+  margin: 0;
+  padding: var(--s-3) var(--s-4) 0;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+/* Inside the panel the rows sit on the panel itself: no hairline between the title and the first row. */
+.budget__attention .budget__row:first-of-type {
+  border-top: 0;
+}
+
+/* Recent entries: what it was on the left, the signed amount on the right; wraps beneath at a large font. */
+.budget__recent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+
+.budget__recent > .row__text {
+  flex: 1 1 10rem;
+}
+
+.budget__recent > .row__text > *,
+.networth__row > .row__text > * {
+  overflow-wrap: anywhere;
+}
+
+.budget__recent > .budget__amt,
+.networth__row > .budget__amt {
+  flex: none;
+  margin-left: auto;
+}
+
+.group > .budget__recent:last-child,
+.group > .networth__row:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+/* Money in: the only green figure on the screen, and its line says "Money in" too. */
+.budget__amt--in {
+  color: var(--positive);
+}
+
+.budget__more {
+  margin-top: var(--s-4);
+}
+
+.budget__more + .budget__add {
+  margin-top: var(--s-4);
+}
+
+/* Net worth */
+.networth__stale {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  margin: var(--s-2) var(--s-4) 0;
+  padding: var(--s-3) var(--s-4);
+  background: var(--surface);
+  border-radius: var(--r-md);
+  font-size: 0.875rem;
+  color: var(--ink);
+}
+
+.networth__stale > .icon {
+  flex: none;
+  margin-top: 2px;
+}
+
+.networth__stale-sub {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+
+.networth__fresh {
+  margin: 0 var(--s-4);
+}
+
+.networth__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: 0 var(--s-4) var(--s-3);
+}
+
+.networth__split {
+  display: flex;
+  height: 12px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.networth__split > span {
+  display: block;
+  min-width: 2px;
+}
+
+.networth__legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.networth__legend > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--s-2);
+  font-size: 0.875rem;
+}
+
+.networth__kind {
+  flex: 1 1 8rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.networth__dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--r-lg);
+}
+
+.networth__trend {
+  display: flex;
+  gap: var(--s-2);
+  height: 96px;
+  margin: 0 var(--s-4);
+}
+
+.networth__col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s-1);
+}
+
+.networth__well {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: flex-end;
+}
+
+.networth__bar {
+  display: block;
+  width: 100%;
+  background: var(--ink-3);
+  border-radius: var(--r-sm);
+}
+
+.networth__bar--now {
+  background: var(--ink);
+}
+
+.networth__bar--negative {
+  background: var(--negative);
+}
+
+.networth__month {
+  flex: none;
+  font-size: 0.75rem;
+  color: var(--ink-2);
+  text-align: center;
+  /* Never split a month name; at 200% font a long one ("Sept") spills a little into the gap beside it. */
+  white-space: nowrap;
+}
+
+.networth__gap {
+  margin: var(--s-2) var(--s-4) 0;
+}
+
+.networth__cat {
+  margin-top: var(--s-4);
+}
+
+.networth__cathead {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 0 var(--s-4) var(--s-2);
+}
+
+.networth__catname {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.networth__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+
+.networth__row > .row__text {
+  flex: 1 1 9rem;
+}
+
+/* The clock sits inline before the words, so the line wraps as text. */
+.networth__age > .icon {
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: -2px;
+}
+
+.networth > .budget__add {
+  margin-top: var(--s-4);
+}
+
+/* Pace and Change limits share one line; each keeps its 44px tap height. */
+.budget__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s-4);
+  margin-left: calc(-1 * var(--s-1));
 }

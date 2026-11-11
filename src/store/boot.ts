@@ -19,7 +19,7 @@ export async function bootStore(storage: KeyValueStorage): Promise<Booted> {
   const { data: initial, failed } = await loadChecked(storage)
   const store = createAppStore(initial)
 
-  const pick = (s: ReturnType<typeof store.getState>) => [s.input, s.history, s.cards, s.reminders, s.memory, s.settings, s.budget, s.drafts] as const
+  const pick = (s: ReturnType<typeof store.getState>) => [s.input, s.history, s.cards, s.reminders, s.memory, s.settings, s.budget, s.portfolio, s.drafts] as const
   let saved = pick(store.getState())
   let timer: ReturnType<typeof setTimeout> | undefined
 

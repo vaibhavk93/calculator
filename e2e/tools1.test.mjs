@@ -79,8 +79,8 @@ async function openTool(page, t, how = 'group') {
     await page.locator('input[aria-label="Search calculators"]').fill(t.title)
     await page.locator('.tools__list .navrow', { has: page.getByText(t.title, { exact: true }) }).first().click()
   } else {
-    await page.locator('.group[aria-label="Browse by what you need"] .navrow', { hasText: t.group }).click()
-    await page.locator('.screen .navrow', { has: page.getByText(t.title, { exact: true }) }).first().click()
+    await page.locator('.gtiles[aria-label="Groups"] .gtile', { hasText: t.group }).click()
+    await page.locator('.screen .gtile', { has: page.getByText(t.title, { exact: true }) }).first().click()
   }
   await scr(page, t).waitFor({ timeout: 5000 })
   return scr(page, t)
@@ -247,29 +247,29 @@ def('T1-SEARCH-case', 'CORNER', 'Search ignores case and surrounding spaces', ()
     fail(!names.includes('Loan EMI') ? `got ${names.join(', ')}` : '')
   }),
 )
-def('T1-GROUPS-counts', 'UX', 'Each group row count matches the rows on its page (Math 2, Money 5, Units 3, Dates 5, Loans 13)', () =>
+def('T1-GROUPS-counts', 'UX', 'Each group row count matches the rows on its page (Math 2, Money 6, Units 3, Dates 5, Loans 13)', () =>
   withPage({}, async ({ page }) => {
     await tab(page, 'Tools')
-    const want = { 'Math and numbers': 2, 'Money and shopping': 5, 'Units and travel': 3, 'Dates and health': 5, 'Loans and EMI': 13 }
+    const want = { 'Math and numbers': 2, 'Money and shopping': 6, 'Units and travel': 3, 'Dates and health': 5, 'Loans and EMI': 13 }
     const bad = []
     for (const [g, n] of Object.entries(want)) {
-      const shown = await page.locator('.group[aria-label="Browse by what you need"] .navrow', { hasText: g }).locator('.navrow__meta').innerText()
-      if (shown !== String(n)) bad.push(`${g}: list shows "${shown}", want ${n}`)
-      await page.locator('.group[aria-label="Browse by what you need"] .navrow', { hasText: g }).click()
-      const k = await page.locator('.screen .navrow').count()
+      const shown = await page.locator('.gtiles[aria-label="Groups"] .gtile', { hasText: g }).locator('.gtile__count').innerText()
+      if (shown !== `${n} tools`) bad.push(`${g}: list shows "${shown}", want ${n}`)
+      await page.locator('.gtiles[aria-label="Groups"] .gtile', { hasText: g }).click()
+      const k = await page.locator('.screen .gtile').count()
       if (k !== n) bad.push(`${g}: ${k} rows, row says ${n}`)
       await page.locator('.screen button[aria-label="Back"]').click()
     }
     fail(bad)
   }),
 )
-def('T1-GROUPS-tap', 'UI', 'Group rows and tool rows are at least 44px and show a chevron', () =>
+def('T1-GROUPS-tap', 'UI', 'Group tiles and tool tiles are at least 44px high', () =>
   withPage({}, async ({ page }) => {
     await tab(page, 'Tools')
-    const tiles = await page.locator('.group[aria-label="Browse by what you need"] .navrow').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
-    await page.locator('.group[aria-label="Browse by what you need"] .navrow', { hasText: 'Loans and EMI' }).click()
-    const rows = await page.locator('.screen .navrow').evaluateAll((els) => els.map((e) => ({ h: Math.round(e.getBoundingClientRect().height), chev: !!e.querySelector('.navrow__chev') })))
-    fail(tiles.some((h) => h < 44) ? `group row heights ${tiles}` : '', rows.some((r) => r.h < 44 || !r.chev) ? `rows ${JSON.stringify(rows.filter((r) => r.h < 44 || !r.chev))}` : '')
+    const tiles = await page.locator('.gtiles[aria-label="Groups"] .gtile').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)))
+    await page.locator('.gtiles[aria-label="Groups"] .gtile', { hasText: 'Loans and EMI' }).click()
+    const rows = await page.locator('.screen .gtile').evaluateAll((els) => els.map((e) => ({ h: Math.round(e.getBoundingClientRect().height) })))
+    fail(tiles.some((h) => h < 44) ? `group row heights ${tiles}` : '', rows.some((r) => r.h < 44) ? `tiles ${JSON.stringify(rows.filter((r) => r.h < 44))}` : '')
   }),
 )
 
@@ -1935,10 +1935,10 @@ def('T1-BACK-header', 'UX', 'Back in the header returns to the group page, then 
     await page.locator(`.screen[aria-label="${t.title}"] button[aria-label="Back"]`).click()
     const onGroup = await page.locator('.screen[aria-label="Loans and EMI"]').count()
     await page.locator('.screen[aria-label="Loans and EMI"] button[aria-label="Back"]').click()
-    const home = await page.locator('.group[aria-label="Browse by what you need"] .navrow').count()
+    const home = await page.locator('.gtiles[aria-label="Groups"] .gtile').count()
     await openTool(page, t)
     await tab(page, 'Tools')
-    const afterTap = await page.locator('.group[aria-label="Browse by what you need"] .navrow').count()
+    const afterTap = await page.locator('.gtiles[aria-label="Groups"] .gtile').count()
     fail(!onGroup ? 'Back did not land on the group page' : '', !home ? 'second Back did not land on Tools home' : '', !afterTap ? 'tapping Tools tab did not return to Tools home' : '')
     void s
   }),

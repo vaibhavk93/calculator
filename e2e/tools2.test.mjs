@@ -53,8 +53,8 @@ export const settle = (page) => page.evaluate(() => new Promise((r) => requestAn
 export async function openTool(page, id) {
   const s = SPEC[id]
   await tab(page, 'Tools')
-  await page.locator('.group[aria-label="Browse by what you need"] .navrow', { hasText: s.g }).click()
-  await page.locator('.navrow .row__label').filter({ hasText: exact(s.t) }).click()
+  await page.locator('.gtiles[aria-label="Groups"] .gtile', { hasText: s.g }).click()
+  await page.locator('.gtile .gtile__name').filter({ hasText: exact(s.t) }).click()
   await page.waitForSelector('.tool')
   await settle(page)
 }
