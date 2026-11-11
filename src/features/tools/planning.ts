@@ -1,5 +1,6 @@
 import { D, type Dec } from '../../engine/decimal'
 import { debtToIncome, emergencyFund, savingsRate, type DtiBand } from '../../engine/investments/planning'
+import { breakEven, profitAt } from '../../engine/metrics/breakEven'
 import { fromMargin, fromMarkup, fromPrice } from '../../engine/metrics/markup'
 import { formatDecimal } from '../../lib/format'
 import { junkOptional, need, parseNum, type Field, type ToolSpec } from '../../lib/tool'
@@ -177,4 +178,74 @@ const markupSpec: ToolSpec = {
   },
 }
 
-export const TOOLS: ToolSpec[] = [emergencySpec, dtiSpec, savingsRateSpec, markupSpec]
+const breakEvenSpec: ToolSpec = {
+  id: 'break-even',
+  title: 'Break-even',
+  blurb: 'Units and sales to cover fixed costs, and your margin of safety',
+  category: 'metrics',
+  keywords: ['break even', 'breakeven', 'bep', 'fixed costs', 'variable cost', 'contribution', 'margin of safety', 'shop', 'startup', 'units to sell', 'cost volume profit'],
+  fields: [
+    num('fixed', 'Fixed costs', '500000', 'rupee', 'Costs you pay whatever you sell: rent, salaries, loan EMIs. For the period you plan, e.g. a month or a year'),
+    num('price', 'Selling price per unit', '1000', 'rupee'),
+    num('variable', 'Variable cost per unit', '600', 'rupee', 'What each extra unit costs you: materials, packing, delivery, commission'),
+    num('planned', 'Units you plan to sell', '2000', 'none', 'Optional, for the same period as the fixed costs. Leave blank to skip the margin of safety'),
+  ],
+  compute: (v) => {
+    const r = need(v, [{ id: 'fixed', label: 'Fixed costs' }, { id: 'price', label: 'Selling price per unit' }, { id: 'variable', label: 'Variable cost per unit' }])
+    if (!r.ok) return r
+    const junk = junkOptional(v, [{ id: 'planned', label: 'Units you plan to sell' }])
+    if (junk) return junk
+    const planned = typeof v.planned === 'string' && v.planned.trim() === '' ? null : parseNum(v.planned)
+    const { fixed, price, variable } = r.n as Record<string, Dec>
+    if (fixed!.isNegative() || fixed!.isZero()) return { error: 'Fixed costs must be more than zero', field: 'fixed' }
+    if (price!.lte(0)) return { error: 'Selling price must be more than zero', field: 'price' }
+    if (variable!.isNegative()) return { error: "Variable cost can't be negative", field: 'variable' }
+    if (price!.lte(variable!)) return { error: 'Each unit loses money (the price is not above its variable cost), so you never break even. Raise the price or cut the variable cost', field: 'price' }
+    if (planned !== null && planned.lte(0)) return { error: 'Planned units must be more than zero. Leave it blank to skip', field: 'planned' }
+    const b = breakEven(fixed!, price!, variable!, planned)!
+    const q = b.planned
+    // A short profit table: nothing sold, half way, break-even, one and a half times, double, and the planned volume.
+    const at = new Map<string, Dec>()
+    for (const u of [new D(0), b.units.div(2).ceil(), b.units, b.units.times(1.5).ceil(), b.units.times(2), ...(q ? [q.units] : [])]) at.set(u.toFixed(), u)
+    const volumes = [...at.values()].sort((x, y) => x.cmp(y))
+    const short = q && q.safetyUnits.isNegative()
+    return {
+      rows: [
+        { label: 'Break-even units', value: b.units, fmt: 'int', main: true },
+        { label: 'Break-even sales', value: b.revenue, fmt: 'money' },
+        { label: 'Profit on each unit', value: b.contribution, fmt: 'money' },
+        { label: 'Profit as a share of the price', value: b.contributionPct, fmt: 'percent' },
+        ...(q
+          ? short
+            ? [
+                { label: 'Short of break-even by (units)', value: q.safetyUnits.abs(), fmt: 'int' as const },
+                { label: 'Loss at planned units', value: q.profit.abs(), fmt: 'money' as const, tone: 'negative' as const },
+              ]
+            : [
+                { label: 'Margin of safety (units)', value: q.safetyUnits, fmt: 'int' as const },
+                { label: 'Margin of safety', value: q.safetyPct, fmt: 'percent' as const },
+                { label: 'Profit at planned units', value: q.profit, fmt: 'money' as const },
+              ]
+          : []),
+      ],
+      table: {
+        title: 'Profit or loss at different volumes',
+        columns: ['Units', 'Sales', 'Total cost', 'Profit'],
+        fmts: ['int', 'money', 'money', 'money'],
+        rows: volumes.map((u) => [u, u.times(price!), fixed!.plus(u.times(variable!)), profitAt(fixed!, price!, variable!, u)]),
+      },
+      formula: [
+        'Profit on each unit = price − variable cost',
+        `${s(price!)} − ${s(variable!)} = ${s(b.contribution)}`,
+        'Break-even units = fixed costs ÷ profit on each unit, rounded up to a whole unit',
+        `${s(fixed!)} ÷ ${s(b.contribution)} = ${s(b.exactUnits, 4)}, so ${s(b.units, 0)} units; sales = ${s(b.units, 0)} × ${s(price!)} = ${s(b.revenue)}`,
+        ...(q ? ['Margin of safety = (planned units − break-even units) ÷ planned units', `(${s(q.units, 0)} − ${s(b.units, 0)}) ÷ ${s(q.units, 0)} = ${s(q.safetyPct)}%`] : []),
+      ],
+      note:
+        'Assumptions: the price and the variable cost per unit stay the same however much you sell, the fixed costs do not change, and everything you make is sold. Use the same period (a month or a year) for the fixed costs and the units. Taxes such as GST are left out, so enter prices and costs without GST.' +
+        (q && !short ? ' The margin of safety is how far sales can fall before you stop making a profit.' : ''),
+    }
+  },
+}
+
+export const TOOLS: ToolSpec[] = [emergencySpec, dtiSpec, savingsRateSpec, markupSpec, breakEvenSpec]

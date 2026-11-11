@@ -74,7 +74,7 @@ export const GROUPS: ToolGroup[] = [
     { title: 'Customers', tools: ['cac-ltv', 'cac-payback', 'retention'] },
     { title: 'Growth', tools: ['funnel', 'arr-mrr', 'rule-of-40'] },
     { title: 'Experiments', tools: ['ab-sample-size'] },
-    { title: 'Pricing', tools: ['markup'] },
+    { title: 'Pricing', tools: ['markup', 'break-even'] },
   ]),
 ]
 
