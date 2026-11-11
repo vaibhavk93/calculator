@@ -1,5 +1,16 @@
 # Session state: resume here
 
+## Round 20 (2026-11-11): a ready-to-paste prompt for a Fable 5.2 improvement session
+
+**Owner's prompt:** create a prompt to give Claude Fable 5.2 to improve this system, based on Anthropic's guidelines for prompting it.
+
+| Item | Status |
+|---|---|
+| Prompt written: `docs/prompts/FABLE-5-2-IMPROVE.md` (goal: trustworthy checks, correct numbers, screens up to the calculator page's bar, one doc map; then THE-PLAN's order of work) | Done |
+| Based on Anthropic's "Prompting Claude Fable 5.2" page (fetched 2026-11-11) and the Fable 5.1 guidance it builds on | Done |
+| No app code changed | — |
+| `docs/MODEL-GUIDE.md` still lists Fable 5.1 prices, not 5.2 | Open, small |
+
 ## Round 19 (2026-11-05/06): Budget home collapses to one "More" row; Tools still untouched
 
 **Continuing the Budget/Tools density question from Round 18** without re-asking: the evidence-backed move
