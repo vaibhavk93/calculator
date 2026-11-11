@@ -73,7 +73,7 @@ Decision: catch bank messages the moment they arrive so they wait for review. Th
 - The id includes the sender's own timestamp (second resolution). Two different real messages with the same sender, text and second would count as one. The app's own fingerprint check is the second guard.
 - Phone makers' battery savers can stop a receiver for apps they consider idle. A missed message is invisible; the manual scan is the backstop. See `docs/BUILD-ANDROID.md` section 4.
 - Each queue operation decrypts the whole file (at most 500 records). Fine for a queue that is nearly always short.
-- Not tested with a real incoming text on a phone (only fake ones through the same code path). The first real bank message is the final test.
+- Real delivery was seen once, by accident: while capture was on in the QA copy, a real promotional text from a letter-style sender arrived and was queued, so the system does deliver `SMS_RECEIVED` to the receiver. Not yet seen with a real bank message. Note it also shows the receiver queues promotions (by design: the parser decides), so expect noise in the queue.
 
 **Debug-only injection hook (debug and qa builds, absent from release).** Lives in `android/app/src/debug/` (the `qa` build type also compiles that folder, see `app/build.gradle`); `MainActivity` registers it by name only if the class exists. Two ways in, both go through `SmsReceiver.deliver()`, the same function a real text uses, so the on/off switch, permission check, sender filter and queue all apply:
 - TS: `debugInjectSms(sender, body, receivedAt?)` in `smsQueueNative.ts` (null on the web and in release).
