@@ -85,6 +85,8 @@ const openMoreIfNeeded = async (page) => {
 const toSummary = async (page) => { await openMoreIfNeeded(page); await page.getByRole('button', { name: /Spending summary/ }).first().click(); await pageOf(page, 'Spending summary').waitFor() }
 const toBills = async (page) => { await openMoreIfNeeded(page); await page.getByRole('button', { name: /Bills and subscriptions/ }).first().click(); await pageOf(page, 'Bills and subscriptions').waitFor() }
 const toManage = async (page) => { await openMoreIfNeeded(page); await page.getByRole('button', { name: /Categories and cards/ }).first().click(); await pageOf(page, 'Categories and cards').waitFor() }
+// Categories and cards is a two-state screen (design reference): the cards and accounts are on its Cards state.
+const toCards = async (page) => { await toManage(page); await pageOf(page, 'Categories and cards').getByRole('radio', { name: 'Cards', exact: true }).click() }
 const toImport = async (page) => { await openMoreIfNeeded(page); await page.getByText('Add from bank messages').first().click(); await pageOf(page, 'Add from messages').waitFor() }
 const SUM = (page) => pageOf(page, 'Spending summary')
 const entriesTab = (page) => SUM(page).getByRole('radio', { name: 'Entries', exact: true }).click()
@@ -430,7 +432,7 @@ T('B-201', 'POS', 'Repeats = Monthly on Add expense makes a bill: Bills page wor
   eq((b.recurring ?? []).length, 1)
   await toBills(page)
   const t = await bodyText(page)
-  has(t, '₹199 a month = ₹2,388 a year'); has(t, 'Per year, all running bills'); has(t, 'Next due')
+  has(t, 'Recurring spend'); has(t, '₹2,388 a year'); has(t, 'Monthly · due in')
   noBad(t)
 })
 T('B-202', 'POS', 'quarterly and yearly words are right', async (c) => {
@@ -439,7 +441,7 @@ T('B-202', 'POS', 'quarterly and yearly words are right', async (c) => {
   await addExpense(page, { amount: '12000', note: 'Domain', repeat: 'Yearly', date: '2026-06-01' })
   await toBills(page)
   const t = await bodyText(page)
-  has(t, '₹1,200 every 3 months = ₹4,800 a year'); has(t, '₹12,000 a year, about ₹1,000 a month')
+  has(t, 'Quarterly · due'); has(t, '₹1,200 every 3 months'); has(t, '₹12,000 a year'); has(t, '₹400'); has(t, '₹1,000')
 })
 T('B-203', 'POS', 'Mark paid in Due adds this period\'s expense once; a second tap does not double it', async (c) => {
   const { page } = await c.open({ budget: BASE() })
@@ -482,7 +484,7 @@ T('B-205', 'NEG', 'Edit bill: empty name and zero amount are refused in plain wo
   has(e, 'Give it a name'); has(e, 'Enter an amount above zero')
   await S(page).locator('#bill-title').fill('Netflix 4K'); await S(page).locator('#bill-amount').fill('649'); await save(page)
   await S(page).waitFor({ state: 'detached' })
-  has(await bodyText(page), '₹649 a month = ₹7,788 a year')
+  has(await bodyText(page), '₹649'); has(await bodyText(page), '₹7,788 a year')
 })
 T('B-206', 'UX', '"Add a bill" on the Bills page opens the sheet already on Monthly', async (c) => {
   const { page } = await c.open({ budget: BASE() }); await toBills(page)
@@ -670,24 +672,24 @@ T('B-401', 'POS', 'Paid with tree: UPI with no account chosen shows "Bank accoun
 })
 T('B-402', 'POS', 'credit utilisation: "Using 34% of ₹1,50,000 limit"; over the limit says so in words; no limit = no line', async (c) => {
   const { page } = await c.open({ budget: BASE({ expenses: [exp('2026-11-03', '51000', { mode: 'credit', instrumentId: 'i-neo' })] }) })
-  await toManage(page)
+  await toCards(page)
   has(await pageOf(page, 'Categories and cards').locator('.navrow', { hasText: 'Tata Neo' }).innerText(), 'Using 34%')
   has(await pageOf(page, 'Categories and cards').locator('.navrow', { hasText: 'Tata Neo' }).innerText(), '1,50,000')
   lacks(await pageOf(page, 'Categories and cards').locator('.navrow', { hasText: 'Visa Gold' }).innerText(), 'Using')
   const o = await c.open({ budget: BASE({ expenses: [exp('2026-11-03', '160000', { mode: 'credit', instrumentId: 'i-neo' })] }) })
-  await toManage(o.page)
+  await toCards(o.page)
   const t = await pageOf(o.page, 'Categories and cards').locator('.navrow', { hasText: 'Tata Neo' }).innerText()
   ok(/over|above|more than/i.test(t), 'over the limit not said in words: ' + t)
 })
 T('B-403', 'POS', 'card cost: annual fee plus fee/interest category entries for this year, shown in the card form', async (c) => {
   const b = BASE({ categories: [...CATS(), cat('c-fee', 'Card interest and fees')], expenses: [exp('2026-11-03', '300', { categoryId: 'c-fee', mode: 'credit', instrumentId: 'i-neo' })] })
-  const { page } = await c.open({ budget: b }); await toManage(page)
+  const { page } = await c.open({ budget: b }); await toCards(page)
   await pageOf(page, 'Categories and cards').locator('.navrow', { hasText: 'Tata Neo' }).click()
   const t = await S(page).innerText()
   has(t, 'cost you'); has(t, '₹800')
 })
 T('B-404', 'POS', 'card bill reminder from the card form makes a Due reminder and a "Card bill reminders" row; it never adds an expense', async (c) => {
-  const { page } = await c.open({ budget: BASE() }); await toManage(page)
+  const { page } = await c.open({ budget: BASE() }); await toCards(page)
   await pageOf(page, 'Categories and cards').locator('.navrow', { hasText: 'Tata Neo' }).click()
   await S(page).locator('summary', { hasText: 'More details' }).click()
   const sw = S(page).getByRole('switch', { name: /Remind me about this card's bill/ })

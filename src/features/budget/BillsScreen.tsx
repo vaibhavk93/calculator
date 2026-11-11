@@ -4,16 +4,19 @@ import { Icon } from '../../components/Icon'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { Sheet } from '../../components/Sheet'
 import { useApp, useAppStore } from '../../components/StoreProvider'
-import { tintStyle } from '../../components/tint'
+import { dotStyle, tintStyle } from '../../components/tint'
 import { D } from '../../engine'
 import { BILL_REPEATS, cleanPaymentCount, type BillRepeat, type RecurringItem } from '../../lib/budget'
-import { billTotals, billWords, lastPaymentAt, liveBills, paymentsLeftText, validateBill } from '../../lib/recurring'
-import { dueLabel } from '../../lib/reminders'
+import { billPerMonth, billTotals, billWords, lastPaymentAt, liveBills, paymentsLeftText, repeatWord, validateBill } from '../../lib/recurring'
+import { dueLabel, groupReminders } from '../../lib/reminders'
 import { dayText, parseDay, shortDate } from '../../lib/tasks'
+import { DATE_LOCALE } from '../../lib/dateLocale'
 import { Segmented } from '../settings/controls'
 import { GuardedFooter, MoneyInput, focusField, useDiscardGuard } from './formKit'
 import { ExpenseSheet } from './sheets'
 import { FitHero, useMoney } from './SpendSummary'
+
+const DAY_MONTH = new Intl.DateTimeFormat(DATE_LOCALE, { day: 'numeric', month: 'short' })
 
 type SheetState = null | { kind: 'add' } | { kind: 'edit'; id: string }
 
@@ -43,10 +46,42 @@ export function BillsScreen({ onBack }: { onBack: () => void }) {
     if (i.paused) return 'Paused: no reminder and no new entries'
     return at === undefined ? 'No reminder is set. Tap Resume to turn it on' : `Next due ${shortDate(at)} · ${dueLabel(at, now)}${i.remaining !== undefined ? ` · ${paymentsLeftText(i.remaining)}` : ''}`
   }
+  // Bills the way Due groups reminders: this week (and anything overdue), later, then the ones that are not running.
+  const dated = bills.flatMap((i) => { const r = reminders.find((x) => x.cardId === i.cardId); return !i.paused && r ? [{ i, r }] : [] })
+  const g = groupReminders(dated.map((d) => d.r), now)
+  const billOf = (id: string) => dated.find((d) => d.r.id === id)!.i
+  const week = [...g.overdue, ...g.week].map((r) => billOf(r.id))
+  const later = g.later.map((r) => billOf(r.id))
+  const idle = bills.filter((i) => !dated.some((d) => d.i.id === i.id))
+  const meta = (i: RecurringItem) => {
+    const at = nextOf(i)
+    if (i.paused) return 'Paused: no reminder and no new entries'
+    if (at === undefined) return 'No reminder is set. Tap Resume to turn it on'
+    const l = dueLabel(at, now).toLowerCase()
+    const per = i.repeat === 'monthly' ? '' : i.repeat === 'quarterly' ? `${money(new D(i.amount!))} every 3 months` : `${money(new D(i.amount!))} a year`
+    return [repeatWord(i.repeat).replace(/^./, (c) => c.toUpperCase()), `${l.includes('overdue') ? l : `due ${l}`} · ${DAY_MONTH.format(at)}`, per, i.remaining !== undefined ? paymentsLeftText(i.remaining) : ''].filter(Boolean).join(' · ')
+  }
+  const billRow = (i: RecurringItem) => (
+    <div key={i.id} className="bills__item">
+      <button type="button" className="budget__row tap-row bills__row" style={dotStyle(budget.categories, i.categoryId)} aria-label={`Edit ${i.title}. ${billWords(i, money)}`} onClick={() => setSheet({ kind: 'edit', id: i.id })}>
+        <span className="catdot" aria-hidden="true" />
+        <span className="row__text">
+          <span className="row__label">{i.title}{i.paused ? ' (paused)' : ''}</span>
+          <span className="row__hint">{meta(i)}</span>
+        </span>
+        <span className="budget__amt spend__amt">{money(billPerMonth(i.amount!, i.repeat))}</span>
+      </button>
+    </div>
+  )
+  const billGroup = (title: string, list: RecurringItem[]) =>
+    list.length > 0 && (
+      <>
+        <h2 className="sect__head">{title}</h2>
+        {list.map(billRow)}
+      </>
+    )
   // Card bill reminders have no detail sheet of their own (their day is set from Categories and cards), so
-  // their Pause/Resume/Stop stay here, on the row. Regular bills open BillSheet on tap, so theirs moved there
-  // instead (B20): the row already says the state in words (the title's "(paused)" and dueText's own line),
-  // so no separate chip is needed, just fewer buttons.
+  // their Pause/Resume/Stop stay here, on the row. Regular bills open BillSheet on tap, so theirs live there.
   const cardBillActions = (i: RecurringItem) => (
     <div className="due__actions bills__actions">
       {i.paused || nextOf(i) === undefined ? (
@@ -66,34 +101,34 @@ export function BillsScreen({ onBack }: { onBack: () => void }) {
           {totals.count > 0 && (
             <section className="sect" aria-label="What your bills cost">
               <div className="budget__sum">
-                <span className="result__label">Per year, all running bills</span>
-                <FitHero text={money(totals.perYear)} />
-                <span className="budget__note">About {money(totals.perMonth)} a month · {totals.count} {totals.count === 1 ? 'bill' : 'bills'}</span>
+                <span className="result__label">Recurring spend</span>
+                <span className="bills__hero">
+                  <FitHero text={money(totals.perMonth)} />
+                  <span className="bills__per" aria-hidden="true">/ mo</span>
+                </span>
+                <span className="budget__note">{totals.count} {totals.count === 1 ? 'bill' : 'bills'}, normalized to monthly · {money(totals.perYear)} a year</span>
               </div>
             </section>
           )}
 
           <section className="sect" aria-label="Bills">
-            <h2 className="sect__head">
-              <span>Bills</span>
-              <span className="sect__count">{bills.length}</span>
-            </h2>
-            <div className="sect__body">
-              {bills.length === 0 && <p className="budget__none">No bills yet. Add one below, or choose Repeats when you add an expense.</p>}
-              {bills.map((i) => (
-                <div key={i.id} className="bills__item">
-                  <button type="button" className="budget__row tap-row" aria-label={`Edit ${i.title}. ${billWords(i, money)}`} onClick={() => setSheet({ kind: 'edit', id: i.id })}>
-                    <span className="row__label">{i.title}{i.paused ? ' (paused)' : ''}</span>
-                    <span className="budget__amt spend__amt">{money(new D(i.amount!))}</span>
-                    <Icon name="chevron" size={18} className="tap-row__chev" />
-                    <span className="budget__note">{billWords(i, money)}</span>
-                    <span className="budget__note">{dueText(i)}</span>
-                  </button>
-                </div>
-              ))}
-            </div>
+            {bills.length === 0 && (
+              <>
+                <h2 className="sect__head">
+                  <span>Bills</span>
+                  <span className="sect__count">0</span>
+                </h2>
+                <p className="budget__none">No bills yet. Add one below, or choose Repeats when you add an expense.</p>
+              </>
+            )}
+            {billGroup('Due this week', week)}
+            {billGroup('Later', later)}
+            {billGroup('Not running', idle)}
             <div className="manage__actions">
-              <button type="button" className="btn btn--primary" onClick={() => setSheet({ kind: 'add' })}>Add a bill</button>
+              <button type="button" className="btn" onClick={() => setSheet({ kind: 'add' })}>
+                <Icon name="plus" size={18} />
+                <span>Add a bill</span>
+              </button>
             </div>
           </section>
 
