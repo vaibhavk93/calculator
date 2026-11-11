@@ -101,9 +101,20 @@ Agents work **in place on `dev`** (no worktrees), each owning a set of files, co
 (`settings.reminderTime`). There is no other source. So quiet hours only bite when that time falls inside the
 window — and then they move *every* reminder. The Settings screen says so in words; do not "simplify" that line away.
 
-**Known and not fixed:** the notifications plugin's boot receiver re-fires a reminder missed while the phone was
-off about 15 seconds after a restart — so a reboot at 2 am can buzz at 2 am. It runs before any web code, so no
-web-side plan (quiet hours included) can hold it back. Fixing it means a receiver of our own ordered ahead of it.
+**A "2 am buzz after a reboot" was flagged here on 2026-11-11 and then checked properly: it does not happen.**
+Read the whole receiver, not just one branch. `LocalNotificationRestoreReceiver` (plugin 8.3.1) does have a
+"show notifications that would have been delivered while the device was off" branch that fires them 15 seconds
+after boot — but an earlier guard `continue`s before it ever gets there:
+
+```kotlin
+// Fired one-shot: kept in storage only for TRIGGERED queries — never re-arm it on boot.
+if (!schedule.isPerpetual() && notification.isTriggered()) { ...; continue }
+```
+
+Every notification this app schedules is a one-shot (`schedule: { at, allowWhileIdle }` in `notifications.ts`,
+no `every`/`on`/`repeats`), so `isPerpetual()` is false; a reminder missed while the phone was off has a past
+`at`, so `isTriggered()` is true. The guard catches all of them. The 15-second branch is reachable only for
+perpetual schedules, which this app never creates. **No native fix is needed, and none was written.**
 
 ---
 

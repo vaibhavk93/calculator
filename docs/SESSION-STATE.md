@@ -1,5 +1,30 @@
 # Session state: resume here
 
+## Round 28 (2026-11-11): the "2 am boot buzz" was not real; nothing was built
+
+**Owner's prompt:** "fix the boot receiver buzzing at 2am".
+
+**There is nothing to fix.** Round 27 reported that the notifications plugin re-fires a reminder missed while the
+phone was off, ~15 seconds after a reboot. That came from reading one branch of
+`LocalNotificationRestoreReceiver` without the guard sitting above it. Checked properly this round:
+
+| Step | Evidence |
+|---|---|
+| Every notification this app schedules is a one-shot | `notifications.ts` lines 135 and 211: `schedule: { at, allowWhileIdle }`. No `every`, `on` or `repeats` |
+| So `isPerpetual()` is false | `LocalNotificationSchedule.kt:59` — true only for `every`/`on`/`repeats` |
+| A reminder missed while the phone was off has a past `at`, so `isTriggered()` is true | `LocalNotification.kt:104` — "a one-shot `at` whose time has passed" |
+| The receiver `continue`s on exactly that, BEFORE the 15-second re-fire branch | `LocalNotificationRestoreReceiver.kt:38`, comment: "never re-arm it on boot, or it re-fires after every reboot" |
+
+The 15-second branch is reachable only for perpetual schedules, which this app never creates. Plugin version
+confirmed 8.3.1 (`package.json` `^8.3.1`, installed 8.3.1).
+
+**No code written.** The Android toolchain was checked and does work here, should native work ever be needed:
+JDK 21 at `~/.local/jdks/jdk-21.0.13+9/Contents/Home` (note the nested `Contents/Home`), and
+`./gradlew :app:compileDebugJavaWithJavac --offline` builds in about 6 seconds.
+
+**⚠ Remember:** when reading a third-party receiver or handler, read every guard above the branch you care about.
+One branch in isolation said the opposite of what the file actually does.
+
 ## Round 27 (2026-11-11): checked the Reminders agent's claims, built the one thing actually missing
 
 **Owner's prompts:** "check if boot rescheduling and quiet hours were built", then "yes build quiet hours".
@@ -26,8 +51,8 @@ notification, not two buzzes; the window end is built from the calendar date, so
 **Verified:** `npm run check` 3715 / 16 skipped (was 3685), build clean, architecture gate 356, layout-contract
 216/216, `shell.test.mjs` failure list byte-identical to `3caa222` (37 both, pre-existing). Checked live at 390px.
 
-**Not fixed, flagged:** the plugin's boot receiver re-fires a missed reminder ~15s after a restart, so a 2 am
-reboot can buzz at 2 am. It runs before any web code; quiet hours cannot reach it.
+**Flagged here as "a 2 am reboot can buzz at 2 am" — wrong, see Round 28.** The plugin guards against exactly
+that; the claim came from reading one branch of the receiver without the guard above it.
 
 **Not pushed. Not on the phone.**
 
