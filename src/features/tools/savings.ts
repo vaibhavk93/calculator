@@ -5,8 +5,9 @@ import { DICGC, KVP, MIS, NSC, OFFICIAL_TO, RATES_AS_OF as SAVINGS_AS_OF, SCSS, 
 import { kvp, mis, nsc, scss, ssy, timeDeposit } from '../../engine/investments/smallSavings'
 import { RATES_AS_OF as TAX_AS_OF, RULES_FY2026_27 as R } from '../../engine/tax/rules.FY2026-27'
 import { goalSipByMonths, monthsUntil } from '../../engine/investments/goalSip'
-import { addMonths, parseDate, toIso } from '../../engine/everyday/dates'
-import { yearsMonthsText, toWholeMonths } from '../../engine/duration'
+import { addMonths, formatDate, parseDate, toIso } from '../../engine/everyday/dates'
+import { fdMaturity, fdValue, PERIODS_PER_YEAR, type FdComp } from '../../engine/investments/fdMaturity'
+import { yearsMonthsText, toWholeMonths, unitText, type TimeUnit } from '../../engine/duration'
 import { growth, yearRow, type GrowRow } from './invest'
 import { junkOptional, need, parseNum, unitOf, type Field, type ResultRow, type ToolSpec } from '../../lib/tool'
 
@@ -492,4 +493,79 @@ const goalDateSpec: ToolSpec = {
   },
 }
 
-export const TOOLS: ToolSpec[] = [fdLadderSpec, ssySpec, nscSpec, scssSpec, kvpSpec, misSpec, tdSpec, goalDateSpec]
+// ---- FD maturity date and value ------------------------------------------------------------
+
+const FD_UNITS = { id: 'period', unit: 'years' as const, units: ['years', 'months', 'days'] as TimeUnit[] }
+const FD_COMP_LABEL: Record<FdComp, string> = { monthly: 'monthly', quarterly: 'quarterly', yearly: 'yearly', maturity: 'at maturity (simple interest)' }
+
+const fdMaturitySpec: ToolSpec = {
+  id: 'fd-maturity',
+  title: 'FD maturity date',
+  blurb: 'Maturity amount, interest and date from a start date',
+  category: 'invest',
+  keywords: ['fd', 'fixed deposit', 'maturity date', 'maturity value', 'term deposit', 'when does my fd mature', 'start date', 'tenure in days', 'cumulative', 'simple interest'],
+  fields: [
+    { id: 'principal', label: 'Deposit amount', kind: 'number', unit: 'rupee', default: '100000' },
+    { id: 'rate', label: 'Yearly interest rate', kind: 'number', unit: 'percent', default: '7', hint: 'Example rate, enter your bank’s.' },
+    { id: 'start', label: 'Start date', kind: 'date', default: toIso(localToday()) },
+    { id: 'period', label: 'Deposit period', kind: 'number', unit: 'years', units: ['years', 'months', 'days'], default: '1', hint: 'Fractions are fine for years and months, e.g. 1.5. Days must be whole.' },
+    {
+      id: 'comp',
+      label: 'Interest is added',
+      kind: 'select',
+      default: 'quarterly',
+      options: [
+        { value: 'monthly', label: 'Monthly' },
+        { value: 'quarterly', label: 'Quarterly' },
+        { value: 'yearly', label: 'Yearly' },
+        { value: 'maturity', label: 'Only at maturity' },
+      ],
+    },
+  ],
+  compute: (v) => {
+    const r = need(v, [{ id: 'principal', label: 'Deposit amount' }, { id: 'rate', label: 'Interest rate' }, { id: 'period', label: 'Deposit period' }])
+    if (!r.ok) return r
+    const { principal, rate, period } = r.n as Record<string, Dec>
+    if (principal!.lte(0)) return { error: 'Deposit amount must be more than zero', field: 'principal' }
+    if (rate!.isNegative() || rate!.gt(100)) return { error: 'Enter a yearly interest rate from 0 to 100%', field: 'rate' }
+    const startText = typeof v.start === 'string' ? v.start.trim() : ''
+    if (startText === '') return { error: 'Pick the start date', field: 'start' }
+    const start = parseDate(startText)
+    if (!start) return { error: 'Enter a real start date', field: 'start' }
+    const unit = unitOf(FD_UNITS, v)
+    if (period!.lte(0)) return { error: 'Deposit period must be more than zero', field: 'period' }
+    if (unit === 'days' && !period!.isInteger()) return { error: 'Days must be a whole number', field: 'period' }
+    const comp: FdComp = v.comp === 'monthly' || v.comp === 'yearly' || v.comp === 'maturity' ? v.comp : 'quarterly'
+    const out = fdMaturity(principal!, rate!, period!, unit, start, comp)
+    if (!out) return { error: 'Use a deposit period of 50 years or less', field: 'period' }
+    const t = out.years
+    const rows: GrowRow[] = []
+    for (let k = 1; t.gte(k); k++) rows.push({ cell: new D(k), label: `Y${k}`, invested: principal!, value: fdValue(principal!, rate!, new D(k), comp) })
+    if (!t.isInteger()) rows.push({ cell: 'At maturity', label: 'End', invested: principal!, value: out.amount })
+    const perYear = PERIODS_PER_YEAR[comp]
+    const timeLine = unit === 'years' ? [] : [`Time = ${s(period!, 4)} ${unitText(period!, unit)} ÷ ${unit === 'months' ? 12 : 365} = ${s(t, 4)} years`]
+    return {
+      rows: [
+        { label: 'Maturity amount', value: out.amount, fmt: 'money', main: true },
+        { label: 'Interest earned', value: out.interest, fmt: 'money' },
+        { label: 'Matures on', value: formatDate(out.maturity), fmt: 'text' },
+        { label: 'Days in the deposit', value: new D(out.days), fmt: 'int' },
+        { label: 'Effective yearly yield', value: out.effectivePct, fmt: 'percent' },
+      ],
+      ...growth(rows, 'Value'),
+      formula: [
+        comp === 'maturity' ? 'A = P × (1 + r × t ÷ 100), simple interest paid once at the end' : `A = P × (1 + r ÷ (100 × n))^(n × t), n = ${perYear} times a year`,
+        comp === 'maturity' ? `${s(principal!)} × (1 + ${s(rate!)} × ${s(t, 4)} ÷ 100)` : `${s(principal!)} × (1 + ${s(rate!)} ÷ ${100 * perYear})^(${perYear} × ${s(t, 4)})`,
+        ...timeLine,
+        `Maturity date = ${formatDate(start)} + ${s(period!, 4)} ${unitText(period!, unit)} = ${formatDate(out.maturity)}`,
+        'Effective yearly yield = (A ÷ P)^(1 ÷ t) − 1',
+      ],
+      note:
+        `Assumptions: interest is added ${FD_COMP_LABEL[comp]}; the rate stays the same; months are counted as ÷ 12 and days as ÷ 365 (leap years ignored) for the interest, while the maturity date follows the calendar (31 Jan plus 1 month is 28 Feb). The start day itself is day 0.` +
+        (out.partPeriod ? ' The tenure ends part way through a compounding period; that part is compounded fractionally here, but a bank may pay plain simple interest for it (unproven), so ask yours.' : '') +
+        ' Tax (TDS) is not deducted. A bank may round the amounts or count the dates a little differently.',
+    }
+  },
+}
+
+export const TOOLS: ToolSpec[] = [fdLadderSpec, ssySpec, nscSpec, scssSpec, kvpSpec, misSpec, tdSpec, goalDateSpec, fdMaturitySpec]
