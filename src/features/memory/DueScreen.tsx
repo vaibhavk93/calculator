@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { setMissed, missedText } from '../../lib/delivery'
+import { setMissed, missedText, setRestored, restoredText } from '../../lib/delivery'
+import { checkReminderPermissions, ensurePermission, notificationsSupported } from '../../lib/notifications'
+import { useRestoredReminders } from '../../components/useRestoredReminders'
 import { useMissedReminder } from '../../components/useMissedReminder'
 import { ReliableRemindersSheet } from '../settings/ReliableRemindersSheet'
 import { Icon } from '../../components/Icon'
@@ -44,6 +46,18 @@ export function DueScreen() {
   const tabTap = useApp((s) => s.tabTap)
   // "A reminder may not have shown": found when the app was opened (lib/delivery.ts). Calm, and never certain.
   const missed = useMissedReminder()
+  // "Put back": the phone had lost reminders (a restart or an update) and the app restored them. Only shown when that really happened.
+  const restored = useRestoredReminders()
+  // Notifications turned off for the app: reminders cannot ring, but they still show here. One quiet line, no nagging.
+  const [blocked, setBlocked] = useState(false)
+  useEffect(() => {
+    if (!notificationsSupported()) return
+    const check = () => void checkReminderPermissions().then((p) => setBlocked(!p.notifications))
+    check()
+    const onShow = () => document.visibilityState === 'visible' && check()
+    document.addEventListener('visibilitychange', onShow)
+    return () => document.removeEventListener('visibilitychange', onShow)
+  }, [])
   const [fixing, setFixing] = useState(false)
   const tour = useTour('due', (a) => a === 'reliable' && setFixing(true))
 
@@ -181,6 +195,22 @@ export function DueScreen() {
           <div className="due__missed-acts">
             <button type="button" className="link-btn" onClick={() => setFixing(true)}>Fix reminders</button>
             <button type="button" className="link-btn" onClick={() => setMissed(null)}>Dismiss</button>
+          </div>
+        </div>
+      )}
+      {restored > 0 && !open && (
+        <div className="due__missed" role="status">
+          <p>{restoredText(restored)}</p>
+          <div className="due__missed-acts">
+            <button type="button" className="link-btn" onClick={() => setRestored(0)}>OK</button>
+          </div>
+        </div>
+      )}
+      {blocked && !open && (
+        <div className="due__missed" role="status">
+          <p>Notifications are off for Calc, so reminders cannot ring. They still show here.</p>
+          <div className="due__missed-acts">
+            <button type="button" className="link-btn" onClick={() => void ensurePermission().then((ok) => setBlocked(!ok))}>Turn on</button>
           </div>
         </div>
       )}

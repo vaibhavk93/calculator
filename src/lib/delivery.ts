@@ -163,3 +163,18 @@ export function subscribeMissed(l: () => void) {
   listeners.add(l)
   return () => void listeners.delete(l)
 }
+
+/** "Reminders were put back": how many alarms the phone had lost and the app restored (counted natively, see lib/notifications.ts takeLostAlarms). Quiet, dismissible, forgotten when the app closes. */
+let restored = 0
+const restoredListeners = new Set<() => void>()
+export const getRestored = () => restored
+export function setRestored(n: number) {
+  restored = n
+  restoredListeners.forEach((l) => l())
+}
+export function subscribeRestored(l: () => void) {
+  restoredListeners.add(l)
+  return () => void restoredListeners.delete(l)
+}
+export const restoredText = (n: number) =>
+  `${n === 1 ? 'A reminder' : `${n} reminders`} went missing from your phone (a restart or a phone cleaner can do that). ${n === 1 ? 'It is' : 'They are'} back now.`

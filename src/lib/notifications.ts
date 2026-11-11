@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { atTime, dueLabel, leadsOf } from './reminders'
 import type { Reminder, SavedCard } from './memory'
@@ -141,6 +141,26 @@ export async function applyNotifications(planned: Planned[]): Promise<boolean> {
     return true
   } catch {
     return false
+  }
+}
+
+interface ReminderAlarmsPlugin {
+  takeLost(): Promise<{ lost: number }>
+}
+const alarms = registerPlugin<ReminderAlarmsPlugin>('ReminderAlarms')
+
+/**
+ * How many reminder alarms the phone had lost (a reboot, a force-stop, a battery saver) when the app last started, once.
+ * The notifications plugin re-arms them silently before any web code runs, so only the native side can count them
+ * (android/.../ReminderAlarmsPlugin.java). 0 on the web, with an old build, or on any error.
+ */
+export async function takeLostAlarms(): Promise<number> {
+  if (!notificationsSupported()) return 0
+  try {
+    const { lost } = await alarms.takeLost()
+    return Number.isFinite(lost) && lost > 0 ? Math.floor(lost) : 0
+  } catch {
+    return 0
   }
 }
 

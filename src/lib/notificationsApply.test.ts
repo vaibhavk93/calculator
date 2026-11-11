@@ -9,7 +9,7 @@ const plugin = vi.hoisted(() => ({
   checkExactNotificationSetting: vi.fn(),
 }))
 vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: plugin }))
-vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true } }))
+vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true }, registerPlugin: () => ({}) }))
 
 import { applyNotifications, type Planned } from './notifications'
 

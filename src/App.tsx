@@ -15,8 +15,9 @@ import { drainNow } from './store/smsRuntime'
 import { createWakeLock } from './lib/device'
 import { exitApp, onHardwareBack } from './lib/nativeBack'
 import { setStatusBar } from './lib/statusBar'
-import { ackReminder, markSeen, recordPlan, setMissed, verifyDelivery } from './lib/delivery'
-import { applyNotifications, deliveredIds, ensurePermission, notificationsSupported, onNotificationAction, planNotifications } from './lib/notifications'
+import { ackReminder, markSeen, setMissed, verifyDelivery } from './lib/delivery'
+import { deliveredIds, ensurePermission, onNotificationAction, planNotifications } from './lib/notifications'
+import { syncReminders } from './lib/reminderSync'
 import { formatCell } from './lib/toolFormat'
 import { D } from './engine'
 import { applyTheme } from './lib/theme'
@@ -73,14 +74,12 @@ function useReminderNotifications() {
     const planned = planNotifications(reminders, cards, Date.now(), money, time)
     void (async () => {
       if (planned.length > 0 && !(await ensurePermission())) return
-      const ok = await applyNotifications(planned)
+      // Apply, remember the plan, and note any reminder the phone had lost (a reboot or update): lib/reminderSync.ts.
+      const ok = await syncReminders(planned, reminders)
       if (!ok) {
         // The old alarms were kept (applyNotifications cancels nothing on failure). Say so, and do not record a plan that never existed.
         notifyStore.getState().showNotice("Couldn't set your reminders just now. They will be tried again next time you open the app.", 'error')
-        return
       }
-      // Remember what was scheduled, so a later open can tell when one that was due never showed (lib/delivery.ts).
-      if (notificationsSupported()) await recordPlan(planned, reminders)
     })()
   }, [reminders, cards, system, decimals, time, resumed, notifyStore])
 

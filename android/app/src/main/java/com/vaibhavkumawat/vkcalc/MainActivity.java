@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(BackupFilePlugin.class);
         registerPlugin(SmsInboxPlugin.class);
         registerPlugin(BatterySettingsPlugin.class);
+        registerPlugin(ReminderAlarmsPlugin.class);
         registerPlugin(SmsQueuePlugin.class);
         // Test-only message injection. The class exists only in the debug and qa builds (src/debug), so release skips this.
         try {
@@ -18,6 +19,8 @@ public class MainActivity extends BridgeActivity {
         } catch (ClassNotFoundException ignored) {
             // release build: no hook
         }
+        // Before the notifications plugin starts and silently re-arms lost alarms: count them, so the app can say so (ReminderAlarmsPlugin).
+        ReminderAlarmsPlugin.noteLost(this);
         super.onCreate(savedInstanceState);
     }
 }
