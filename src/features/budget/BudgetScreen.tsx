@@ -6,19 +6,23 @@ import { useApp } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
 import { D } from '../../engine'
 import { limitState, monthFlow, monthKey, monthLabel, monthShortLabel, needsAttention, paceLeft, summarise } from '../../lib/budget'
+import { pendingItems, recentlyAuto } from '../../lib/inbox'
 import { billTotals, liveBills } from '../../lib/recurring'
+import { smsPort } from '../../store/smsRuntime'
 import { useTour } from '../onboarding/useTour'
 import { Segmented } from '../settings/controls'
 import { BillsScreen } from './BillsScreen'
+import { CaptureExplainer } from './CaptureExplainer'
 import { DayView } from './DayView'
 import { ImportScreen } from './ImportScreen'
+import { InboxScreen } from './InboxScreen'
 import { ManageScreen } from './ManageScreen'
 import { PortfolioView } from './PortfolioScreen'
 import { RulesScreen } from './RulesScreen'
 import { ExpenseSheet } from './sheets'
 import { Bar, DayHeader, EntryRow, FitHero, MonthNav, SpendSummary, limitWords, startsDay, useMoney, type SummaryTab } from './SpendSummary'
 
-type Page = 'home' | 'summary' | 'manage' | 'import' | 'bills' | 'rules'
+type Page = 'home' | 'summary' | 'manage' | 'import' | 'bills' | 'rules' | 'inbox'
 type View = 'spending' | 'networth'
 type SheetState = null | { id: string | null }
 
@@ -45,6 +49,8 @@ export function BudgetScreen() {
   const [sheet, setSheet] = useState<SheetState>(null)
   // The Day view: one day's entries, on top of whatever is open. Opened from a day heading in Recent entries or in the Entries list.
   const [day, setDay] = useState<string | null>(null)
+  // The explanation before Android's permission dialog, opened from the empty state.
+  const [explain, setExplain] = useState(false)
 
   // Tapping the Budget tab while on it goes back to this month, on the home. The view stays; amounts hide again.
   useEffect(() => {
@@ -63,6 +69,9 @@ export function BudgetScreen() {
   const s = summarise(budget, month)
   const bills = billTotals(liveBills(budget))
   const rules = (budget.rules ?? []).length
+  const toReview = pendingItems(budget).length
+  const autoRecent = recentlyAuto(budget, Date.now()).length
+  const capturing = useApp((x) => x.settings.smsCapture)
   const never = budget.expenses.every((e) => e.deletedAt !== null)
   const goSummary = (tab: SummaryTab, categoryId: string | null = null) => {
     setOpen({ tab, categoryId })
@@ -83,6 +92,7 @@ export function BudgetScreen() {
       {page === 'import' && <ImportScreen onBack={() => setPage('home')} />}
       {page === 'bills' && <BillsScreen onBack={() => setPage('home')} />}
       {page === 'rules' && <RulesScreen onBack={() => setPage('home')} />}
+      {page === 'inbox' && <InboxScreen onBack={() => setPage('home')} />}
       {day !== null && <DayView date={day} onBack={() => setDay(null)} />}
     </>
   )
@@ -106,6 +116,7 @@ export function BudgetScreen() {
       action={<button type="button" className="btn btn--primary" onClick={() => setSheet({ id: null })}>Add expense</button>}
       more={[
         { label: 'Add from bank messages', onClick: () => setPage('import') },
+        smsPort() && !capturing ? { label: 'Capture bank messages', onClick: () => setExplain(true) } : null,
         { label: 'Bills and subscriptions', onClick: () => setPage('bills') },
         { label: 'Set a monthly limit', onClick: () => setPage('manage') },
         { label: 'Categories and cards', onClick: () => setPage('manage') },
@@ -230,6 +241,18 @@ export function BudgetScreen() {
       </div>
 
       {view === 'spending' && tour.row}
+      {/* Quiet: one row, only when something waits (or the app added something by itself lately, so Undo is never out of reach). No badge, no notification. */}
+      {view === 'spending' && (toReview > 0 || autoRecent > 0) && (
+        <div className="group budget__review">
+          <button type="button" className="navrow tap-row" onClick={() => setPage('inbox')}>
+            <span className="row__text">
+              <span className="row__label">{toReview > 0 ? `${toReview} to review` : `${autoRecent} auto-added`}</span>
+              <span className="row__hint">{toReview > 0 ? 'Bank payments waiting for your OK' : 'Added for you lately. Check them or undo one'}</span>
+            </span>
+            <Icon name="chevron" size={18} className="navrow__chev" />
+          </button>
+        </div>
+      )}
       <div className="tools__list">
         {view === 'spending' ? spending : <PortfolioView hidden={hidden} />}
       </div>
@@ -252,6 +275,7 @@ export function BudgetScreen() {
     {sheets}
     {pages}
     {tour.sheet}
+    {explain && <CaptureExplainer onClose={() => setExplain(false)} />}
     </>
   )
 }

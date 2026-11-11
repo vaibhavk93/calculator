@@ -11,6 +11,7 @@ import { SavedScreen } from './features/memory/SavedScreen'
 import { SettingsScreen } from './features/settings/SettingsScreen'
 import { ToolsScreen } from './features/tools/ToolsScreen'
 import { goBack } from './lib/backStack'
+import { drainNow } from './store/smsRuntime'
 import { createWakeLock } from './lib/device'
 import { exitApp, onHardwareBack } from './lib/nativeBack'
 import { setStatusBar } from './lib/statusBar'
@@ -130,6 +131,21 @@ function useBackupNudge() {
 }
 
 /**
+ * "Capture bank messages": whenever the app opens or comes back to the front, and when capture is switched on, pull what the phone caught
+ * into the Inbox. It saves first and only then lets the phone forget the messages (lib/inbox.ts drainQueue). Quiet: no notice, no badge.
+ */
+function useSmsDrain() {
+  const on = useApp((s) => s.settings.smsCapture)
+  useEffect(() => {
+    if (!on) return
+    void drainNow()
+    const onShow = () => document.visibilityState === 'visible' && void drainNow()
+    document.addEventListener('visibilitychange', onShow)
+    return () => document.removeEventListener('visibilitychange', onShow)
+  }, [on])
+}
+
+/**
  * The Android back button: close a settings or history screen first, then whatever screen has
  * registered a handler (a calculator, a Tools group), then go to the Calculate tab, then leave.
  */
@@ -171,6 +187,7 @@ export function App() {
   useBlurAfterPointerClick()
   useReminderNotifications()
   useBackupNudge()
+  useSmsDrain()
   useHardwareBack()
   const tab = useApp((s) => s.tab)
   const overlay = useApp((s) => s.overlay)

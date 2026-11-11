@@ -14,6 +14,7 @@ import { ALL_TOOLS } from '../tools/registry'
 import { RecentTools } from '../tools/RecentTools'
 import { GROUPS } from '../tools/groups'
 import { BackupScreen } from './BackupScreen'
+import { BankMessages } from './BankMessages'
 import { OptionRow, Row, Segmented, Toggle } from './controls'
 import { ReliableRemindersSheet } from './ReliableRemindersSheet'
 import { TipsAndToursScreen } from '../onboarding/TipsAndTours'
@@ -269,6 +270,8 @@ export function SettingsScreen() {
             <Toggle label="Keep calculation history" checked={s.keepHistory} onChange={(keepHistory) => update({ keepHistory })} />
           </Row>
         </Section>
+
+        {moduleOn(s, 'budget') && <Section title="Bank messages"><BankMessages /></Section>}
 
         <ReminderSettings />
 

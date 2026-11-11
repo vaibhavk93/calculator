@@ -792,7 +792,8 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: var(--s-1);
-  height: 52px;
+  /* min-height, not height: a long title at a large text size wraps and the bar grows, instead of the title spilling over the list below. */
+  min-height: 52px;
   padding: 0 var(--s-3) 0 var(--s-2);
 }
 

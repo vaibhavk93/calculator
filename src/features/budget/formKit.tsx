@@ -1,6 +1,18 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useBackHandler } from '../../components/useBackHandler'
+import type { PickOption } from '../../components/PickerSelect'
+import { categoryName, type BudgetData } from '../../lib/budget'
 import { decimalComma } from '../../lib/decimalComma'
+
+/** Live categories, each followed by its subcategories, as picker options. */
+export function categoryPickOptions(budget: Pick<BudgetData, 'categories'>): PickOption[] {
+  const options: PickOption[] = []
+  for (const top of budget.categories.filter((c) => c.deletedAt === null && c.parentId === null)) {
+    options.push({ value: top.id, label: top.name })
+    for (const sub of budget.categories.filter((c) => c.deletedAt === null && c.parentId === top.id)) options.push({ value: sub.id, label: categoryName(budget, sub.id) })
+  }
+  return options
+}
 
 /** Keep digits and one dot. The store checks the rest and says what to fix. */
 export const cleanMoney = (v: string) => decimalComma(v).replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1').slice(0, 16)

@@ -1,31 +1,32 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FormField } from '../../components/FormField'
-import { PickerSelect, type PickOption } from '../../components/PickerSelect'
+import { PickerSelect } from '../../components/PickerSelect'
 import { ScreenHeader } from '../../components/ScreenHeader'
 import { useApp } from '../../components/StoreProvider'
 import { useBackHandler } from '../../components/useBackHandler'
 import { categoryName, categoryUsable, cleanRuleMatch, MAX_RULES, RULE_MAX } from '../../lib/budget'
+import { categoryPickOptions } from './formKit'
 
 /**
  * Merchant rules: "when the merchant contains this word, suggest this category" for bank messages and statements.
  * Newest first, and the newest matching rule wins. Never applied to entries already added. Opened from Manage.
  */
-export function RulesScreen({ onBack }: { onBack: () => void }) {
+export function RulesScreen({ onBack, toLearned = false }: { onBack: () => void; /** Opened from Settings > Learned payees: scrolls to that list. */ toLearned?: boolean }) {
   useBackHandler(true, onBack)
   const budget = useApp((s) => s.budget)
   const addRule = useApp((s) => s.addRule)
   const deleteRule = useApp((s) => s.deleteRule)
+  const setLearned = useApp((s) => s.setLearned)
+  const forgetLearned = useApp((s) => s.forgetLearned)
   const rules = budget.rules ?? []
+  const learned = budget.learned ?? []
+  useEffect(() => { if (toLearned) document.getElementById('learned')?.scrollIntoView?.({ block: 'start' }) }, [toLearned])
 
   const [text, setText] = useState('')
   const [cat, setCat] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  const options: PickOption[] = []
-  for (const top of budget.categories.filter((c) => c.deletedAt === null && c.parentId === null)) {
-    options.push({ value: top.id, label: top.name })
-    for (const sub of budget.categories.filter((c) => c.deletedAt === null && c.parentId === top.id)) options.push({ value: sub.id, label: categoryName(budget, sub.id) })
-  }
+  const options = categoryPickOptions(budget)
 
   const checked = cleanRuleMatch(text)
   const textError = submitted && !checked.ok ? checked.error : null
@@ -91,6 +92,32 @@ export function RulesScreen({ onBack }: { onBack: () => void }) {
             })}
           </div>
           {rules.length >= MAX_RULES && <p className="manage__help">That is the most rules you can have ({MAX_RULES}).</p>}
+        </section>
+
+        <section id="learned" className="sect sect--settings" aria-label="Learned payees">
+          <h2 className="sect__head"><span>Learned payees</span><span className="sect__count">{learned.length}</span></h2>
+          <div className="sect__body">
+            {learned.length === 0 && <p className="manage__none">Nothing learned yet. When you approve a payment from your bank messages, Calc remembers how you tagged that payee.</p>}
+            {learned.map((l) => {
+              const name = l.key.replace(/\b\p{L}/gu, (c) => c.toUpperCase())
+              const gone = !categoryUsable(budget, l.categoryId)
+              return (
+                <div key={l.key} className="learned__item">
+                  <span className="budget__main">
+                    <span className="row__label">{name}</span>
+                    <span className="row__hint">
+                      {gone ? 'Category removed. Not used until you pick another.' : l.count >= 2 ? `Tagged the same way ${l.count} times in a row. Auto mode may add it, unless it is a person.` : 'Tagged once. Only a suggestion for now.'}
+                    </span>
+                  </span>
+                  <div className="learned__acts">
+                    <PickerSelect label={`Category for ${name}`} title={`Category for ${name}`} value={gone ? '' : l.categoryId} placeholder="Pick a category" options={options} onChange={(v) => setLearned(l.key, v)} />
+                    <button type="button" className="link-btn link-btn--danger" aria-label={`Forget ${name}`} onClick={() => forgetLearned(l.key)}>Forget</button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <p className="manage__help">Calc counts. A payee you tag the same way twice in a row can be added for you (in Auto mode), never a person. Changing a category here, or forgetting a payee, starts the count again.</p>
         </section>
       </div>
     </div>

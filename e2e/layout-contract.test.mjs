@@ -65,15 +65,26 @@ const CARDS = [
 const TASKS = Array.from({ length: 8 }, (_, i) => cardBase({ id: 't' + i, title: i === 0 ? LONG : `Task ${i}`, kind: 'task', summary: i % 2 === 0 ? 'Due today' : 'No date' }))
 const REMINDERS = Array.from({ length: 6 }, (_, i) => ({ id: 'r' + i, cardId: `n${i + 3}`, dueAt: Date.now() + i * 86_400_000, repeat: 'none', leadDays: [3], done: false }))
 
+// SMS Inbox (docs/SMS-INBOX-PLAN.md): waiting items with long payee names, one confirmed suggestion, one person, one card bill; two recently auto-added.
+const inboxItem = (id, o = {}) => ({ id, date: '2026-11-14', amount: '450.00', merchant: 'Swiggy', kind: 'spend', mode: 'credit', instrumentId: 'i2', last4: '4321', bank: 'Axis Bank', categoryId: 'c1', why: 'You tagged Swiggy as Food twice in a row', person: false, status: 'pending', at: 1, ...o })
+const INBOX = [
+  inboxItem('fp0001'),
+  inboxItem('fp0002', { merchant: LONG.slice(0, 70), amount: '1234567.50', categoryId: 'c2', why: LONG.slice(0, 110), instrumentId: null }),
+  inboxItem('fp0003', { merchant: 'Rahul S', mode: 'upi', instrumentId: 'i1', amount: '150.00', person: true, categoryId: null, why: '' }),
+  inboxItem('fp0004', { kind: 'cardBill', merchant: '', categoryId: null, why: '', amount: '12345.00' }),
+  inboxItem('fp0005', { status: 'approved', auto: true, entryId: 'x1', resolvedAt: Date.now(), merchant: 'Zomato', categoryId: 'c1' }),
+]
+const LEARNED = [{ key: 'swiggy', categoryId: 'c1', count: 2, lastAt: 1 }, { key: LONG.slice(0, 40).toLowerCase().replace(/[^a-z ]/g, ''), categoryId: 'c2', count: 1, lastAt: 1 }, { key: 'rahul s', categoryId: 'c4', count: 5, lastAt: 1 }]
+
 const SEED = {
   schemaVersion: 3,
-  settings: { startupTab: 'calculate' },
+  settings: { startupTab: 'calculate', smsCapture: true, smsMode: 'auto' },
   history: Array.from({ length: 5 }, (_, i) => ({ id: 'h' + i, expression: `${100 + i}+${200 + i}`, result: String(300 + 2 * i), at: Date.now() - i * 1000, locked: false, memo: i === 0 ? LONG : null })),
   cards: [...CARDS, ...TASKS],
   reminders: REMINDERS,
   memory: null,
   input: { expr: '', fresh: false },
-  budget: { overall: '50000', categories: CATS, instruments: INSTS, expenses: EXPENSES },
+  budget: { overall: '50000', categories: CATS, instruments: INSTS, expenses: EXPENSES, inbox: INBOX, learned: LEARNED },
 }
 
 // ---- Screens to check: each opens the app then does whatever navigation is needed -------------------
@@ -86,6 +97,9 @@ const SCREENS = [
   ['budget', async (p) => tab(p, 'Budget')],
   // The Day view: a day heading in Recent entries opens it (the seed has long notes, long names and a long card name).
   ['budget-day', async (p) => { await tab(p, 'Budget'); await p.locator('.budget__day').first().click(); await p.locator('.screen[aria-label^="Day:"]').waitFor() }],
+  // SMS Inbox: the "N to review" row on Budget home opens it; the learned payees live on the Merchant rules screen.
+  ['budget-inbox', async (p) => { await tab(p, 'Budget'); await p.getByRole('button', { name: /to review/ }).click(); await p.locator('.screen[aria-label="To review"]').waitFor() }],
+  ['budget-learned', async (p) => { await tab(p, 'Budget'); await p.getByRole('button', { name: 'More in Budget' }).click(); await p.locator('button.tap-row', { hasText: 'Rules' }).first().click(); await p.locator('.screen[aria-label="Merchant rules"]').waitFor(); await p.locator('#learned').scrollIntoViewIfNeeded() }],
 ]
 
 const geomCheck = (p) =>
@@ -106,6 +120,8 @@ const geomCheck = (p) =>
       const cs = getComputedStyle(el)
       if (cs.visibility === 'hidden' || cs.display === 'none') return false
       // A page left mounted under a full screen (Budget home under the Day view) is covered, so nobody can tap it: not part of what this screen shows.
+      // Also when it is scrolled out of the viewport (a long list under a long list), where elementFromPoint cannot tell.
+      if (!el.closest('.screen') && el.closest('.tools') && document.querySelector('.screen')) return false
       if (!el.closest('.screen')) {
         const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
         if (top && !el.contains(top) && !top.contains(el) && top.closest('.screen')) return false

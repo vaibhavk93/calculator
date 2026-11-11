@@ -29,7 +29,7 @@ export async function startApp({ port = 4200 + Math.floor(Math.random() * 500), 
 }
 
 /** A new page at phone size with optional stored data (written before the app starts), theme and font scale. */
-export async function openApp(app, { data = null, settings = {}, width = 360, height = 790, font = 100, theme = null, locale = 'en-IN', timezone = 'Asia/Kolkata', now = null } = {}) {
+export async function openApp(app, { data = null, settings = {}, width = 360, height = 790, font = 100, theme = null, locale = 'en-IN', timezone = 'Asia/Kolkata', now = null, smsQueue = null } = {}) {
   // Every .screen slides in over 220ms (global.css); without this, a geometry check run right after
   // navigation can catch the entrance transform mid-flight and report a few pixels of fake sideways
   // overflow -- the app itself already turns this off via @media (prefers-reduced-motion: reduce).
@@ -39,11 +39,12 @@ export async function openApp(app, { data = null, settings = {}, width = 360, he
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`console.error: ${m.text().slice(0, 300)}`) })
   const stored = data ?? { schemaVersion: 3, settings: { ...(theme ? { theme } : {}), ...settings }, history: [], cards: [], reminders: [], memory: null, input: { expr: '', fresh: false } }
-  await page.addInitScript(([d, f, fixed]) => {
-    try { if (!localStorage.getItem('__seeded')) { localStorage.setItem('vkcalc.data', JSON.stringify(d)); localStorage.setItem('__seeded', '1') } } catch {}
+  // smsQueue: { permission, messages } hands the app an in-memory phone-side SMS queue (src/main.tsx test hook) and exposes it as window.__smsQueue.
+  await page.addInitScript(([d, f, fixed, q]) => {
+    try { if (!localStorage.getItem('__seeded')) { localStorage.setItem('vkcalc.data', JSON.stringify(d)); if (q) localStorage.setItem('vkcalc.test.smsqueue', JSON.stringify(q)); localStorage.setItem('__seeded', '1') } } catch {}
     if (f !== 100) document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.fontSize = f + '%' })
     if (fixed) { const T = fixed; const RealDate = Date; globalThis.Date = class extends RealDate { constructor(...a) { if (a.length === 0) super(T); else super(...a) } static now() { return T } } }
-  }, [stored, font, now])
+  }, [stored, font, now, smsQueue])
   await page.goto(app.url)
   await page.waitForSelector('.app', { timeout: 10000 })
   return { page, errors, context, async close() { await context.close() } }

@@ -138,14 +138,14 @@ export function EntryRow({ e, onEdit, select, plain }: { e: BudgetExpense; onEdi
   const name = e.settlement ? SETTLEMENT_LABEL[e.settlement] : income ? 'Money in' : categoryName(budget, e.categoryId)
   const inst = e.instrumentId === null ? undefined : budget.instruments.find((i) => i.id === e.instrumentId)
   const how = [e.mode ? modeLabel(e.mode) : '', inst ? instrumentLabel(inst) : ''].filter(Boolean).join(' · ')
-  const hint = [refund ? 'Refund' : '', income ? 'Came in' : '', shortDate(e.date), how, e.settlement ? 'Not counted as spending' : '', e.note].filter(Boolean).join(' · ')
+  const hint = [refund ? 'Refund' : '', income ? 'Came in' : '', shortDate(e.date), how, e.settlement ? 'Not counted as spending' : '', e.auto ? 'Auto-added' : '', e.note].filter(Boolean).join(' · ')
   const spoken = `${refund ? 'refund of ' : ''}${money(amount)} ${name}${e.settlement ? ', not counted as spending' : ''}`
   if (plain) {
     // Budget home's "Recent entries": what it was on the left, the signed amount on the right, no delete (that is in the sheet).
     // Money in is the only green figure, and its meta line says "Money in" too, so colour is never the only signal.
     const title = e.note || name
     // No date here: Recent entries sit under a day heading (DayHeader).
-    const meta = [e.note || income ? name : '', refund ? 'Refund' : '', how, e.settlement ? 'Not counted as spending' : ''].filter(Boolean).join(' · ')
+    const meta = [e.note || income ? name : '', refund ? 'Refund' : '', how, e.settlement ? 'Not counted as spending' : '', e.auto ? 'Auto-added' : ''].filter(Boolean).join(' · ')
     const sign = e.settlement ? '' : income || refund ? '+' : '−'
     return (
       <button type="button" className="budget__recent tap-row" aria-label={`Edit ${spoken}`} onClick={() => onEdit(e.id)}>

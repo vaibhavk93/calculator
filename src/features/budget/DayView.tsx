@@ -93,7 +93,7 @@ export function DayView({ date, onBack }: { date: string; onBack: () => void }) 
     const route = kind === 'spend' ? routeLabel(budget, e) : null
     const sign = kind === 'settlement' ? '' : kind === 'income' || e.refund ? '+' : '−'
     // With no note the title already IS the category, so the second line says only how it was paid.
-    const parts = [e.note || kind === 'income' ? name : '', e.refund ? 'Refund' : '', kind === 'settlement' ? 'Not counted as spending' : ''].filter(Boolean)
+    const parts = [e.note || kind === 'income' ? name : '', e.refund ? 'Refund' : '', kind === 'settlement' ? 'Not counted as spending' : '', e.auto ? 'Auto-added' : ''].filter(Boolean)
     const spoken = `${e.refund ? 'refund of ' : ''}${money(amount)} ${name}${route ? `, ${route}` : ''}`
     return (
       <div key={e.id} className="day__item">
