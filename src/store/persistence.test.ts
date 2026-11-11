@@ -472,6 +472,19 @@ describe('capHistory', () => {
   })
 })
 
+describe('sanitizeSettings: quiet hours', () => {
+  it('off by default', () => expect(sanitizeSettings({}).quietHours).toBe(null))
+  it('a real window is kept', () => expect(sanitizeSettings({ quietHours: { from: '22:00', until: '07:00' } }).quietHours).toEqual({ from: '22:00', until: '07:00' }))
+  it('anything that is not two real times is off, never a half-set window', () => {
+    for (const junk of [5, 'x', [], true, {}, { from: '22:00' }, { until: '07:00' }, { from: '7:5', until: '07:00' }, { from: '22:00', until: '25:00' }, { from: null, until: null }]) {
+      expect(sanitizeSettings({ quietHours: junk }).quietHours).toBe(null)
+    }
+  })
+  it('a window of no length is off, so stored data can never silence every reminder', () => {
+    expect(sanitizeSettings({ quietHours: { from: '22:00', until: '22:00' } }).quietHours).toBe(null)
+  })
+})
+
 describe('sanitizeSettings: reminder and backup fields', () => {
   it('defaults to 9:00 and no backup, and rejects junk', () => {
     expect(sanitizeSettings({}).reminderTime).toBe('09:00')

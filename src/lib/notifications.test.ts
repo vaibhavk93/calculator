@@ -86,3 +86,45 @@ describe('planNotifications with several lead times', () => {
     expect(plan.map((p) => [new Date(p.at).getDate(), new Date(p.at).getHours(), new Date(p.at).getMinutes()])).toEqual([[17, 18, 30], [20, 18, 30]])
   })
 })
+
+describe('planNotifications with quiet hours', () => {
+  const NIGHT = { from: '22:00', until: '07:00' }
+  const hm = (ts: number) => `${String(new Date(ts).getHours()).padStart(2, '0')}:${String(new Date(ts).getMinutes()).padStart(2, '0')}`
+
+  it('without quiet hours a late reminder time stays late', () => {
+    const [p] = planNotifications([rem({ leadDays: 3 })], [card], NOW, money, '23:00')
+    expect(hm(p!.at)).toBe('23:00')
+  })
+  it('a reminder time inside the quiet hours moves to the end of them', () => {
+    const [p] = planNotifications([rem({ leadDays: 3 })], [card], NOW, money, '23:00', NIGHT)
+    expect(hm(p!.at)).toBe('07:00')
+    // 3 days before the due day, then pushed to the following morning.
+    expect(new Date(p!.at).getDate()).toBe(new Date(NOW + 8 * DAY).getDate())
+  })
+  it('a reminder time outside the quiet hours is untouched', () => {
+    const [p] = planNotifications([rem({ leadDays: 3 })], [card], NOW, money, '09:00', NIGHT)
+    expect(hm(p!.at)).toBe('09:00')
+  })
+  it('null quiet hours behave exactly like none at all', () => {
+    const a = planNotifications([rem({ leadDays: 3, leads: [7, 3, 1] })], [card], NOW, money, '23:00')
+    const b = planNotifications([rem({ leadDays: 3, leads: [7, 3, 1] })], [card], NOW, money, '23:00', null)
+    expect(b).toEqual(a)
+  })
+  it('two heads-ups moved to the same morning become ONE notification, not two buzzes', () => {
+    // 22:30 and 23:30 on the same night both land at 07:00 the next day. Only one may survive.
+    const r = rem({ dueAt: new Date(2026, 10, 20, 9).getTime(), leadDays: 3, leads: [3, 2] })
+    const wide = { from: '12:00', until: '23:00' } // swallows the 13:00 reminder time on both days
+    const plan = planNotifications([r], [card], NOW, money, '13:00', wide)
+    expect(new Set(plan.map((p) => p.at)).size).toBe(plan.length)
+  })
+  it('never moved to at or after the due moment: a heads-up that would be pushed past it keeps its time', () => {
+    // Due 23:30 tonight-ish; the only heads-up is at the same quiet time, so moving it would be too late.
+    const due = new Date(2026, 10, 12, 23, 30).getTime()
+    const [p] = planNotifications([rem({ dueAt: due, leadDays: 0, leads: [0] })], [card], NOW, money, '23:30', NIGHT)
+    expect(hm(p!.at)).toBe('23:30')
+  })
+  it('a window of no length changes nothing', () => {
+    const [p] = planNotifications([rem({ leadDays: 3 })], [card], NOW, money, '23:00', { from: '22:00', until: '22:00' })
+    expect(hm(p!.at)).toBe('23:00')
+  })
+})

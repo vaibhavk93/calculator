@@ -6,7 +6,8 @@ import { useApp } from '../../components/StoreProvider'
 import { backupNudge, countItems } from '../../lib/backupNudge'
 import { checkReminderPermissions, ensurePermission, notificationsSupported, openExactAlarmSettings, scheduleTestReminder, type ReminderPermissions } from '../../lib/notifications'
 import { moduleOn, startTab, tabOn, withModule } from '../../lib/modules'
-import { timeLabel } from '../../lib/reminders'
+import { atTime, timeLabel } from '../../lib/reminders'
+import { inQuietHours } from '../../lib/quietHours'
 import { takeSettingsSection } from '../../lib/settingsJump'
 import { ACCENT_NAMES, ACCENTS } from '../../lib/theme'
 import { TABS, type CopyFormat, type Tab } from '../../store/types'
@@ -82,10 +83,53 @@ function ReminderPermissionRows() {
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 
+/**
+ * The two ends of the quiet window, and a plain line when the reminder time itself sits inside it.
+ *
+ * That line matters: every reminder already comes at one chosen time, so quiet hours usually change nothing.
+ * When they do bite, they move EVERY reminder, and the screen should say so rather than let it be a surprise.
+ */
+function QuietHourRows({ quiet, time, onChange }: { quiet: { from: string; until: string }; time: string; onChange: (q: { from: string; until: string }) => void }) {
+  // Today at the reminder time: only the time of day decides whether it is inside the window.
+  const clash = inQuietHours(atTime(Date.now(), time), quiet)
+  const endLabel = timeLabel(quiet.until)
+  return (
+    <>
+      <Row label="Quiet from">
+        <input
+          type="time"
+          className="field field--mono"
+          style={{ width: '8rem', textAlign: 'right' }}
+          aria-label="Quiet hours start"
+          value={quiet.from}
+          onChange={(e) => e.target.value && e.target.value !== quiet.until && onChange({ ...quiet, from: e.target.value })}
+        />
+      </Row>
+      {/* Both are zero-padded HH:MM (parseTime enforces it), so comparing them as text compares the clock. */}
+      <Row label="Quiet until" hint={quiet.until <= quiet.from ? 'The next morning' : undefined}>
+        <input
+          type="time"
+          className="field field--mono"
+          style={{ width: '8rem', textAlign: 'right' }}
+          aria-label="Quiet hours end"
+          value={quiet.until}
+          onChange={(e) => e.target.value && e.target.value !== quiet.from && onChange({ ...quiet, until: e.target.value })}
+        />
+      </Row>
+      {clash && (
+        <p className="note" role="status">
+          Your reminder time ({timeLabel(time)}) is inside these hours, so reminders will arrive at {endLabel} instead.
+        </p>
+      )}
+    </>
+  )
+}
+
 /** When reminders arrive, a way to prove they do, and (on the phone) what the system allows. */
 function ReminderSettings() {
   const time = useApp((x) => x.settings.reminderTime)
   const offer = useApp((x) => x.settings.showAdvanceTaxOffer)
+  const quiet = useApp((x) => x.settings.quietHours)
   const update = useApp((x) => x.updateSettings)
   const toast = useApp((x) => x.toast)
   const [fixing, setFixing] = useState(false)
@@ -112,6 +156,14 @@ function ReminderSettings() {
           onChange={(e) => e.target.value && update({ reminderTime: e.target.value })}
         />
       </Row>
+      <Row label="Quiet hours" hint="No reminder makes a sound in these hours. One that falls inside waits until they end, so nothing is lost">
+        <Toggle
+          label="Quiet hours"
+          checked={quiet !== null}
+          onChange={(on) => update({ quietHours: on ? { from: '22:00', until: '07:00' } : null })}
+        />
+      </Row>
+      {quiet !== null && <QuietHourRows quiet={quiet} time={time} onChange={(q) => update({ quietHours: q })} />}
       <Row label="Advance-tax reminders offer" hint="Shows a one-tap pack of the 4 advance-tax dates on Due">
         <Toggle label="Advance-tax reminders offer" checked={offer} onChange={(showAdvanceTaxOffer) => update({ showAdvanceTaxOffer })} />
       </Row>

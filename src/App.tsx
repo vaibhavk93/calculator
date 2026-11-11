@@ -56,6 +56,7 @@ function useReminderNotifications() {
   const system = useApp((s) => s.settings.numberSystem)
   const decimals = useApp((s) => s.settings.decimals)
   const time = useApp((s) => s.settings.reminderTime)
+  const quiet = useApp((s) => s.settings.quietHours)
   const markPaid = useApp((s) => s.markPaid)
   const snooze = useApp((s) => s.snooze)
   const setTab = useApp((s) => s.setTab)
@@ -71,7 +72,7 @@ function useReminderNotifications() {
   const notifyStore = useAppStore()
   useEffect(() => {
     const money = (plain: string, fmt?: Parameters<typeof formatCell>[1]) => formatCell(new D(plain), fmt ?? 'money', { system, decimals })
-    const planned = planNotifications(reminders, cards, Date.now(), money, time)
+    const planned = planNotifications(reminders, cards, Date.now(), money, time, quiet)
     void (async () => {
       if (planned.length > 0 && !(await ensurePermission())) return
       // Apply, remember the plan, and note any reminder the phone had lost (a reboot or update): lib/reminderSync.ts.
@@ -81,7 +82,7 @@ function useReminderNotifications() {
         notifyStore.getState().showNotice("Couldn't set your reminders just now. They will be tried again next time you open the app.", 'error')
       }
     })()
-  }, [reminders, cards, system, decimals, time, resumed, notifyStore])
+  }, [reminders, cards, system, decimals, time, quiet, resumed, notifyStore])
 
   // Delivery check: when the app opens or comes back, see whether a reminder came due while it was away and may not have shown.
   // It waits a moment so a tap on a notification (which opened the app) is counted first.

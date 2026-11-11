@@ -30,6 +30,11 @@ export interface Settings {
   reminderTime: string
   /** Due shows a one-tap pack of the 4 advance-tax dates only when this is on. Off by default. */
   showAdvanceTaxOffer: boolean
+  /**
+   * Hours when a reminder must not make a sound. Null: off (the default). A reminder landing inside the window
+   * is moved to the end of it, never dropped. `until` earlier than `from` means the window crosses midnight.
+   */
+  quietHours: { from: string; until: string } | null
   /** When a backup file was last saved from Settings, in ms. Null: never. */
   lastBackupAt: number | null
   /** When the launch reminder to back up was last shown, in ms. At most one per 14 days. */
@@ -79,6 +84,7 @@ export const DEFAULT_SETTINGS: Settings = {
   copyFormat: 'ask',
   reminderTime: '09:00',
   showAdvanceTaxOffer: false,
+  quietHours: null,
   lastBackupAt: null,
   backupNudgedAt: null,
   backupDismissedAt: null,

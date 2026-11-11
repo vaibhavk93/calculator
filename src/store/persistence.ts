@@ -71,6 +71,17 @@ const stamp = (v: unknown): number | null => (typeof v === 'number' && Number.is
 const isToolId = (t: unknown): t is string => typeof t === 'string' && /^[a-z0-9-]{1,64}$/.test(t)
 
 /** Tool id -> a whole count from 1 to the cap. Anything else is dropped; the table is trimmed to its size limit. */
+/**
+ * Quiet hours, or null when off. Both ends must be real times, and the two must differ: a window of no length
+ * would silence nothing but still read as "on", and anything stored by hand could otherwise claim the whole day.
+ */
+function sanitizeQuietHours(raw: unknown): { from: string; until: string } | null {
+  if (!raw || typeof raw !== 'object') return null
+  const { from, until } = raw as { from?: unknown; until?: unknown }
+  if (!parseTime(from) || !parseTime(until) || from === until) return null
+  return { from: from as string, until: until as string }
+}
+
 function sanitizeToolUse(raw: unknown): Record<string, number> {
   if (!isObject(raw)) return {}
   const out: Record<string, number> = {}
@@ -117,6 +128,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     copyFormat: oneOf(r.copyFormat, ['ask', 'with', 'without'] as const, d.copyFormat),
     reminderTime: parseTime(r.reminderTime) ? (r.reminderTime as string) : d.reminderTime,
     showAdvanceTaxOffer: bool(r.showAdvanceTaxOffer, d.showAdvanceTaxOffer),
+    quietHours: sanitizeQuietHours(r.quietHours),
     lastBackupAt: stamp(r.lastBackupAt),
     backupNudgedAt: stamp(r.backupNudgedAt),
     backupDismissedAt: stamp(r.backupDismissedAt),

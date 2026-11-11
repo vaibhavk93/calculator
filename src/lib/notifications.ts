@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { LocalNotifications } from '@capacitor/local-notifications'
+import { shiftOutOfQuiet, type QuietHours } from './quietHours'
 import { atTime, dueLabel, leadsOf } from './reminders'
 import type { Reminder, SavedCard } from './memory'
 
@@ -35,8 +36,11 @@ const daysBefore = (ts: number, n: number) => {
  * Due tab: re-notifying forever is how apps get muted. With `time` ("HH:MM"), every notification
  * comes at that time of day instead of the 9:00 a reminder is stored with, worked out in the phone's
  * current time zone, so a time-zone change is fixed by planning again.
+ *
+ * With `quiet`, a notification landing in those hours is moved to the end of them instead (lib/quietHours.ts).
+ * It is never dropped, and never moved to at or after the moment the thing was due.
  */
-export function planNotifications(reminders: Reminder[], cards: SavedCard[], now: number, money: (plain: string, fmt?: SavedCard['amountFmt']) => string, time?: string): Planned[] {
+export function planNotifications(reminders: Reminder[], cards: SavedCard[], now: number, money: (plain: string, fmt?: SavedCard['amountFmt']) => string, time?: string, quiet?: QuietHours | null): Planned[] {
   const out: Planned[] = []
   const when = (ts: number) => (time ? atTime(ts, time) : ts)
   for (const r of reminders) {
@@ -46,7 +50,8 @@ export function planNotifications(reminders: Reminder[], cards: SavedCard[], now
     // One notification per heads-up time that is still ahead; if none is (all passed), one at the due time.
     const times = new Map<number, number>()
     leadsOf(r).forEach((lead, i) => {
-      const heads = time ? atTime(daysBefore(r.dueAt, lead), time) : r.dueAt - lead * DAY
+      // Shifted BEFORE the map, so two heads-ups moved to the same morning become one notification, not two buzzes.
+      const heads = shiftOutOfQuiet(time ? atTime(daysBefore(r.dueAt, lead), time) : r.dueAt - lead * DAY, quiet ?? null, dueAt)
       if (heads > now && !times.has(heads)) times.set(heads, i)
     })
     if (times.size === 0) times.set(dueAt, 0)
