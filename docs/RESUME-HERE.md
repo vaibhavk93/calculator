@@ -196,3 +196,26 @@ Other Claude sessions may push to `origin/dev` too (a cloud session added docs o
 2. `git status` is clean (apart from the owner's `docs/design-reference` files) and `git ls-files node_modules` is 0.
 3. The build is installed on the phone and the owner's test sheet (given in chat) passes.
 4. `git push origin dev` succeeded and `git rev-list --left-right --count origin/dev...dev` is `0 0`.
+
+---
+
+## 10. Live log, 2026-11-11 afternoon (owner feedback after scanning REAL messages)
+
+**Installed on the phone:** commit `26a9f8a` (14:45). Pushed. QA copy ("Calc QA", `com.vaibhavkumawat.vkcalc.qa`) is a separate app: **clear its data from Android settings** (adb `pm clear` is refused on this phone). It once held real-looking data: always check it is empty before injecting fake messages, and never print its screen text.
+
+**Phone test (QA copy, fake messages, 2026-11-11 ~15:30), driven over Chrome DevTools (`adb forward tcp:9333 localabstract:webview_devtools_remote_<pid>` + Playwright `connectOverCDP`) and the debug receiver:**
+PASS: Budget row with capture off; explainer before any Android dialog; messages caught while the app was closed (5 to review); Inbox lists Swiggy and Amazon clubbed (x2) with a "guess" category and a "Not sure" section; OTP, promo and a personal chat never reach the Inbox.
+FAIL: a synthetic "sent via UPI from ICICI Bank A/c ... to RAHUL SHARMA rahul.s@okaxis" shows as "ICICI Bank payment" (payee name not extracted). Sent to the logic agent.
+Not tested: the denied-permission and restricted-settings paths (Android did not show a dialog).
+
+**Owner feedback (real scan), and the two agents working on it now:**
+| Feedback | Agent and task |
+|---|---|
+| Duplicates shown (probably one payment = two messages from different senders with different names) | **Logic agent**: collapse same payment across senders (`mergedFrom`), find every cause |
+| Many "SBI account not in your cards" prompts (likely FD/TD account numbers) | **Logic agent**: deposit accounts (FD/TD/RD) are never offered as bank accounts |
+| Wants to know if money is theirs moving (FD broken, sweep, own-account transfer) vs real spend/income | **Logic agent**: `nature: spend|moneyIn|ownMoney`, `ownKind`, `ownWhy`; never auto-added; default "Not a spend" |
+| Self transfer vs somebody else | **Logic agent**: counterparty self/person/merchant, learned per payee (`markPayeeSelf`), matches saved instruments |
+| Wants real examples to refine, without exposing data | **Logic agent**: masked samples + "Copy masked examples" button |
+| Skip/Ignore buttons not visually clear; clubbing "feels off" | **Screens agent**: real buttons, tidy action row, group layout; later wires `mergedFrom`, "Your own money" section, self/other choice |
+
+Files: logic agent owns `src/lib/smsParse*`, `inbox.ts`, `maskText.ts`, store; screens agent owns `ImportScreen.tsx`, `InboxScreen.tsx`, css. After both report: run `npm run check`, smsinbox and import e2e, layout-contract; message the screens agent to wire the new fields; reinstall; ask the owner to rescan and send the masked examples.
