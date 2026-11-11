@@ -141,6 +141,27 @@ await T('Due: "may not have shown" notice, and its Fix reminders link', async (p
   ok((await page.locator('.due__missed').count()) === 0, 'dismissed')
 }, { data: seed([base({ id: 'C1', title: 'Pay rent', kind: 'task', summary: 'x' })], [{ id: 'R1', cardId: 'C1', dueAt: Date.parse('2026-11-02T08:00:00+05:30'), repeat: 'none', anchorDay: 2, leadDays: 0, done: false, history: [] }]), now: NOW })
 
+await T('Due: "Skip this time" on a repeating reminder moves it once, Undo brings it back; a one-time reminder has no Skip', async (page) => {
+  await tab(page, 'Due')
+  await page.getByRole('button', { name: 'More for Pay rent' }).click()
+  await page.getByRole('button', { name: 'Skip this time' }).click()
+  const snack = await page.locator('.snack').innerText()
+  ok(snack.includes('Skipped "Pay rent" this time. Next: 5 Dec 2026'), `snack: ${snack}`)
+  await wait(600)
+  ok((await stored(page)).reminders.find((r) => r.id === 'R1').dueAt === Date.parse('2026-12-05T09:00:00+05:30'), `moved one month: ${new Date((await stored(page)).reminders.find((r) => r.id === 'R1').dueAt).toISOString()}`)
+  ok((await stored(page)).reminders.find((r) => r.id === 'R1').history.length === 0, 'no payment recorded')
+  await shot(page, '8-due-skipped')
+  await page.locator('.snack').getByRole('button', { name: /Undo/ }).click()
+  await wait(600)
+  ok((await stored(page)).reminders.find((r) => r.id === 'R1').dueAt === Date.parse('2026-11-05T09:00:00+05:30'), 'undo restored the date')
+  await page.getByRole('button', { name: 'More for Call dentist' }).click()
+  ok((await page.getByRole('button', { name: 'Skip this time' }).count()) === 0, 'no Skip on a one-time reminder')
+  await shot(page, '9-due-more-onetime')
+}, { data: seed([base({ id: 'C1', title: 'Pay rent', kind: 'task', summary: 'x' }), base({ id: 'C2', title: 'Call dentist', kind: 'task', summary: 'x' })], [
+  { id: 'R1', cardId: 'C1', dueAt: Date.parse('2026-11-05T09:00:00+05:30'), repeat: 'monthly', anchorDay: 5, leadDays: 0, done: false, history: [] },
+  { id: 'R2', cardId: 'C2', dueAt: Date.parse('2026-11-06T09:00:00+05:30'), repeat: 'none', anchorDay: 6, leadDays: 0, done: false, history: [] },
+]), now: NOW })
+
 await app.stop()
 console.log(failed ? `${failed} FAILED` : 'ALL PASSED', '— screenshots in', OUT)
 process.exit(failed ? 1 : 0)

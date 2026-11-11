@@ -77,7 +77,7 @@ import {
   type Tab,
   type BudgetData,
 } from './types'
-import { addDaysAt, advance, advanceTaxPack, atTime } from '../lib/reminders'
+import { addDaysAt, advance, advanceTaxPack, atTime, canSkip } from '../lib/reminders'
 import { billForCard, cardBillDue, cardBillFor, firstDue, liveBills, rollForward, validateBill } from '../lib/recurring'
 import { isTaskDone, nextOccurrence, parseDay, shortDate, taskSummary } from '../lib/tasks'
 import { lineState, listSummary, nextLineState, repeatLines, tapeTotal, withLineState } from '../lib/tape'
@@ -219,6 +219,13 @@ export interface AppState {
   approveSuggested: () => number
   /** Removes an item from the Inbox ("Not a spend" or "Reject"); the snackbar offers Undo. */
   rejectInbox: (id: string, notSpend?: boolean) => void
+  /**
+   * "Approve all" for one payee that has several payments waiting: each becomes its OWN entry under `categoryId` (never merged), and the payee
+   * is learned ONCE (one confirmation, not one per payment). One Undo. Returns how many were added.
+   */
+  approveGroup: (ids: string[], categoryId: string) => number
+  /** "Reject all" for one payee: every listed item leaves the Inbox. One Undo. Returns how many. */
+  rejectGroup: (ids: string[]) => number
   /** Undoes an auto-added entry: removes it, makes the payee start learning again, and puts the item back to pending. */
   undoAutoAdded: (itemId: string) => void
   /** Deletes everything waiting in the Inbox (not entries already added). Returns how many. */
@@ -319,6 +326,8 @@ export interface AppState {
   emptyTrash: () => void
   markPaid: (reminderId: string) => void
   snooze: (reminderId: string, days: number) => void
+  /** Skips the coming occurrence of a repeating reminder or bill once: no payment is recorded, the repeat carries on, Undo puts it back. False when it cannot be skipped. */
+  skipOccurrence: (reminderId: string) => boolean
   removeReminder: (reminderId: string) => void
   /**
    * To-do. Ticks a task done, or back to open. A repeating task moves to its next date instead of finishing.
@@ -931,6 +940,44 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
         return made.size
       },
 
+      approveGroup: (ids, categoryId) => {
+        const before = get().budget
+        if (!categoryUsable(before, categoryId)) return 0
+        const made = new Set<string>()
+        const keys = new Set<string>()
+        for (const id of ids) {
+          const item = (get().budget.inbox ?? []).find((i) => i.id === id && i.status === 'pending' && i.kind === 'spend')
+          if (!item || !get().approveInbox(id, { categoryId })) continue
+          made.add(get().budget.expenses[0]!.id)
+          const key = payeeKey(item.merchant)
+          if (key) keys.add(key)
+        }
+        if (made.size === 0) return 0
+        // approveInbox counted one confirmation per payment; a club is ONE decision, so the learning is put back and counted once per payee.
+        const at = deps.now()
+        let learned = before.learned
+        for (const key of keys) learned = recordConfirm(learned, key, categoryId, at)
+        set({ budget: resuggest({ ...get().budget, learned }) })
+        undoable(`${made.size} ${made.size === 1 ? 'payment' : 'payments'} added`, () => {
+          const b = get().budget
+          set({ budget: resuggest({ ...b, expenses: b.expenses.filter((e) => !made.has(e.id)), learned: before.learned, inbox: (b.inbox ?? []).map((i): InboxItem => { if (!i.entryId || !made.has(i.entryId)) return i; const { entryId: _e, resolvedAt: _r, ...rest } = i; return { ...rest, status: 'pending' } }) }) })
+        })
+        return made.size
+      },
+
+      rejectGroup: (ids) => {
+        const { budget } = get()
+        const mine = new Set((budget.inbox ?? []).filter((i) => ids.includes(i.id) && i.status === 'pending').map((i) => i.id))
+        if (mine.size === 0) return 0
+        const at = deps.now()
+        set({ budget: { ...budget, inbox: (budget.inbox ?? []).map((i) => (mine.has(i.id) ? { ...i, status: 'rejected' as const, resolvedAt: at } : i)) } })
+        undoable(`${mine.size} removed from review`, () => {
+          const b = get().budget
+          set({ budget: { ...b, inbox: (b.inbox ?? []).map((i): InboxItem => { if (!mine.has(i.id)) return i; const { resolvedAt: _r, ...rest } = i; return { ...rest, status: 'pending' } }) } })
+        })
+        return mine.size
+      },
+
       rejectInbox: (id, notSpend = false) => {
         const { budget } = get()
         const item = (budget.inbox ?? []).find((i) => i.id === id && i.status === 'pending')
@@ -1465,6 +1512,18 @@ export function createAppStore(initial: PersistedData, deps: StoreDeps = default
       // Calendar days, so a daylight-saving change cannot move the time of day (QA N-112).
       snooze: (reminderId, days) =>
         set({ reminders: get().reminders.map((r) => (r.id === reminderId ? { ...r, dueAt: addDaysAt(Math.max(r.dueAt, deps.now()), days, Math.max(r.dueAt, deps.now())) } : r)) }),
+
+      skipOccurrence: (reminderId) => {
+        const r = get().reminders.find((x) => x.id === reminderId)
+        if (!r || !canSkip(r)) return false
+        // The same "next date still ahead" rule a ticked repeating task uses. No history entry, no budget entry, and a bill keeps its payments left.
+        const next = nextOccurrence(r, deps.now())
+        if (next === null) return false
+        set({ reminders: get().reminders.map((x) => (x.id === reminderId ? { ...x, dueAt: next } : x)) })
+        const title = get().cards.find((c) => c.id === r.cardId)?.title
+        undoable(`Skipped${title ? ` "${title}"` : ''} this time. Next: ${shortDate(next)}`, () => set({ reminders: get().reminders.map((x) => (x.id === reminderId ? r : x)) }))
+        return true
+      },
 
       removeReminder: (reminderId) => {
         const r = get().reminders.find((x) => x.id === reminderId)

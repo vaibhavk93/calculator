@@ -12,7 +12,7 @@ import { useApp } from '../../components/StoreProvider'
 import { formatCell } from '../../lib/toolFormat'
 import { D } from '../../engine'
 import { billForCard } from '../../lib/recurring'
-import { advanceTaxPack, afterDaysLabel, dueLabel, dueSoonTotal, groupReminders } from '../../lib/reminders'
+import { advanceTaxPack, afterDaysLabel, canSkip, dueLabel, dueSoonTotal, groupReminders } from '../../lib/reminders'
 import type { Reminder } from '../../store/types'
 import { CardView } from './CardView'
 import { Segmented } from '../settings/controls'
@@ -35,6 +35,7 @@ export function DueScreen() {
   const updateSettings = useApp((s) => s.updateSettings)
   const markPaid = useApp((s) => s.markPaid)
   const snooze = useApp((s) => s.snooze)
+  const skip = useApp((s) => s.skipOccurrence)
   const remove = useApp((s) => s.removeReminder)
   const setTab = useApp((s) => s.setTab)
   const addPack = useApp((s) => s.addAdvanceTaxPack)
@@ -258,6 +259,12 @@ export function DueScreen() {
                 <span className="navrow__label">{label}</span>
               </button>
             ))}
+            {/* A repeating reminder or bill only: this one is skipped, the repeat carries on, and the snackbar offers Undo. */}
+            {moreR && canSkip(moreR) && (
+              <button type="button" className="navrow tap-row" onClick={() => { skip(more.id); setMoreId(null) }}>
+                <span className="navrow__label">Skip this time</span>
+              </button>
+            )}
             <button type="button" className="navrow tap-row due__remove" onClick={() => { setAskId(more.id); setMoreId(null) }}>
               <span className="navrow__label">Remove reminder</span>
             </button>

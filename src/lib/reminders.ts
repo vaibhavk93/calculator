@@ -31,6 +31,9 @@ export function advance(r: Pick<Reminder, 'dueAt' | 'repeat' | 'anchorDay'> & { 
   return step === 0 ? null : addMonths(r.dueAt, step, r.anchorDay)
 }
 
+/** Only a repeating reminder (or bill) can have one occurrence skipped: skipping a one-time reminder would just lose it. */
+export const canSkip = (r: Pick<Reminder, 'repeat' | 'done'> & { afterDays?: number }) => !r.done && (r.repeat !== 'none' || !!r.afterDays)
+
 /** Heads-up times for a reminder, in days before, biggest first. An old reminder (one number) has one. */
 export function leadsOf(r: Pick<Reminder, 'leadDays' | 'leads'>): number[] {
   const list = r.leads && r.leads.length > 0 ? r.leads : [r.leadDays]
