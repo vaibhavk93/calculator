@@ -151,7 +151,7 @@ perpetual schedules, which this app never creates. **No native fix is needed, an
 | `layout-contract` | 216/216 |
 | `smsinbox`, `dayview`, `portfolio`, `rules`, `import` e2e | Green |
 | `budget.test`, `qa-budget-new` | Pre-existing failures: ST12, B-02 x2 (summary and export sheet at 200% font), B-22, B-23, B-104, B-105, B-107, B-117, B-401. They fail the same way on commit `3fed36e` |
-| `shell.test.mjs`, others | Many failures already present on the earlier code. See `docs/E2E-STATUS-2026-11-11.md` once the tests agent writes it |
+| Everything else | **See `docs/E2E-STATUS-2026-11-11.md`** (written 2026-11-12): all 24 suites classified against baseline `15a53bc`, zero new failures, plus the ranked improvement plan. The table above is superseded by it |
 
 ---
 

@@ -1,5 +1,29 @@
 # Session state: resume here
 
+## Round 29 (2026-11-11/12): the full test pass ran; zero new failures; improvement plan written
+
+**Owner's prompts:** "continue the ongoing test from other account", then "create a improvement plan".
+
+The other account had not started the pass (no E2E-STATUS file, no commits), so it ran here, following
+`docs/prompts/FABLE-TEST-EVERYTHING.md`. **Everything is in `docs/E2E-STATUS-2026-11-11.md`** — the
+classified failure list (the long-outstanding to-do) plus the ranked improvement plan.
+
+| Layer | Result |
+|---|---|
+| Harness canary | Both red correctly: a broken EMI divisor failed 4 unit tests naming lender-table values; a broken screen string failed smsinbox IN21 quoting it |
+| Unit + build | 3,828 passed / 144 files; arch gate 365; build clean |
+| Browser, all 24 live suites | 16 fully green. 8 with failures — **every one pre-existing** (identical failure IDs at baseline `15a53bc`; the 3 ambiguous calculator cases re-run twice each side: CALC-196 pre-existing, CALC-189/219 flaky) |
+| Phone | Not run (needs the owner; `FABLE-TEST-ON-PHONE.md`) |
+
+**The real finding is in the knowns, not the news.** Two half-red suites (`qa-tools` 82/163, `qa-cross`
+25/44) can no longer catch a regression, and three "known" budget failures are live money bugs: negative
+amounts may save as positive (B-23 trio) and deleting a bill payment does not restore the card's Owes (ST12).
+Those lead the plan (P1), ahead of data loss (trash purge does not purge, N20-22), suite triage (P3),
+coverage holes (P4), and the phone layer (P5).
+
+**N43 passed this run** — it was on the known-failure list; the list in RESUME-HERE section 6 is now
+superseded by E2E-STATUS.
+
 ## Round 28 (2026-11-11): the "2 am boot buzz" was not real; nothing was built
 
 **Owner's prompt:** "fix the boot receiver buzzing at 2am".
